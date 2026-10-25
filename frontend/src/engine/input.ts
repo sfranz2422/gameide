@@ -1,0 +1,179 @@
+import { G, KEY_COUNT, KEY_NAMES, type KeyName } from "./layout";
+
+/** KeyboardEvent.code → our key name. Physical keys, so WASD works on AZERTY. */
+const CODE_TO_KEY: Record<string, KeyName> = {
+  ArrowLeft: "left",
+  ArrowRight: "right",
+  ArrowUp: "up",
+  ArrowDown: "down",
+  Space: "space",
+  Enter: "enter",
+  NumpadEnter: "enter",
+  ShiftLeft: "shift",
+  ShiftRight: "shift",
+  ControlLeft: "control",
+  ControlRight: "control",
+  AltLeft: "alt",
+  AltRight: "alt",
+  Escape: "escape",
+  Tab: "tab",
+  Backspace: "backspace",
+};
+for (const c of "ABCDEFGHIJKLMNOPQRSTUVWXYZ") CODE_TO_KEY[`Key${c}`] = c.toLowerCase() as KeyName;
+for (const d of "0123456789") {
+  CODE_TO_KEY[`Digit${d}`] = d as KeyName;
+  CODE_TO_KEY[`Numpad${d}`] = d as KeyName;
+}
+for (let i = 1; i <= 12; i++) CODE_TO_KEY[`F${i}`] = `f${i}` as KeyName;
+
+export const KEY_CODE = new Map<string, number>(KEY_NAMES.map((k, i) => [k, i]));
+
+/**
+ * Collects input between steps and hands each step a consistent picture.
+ *
+ * "Pressed" and "released" are latched until the next step reads them: a
+ * key tapped and let go between two steps (easy at 30 fps on a slow
+ * Chromebook) still shows up as pressed for one step, rather than being
+ * missed entirely. "Held" is what is down at the moment the step starts.
+ */
+export class InputState {
+  private held = new Uint8Array(KEY_COUNT);
+  private pressed = new Uint8Array(KEY_COUNT);
+  private released = new Uint8Array(KEY_COUNT);
+  private mouseHeld = [0, 0, 0];
+  private mousePressed = [0, 0, 0];
+  private mouseReleased = [0, 0, 0];
+  mouseX = 0;
+  mouseY = 0;
+  /** Presses and releases this step, for the engine's instance mouse events. */
+  readonly mouseEdges: { button: number; released: boolean }[] = [];
+  private pendingEdges: { button: number; released: boolean }[] = [];
+
+  keyDown(code: number) {
+    if (!this.held[code]) this.pressed[code] = 1;
+    this.held[code] = 1;
+  }
+
+  keyUp(code: number) {
+    if (this.held[code]) this.released[code] = 1;
+    this.held[code] = 0;
+  }
+
+  /** Lets go of everything — the window lost focus and the keyups will never come. */
+  releaseAll() {
+    for (let i = 0; i < KEY_COUNT; i++) if (this.held[i]) this.keyUp(i);
+    for (let b = 0; b < 3; b++) if (this.mouseHeld[b]) this.mouseUp(b);
+  }
+
+  mouseDown(button: number) {
+    if (button > 2) return;
+    if (!this.mouseHeld[button]) {
+      this.mousePressed[button] = 1;
+      this.pendingEdges.push({ button, released: false });
+    }
+    this.mouseHeld[button] = 1;
+  }
+
+  mouseUp(button: number) {
+    if (button > 2) return;
+    if (this.mouseHeld[button]) {
+      this.mouseReleased[button] = 1;
+      this.pendingEdges.push({ button, released: true });
+    }
+    this.mouseHeld[button] = 0;
+  }
+
+  /** Writes this step's input into the shared arrays and starts the next. */
+  commit(keys: Uint8Array, g: Float64Array) {
+    let any = 0, anyPressed = 0, anyReleased = 0;
+    for (let i = 1; i < KEY_COUNT; i++) {
+      keys[i] = this.held[i]!;
+      keys[KEY_COUNT + i] = this.pressed[i]!;
+      keys[2 * KEY_COUNT + i] = this.released[i]!;
+      any |= this.held[i]!;
+      anyPressed |= this.pressed[i]!;
+      anyReleased |= this.released[i]!;
+    }
+    keys[0] = any;
+    keys[KEY_COUNT] = anyPressed;
+    keys[2 * KEY_COUNT] = anyReleased;
+    this.pressed.fill(0);
+    this.released.fill(0);
+
+    g[G.MOUSE_X] = this.mouseX;
+    g[G.MOUSE_Y] = this.mouseY;
+    for (let b = 0; b < 3; b++) {
+      g[G.MOUSE_DOWN + b] = this.mouseHeld[b]!;
+      g[G.MOUSE_PRESSED + b] = this.mousePressed[b]!;
+      g[G.MOUSE_RELEASED + b] = this.mouseReleased[b]!;
+      this.mousePressed[b] = 0;
+      this.mouseReleased[b] = 0;
+    }
+    this.mouseEdges.length = 0;
+    this.mouseEdges.push(...this.pendingEdges);
+    this.pendingEdges.length = 0;
+  }
+}
+
+/**
+ * Wires an InputState to the page. Keys are listened for on the window, but
+ * only acted on while `active()` says the game has focus — otherwise typing
+ * in the code editor would move the player. Arrow keys and space are kept
+ * from scrolling the page while the game is playing.
+ *
+ * `toRoom` turns a pointer event into room coordinates (the canvas may be
+ * scaled to fit its pane).
+ */
+export function attachInput(
+  input: InputState,
+  canvas: HTMLElement,
+  active: () => boolean,
+  toRoom: (e: PointerEvent) => { x: number; y: number },
+): () => void {
+  const SCROLLERS = new Set(["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Space", "Tab"]);
+  const down = (e: KeyboardEvent) => {
+    if (!active()) return;
+    const k = CODE_TO_KEY[e.code];
+    if (k === undefined) return;
+    if (SCROLLERS.has(e.code)) e.preventDefault();
+    input.keyDown(KEY_CODE.get(k)!);
+  };
+  const up = (e: KeyboardEvent) => {
+    const k = CODE_TO_KEY[e.code];
+    // Released keys are always honoured, even without focus, or a key held
+    // while clicking away would stay "held" forever.
+    if (k !== undefined) input.keyUp(KEY_CODE.get(k)!);
+  };
+  const move = (e: PointerEvent) => {
+    const p = toRoom(e);
+    input.mouseX = p.x;
+    input.mouseY = p.y;
+  };
+  const press = (e: PointerEvent) => {
+    move(e);
+    input.mouseDown(e.button === 2 ? 1 : e.button === 1 ? 2 : 0);
+  };
+  const release = (e: PointerEvent) => {
+    move(e);
+    input.mouseUp(e.button === 2 ? 1 : e.button === 1 ? 2 : 0);
+  };
+  const blur = () => input.releaseAll();
+  const menu = (e: Event) => e.preventDefault(); // right-click is a game button
+
+  window.addEventListener("keydown", down);
+  window.addEventListener("keyup", up);
+  window.addEventListener("blur", blur);
+  canvas.addEventListener("pointermove", move);
+  canvas.addEventListener("pointerdown", press);
+  window.addEventListener("pointerup", release);
+  canvas.addEventListener("contextmenu", menu);
+  return () => {
+    window.removeEventListener("keydown", down);
+    window.removeEventListener("keyup", up);
+    window.removeEventListener("blur", blur);
+    canvas.removeEventListener("pointermove", move);
+    canvas.removeEventListener("pointerdown", press);
+    window.removeEventListener("pointerup", release);
+    canvas.removeEventListener("contextmenu", menu);
+  };
+}
