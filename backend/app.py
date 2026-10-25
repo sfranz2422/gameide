@@ -1,0 +1,675 @@
+"""
+GameIDE's server: signing in, and keeping projects, their pictures and
+their history. It never runs a game — games run in the browser — and it
+serves the built editor (frontend/dist) with the headers the editor needs.
+
+It shares PyIDE's database, Google client and accounts.py, so a student is
+the same `users` row in all four apps. Sign-in follows PyIDE's exactly —
+Google only, `TEACHER_EMAILS` deciding who teaches, `ALLOWED_EMAIL_DOMAINS`
+deciding who may sign in — and, as there, signing in only ever adds
+abilities: with no Google settings the editor works fully, keeping projects
+in the browser.
+"""
+import base64
+import json
+import os
+import secrets
+import time
+from datetime import timedelta
+from pathlib import Path
+
+from flask import Flask, Response, abort, jsonify, make_response, redirect, request, send_from_directory, session, url_for
+from sqlalchemy import create_engine, func
+from sqlalchemy.orm import sessionmaker
+from werkzeug.exceptions import BadRequest
+
+import accounts
+import gamestore
+from gamestore import GameAsset, GameProject, GameVersion
+
+APP_NAME = "gameide"
+HERE = Path(__file__).resolve().parent
+DIST = Path(os.environ.get("GAMEIDE_DIST") or HERE.parent / "frontend" / "dist")
+
+# ---------------------------------------------------------------- database
+
+
+def _database_url() -> str:
+    """Render supplies DATABASE_URL; locally, a SQLite file beside this one."""
+    # GAMEIDE_TEST_DATABASE_URL: the tests' throwaway database. Not
+    # DATABASE_URL, which also means "this is the real server" below.
+    url = os.environ.get("DATABASE_URL", "") or os.environ.get("GAMEIDE_TEST_DATABASE_URL", "")
+    if not url:
+        return "sqlite:///" + str(HERE / "gameide.db")
+    if url.startswith("postgres://"):  # SQLAlchemy 2 wants postgresql://
+        url = url.replace("postgres://", "postgresql://", 1)
+    return url
+
+
+# A fourth app on the same Postgres: keep its share of connections small.
+# Two gunicorn workers × (3 + 2) is ten at the very most.
+_url = _database_url()
+engine = create_engine(
+    _url,
+    pool_pre_ping=True,
+    **({} if _url.startswith("sqlite") else {"pool_size": 3, "max_overflow": 2}),
+)
+SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)
+gamestore.create_all(engine)
+
+# ---------------------------------------------------------------- the app
+
+
+class PackedRequest(Flask.request_class):
+    """Read a JSON body sent as {"_packed": base64(json)}.
+
+    Render's firewall refuses request bodies that look like attacks, and a
+    project is full of code: FlaskIDE's notes full of Flask routes were
+    turned away before reaching the app — nothing in its logs — and the
+    editor said only that it couldn't reach the server. GameIDE's client
+    (frontend/src/store/api.ts) packs every JSON body from the start, so the
+    firewall sees base64. A plain body is still read, for tests and curl.
+    """
+
+    def get_json(self, force=False, silent=False, cache=True):
+        data = super().get_json(force=force, silent=silent, cache=cache)
+        if isinstance(data, dict) and set(data) == {"_packed"}:
+            try:
+                data = json.loads(base64.b64decode(data["_packed"], validate=True).decode("utf-8"))
+            except (ValueError, TypeError):
+                if not silent:
+                    raise BadRequest("That request could not be read.")
+                data = None
+        return data
+
+
+app = Flask(__name__, static_folder=None)
+app.request_class = PackedRequest
+# Signed session cookies. Generated if unset so the app still boots locally,
+# but then every restart signs everyone out — set it on the server.
+app.secret_key = os.environ.get("SECRET_KEY") or secrets.token_hex(32)
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    # Lax, not Strict: the sign-in redirect arrives from Google and must
+    # carry the cookie, or sign-in silently fails.
+    SESSION_COOKIE_SAMESITE="Lax",
+    SESSION_COOKIE_SECURE=bool(os.environ.get("DATABASE_URL")),
+    MAX_CONTENT_LENGTH=gamestore.MAX_PROJECT_BYTES * 2,
+)
+
+
+def _scheme():
+    """Render ends TLS in front of us, so url_for sees plain http."""
+    return "https" if os.environ.get("DATABASE_URL") else "http"
+
+
+def _db():
+    return SessionLocal()
+
+
+def current_user(db):
+    uid = session.get("uid")
+    return db.query(accounts.User).filter_by(id=uid).first() if uid else None
+
+
+def err(message, status):
+    """Every API error is a sentence the editor can show as it is."""
+    return jsonify(error=message), status
+
+
+def fail(message, status):
+    """err(), from inside a helper: stops the request there."""
+    abort(make_response(jsonify(error=message), status))
+
+
+# ---------------------------------------------------------------- headers
+
+# Cross-origin isolation: without both headers the browser gives the page no
+# SharedArrayBuffer, and the editor can no longer stop a student's endless
+# loop at its line — it falls back to restarting Python, with no line to
+# show. Nothing fails loudly when these go missing, so they go on every
+# response. "credentialless" rather than "require-corp", so pictures from
+# elsewhere (Google profile photos) still load.
+ISOLATION = {
+    "Cross-Origin-Opener-Policy": "same-origin",
+    "Cross-Origin-Embedder-Policy": "credentialless",
+}
+
+
+@app.after_request
+def _headers(response):
+    for k, v in ISOLATION.items():
+        response.headers.setdefault(k, v)
+    # A signed-in page is never kept in the browser's cache: Chrome reopening
+    # yesterday's tabs would show them without asking whether this student is
+    # still signed in.
+    if session.get("uid") and response.mimetype == "text/html":
+        response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+# ---------------------------------------------------------------- signing in
+# As in PyIDE. Entirely optional: with no Google credentials `oauth` stays
+# None, /api/me says sign-in is off, and the editor keeps projects in the
+# browser.
+
+
+def _announce_login_settings():
+    if not accounts.login_configured():
+        print("[gameide] Google sign-in: OFF (set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to enable)")
+        return
+    domains = accounts.allowed_domains()
+    print("[gameide] Google sign-in: ON — %s" % (
+        ("only " + ", ".join("@" + d for d in domains)) if domains
+        else "any Google account (ALLOWED_EMAIL_DOMAINS is empty)"))
+
+
+_announce_login_settings()
+
+oauth = None
+if accounts.login_configured():
+    from authlib.integrations.flask_client import OAuth
+
+    oauth = OAuth(app)
+    oauth.register(
+        name="google",
+        client_id=os.environ["GOOGLE_CLIENT_ID"],
+        client_secret=os.environ["GOOGLE_CLIENT_SECRET"],
+        server_metadata_url="https://accounts.google.com/.well-known/openid-configuration",
+        client_kwargs={"scope": "openid email profile"},
+    )
+
+_redirect_logged = [False]
+
+
+def _problem(reason, status):
+    """A plain page for a sign-in that went wrong: a sentence and a way back."""
+    body = (
+        "<!doctype html><meta charset=utf-8><title>Sign-in problem</title>"
+        "<body style='font:16px system-ui;padding:40px;max-width:560px'>"
+        f"<h2>That didn't work</h2><p>{reason}</p><p><a href='/'>Back to GameIDE</a></p>"
+    )
+    return Response(body, status=status, mimetype="text/html")
+
+
+def _safe_next(nxt: str) -> str:
+    """Only somewhere on this site — never an address that leads off it."""
+    return nxt if nxt.startswith("/") and not nxt.startswith("//") else ""
+
+
+@app.get("/login")
+def login():
+    if not oauth:
+        abort(404)
+    session["after_login"] = _safe_next(request.args.get("next", ""))
+    target = url_for("auth_callback", _external=True, _scheme=_scheme())
+    # Google's redirect_uri_mismatch page never says which address it
+    # objected to; this is the one to paste into the Cloud Console.
+    if not _redirect_logged[0]:
+        _redirect_logged[0] = True
+        print(f"[{APP_NAME}] redirect URI sent to Google: {target}", flush=True)
+    try:
+        # select_account: always offer the account chooser, or a teacher's
+        # laptop signs in as whichever personal Gmail is the default.
+        return oauth.google.authorize_redirect(target, prompt="select_account")
+    except Exception:
+        return _problem("Couldn't reach Google just now. Try again in a moment.", 503)
+
+
+def _sign_in(db, sub, email, info):
+    """The users row for this Google account, made or updated, and the session."""
+    user = db.query(accounts.User).filter_by(google_sub=sub).first()
+    if user is None:
+        user = accounts.User(google_sub=sub, email=email, name=info.get("name") or "")
+        db.add(user)
+    else:
+        user.email = email  # a school can rename a mailbox
+        user.name = info.get("name") or user.name
+        user.last_seen = accounts.now()
+    user.first_name = (info.get("given_name") or user.first_name or "")[:80]
+    user.last_name = (info.get("family_name") or user.last_name or "")[:80]
+    db.commit()
+    session.clear()
+    session["uid"] = user.id
+    session["teacher"] = accounts.is_teacher(user.email)
+    session["act"] = int(time.time())
+    return user
+
+
+@app.get("/auth/callback")
+def auth_callback():
+    if not oauth:
+        abort(404)
+    try:
+        token = oauth.google.authorize_access_token()
+    except Exception:
+        return _problem("That sign-in didn't complete.", 400)
+    info = token.get("userinfo") or {}
+    sub = info.get("sub")
+    email = (info.get("email") or "").strip()
+    # Checked here, from the verified token — never from the browser.
+    if not sub or not email or not info.get("email_verified"):
+        return _problem("Google didn't confirm that address.", 400)
+    if not accounts.email_allowed(email):
+        wanted = " or ".join("@" + d for d in accounts.allowed_domains())
+        return _problem(f"You signed in as {email}, but this site only accepts {wanted} addresses.", 403)
+    nxt = session.get("after_login", "")
+    db = _db()
+    try:
+        _sign_in(db, sub, email, info)
+    finally:
+        db.close()
+    return redirect(nxt or "/")
+
+
+@app.get("/logout")
+def logout():
+    session.clear()
+    return redirect(_safe_next(request.args.get("next", "")) or "/")
+
+
+# For trying the signed-in editor, and for its tests, without Google: only
+# when GAMEIDE_DEV_LOGIN=1 and never with a DATABASE_URL (which only the
+# real server has). Both, so a stray variable on Render can't open it.
+DEV_LOGIN = os.environ.get("GAMEIDE_DEV_LOGIN") == "1" and not os.environ.get("DATABASE_URL")
+
+
+@app.get("/dev/login")
+def dev_login():
+    if not DEV_LOGIN:
+        abort(404)
+    email = request.args.get("email", "student@example.com")
+    db = _db()
+    try:
+        _sign_in(db, "dev-" + email, email, {"name": email.split("@")[0].title()})
+    finally:
+        db.close()
+    return redirect(_safe_next(request.args.get("next", "")) or "/")
+
+
+# ---------------------------------------------------------------- idle students
+# As in PyIDE: a student is signed out after two idle hours, because school
+# laptops are shared and Chrome reopens yesterday's tabs. Teachers never are.
+# Polls (any GET to /api/) are not activity, or an open tab would keep
+# itself signed in forever; a save or the page's beat (POSTs) is.
+
+STUDENT_IDLE_SECONDS = 2 * 60 * 60
+
+
+def _counts_as_activity() -> bool:
+    return not (request.method == "GET" and request.path.startswith("/api/"))
+
+
+@app.before_request
+def _sign_out_idle_student():
+    uid = session.get("uid")
+    if not uid or session.get("teacher"):
+        return
+    t = int(time.time())
+    last = session.get("act")
+    if last is not None and t - last > STUDENT_IDLE_SECONDS:
+        session.clear()
+        # Opening the page: sign in again and come back, rather than be shown
+        # it signed out and carry on saving into the browser without noticing.
+        if (request.method == "GET" and not request.path.startswith("/api/")
+                and request.headers.get("Sec-Fetch-Dest", "document") == "document"
+                and "text/html" in request.headers.get("Accept", "") and oauth):
+            return redirect(url_for("login", next=request.full_path.rstrip("?")))
+        return
+    if last is None or (_counts_as_activity() and t - last >= 60):
+        session["act"] = t
+
+
+@app.get("/api/alive")
+def alive_check():
+    """Still signed in? A GET, so asking is not activity."""
+    return jsonify(signed_in=bool(session.get("uid")))
+
+
+@app.post("/api/alive")
+def alive():
+    """The page's "still here" while a student works. Being a POST, it has
+    already moved the idle clock by the time it gets here."""
+    return jsonify(signed_in=bool(session.get("uid")))
+
+
+@app.get("/api/me")
+def me():
+    db = _db()
+    try:
+        user = current_user(db)
+        return jsonify(
+            login_enabled=bool(oauth) or DEV_LOGIN,
+            dev_login=DEV_LOGIN,
+            user=None if not user else {
+                "id": user.id,
+                "name": user.display_name(),
+                "email": user.email,
+                "teacher": accounts.is_teacher(user.email),
+            },
+            idle_seconds=0 if (not user or accounts.is_teacher(user.email)) else STUDENT_IDLE_SECONDS,
+        )
+    finally:
+        db.close()
+
+
+# ---------------------------------------------------------------- projects
+
+
+def _need_user(db):
+    user = current_user(db)
+    if user is None:
+        fail("You're signed out. Sign in again to save to your account.", 401)
+    return user
+
+
+def _own_project(db, user, slug, include_deleted=False):
+    p = db.query(GameProject).filter_by(slug=slug).first()
+    if p is None or (p.deleted_at is not None and not include_deleted):
+        fail("There is no project here.", 404)
+    if p.owner_id != user.id:
+        # Teachers looking at students' work arrive with classrooms (Phase 10).
+        fail("That project belongs to someone else.", 403)
+    return p
+
+
+def _mb(n):
+    return f"{n / 1_000_000:.1f} MB"
+
+
+def _user_bytes(db, user_id) -> int:
+    projects = db.query(func.coalesce(func.sum(GameProject.size), 0)).filter(
+        GameProject.owner_id == user_id, GameProject.deleted_at.is_(None)).scalar()
+    assets = (db.query(func.coalesce(func.sum(GameAsset.size), 0))
+              .join(GameProject, GameAsset.project_id == GameProject.id)
+              .filter(GameProject.owner_id == user_id, GameProject.deleted_at.is_(None)).scalar())
+    return int(projects) + int(assets)
+
+
+def _snapshot(db, p, kind, label=""):
+    db.add(GameVersion(project_id=p.id, version=p.version, kind=kind, label=label[:200], data=p.data, size=p.size))
+
+
+def _prune(db, p):
+    """Keep the newest automatic snapshots (and hand-made ones) up to their limits."""
+    for kind, keep in (("auto", gamestore.KEEP_AUTO_SNAPSHOTS), ("manual", gamestore.KEEP_MANUAL_SNAPSHOTS)):
+        old = (db.query(GameVersion.id).filter_by(project_id=p.id, kind=kind)
+               .order_by(GameVersion.created_at.desc(), GameVersion.id.desc()).offset(keep).all())
+        if old:
+            db.query(GameVersion).filter(GameVersion.id.in_([o.id for o in old])).delete(synchronize_session=False)
+
+
+def _summary(p):
+    return {"id": p.slug, "name": p.name, "modified": p.updated_at.isoformat() + "Z" if p.updated_at.tzinfo is None
+            else p.updated_at.isoformat(), "version": p.version, "size": p.size}
+
+
+@app.get("/api/projects")
+def list_projects():
+    db = _db()
+    try:
+        user = _need_user(db)
+        rows = (db.query(GameProject).filter_by(owner_id=user.id).filter(GameProject.deleted_at.is_(None))
+                .order_by(GameProject.updated_at.desc()).all())
+        return jsonify(projects=[_summary(p) for p in rows], used=_user_bytes(db, user.id),
+                       limit=gamestore.MAX_USER_BYTES)
+    finally:
+        db.close()
+
+
+@app.get("/api/projects/<slug>")
+def get_project(slug):
+    db = _db()
+    try:
+        user = _need_user(db)
+        p = _own_project(db, user, slug)
+        return jsonify(data=json.loads(p.data), version=p.version)
+    finally:
+        db.close()
+
+
+@app.put("/api/projects/<slug>")
+def save_project(slug):
+    """Save the whole project. Body: {data: <project>, base: <version it was
+    loaded at, or 0 for new>}. Answers {version, replaced}."""
+    db = _db()
+    try:
+        user = _need_user(db)
+        body = request.get_json(silent=True) or {}
+        data = body.get("data")
+        base = body.get("base")
+        if not isinstance(data, dict) or data.get("format") != "gameide-project" or data.get("id") != slug:
+            return err("That isn't a GameIDE project.", 400)
+        text = json.dumps(data, separators=(",", ":"))
+        size = len(text.encode("utf-8"))
+        if size > gamestore.MAX_PROJECT_BYTES:
+            return err(f"This project is too big to save ({_mb(size)}; the limit is "
+                       f"{_mb(gamestore.MAX_PROJECT_BYTES)}). Big room layouts are the usual cause.", 413)
+        name = str(data.get("name") or "Untitled")[:200]
+        p = db.query(GameProject).filter_by(slug=slug).first()
+        replaced = False
+        if p is None:
+            count = db.query(func.count(GameProject.id)).filter_by(owner_id=user.id).filter(
+                GameProject.deleted_at.is_(None)).scalar()
+            if count >= gamestore.MAX_PROJECTS_PER_USER:
+                return err(f"You have {count} games, which is the most one account can keep. "
+                           "Delete some you don't need.", 413)
+            p = GameProject(slug=slug, owner_id=user.id, name=name, data=text, size=size, version=1,
+                            schema_version=int(data.get("schemaVersion") or 1))
+            db.add(p)
+            db.flush()
+        else:
+            if p.owner_id != user.id:
+                # The id is someone else's: the browser makes a new one and tries again.
+                return err("That project id is taken.", 409)
+            if p.deleted_at is not None:
+                p.deleted_at = None  # saving a deleted project from an open tab brings it back
+            if _user_bytes(db, user.id) - p.size + size > gamestore.MAX_USER_BYTES:
+                return err(f"Your account is full ({_mb(gamestore.MAX_USER_BYTES)}). "
+                           "Delete games you don't need, then save again.", 413)
+            if base != p.version:
+                # Another tab or computer saved since this one loaded. Keep
+                # what it saved before replacing it: nothing is lost, and
+                # History shows where it went.
+                _snapshot(db, p, "replaced", "Replaced by a save from another tab or computer")
+                replaced = True
+            elif text != p.data:
+                last_auto = (db.query(func.max(GameVersion.created_at))
+                             .filter_by(project_id=p.id).filter(GameVersion.kind.in_(["auto", "manual"])).scalar())
+                stamp = accounts.now()
+                if last_auto is None or (stamp.replace(tzinfo=None) - (last_auto.replace(tzinfo=None))) > timedelta(
+                        seconds=gamestore.AUTO_SNAPSHOT_SECONDS):
+                    _snapshot(db, p, "auto")
+            if text != p.data or replaced:
+                p.data = text
+                p.size = size
+                p.name = name
+                p.schema_version = int(data.get("schemaVersion") or 1)
+                p.version += 1
+                p.updated_at = accounts.now()
+        _prune(db, p)
+        db.commit()
+        return jsonify(version=p.version, replaced=replaced)
+    finally:
+        db.close()
+
+
+@app.delete("/api/projects/<slug>")
+def delete_project(slug):
+    db = _db()
+    try:
+        user = _need_user(db)
+        p = _own_project(db, user, slug)
+        p.deleted_at = accounts.now()
+        db.commit()
+        return jsonify(ok=True)
+    finally:
+        db.close()
+
+
+# ---------------------------------------------------------------- assets
+
+
+@app.put("/api/projects/<slug>/assets/<asset_id>")
+def put_asset(slug, asset_id):
+    """The raw bytes of one picture. An asset never changes, so sending the
+    same id again (a retry after a dropped connection) is accepted, not an
+    error — but it can't replace different bytes already stored."""
+    db = _db()
+    try:
+        user = _need_user(db)
+        p = _own_project(db, user, slug)
+        if not (1 <= len(asset_id) <= 32 and asset_id.isalnum()):
+            return err("That isn't a picture id.", 400)
+        data = request.get_data(cache=False)
+        if len(data) > gamestore.MAX_ASSET_BYTES:
+            return err(f"That picture is too big ({_mb(len(data))}; the limit is "
+                       f"{_mb(gamestore.MAX_ASSET_BYTES)}).", 413)
+        kind = gamestore.sniff_image(data)
+        if kind is None:
+            return err("That file isn't a PNG, JPEG, GIF or WebP picture.", 415)
+        existing = db.query(GameAsset).filter_by(project_id=p.id, asset_id=asset_id).first()
+        if existing:
+            return jsonify(ok=True) if existing.data == data else err("That picture id is already used.", 409)
+        used = db.query(func.coalesce(func.sum(GameAsset.size), 0)).filter_by(project_id=p.id).scalar()
+        if used + len(data) > gamestore.MAX_PROJECT_ASSET_BYTES:
+            return err(f"This game's pictures add up to more than {_mb(gamestore.MAX_PROJECT_ASSET_BYTES)}.", 413)
+        if _user_bytes(db, user.id) + len(data) > gamestore.MAX_USER_BYTES:
+            return err(f"Your account is full ({_mb(gamestore.MAX_USER_BYTES)}).", 413)
+        db.add(GameAsset(project_id=p.id, asset_id=asset_id, content_type=kind, data=data, size=len(data)))
+        db.commit()
+        return jsonify(ok=True), 201
+    finally:
+        db.close()
+
+
+@app.get("/api/projects/<slug>/assets/<asset_id>")
+def get_asset(slug, asset_id):
+    db = _db()
+    try:
+        user = _need_user(db)
+        p = _own_project(db, user, slug)
+        a = db.query(GameAsset).filter_by(project_id=p.id, asset_id=asset_id).first()
+        if a is None:
+            return err("That picture isn't here.", 404)
+        r = Response(a.data, mimetype=a.content_type)
+        # Private: it is the student's. Immutable: an asset id never changes.
+        r.headers["Cache-Control"] = "private, max-age=31536000, immutable"
+        return r
+    finally:
+        db.close()
+
+
+# ---------------------------------------------------------------- history
+
+
+def _version_row(v):
+    return {"id": v.id, "version": v.version, "kind": v.kind, "label": v.label, "size": v.size,
+            "created": v.created_at.isoformat() + ("Z" if v.created_at.tzinfo is None else "")}
+
+
+@app.get("/api/projects/<slug>/versions")
+def list_versions(slug):
+    db = _db()
+    try:
+        user = _need_user(db)
+        p = _own_project(db, user, slug)
+        rows = (db.query(GameVersion).filter_by(project_id=p.id)
+                .order_by(GameVersion.created_at.desc(), GameVersion.id.desc()).all())
+        return jsonify(versions=[_version_row(v) for v in rows])
+    finally:
+        db.close()
+
+
+@app.post("/api/projects/<slug>/versions")
+def make_version(slug):
+    """Save a version: a snapshot of the project as it is now, kept for good."""
+    db = _db()
+    try:
+        user = _need_user(db)
+        p = _own_project(db, user, slug)
+        label = str((request.get_json(silent=True) or {}).get("label") or "")
+        _snapshot(db, p, "manual", label)
+        _prune(db, p)
+        db.commit()
+        return jsonify(ok=True), 201
+    finally:
+        db.close()
+
+
+@app.get("/api/projects/<slug>/versions/<int:vid>")
+def get_version(slug, vid):
+    db = _db()
+    try:
+        user = _need_user(db)
+        p = _own_project(db, user, slug)
+        v = db.query(GameVersion).filter_by(project_id=p.id, id=vid).first()
+        if v is None:
+            return err("That version isn't here.", 404)
+        return jsonify(data=json.loads(v.data), **_version_row(v))
+    finally:
+        db.close()
+
+
+@app.post("/api/projects/<slug>/versions/<int:vid>/restore")
+def restore_version(slug, vid):
+    """Go back to an older version. What is there now is kept first, so a
+    restore is never a step that can't be taken back."""
+    db = _db()
+    try:
+        user = _need_user(db)
+        p = _own_project(db, user, slug)
+        v = db.query(GameVersion).filter_by(project_id=p.id, id=vid).first()
+        if v is None:
+            return err("That version isn't here.", 404)
+        _snapshot(db, p, "restore", f"Before going back to the version from {v.created_at:%b %d %H:%M}")
+        data = json.loads(v.data)
+        data["id"] = p.slug  # a snapshot is always of this project, but be sure
+        text = json.dumps(data, separators=(",", ":"))
+        p.data, p.size, p.name = text, len(text.encode("utf-8")), str(data.get("name") or p.name)[:200]
+        p.version += 1
+        p.updated_at = accounts.now()
+        _prune(db, p)
+        db.commit()
+        return jsonify(data=data, version=p.version)
+    finally:
+        db.close()
+
+
+# ---------------------------------------------------------------- the editor itself
+
+
+@app.get("/healthz")
+def healthz():
+    return "ok"
+
+
+@app.get("/")
+def index():
+    if not (DIST / "index.html").exists():
+        return Response("The editor hasn't been built. Run `npm run build` in frontend/.", 503, mimetype="text/plain")
+    r = send_from_directory(DIST, "index.html")
+    # Never cached: it names the hashed bundles, and a stale one would load
+    # yesterday's editor after a deploy.
+    r.headers["Cache-Control"] = "no-cache"
+    return r
+
+
+@app.get("/assets/<path:name>")
+def built_assets(name):
+    r = send_from_directory(DIST / "assets", name)
+    r.headers["Cache-Control"] = "public, max-age=31536000, immutable"  # names are content hashes
+    return r
+
+
+@app.get("/pyodide/<path:name>")
+def pyodide_files(name):
+    r = send_from_directory(DIST / "pyodide", name, mimetype="application/wasm" if name.endswith(".wasm") else None)
+    # Not hashed, but they change only when the Pyodide version does; a day's
+    # cache keeps Play fast without pinning an old Python for long.
+    r.headers["Cache-Control"] = "public, max-age=86400"
+    return r
+
+
+if __name__ == "__main__":
+    app.run(port=int(os.environ.get("PORT", "5001")), debug=True)

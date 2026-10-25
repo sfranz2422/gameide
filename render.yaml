@@ -1,0 +1,44 @@
+# GameIDE on Render: one web service. Flask (backend/app.py) serves the
+# built editor and the API; the database is PyIDE's, shared.
+#
+# As with PyIDE, the dashboard is what actually counts — if a plan or a
+# setting here disagrees with the dashboard, the dashboard wins, and this
+# file is the record of what the service needs.
+services:
+  - type: web
+    name: gameide
+    runtime: python
+    plan: starter
+    # Node is part of Render's Python build image: the editor is built here,
+    # then the server's packages installed.
+    buildCommand: cd frontend && npm ci && npm run build && cd ../backend && pip install -r requirements.txt
+    startCommand: cd backend && gunicorn app:app --workers 2 --threads 4 --timeout 60
+    healthCheckPath: /healthz
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.6"
+
+      # PyIDE's database: paste its Internal Database URL from the Render
+      # dashboard (pyide-db → Connect). Shared on purpose — one `users` table
+      # for all four apps. GameIDE adds only its own gameide_* tables.
+      - key: DATABASE_URL
+        sync: false
+
+      # Signs the session cookie. Never change it casually: that signs
+      # everyone out.
+      - key: SECRET_KEY
+        generateValue: true
+
+      # The same Google OAuth client as PyIDE. Add this service's
+      # https://<host>/auth/callback to the client's Authorized redirect URIs
+      # (the exact address is printed in the logs on the first sign-in try).
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+
+      # Same values as PyIDE.
+      - key: ALLOWED_EMAIL_DOMAINS
+        sync: false
+      - key: TEACHER_EMAILS
+        sync: false

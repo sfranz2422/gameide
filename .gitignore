@@ -6,3 +6,6 @@ __pycache__/
 frontend/test-results/
 frontend/playwright-report/
 .DS_Store
+backend/.venv/
+backend/gameide.db
+backend/tests/*.db

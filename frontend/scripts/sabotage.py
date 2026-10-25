@@ -27,6 +27,8 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 RT, EN, IN, BR = "src/python/runtime.py", "src/engine/engine.ts", "src/engine/input.ts", "src/python/bridge.ts"
 CG, PJ, HOST, UP = "src/python/codegen.ts", "src/store/project.ts", "src/editor/gameHost.ts", "src/editor/useProject.ts"
 E2E = "e2e"  # a sixth item: run the Playwright test of that name instead of Vitest
+PY = "py"    # …or the server's checks (backend/tests/test_server.py); caught = that check prints FAIL
+APP = "../backend/app.py"
 CASES = [
  ("layout drift", RT, '"x": boxy(F.X)', '"x": boxy(F.Y)', "every built-in property"),
  ("no polar sync", RT, "            _st[b + i] = v\n            set_polar(b)", "            _st[b + i] = v", "two views of one motion"),
@@ -91,6 +93,33 @@ CASES = [
   "    if (!v || !err || usedJumps.has(err.nonce)) return;\n    usedJumps.add(err.nonce);",
   "    if (!v || !err || usedJumps.size < 0) return;", "clicking it goes there", E2E,
   ("  }, [err?.nonce]);", "  }, [err]);")),
+ # Phase 3: the server (backend/tests/test_server.py)
+ ("anyone reads any project", APP, "    if p.owner_id != user.id:\n        # Teachers", "    if False:\n        # Teachers", "someone else's project can't be read", PY),
+ ("id hijack", APP, "            if p.owner_id != user.id:\n                # The id is someone else's", "            if False:\n                # The id is someone else's", "its id is taken", PY),
+ ("replaced not kept", APP, '                _snapshot(db, p, "replaced", "Replaced by a save from another tab or computer")\n', "", "what it replaced is kept", PY),
+ ("not unpacked", APP, '        if isinstance(data, dict) and set(data) == {"_packed"}:', "        if False:", "a packed body", PY),
+ ("any file is a picture", "../backend/gamestore.py", "    return None\n\n\nclass GameProject", '    return "image/png"\n\n\nclass GameProject', "isn't a picture is refused", PY),
+ ("asset overwritten", APP, '            return jsonify(ok=True) if existing.data == data else err("That picture id is already used.", 409)', "            return jsonify(ok=True)", "different bytes can't take", PY),
+ ("no project size limit", APP, "        if size > gamestore.MAX_PROJECT_BYTES:", "        if size > gamestore.MAX_PROJECT_BYTES * 100:", "over the limit is refused, with the sizes", PY),
+ ("never pruned", APP, "        if old:\n            db.query(GameVersion)", "        if old and False:\n            db.query(GameVersion)", "pruned to the newest", PY),
+ ("snapshot every save", APP, "                if last_auto is None or (", "                if True or (", "within the interval", PY),
+ ("restore not undoable", APP, '        _snapshot(db, p, "restore", f"Before going back', '        0 and _snapshot(db, p, "restore", f"Before going back', "keeps what was there before the restore", PY),
+ ("polls count", APP, '    return not (request.method == "GET" and request.path.startswith("/api/"))', "    return True", "polling (a GET to /api/) is not activity", PY),
+ ("teachers idle out", APP, '    if not uid or session.get("teacher"):', "    if not uid:", "a teacher is never signed out", PY),
+ ("dev login on server", APP, 'DEV_LOGIN = os.environ.get("GAMEIDE_DEV_LOGIN") == "1" and not os.environ.get("DATABASE_URL")', 'DEV_LOGIN = os.environ.get("GAMEIDE_DEV_LOGIN") == "1"', "dev sign-in is off", PY),
+ ("open redirect", APP, '    return nxt if nxt.startswith("/") and not nxt.startswith("//") else ""', '    return nxt if nxt.startswith("/") else ""', "never redirects off the site", PY),
+ ("not isolated", APP, "        response.headers.setdefault(k, v)", "        pass", "cross-origin isolated", PY),
+ ("deleted still listed", APP, "        rows = (db.query(GameProject).filter_by(owner_id=user.id).filter(GameProject.deleted_at.is_(None))", "        rows = (db.query(GameProject).filter_by(owner_id=user.id)", "a deleted project leaves the list", PY),
+ # Phase 3: the editor's side
+ ("tab speaks for the browser", "src/store/cloudStore.ts", "          json: { data: project, base: this.bases.get(id) ?? meta.base },", "          json: { data: project, base: meta.base },", "two tabs editing one game", E2E),
+ ("offline is an error", "src/store/cloudStore.ts", '      if (e instanceof OfflineError) return { state: "offline" };', '      if (e instanceof OfflineError) return { state: "error", message: "offline" };', "edits made offline", E2E),
+ ("never retried", "src/store/cloudStore.ts", "    for (const p of await this.cache.list()) {\n      const m = await this.meta(p.id);\n      if (m.dirty || m.pending.length) void this.sync(p.id);", "    for (const p of await this.cache.list()) {\n      const m = await this.meta(p.id);\n      if (m.dirty && p.id === \"never\") void this.sync(p.id);", "edits made offline", E2E),
+ ("moved but kept", "src/editor/ProjectsPage.tsx", "      await browser.remove(summary.id);", "      await browser.list();", "moved into the account", E2E),
+ ("restore not shown", "src/editor/AccountBits.tsx", "                      replace(await store.restoreVersion!(project.id, v.id));", "                      void (await store.restoreVersion!(project.id, v.id)), replace;", "History keeps versions", E2E),
+ ("bodies not packed", "src/store/api.ts", "      body: opts.json !== undefined ? packed(opts.json) : opts.body,", "      body: opts.json !== undefined ? JSON.stringify(opts.json) : opts.body,", "opens on another computer", E2E),
+ ("pictures never uploaded", "src/store/cloudStore.ts", "        if (blob) await api(`/api/projects/", "        if (blob && !blob) await api(`/api/projects/", "picture added in the editor reaches", E2E),
+ ("import overwrites", "src/store/zip.ts", "  project.id = newId();", "  project.id = project.id || newId();", "round-trips a project"),
+ ("no folder prefix", "src/store/zip.ts", '  const prefix = Object.keys(entries).find((k) => k.endsWith("project.json"))?.slice(0, -"project.json".length);', '  const prefix = "project.json" in entries ? "" : undefined;', "inside a folder"),
  ("no isolation", "vite.config.ts", '  "Cross-Origin-Embedder-Policy": "credentialless",', "", "stopped at its line", E2E),
 ]
 only = sys.argv[1:]
@@ -109,11 +138,23 @@ for name, f, old, new, test, *extra in CASES:
         broken = broken.replace(o, n)
     p.write_text(broken)
     try:
-        cmd = ["npx", "playwright", "test", "-g", test] if runner == [E2E] else ["npx", "vitest", "run", "-t", test]
-        r = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True)
-        out = r.stdout + r.stderr
-        failed = r.returncode != 0 and "failed" in out
-        ran = "passed" in out or "failed" in out
+        if runner == [PY]:
+            # No bytecode cache: Python trusts a .pyc whose source has the same
+            # size and modification second, and two sabotages of equal length
+            # made within one second would run the first one's code twice.
+            import os, shutil
+            shutil.rmtree(ROOT.parent / "backend/__pycache__", ignore_errors=True)
+            r = subprocess.run([str(ROOT.parent / "backend/.venv/bin/python"), str(ROOT.parent / "backend/tests/test_server.py")],
+                               capture_output=True, text=True, env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"})
+            out = r.stdout + r.stderr
+            failed = any(l.startswith("FAIL") and test in l for l in out.splitlines())
+            ran = "ok   " in out or "FAIL " in out
+        else:
+            cmd = ["npx", "playwright", "test", "-g", test] if runner == [E2E] else ["npx", "vitest", "run", "-t", test]
+            r = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True)
+            out = r.stdout + r.stderr
+            failed = r.returncode != 0 and "failed" in out
+            ran = "passed" in out or "failed" in out
         print(f"{'ok  ' if failed else 'MISS'} {name}  ->  '{test}'" + ("" if ran else "  (no test matched!)"))
         if not failed: bad.append(name)
     finally:

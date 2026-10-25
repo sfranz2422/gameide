@@ -9,9 +9,14 @@
  */
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { migrate, type Project } from "../store/project";
-import { loadAssets, type ProjectStore } from "../store/store";
+import { loadAssets, type ProjectStore, type SaveOutcome } from "../store/store";
 
-export type SaveStatus = "saved" | "saving" | "error";
+/**
+ * "offline" and "signed-out" are safe: the work is in this browser and goes
+ * to the server when it can. Only "error" may mean it isn't saved anywhere
+ * it should be, and `saveError` says why.
+ */
+export type SaveStatus = "saved" | "saving" | "offline" | "signed-out" | "error";
 
 export interface ProjectApi {
   project: Project;
@@ -20,6 +25,11 @@ export interface ProjectApi {
   addAssets: (assets: Map<string, Blob>) => Promise<void>;
   status: SaveStatus;
   saveError: string | null;
+  /** Something worth saying about a save that worked ("another tab saved too"). */
+  saveNote: string | null;
+  /** Swap in a different version of the project (History's restore). */
+  replace: (p: Project) => void;
+  store: ProjectStore;
 }
 
 export const ProjectContext = createContext<ProjectApi | null>(null);
@@ -56,6 +66,7 @@ export function useProjectState(store: ProjectStore, id: string) {
   const [assets, setAssets] = useState<Map<string, Blob>>(new Map());
   const [status, setStatus] = useState<SaveStatus>("saved");
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveNote, setSaveNote] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const loaded = useRef<Project | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -91,22 +102,37 @@ export function useProjectState(store: ProjectStore, id: string) {
     const p = latest.current;
     if (!p) return;
     try {
-      await store.save(p);
-      // Only "saved" if nothing changed while that save was in flight.
-      if (latest.current === p) {
-        setStatus("saved");
-        try {
-          localStorage.removeItem(backupKey(p.id));
-        } catch {
-          /* nothing to remove */
-        }
+      const outcome = await store.save(p);
+      // In this browser now, whatever the server said: the close-time
+      // backup has done its job.
+      try {
+        localStorage.removeItem(backupKey(p.id));
+      } catch {
+        /* nothing to remove */
       }
-      setSaveError(null);
+      // Only report it if nothing changed while that save was in flight.
+      if (latest.current === p) report(outcome);
     } catch (e) {
       setStatus("error");
       setSaveError(e instanceof Error ? e.message : String(e));
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [store]);
+
+  const report = useCallback((o: SaveOutcome) => {
+    setStatus(o.state);
+    setSaveError(o.state === "error" ? (o.message ?? "Not saved.") : null);
+    if (o.note) setSaveNote(o.note);
+  }, []);
+
+  // A save that finishes later (back online, signed in again) updates the
+  // status too — "Offline" must not stay up after the work has gone through.
+  useEffect(() => {
+    if (!store.onSync) return;
+    return store.onSync((pid, o) => {
+      if (pid === id && !timer.current) report(o);
+    });
+  }, [store, id, report]);
 
   // Autosave: shortly after the last change, and at once when the page is
   // hidden or closed, so switching tabs never leaves a change unsaved.
@@ -162,5 +188,19 @@ export function useProjectState(store: ProjectStore, id: string) {
     [store],
   );
 
-  return { project, assets, mutate, addAssets, status, saveError, loadError };
+  /**
+   * Puts a whole different version in place — what the store already holds
+   * (History's restore saved it there), so it is "loaded", not a change.
+   */
+  const replace = useCallback((p: Project) => {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = null;
+    loaded.current = p;
+    latest.current = p;
+    setProject(p);
+    setStatus("saved");
+    void loadAssets(store, p).then(setAssets);
+  }, [store]);
+
+  return { project, assets, mutate, addAssets, status, saveError, saveNote, setSaveNote, loadError, replace };
 }

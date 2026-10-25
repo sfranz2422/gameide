@@ -1,0 +1,1116 @@
+"""
+PyIDE — signing in, saved projects, assignments and turning work in.
+
+Everything here is *additive*. With no Google credentials configured the app
+behaves exactly as it always has: anonymous students open a link, write code,
+press Run, and share a snapshot. Signing in only ever adds abilities — it is
+never required to use the editor, and an anonymous student's experience is
+untouched.
+
+Four tables, chosen so they cannot collide with WebIDE, which lives in the
+same database and already owns `projects`:
+
+    users          one row per person who has ever signed in
+    assignments    a starter project a teacher hands out, with a link
+    drafts         a student's living copy — this is what autosaves
+    submissions    what a student turned in, and when
+    live_sessions  a lesson the class is watching the teacher type
+    classroom_links  a teacher's connection to their Google Classroom
+    classroom_posts  each Classroom class an assignment was posted to
+    quiz_questions   the answer key to each question in an assignment's notes
+    quiz_answers     a student's one answer to one of those questions
+    xp_awards        every piece of XP a student was given, once each (xp.py)
+    class_events     each random event a teacher set off in a class
+    student_photos   pictures students uploaded as avatars, approved or waiting
+    shop_items       what a teacher's students can spend tokens on
+    shop_requests    a student asking for one; approving spends the tokens
+    test_results     what an assignment's tests found: the student's own check,
+                     and the teacher's, which is the one that counts
+
+`snippets`, the existing share-link table, is not touched at all. Every link
+handed out before today keeps working, and turning work in reuses it to take
+an immutable snapshot, so what a student submitted cannot change afterwards.
+"""
+
+import json
+import os
+import re
+import secrets
+from datetime import datetime, timezone
+
+from sqlalchemy import (
+    BigInteger, Column, DateTime, Float, ForeignKey, Integer, LargeBinary, String,
+    Text,
+    UniqueConstraint,
+)
+from sqlalchemy.orm import declarative_base
+
+Base = declarative_base()
+
+ID_ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789"   # no look-alike characters
+ID_LENGTH = 7
+
+
+def new_id(db, model, column="slug") -> str:
+    """A short random id, retried on the (very unlikely) collision."""
+    for _ in range(12):
+        candidate = "".join(secrets.choice(ID_ALPHABET) for _ in range(ID_LENGTH))
+        if not db.query(model.id).filter(getattr(model, column) == candidate).first():
+            return candidate
+    raise RuntimeError("could not allocate an id")
+
+
+def now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+# --------------------------------------------------------------------------
+# Who
+# --------------------------------------------------------------------------
+
+class User(Base):
+    """Someone who has signed in with Google.
+
+    `google_sub` rather than the email address is the real identity: Google
+    guarantees it never changes and is never reused, whereas a school can
+    rename a mailbox. The email is stored to display and to match against the
+    teacher list, but it is not what rows hang off.
+    """
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True)
+    google_sub = Column(String(64), unique=True, index=True, nullable=False)
+    email = Column(String(320), index=True, nullable=False)
+    name = Column(String(160), nullable=False, default="")
+    #: First and last name apart, as Google gives them at sign-in. Skyward's
+    #: score import matches a student on exactly these two, and `name` can't
+    #: be split back into them reliably ("Mary Ann Smith", "Ana De La Cruz").
+    #: Empty until the student next signs in, or until a Classroom roster
+    #: supplies them (see the Skyward download in each app).
+    first_name = Column(String(80), nullable=False, default="")
+    last_name = Column(String(80), nullable=False, default="")
+    created_at = Column(DateTime, nullable=False, default=now)
+    last_seen = Column(DateTime, nullable=False, default=now)
+    #: XP's side of a student (xp.py). The avatar is the id of one picture
+    #: from xp.AVATARS, or "photo:<slug>" for their own StudentPhoto once a
+    #: teacher approved it — never free text — checked whenever it is saved
+    #: and again whenever it is shown. Empty (or anything no longer on the
+    #: list) is a plain silhouette. `board_hidden` keeps them off every class's leaderboard; they
+    #: still earn. `tokens_used` is how many of their tokens a teacher has
+    #: pressed Use on: the tokens they have are those earned (one per
+    #: xp.TOKEN_EVERY) less these, so nothing about tokens is stored but this.
+    avatar = Column(Text, nullable=False, default="")
+    board_hidden = Column(Integer, nullable=False, default=0)
+    tokens_used = Column(Integer, nullable=False, default=0)
+    #: Editor themes (xp.EDITOR_THEMES): the ones bought with tokens, as a
+    #: comma-separated list of ids, and the one chosen ("" is the ordinary
+    #: light/dark). Free themes unlock by level and are never listed here.
+    #: The choice is checked against both whenever a page is drawn, so a
+    #: theme that stops being theirs simply stops showing.
+    themes_owned = Column(String(400), nullable=False, default="")
+    editor_theme = Column(String(24), nullable=False, default="")
+
+    def display_name(self) -> str:
+        return self.name or self.email.split("@")[0]
+
+
+# --------------------------------------------------------------------------
+# What was set
+# --------------------------------------------------------------------------
+
+class Assignment(Base):
+    """A starter project a teacher publishes and hands out as a link.
+
+    The starter code lives here rather than pointing at a draft, so a teacher
+    can carry on editing their own copy without quietly changing what the
+    class was given.
+
+    `app` exists because WebIDE will want assignments too, and one table
+    serving both is better than two that drift apart.
+    """
+    __tablename__ = "assignments"
+
+    id = Column(Integer, primary_key=True)
+    slug = Column(String(16), unique=True, index=True, nullable=False)
+    app = Column(String(16), nullable=False, default="pyide")
+    teacher_id = Column(Integer, ForeignKey("users.id"), index=True, nullable=False)
+    title = Column(String(200), nullable=False, default="Untitled assignment")
+    code = Column(Text, nullable=False, default="")
+    files = Column(Text, nullable=False, default="{}")
+    created_at = Column(DateTime, nullable=False, default=now)
+    closed = Column(Integer, nullable=False, default=0)
+    # Tidied away rather than destroyed. An archived assignment keeps every
+    # submission and every student's work; it just stops filling up the
+    # dashboard months after the class moved on.
+    archived = Column(Integer, nullable=False, default=0)
+    #: "code" — the ordinary assignment, a starter project students copy and
+    #: work in — or "lesson": notes with questions in them and no code at
+    #: all, shown to students full screen (PyIDE's lesson.html). A lesson
+    #: keeps its notes in `files` like any assignment's, so the answer keys,
+    #: grading, Classroom and the live link work on it unchanged.
+    kind = Column(String(16), nullable=False, default="code")
+    #: What it is marked out of. NULL means not graded: no score boxes, and
+    #: it cannot be posted to Google Classroom, which only takes grades on
+    #: work that has points.
+    out_of = Column(Integer, nullable=True)
+    #: SUPERSEDED by ClassroomPost: an assignment can now be posted to
+    #: several classes (Period 4 and Period 7 doing the same work), and one
+    #: set of columns could only hold one. A post written here by the first
+    #: version is moved into classroom_posts the first time the assignment
+    #: is looked at, and these are emptied. Kept, not dropped, because
+    #: create_all() never drops anything and an ALTER to do it would be one
+    #: more thing to go wrong on a deploy.
+    classroom_course_id = Column(String(32), nullable=False, default="")
+    classroom_course_name = Column(String(200), nullable=False, default="")
+    classroom_work_id = Column(String(32), nullable=False, default="")
+    classroom_url = Column(String(300), nullable=False, default="")
+    #: When the teacher last changed it — its code, notes, title or points,
+    #: or where it stands in Google Classroom (posted, assigned, unlinked).
+    #: The dashboard lists the most recently changed first. NULL means not
+    #: changed since it was made, which is true of every assignment from
+    #: before the column existed; `changed` falls back to created_at.
+    updated_at = Column(DateTime, nullable=True)
+    #: XP paid once to each student who gets full marks on it (xp.py). 0 is
+    #: no bonus, which is what every assignment is until a teacher sets one.
+    xp_bonus = Column(Integer, nullable=False, default=0)
+
+    @property
+    def changed(self):
+        return self.updated_at or self.created_at
+
+    def file_map(self) -> dict:
+        return _as_map(self.files)
+
+
+# --------------------------------------------------------------------------
+# What a student is working on
+# --------------------------------------------------------------------------
+
+class Draft(Base):
+    """A student's living project. This is the thing autosave writes to.
+
+    Deliberately not called a snapshot: it changes as they type, and there is
+    exactly one per student per assignment, found again by that pair rather
+    than by a link the student has to keep hold of. Losing the link was the
+    whole problem.
+    """
+    __tablename__ = "drafts"
+    __table_args__ = (
+        UniqueConstraint("owner_id", "assignment_id", name="uq_draft_owner_assignment"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    slug = Column(String(16), unique=True, index=True, nullable=False)
+    owner_id = Column(Integer, ForeignKey("users.id"), index=True, nullable=False)
+    assignment_id = Column(Integer, ForeignKey("assignments.id"),
+                           index=True, nullable=True)
+    # Which editor this belongs to. PyIDE and WebIDE share this database and
+    # one sign-in, but a Python project cannot be opened in the web editor, so
+    # each app only ever lists and opens its own.
+    app = Column(String(16), nullable=False, default="pyide", index=True)
+    title = Column(String(200), nullable=False, default="Untitled")
+    code = Column(Text, nullable=False, default="")
+    files = Column(Text, nullable=False, default="{}")
+    created_at = Column(DateTime, nullable=False, default=now)
+    updated_at = Column(DateTime, nullable=False, default=now)
+    #: TWO TABS ON ONE DRAFT. A student can have the same assignment open
+    #: twice — the lesson in one tab, the Classroom link in another — and
+    #: both autosave to this row. Without these, whichever tab was typed in
+    #: last wrote its copy over the other's: twenty minutes of work in the
+    #: lesson, then one key pressed in a forgotten tab, and the twenty
+    #: minutes were gone without a word.
+    #:
+    #: `version` goes up on every write. A tab says which version it last
+    #: saw and who it is (`writer`, a random id per page load), and a write
+    #: is refused when the draft has moved on since AND the move was made by
+    #: some other tab. A tab's own saves overlapping — an autosave still in
+    #: flight when Turn in is pressed — are the same writer, so they never
+    #: refuse each other.
+    version = Column(BigInteger, nullable=False, default=0)
+    writer = Column(String(24), nullable=False, default="")
+
+    def file_map(self) -> dict:
+        return _as_map(self.files)
+
+
+# --------------------------------------------------------------------------
+# What was handed in
+# --------------------------------------------------------------------------
+
+class Submission(Base):
+    """A student's work as it stood the moment they pressed Turn in.
+
+    `snippet_slug` points at an ordinary share snapshot, so a submission is
+    frozen — a student can carry on editing their draft and what you are
+    marking does not move under you. Turning in again replaces this row and
+    points it at a fresh snapshot.
+    """
+    __tablename__ = "submissions"
+    __table_args__ = (
+        UniqueConstraint("assignment_id", "student_id", name="uq_one_per_student"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    assignment_id = Column(Integer, ForeignKey("assignments.id"),
+                           index=True, nullable=False)
+    student_id = Column(Integer, ForeignKey("users.id"), index=True, nullable=False)
+    snippet_slug = Column(String(16), nullable=False)
+    submitted_at = Column(DateTime, nullable=False, default=now)
+    times_submitted = Column(Integer, nullable=False, default=1)
+    #: 1 when snippet_slug is a snapshot the automatic turn-in made (app.py,
+    #: _auto_turn_in), which the next automatic one REWRITES in place rather
+    #: than adding another: a project carrying a few books' worth of data
+    #: files would otherwise leave a full copy every two minutes. 0 once the
+    #: student presses Turn in — that copy is theirs and stays as it is.
+    auto_snap = Column(Integer, nullable=False, default=0)
+
+    #: The teacher's comment on it, shown on the student's My work page.
+    #: On this row rather than the snapshot, so it SURVIVES a re-submit —
+    #: turning in again updates this row in place — and the teacher's
+    #: dashboard says "turned in again since your feedback" by comparing
+    #: submitted_at with feedback_at. NULL feedback_at means none was given.
+    feedback = Column(Text, nullable=False, default="")
+    feedback_at = Column(DateTime, nullable=True)
+    #: Whether the student has seen the current feedback. Writing new
+    #: feedback clears it; the student opening My work sets it.
+    feedback_seen = Column(Integer, nullable=False, default=0)
+    #: The teacher's score, out of the assignment's out_of. NULL is "not
+    #: scored", which is not the same as 0. A float so half marks work.
+    score = Column(Float, nullable=True)
+    #: The score last sent to Google Classroom. Differs from `score` when it
+    #: has changed since the last Sync, which is how the page knows to say so.
+    score_synced = Column(Float, nullable=True)
+
+
+# --------------------------------------------------------------------------
+# Questions in the notes
+# --------------------------------------------------------------------------
+
+class QuizQuestion(Base):
+    """The answer key to one question written in an assignment's notes.
+
+    The notes go to students whole, so the key cannot travel in them: it is
+    taken out of every copy a student is sent and kept here instead (quiz.py
+    in PyIDE says how). Written whenever the teacher saves the assignment or
+    pushes notes in a live lesson, so a question added mid-lesson can be
+    answered without the assignment being saved first.
+
+    `qid` is a hash of the question as the student sees it. Rewording a
+    question makes a new row, and the old one is kept, because a student
+    with an older copy may still answer it. Changing only the key or the
+    points rewrites this row, and every answer already given is marked
+    against the new key — that is a teacher fixing a mistake.
+    """
+    __tablename__ = "quiz_questions"
+    __table_args__ = (
+        UniqueConstraint("assignment_id", "qid", name="uq_quiz_question"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    assignment_id = Column(Integer, ForeignKey("assignments.id"),
+                           index=True, nullable=False)
+    qid = Column(String(16), nullable=False)
+    #: "choice", "text", or "long" — a long response, marked by hand, which
+    #: has no key: its points are QuizAnswer.score.
+    kind = Column(String(8), nullable=False, default="choice")
+    prompt = Column(Text, nullable=False, default="")
+    #: JSON lists: every choice shown, the ones that are right, and for a
+    #: short answer the answers accepted.
+    choices = Column(Text, nullable=False, default="[]")
+    correct = Column(Text, nullable=False, default="[]")
+    answers = Column(Text, nullable=False, default="[]")
+    points = Column(Float, nullable=False, default=1.0)
+    updated_at = Column(DateTime, nullable=False, default=now)
+
+
+class QuizAnswer(Base):
+    """A student's one answer to one question. One try: the unique
+    constraint is the lock, so two workers taking the same student's two
+    quick clicks cannot both record one.
+
+    Whether it is right is NOT stored. It is worked out against the key
+    whenever it is needed, so a corrected key corrects the marks. The one
+    exception is a long response, which has no key: the teacher reads it and
+    gives it `score`."""
+    __tablename__ = "quiz_answers"
+    __table_args__ = (
+        UniqueConstraint("assignment_id", "student_id", "qid",
+                         name="uq_quiz_answer"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    assignment_id = Column(Integer, ForeignKey("assignments.id"),
+                           index=True, nullable=False)
+    student_id = Column(Integer, ForeignKey("users.id"), index=True, nullable=False)
+    qid = Column(String(16), nullable=False)
+    response = Column(Text, nullable=False, default="")
+    answered_at = Column(DateTime, nullable=False, default=now)
+    #: A long response's points, given by the teacher. NULL is "not marked
+    #: yet" — which is what puts "needs grading" on the class page — and is
+    #: not the same as 0. Unused for every other kind, which is marked
+    #: against the key instead.
+    score = Column(Float, nullable=True)
+
+
+# --------------------------------------------------------------------------
+# XP
+# --------------------------------------------------------------------------
+
+class XpAward(Base):
+    """One piece of XP given to one person. Their XP is the sum of these.
+
+    PER PERSON, NOT PER CLASS OR APP: a student's XP is one number across
+    every class and all three editors, which is what the teacher asked for
+    (a student in two of their classes earns in both). `app` only says where
+    it was earned, for the list of recent XP.
+
+    `source` names what it was for — "quiz:12:ab34cd", "all:12", "bonus:12",
+    "run:29012345", "grant:<random>" — and the unique constraint is what stops
+    anything being paid twice. Two workers taking the same answer, a page
+    sent twice, a teacher's double click: the second insert fails, and
+    xp.award treats that as already paid. Nothing ever updates a row, so a
+    total cannot drift from its history.
+
+    `detail` is for the award's own bookkeeping, never shown: for a run, a
+    hash of the code, because a run only pays when the code has changed.
+    `by_id` is the teacher who gave it by hand, NULL for everything earned.
+    """
+    __tablename__ = "xp_awards"
+    __table_args__ = (
+        UniqueConstraint("user_id", "source", name="uq_xp_once"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True, nullable=False)
+    app = Column(String(16), nullable=False, default="pyide")
+    source = Column(String(80), nullable=False)
+    xp = Column(Integer, nullable=False, default=0)
+    reason = Column(String(200), nullable=False, default="")
+    detail = Column(String(64), nullable=False, default="")
+    by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    created_at = Column(DateTime, nullable=False, default=now, index=True)
+
+
+class TestResult(Base):
+    """What an assignment's tests (autograde.py) found in a student's work.
+
+    Two kinds, one row of each per student per assignment, rewritten in
+    place. "self" is the student's own Check my work: run in their browser,
+    so it could be faked, and kept only so the teacher can see it. "verified"
+    is the teacher's Check all, run in the TEACHER's browser on what the
+    student turned in: that one counts toward the grade (app.py, _earned).
+    A verified result older than the student's last turn-in is stale — the
+    work changed since — and the teacher's page says so.
+    """
+    __tablename__ = "test_results"
+    __table_args__ = (
+        UniqueConstraint("assignment_id", "student_id", "kind", name="uq_test_result"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    assignment_id = Column(Integer, ForeignKey("assignments.id"), index=True, nullable=False)
+    student_id = Column(Integer, ForeignKey("users.id"), index=True, nullable=False)
+    kind = Column(String(16), nullable=False, default="self")
+    earned = Column(Float, nullable=False, default=0.0)
+    possible = Column(Float, nullable=False, default=0.0)
+    #: JSON list of {label, ok, detail, points}, for the teacher's page.
+    details = Column(Text, nullable=False, default="[]")
+    checked_at = Column(DateTime, nullable=False, default=now)
+
+
+class ShopItem(Base):
+    """Something a teacher's students can spend tokens on: a late pass, a
+    seat for the day. One shop per teacher, shared by every class and all
+    three editors, because tokens are (xp.py). Never deleted, only taken off
+    the shelf (`active` 0): a request keeps pointing at what was bought, and
+    a teacher who cleared the shelf isn't handed the starter list again."""
+    __tablename__ = "shop_items"
+
+    id = Column(Integer, primary_key=True)
+    teacher_id = Column(Integer, ForeignKey("users.id"), index=True, nullable=False)
+    name = Column(String(120), nullable=False, default="")
+    description = Column(String(400), nullable=False, default="")
+    cost = Column(Integer, nullable=False, default=1)
+    active = Column(Integer, nullable=False, default=1)
+    #: An editor theme's id (xp.EDITOR_THEMES) when the item is one: bought
+    #: at once, no request, because it only changes the buyer's own screen.
+    #: "" for everything else.
+    theme = Column(String(24), nullable=False, default="")
+    created_at = Column(DateTime, nullable=False, default=now)
+
+
+class ShopRequest(Base):
+    """A student asking for a shop item. "pending" until the teacher decides:
+    "approved" spends the tokens (users.tokens_used goes up by `cost`, in one
+    conditional UPDATE), "declined" or "cancelled" spends nothing. While
+    pending, its cost is held: a student can't ask for more than they have,
+    counting what they have already asked for. The name and cost are copied,
+    so a later price change doesn't rewrite what was asked for."""
+    __tablename__ = "shop_requests"
+
+    id = Column(Integer, primary_key=True)
+    item_id = Column(Integer, ForeignKey("shop_items.id"), index=True, nullable=False)
+    teacher_id = Column(Integer, ForeignKey("users.id"), index=True, nullable=False)
+    student_id = Column(Integer, ForeignKey("users.id"), index=True, nullable=False)
+    name = Column(String(120), nullable=False, default="")
+    cost = Column(Integer, nullable=False, default=1)
+    status = Column(String(16), nullable=False, default="pending", index=True)
+    created_at = Column(DateTime, nullable=False, default=now)
+    decided_at = Column(DateTime, nullable=True)
+
+
+class StudentPhoto(Base):
+    """A picture a student uploaded to be their avatar. NOBODY ELSE SEES IT
+    UNTIL A TEACHER APPROVES IT: a leaderboard is shown to the whole class,
+    and what a student uploads is not checked by anything but a person.
+
+    "pending" is seen only by the student and the teachers of their classes
+    (/photo/<slug> checks), "approved" by anyone the board shows it to.
+    A student has at most one of each: a new upload replaces their pending
+    one, a new approval their approved one, and a rejected one is deleted,
+    picture and all. Not in `images`, whose pictures /img serves to anyone
+    with the address."""
+    __tablename__ = "student_photos"
+
+    id = Column(Integer, primary_key=True)
+    slug = Column(String(16), unique=True, index=True, nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True, nullable=False)
+    app = Column(String(16), nullable=False, default="pyide")
+    content_type = Column(String(40), nullable=False)
+    data = Column(LargeBinary, nullable=False)
+    size = Column(Integer, nullable=False, default=0)
+    status = Column(String(16), nullable=False, default="pending", index=True)
+    created_at = Column(DateTime, nullable=False, default=now)
+    decided_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    decided_at = Column(DateTime, nullable=True)
+
+
+class ClassEvent(Base):
+    """A random event the teacher set off in a class (xp.EVENTS): what it
+    was, and when. Its XP is ordinary XpAward rows with the source
+    "event:<this id>:<user id>", so Undo can find exactly them and nothing
+    else. `undone` keeps the row, so the class page stops showing the event
+    rather than forgetting it happened."""
+    __tablename__ = "class_events"
+
+    id = Column(Integer, primary_key=True)
+    class_id = Column(Integer, ForeignKey("classes.id"), index=True, nullable=False)
+    app = Column(String(16), nullable=False, default="pyide")
+    #: The event's id in xp.EVENTS, and its title and words as they were
+    #: shown — copied, so renaming an event later doesn't rewrite history.
+    kind = Column(String(32), nullable=False, default="")
+    title = Column(String(120), nullable=False, default="")
+    text = Column(String(400), nullable=False, default="")
+    by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    undone = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime, nullable=False, default=now, index=True)
+
+
+# --------------------------------------------------------------------------
+# Google Classroom
+# --------------------------------------------------------------------------
+
+class ClassroomLink(Base):
+    """A teacher's standing permission to post to their Google Classroom.
+
+    Only teachers ever have one. Students sign in with the plain
+    openid/email/profile they always have; the Classroom permissions are asked
+    for separately, by the teacher, from the dashboard.
+
+    One per teacher PER APP, because the refresh token belongs to the OAuth
+    client that obtained it, and the three editors are three Render services
+    that may each have their own GOOGLE_CLIENT_ID. A token got by PyIDE is
+    refused by Google if WebIDE presents it.
+
+    `refresh_token` is ENCRYPTED, with a key derived from the app's
+    SECRET_KEY, which lives in Render's environment and not in this
+    database. A copy of the database alone is not a working key to anyone's
+    classes. The cost: changing SECRET_KEY makes every stored token
+    unreadable, and each teacher has to press Connect again. That is all.
+    """
+    __tablename__ = "classroom_links"
+    __table_args__ = (
+        UniqueConstraint("user_id", "app", name="uq_classroom_user_app"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True, nullable=False)
+    app = Column(String(16), nullable=False, default="pyide")
+    refresh_token = Column(Text, nullable=False)
+    #: The Google account that granted it. Usually the teacher's sign-in
+    #: address; recorded so the dashboard can say which account is connected.
+    google_email = Column(String(320), nullable=False, default="")
+    connected_at = Column(DateTime, nullable=False, default=now)
+
+
+class ClassroomPost(Base):
+    """One Google Classroom class an assignment was posted to.
+
+    Several per assignment when several periods do the same work from the
+    same link: each class gets its own Classroom assignment, because each
+    class's grades have to go to coursework in that class. A student is put
+    in a period by being on that class's Classroom roster, which is asked of
+    Google when it is needed and never stored here — rosters change, and a
+    stored copy would quietly go stale.
+    """
+    __tablename__ = "classroom_posts"
+    __table_args__ = (
+        UniqueConstraint("assignment_id", "course_id", name="uq_post_per_class"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    assignment_id = Column(Integer, ForeignKey("assignments.id"),
+                           index=True, nullable=False)
+    course_id = Column(String(32), nullable=False)
+    course_name = Column(String(200), nullable=False, default="")
+    work_id = Column(String(32), nullable=False)
+    url = Column(String(300), nullable=False, default="")
+    posted_at = Column(DateTime, nullable=False, default=now)
+
+
+# --------------------------------------------------------------------------
+# Classes
+# --------------------------------------------------------------------------
+
+class Course(Base):
+    """A class the teacher teaches: one period, so P4 Intro and P7 Intro are
+    two. Called Course here because `class` is a Python word; the table and
+    every page say class.
+
+    Linked to the period's Google Classroom course, which is where its
+    students come from (Enrollment) and where its assignments are posted.
+    Optional: a class with no Classroom course has a page and no students,
+    which is still somewhere to arrange the assignments.
+    """
+    __tablename__ = "classes"
+
+    id = Column(Integer, primary_key=True)
+    app = Column(String(16), nullable=False, default="pyide", index=True)
+    teacher_id = Column(Integer, ForeignKey("users.id"), index=True, nullable=False)
+    name = Column(String(200), nullable=False, default="Untitled class")
+    course_id = Column(String(32), nullable=False, default="")
+    course_name = Column(String(200), nullable=False, default="")
+    #: When the roster was last fetched from Classroom; NULL is never.
+    roster_at = Column(DateTime, nullable=True)
+    #: The box pinned to the top of the class's page, under its name: a
+    #: picture, a welcome, office hours. Markdown, like a description, and
+    #: shown the same way. Empty is no box.
+    banner = Column(Text, nullable=False, default="")
+    #: The secret in the class's view-only link, /view/<token>: the class's
+    #: page as a student sees it, for an administrator, with every assignment
+    #: openable as a preview that saves, turns in and records nothing. Made
+    #: the first time the teacher's class page is opened (empty until then),
+    #: and replaced by New link, which is how a link that has gone too far is
+    #: taken back.
+    view_token = Column(String(32), nullable=False, default="")
+    created_at = Column(DateTime, nullable=False, default=now)
+
+
+class ClassItem(Base):
+    """One line on a class's page: an assignment, or a group heading.
+
+    A group is only a heading — the assignments under it on the page are
+    simply the ones placed after it, until the next heading. It means
+    nothing to grading or to anything else, which is what the teacher asked
+    for: a way to lay the page out, not a structure.
+
+    An assignment is in one class at most (the unique constraint): a second
+    period doing the same work gets a copy, with its own links, its own
+    live lesson and its own results.
+    """
+    __tablename__ = "class_items"
+    __table_args__ = (
+        UniqueConstraint("assignment_id", name="uq_assignment_one_class"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    class_id = Column(Integer, ForeignKey("classes.id"), index=True, nullable=False)
+    #: NULL for a group heading or a material.
+    assignment_id = Column(Integer, ForeignKey("assignments.id"), nullable=True)
+    #: "material" for a card that is only a title and its description — a
+    #: link, a reading, a picture — with no editor or assignment behind it.
+    #: "" for everything else, which is what every row made before materials
+    #: was: an assignment when assignment_id is set, a group heading when not.
+    kind = Column(String(16), nullable=False, default="")
+    #: Whether the class's students see the assignment's live link. It is
+    #: always made (_place); this only decides if the page offers it. While
+    #: the lesson is on the air it is offered regardless — a teacher who has
+    #: gone live means the class to find it.
+    show_live = Column(Integer, nullable=False, default=1)
+    #: A group's heading. Unused for an assignment, whose title is its own.
+    title = Column(String(200), nullable=False, default="")
+    #: Hidden from the class's students; the teacher still sees it, marked.
+    hidden = Column(Integer, nullable=False, default=0)
+    #: Markdown under the item on the class's page: what the assignment is,
+    #: links to other pages, or a group's introduction. Shown to students
+    #: rendered and sanitised (notes.js), links opening in a new tab.
+    description = Column(Text, nullable=False, default="")
+    #: Smallest first, so a new item goes on top with one less than the least.
+    position = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime, nullable=False, default=now)
+
+
+class Enrollment(Base):
+    """A student in a class, as the class's Classroom roster says.
+
+    By email, not by user: most of a roster has never signed in here, and
+    must still find the class in their menu the first time they do. Kept
+    rather than asked of Google on every page, because a student's menu is
+    on every page; refreshed when the teacher presses Sync roster.
+    """
+    __tablename__ = "enrollments"
+    __table_args__ = (
+        UniqueConstraint("class_id", "email", name="uq_enrolled_once"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    class_id = Column(Integer, ForeignKey("classes.id"), index=True, nullable=False)
+    email = Column(String(320), nullable=False, index=True)
+    name = Column(String(200), nullable=False, default="")
+
+
+class Visit(Base):
+    """A student in a class: one sitting, from arriving to last being busy.
+
+    Attendance, for the teacher's class page. A sitting starts when a
+    signed-in student opens anything of the class's — its page, one of its
+    assignments, its live lesson — and runs on while they keep working: the
+    editor's "still here" beat moves `last_at` every few minutes. A gap of
+    more than VISIT_GAP_MINUTES starts a new row, so one row is one stretch
+    of work and a day can hold several.
+
+    The email and name are copied in, not joined from users, so the record
+    reads the same after a roster sync renames or drops the student.
+    `places` is what they opened during the sitting, for the time log.
+
+    Times are UTC, like every other column here. Which DAY a sitting
+    belongs to is the teacher's local day, so the page groups them in the
+    browser; the server cannot know the school's time zone.
+    """
+    __tablename__ = "class_visits"
+
+    id = Column(Integer, primary_key=True)
+    class_id = Column(Integer, ForeignKey("classes.id"), index=True, nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True, nullable=False)
+    email = Column(String(320), nullable=False, default="")
+    name = Column(String(200), nullable=False, default="")
+    places = Column(String(500), nullable=False, default="")
+    started_at = Column(DateTime, nullable=False, default=now, index=True)
+    last_at = Column(DateTime, nullable=False, default=now)
+
+
+#: Longer than this between two signs of a student and the second starts a
+#: new sitting. Above the editor's 5-minute beat, so a student who is typing
+#: never splits one in two, and short enough that leaving at lunch and
+#: coming back after shows as two.
+VISIT_GAP_MINUTES = 20
+
+
+class Image(Base):
+    """A picture a teacher uploaded for a description, served at /img/<slug>.
+
+    In the database rather than on disk because Render's disk is wiped on
+    every deploy. Teachers only, a few MB at most (the editor shrinks big
+    photos first), and only real PNG, JPEG, GIF or WebP — checked by their
+    first bytes, not by the name or the type the browser claimed.
+    """
+    __tablename__ = "images"
+
+    id = Column(Integer, primary_key=True)
+    slug = Column(String(16), unique=True, index=True, nullable=False)
+    app = Column(String(16), nullable=False, default="pyide")
+    owner_id = Column(Integer, ForeignKey("users.id"), index=True, nullable=False)
+    content_type = Column(String(40), nullable=False)
+    data = Column(LargeBinary, nullable=False)
+    size = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime, nullable=False, default=now)
+
+
+# --------------------------------------------------------------------------
+# Teaching live
+# --------------------------------------------------------------------------
+
+class LiveSession(Base):
+    """A lesson the class is watching: the teacher's editor, mirrored.
+
+    WHY THIS IS A TABLE AND NOT A DICTIONARY IN MEMORY
+
+    Every one of these apps runs `gunicorn --workers 2`: two separate
+    processes, each with its own memory, and nothing routes a given person to
+    a given one. Kept in a module-level dict, the teacher's keystrokes would
+    land in whichever worker served that request and be invisible to half the
+    class — and which half would change from poll to poll. It would work
+    perfectly on a laptop with one worker and fail in front of thirty people.
+
+    The same argument rules out WebSockets here: a socket lives in one worker,
+    so broadcasting across both needs a message broker, which is another
+    Render service and another bill. Polling a row costs nothing new.
+
+    ONE ROW PER SESSION, REWRITTEN IN PLACE. No history is kept, because what
+    a live mirror is for is what is on the screen now. `version` counts up on
+    every push and is what students poll against, so the usual reply is a bare
+    304-shaped "nothing new" rather than the whole program.
+    """
+    __tablename__ = "live_sessions"
+
+    id = Column(Integer, primary_key=True)
+    #: What students type in to join. Short and unambiguous, because it gets
+    #: read off a projector and typed by someone at the back.
+    code = Column(String(16), unique=True, index=True, nullable=False)
+    app = Column(String(16), nullable=False, default="pyide", index=True)
+    host_id = Column(Integer, ForeignKey("users.id"), index=True, nullable=False)
+    host_name = Column(String(160), nullable=False, default="")
+    title = Column(String(200), nullable=False, default="Live lesson")
+
+    #: The assignment this lesson is for, if the teacher picked one.
+    #:
+    #: WITHOUT IT THE CLASS CANNOT HAND ANYTHING IN. Turning work in needs a
+    #: draft with an assignment on it — see Submission and /api/submit — and
+    #: a project saved from the live page had none, so the button could never
+    #: appear. Nothing about that was visible: the lesson worked, the saving
+    #: worked, and the hand-in was simply impossible.
+    #:
+    #: With it set, a student's save on the live page creates or finds the
+    #: SAME draft row the assignment link would have made, so a student who
+    #: also opened /a/<slug> has one copy of the work rather than two.
+    assignment_id = Column(Integer, ForeignKey("assignments.id"),
+                           index=True, nullable=True)
+
+    #: What the class sees. `body` is the teacher's current file, whole —
+    #: not a diff. A diff stream is smaller and needs every update to arrive
+    #: in order and none to be missed, which polling cannot promise. Sending
+    #: the whole file means a student who misses ten polls is still correct
+    #: on the eleventh, and a student who joins late needs no catch-up path
+    #: at all: the first poll IS the catch-up.
+    body = Column(Text, nullable=False, default="")
+    filename = Column(String(200), nullable=False, default="main.py")
+
+    #: Counts up on every push, and is BOTH what students poll against and
+    #: what rejects a push that arrived late.
+    #:
+    #: The teacher's browser sends a stamp that only ever increases, and the
+    #: update is conditional on it being higher than the row's. Without that,
+    #: two pushes overtaking each other on a slow connection would leave the
+    #: OLDER text in the row with the HIGHER version — and the class would sit
+    #: looking at a line the teacher had already fixed, with nothing to
+    #: correct it until the next keystroke.
+    #:
+    #: BigInteger because the stamp is a millisecond clock reading, about
+    #: 1.8e12, and Postgres INTEGER stops at 2.1e9. As a plain Integer this
+    #: works on SQLite in development and raises NumericValueOutOfRange on
+    #: the first push in production.
+    version = Column(BigInteger, nullable=False, default=0)
+
+    #: A few lines the teacher chose to hand the class — highlighted and sent
+    #: with "Send to students". The ONLY thing a student can put into their
+    #: own editor with a button; the mirror stays type-it-yourself. Empty
+    #: means nothing is out, and "take it back" is writing it empty.
+    #:
+    #: `snippet_seq` is the push stamp it went out with, so a student's page
+    #: can tell a new snippet from the one it already showed (or they closed)
+    #: — the same text sent twice is still a second send. BigInteger for the
+    #: same reason as `version`.
+    #:
+    #: Sending also moves `version`, which is what makes it arrive at all:
+    #: students poll against `version` and get a bare 304 otherwise.
+    snippet = Column(Text, nullable=False, default="")
+    snippet_seq = Column(BigInteger, nullable=False, default=0)
+
+    #: The project's notes — its first .md file, whole — sent with every push
+    #: whichever file is open. `body` is only the open file, so notes used to
+    #: reach the class only while the teacher had the .md tab selected, and
+    #: vanished the moment they went back to the code they were explaining.
+    #: Empty when the project has none.
+    notes = Column(Text, nullable=False, default="")
+
+    #: Where the teacher is in those notes when they are cut into slides, as
+    #: the class should read it: "3/5". Only the current slide goes out in
+    #: `notes`, so this is the one thing that says there are others. Empty
+    #: when the notes are not slides, which is every lesson before this.
+    slide = Column(String(16), nullable=False, default="")
+
+    #: What the teacher's last Run printed, the tail of it, so the class can
+    #: see the program they just watched being written actually work. Text
+    #: only: a kaypy game's picture is drawn on the teacher's canvas and is
+    #: not sent, only whatever it printed. Empty until they press Run.
+    output = Column(Text, nullable=False, default="")
+
+    #: The teacher's rendered page after their last Run, as HTML, for the
+    #: apps whose Run makes a page rather than text: WebIDE sends the page it
+    #: built, FlaskIDE the response its preview is showing. The class sees it
+    #: in a sandboxed frame beside their own. PyIDE has no page and never
+    #: sets it. Empty until the teacher presses Run.
+    page = Column(Text, nullable=False, default="")
+
+    #: Where the teacher's caret is in `body`, as "line:ch" counted from 0,
+    #: so the class can see where they are typing and the mirror can follow
+    #: it. Empty when there is nothing to point at: a notes file, which the
+    #: class reads rendered rather than as text, or an editor from before
+    #: this existed. Rides on the ordinary push, so it costs no extra
+    #: requests — a caret moved without typing is simply one more push.
+    cursor = Column(String(24), nullable=False, default="")
+
+    #: The teacher's laser pointer, while they hold Alt over their code or a
+    #: slide (static/laser.js has the format): "c:line:ch" for a place in
+    #: `body`, "s:..." for a place on a slide, empty when they are not
+    #: pointing. NOT part of a push and does NOT move `version`: it changes
+    #: several times a second while the teacher points, and moving `version`
+    #: would make every student fetch the whole file and notes each time.
+    #: `pointer_seq` is its own stamp instead, from the same clock as
+    #: `version` and kept in order the same way, and the poll answers a
+    #: student whose `version` is current but whose pointer is not with the
+    #: pointer alone. BigInteger for the same reason as `version`.
+    pointer = Column(String(80), nullable=False, default="")
+    pointer_seq = Column(BigInteger, nullable=False, default=0)
+    #: The path to `pointer`: the last fraction of a second of the teacher's
+    #: mouse, as "stamp@place;stamp@place;…", which the class plays back so a
+    #: circle drawn round a word arrives as a circle rather than as the four
+    #: corners a poll four times a second would catch. Text, not String: it
+    #: is several places long, and `pointer` stays the newest one alone, for
+    #: a page that does not know about paths.
+    pointer_path = Column(Text, nullable=False, default="")
+
+    started_at = Column(DateTime, nullable=False, default=now)
+    updated_at = Column(DateTime, nullable=False, default=now)
+    #: Set when the teacher stops. The row stays so that a student still on
+    #: the page is told the lesson ended, rather than watching a mirror that
+    #: has quietly stopped moving.
+    ended = Column(Integer, nullable=False, default=0)
+
+
+# --------------------------------------------------------------------------
+# Helpers
+# --------------------------------------------------------------------------
+
+def _as_map(raw) -> dict:
+    try:
+        data = json.loads(raw or "{}")
+        return data if isinstance(data, dict) else {}
+    except (ValueError, TypeError):
+        return {}
+
+
+# Columns added after a table first shipped, with the DDL to add each one.
+# create_all() makes missing tables but never missing columns, so a database
+# from an earlier deploy needs these. Every default has to leave existing rows
+# correct: an assignment that existed before archiving did is not archived.
+LATER_COLUMNS = [
+    # NULL is true of every answer from before long responses: none of them
+    # was one, and NULL is "not marked by hand", which they never need.
+    # 0 is true of every submission from before: each snapshot was made by
+    # pressing Turn in, and must never be rewritten.
+    ("submissions", "auto_snap",
+     "ALTER TABLE submissions ADD COLUMN auto_snap INTEGER NOT NULL DEFAULT 0"),
+    ("quiz_answers", "score",
+     "ALTER TABLE quiz_answers ADD COLUMN score FLOAT"),
+    # Empty is true of every class made before the banner: none had one.
+    ("classes", "banner",
+     "ALTER TABLE classes ADD COLUMN banner TEXT NOT NULL DEFAULT ''"),
+    # 1: every item from before showed its live link, and still should.
+    ("class_items", "show_live",
+     "ALTER TABLE class_items ADD COLUMN show_live INTEGER NOT NULL DEFAULT 1"),
+    # "" is true of every row made before materials: each is the assignment
+    # or group heading its assignment_id already says.
+    ("class_items", "kind",
+     "ALTER TABLE class_items ADD COLUMN kind VARCHAR(16) NOT NULL DEFAULT ''"),
+    # Empty is true of every item made before descriptions existed.
+    ("class_items", "description",
+     "ALTER TABLE class_items ADD COLUMN description TEXT NOT NULL DEFAULT ''"),
+    # NULL, not now(): an assignment from before this was last changed when
+    # it was made, as far as anything knows, and Assignment.changed says so.
+    ("assignments", "updated_at",
+     "ALTER TABLE assignments ADD COLUMN updated_at TIMESTAMP"),
+    ("assignments", "archived",
+     "ALTER TABLE assignments ADD COLUMN archived INTEGER NOT NULL DEFAULT 0"),
+    # Everything that existed before two editors shared these tables was
+    # PyIDE's, so 'pyide' is the only default that makes an existing row true.
+    # BOTH tables need this. Leaving `assignments` out was a real bug: the
+    # column is in the model, so every query selects it, and on a database
+    # whose `assignments` table predates the column that is an immediate
+    # UndefinedColumn on the dashboard, the assignment link and turning in.
+    ("drafts", "app",
+     "ALTER TABLE drafts ADD COLUMN app VARCHAR(16) NOT NULL DEFAULT 'pyide'"),
+    ("assignments", "app",
+     "ALTER TABLE assignments ADD COLUMN app VARCHAR(16) NOT NULL "
+     "DEFAULT 'pyide'"),
+    # Live lessons shipped before they could be tied to an assignment. NULL
+    # is the right default: a lesson that existed before this has no
+    # assignment, which is exactly what it was.
+    ("live_sessions", "assignment_id",
+     "ALTER TABLE live_sessions ADD COLUMN assignment_id INTEGER"),
+    # Sent snippets. Empty and 0 are true of every earlier lesson: nothing
+    # was ever sent in them.
+    ("live_sessions", "snippet",
+     "ALTER TABLE live_sessions ADD COLUMN snippet TEXT NOT NULL DEFAULT ''"),
+    ("live_sessions", "snippet_seq",
+     "ALTER TABLE live_sessions ADD COLUMN snippet_seq BIGINT NOT NULL "
+     "DEFAULT 0"),
+    # Notes shown beside the lesson. Empty is true of every earlier lesson:
+    # none of them sent any.
+    ("live_sessions", "notes",
+     "ALTER TABLE live_sessions ADD COLUMN notes TEXT NOT NULL DEFAULT ''"),
+    # Slides and the teacher's output. Empty is true of every earlier
+    # lesson: none had slides, and none ever sent what a Run printed.
+    ("live_sessions", "slide",
+     "ALTER TABLE live_sessions ADD COLUMN slide VARCHAR(16) NOT NULL "
+     "DEFAULT ''"),
+    ("live_sessions", "output",
+     "ALTER TABLE live_sessions ADD COLUMN output TEXT NOT NULL DEFAULT ''"),
+    # The teacher's rendered page. Empty is true of every earlier lesson.
+    ("live_sessions", "page",
+     "ALTER TABLE live_sessions ADD COLUMN page TEXT NOT NULL DEFAULT ''"),
+    # The teacher's caret. Empty is true of every earlier lesson: none sent
+    # one, and the class's page shows no caret for it.
+    ("live_sessions", "cursor",
+     "ALTER TABLE live_sessions ADD COLUMN cursor VARCHAR(24) NOT NULL "
+     "DEFAULT ''"),
+    # The teacher's laser pointer. Empty and 0 are true of every earlier
+    # lesson: nobody was pointing.
+    ("live_sessions", "pointer",
+     "ALTER TABLE live_sessions ADD COLUMN pointer VARCHAR(80) NOT NULL "
+     "DEFAULT ''"),
+    ("live_sessions", "pointer_seq",
+     "ALTER TABLE live_sessions ADD COLUMN pointer_seq BIGINT NOT NULL "
+     "DEFAULT 0"),
+    # A class's view-only link. Empty is "not made yet", which is true of
+    # every earlier class; its teacher's page makes one when next opened.
+    ("classes", "view_token",
+     "ALTER TABLE classes ADD COLUMN view_token VARCHAR(32) NOT NULL DEFAULT ''"),
+    # The laser's path. Empty is true of every earlier lesson.
+    ("live_sessions", "pointer_path",
+     "ALTER TABLE live_sessions ADD COLUMN pointer_path TEXT NOT NULL "
+     "DEFAULT ''"),
+    # Feedback on turned-in work. Empty, NULL and 0 are true of every earlier
+    # submission: none had any, and "not seen" is harmless with nothing to
+    # see, because the New marker is only shown beside feedback that exists.
+    ("submissions", "feedback",
+     "ALTER TABLE submissions ADD COLUMN feedback TEXT NOT NULL DEFAULT ''"),
+    ("submissions", "feedback_at",
+     "ALTER TABLE submissions ADD COLUMN feedback_at TIMESTAMP"),
+    ("submissions", "feedback_seen",
+     "ALTER TABLE submissions ADD COLUMN feedback_seen INTEGER NOT NULL "
+     "DEFAULT 0"),
+    # Grading. NULL and empty are true of everything before: no assignment
+    # had points, none was posted to Classroom, no work was scored or synced.
+    ("assignments", "out_of",
+     "ALTER TABLE assignments ADD COLUMN out_of INTEGER"),
+    ("assignments", "classroom_course_id",
+     "ALTER TABLE assignments ADD COLUMN classroom_course_id VARCHAR(32) "
+     "NOT NULL DEFAULT ''"),
+    ("assignments", "classroom_course_name",
+     "ALTER TABLE assignments ADD COLUMN classroom_course_name VARCHAR(200) "
+     "NOT NULL DEFAULT ''"),
+    ("assignments", "classroom_work_id",
+     "ALTER TABLE assignments ADD COLUMN classroom_work_id VARCHAR(32) "
+     "NOT NULL DEFAULT ''"),
+    ("assignments", "classroom_url",
+     "ALTER TABLE assignments ADD COLUMN classroom_url VARCHAR(300) "
+     "NOT NULL DEFAULT ''"),
+    ("submissions", "score",
+     "ALTER TABLE submissions ADD COLUMN score FLOAT"),
+    ("submissions", "score_synced",
+     "ALTER TABLE submissions ADD COLUMN score_synced FLOAT"),
+    # The two-tab guard. 0 and '' are right for every earlier draft: no tab
+    # has claimed it, so the first save from any tab is accepted.
+    ("drafts", "version",
+     "ALTER TABLE drafts ADD COLUMN version BIGINT NOT NULL DEFAULT 0"),
+    ("drafts", "writer",
+     "ALTER TABLE drafts ADD COLUMN writer VARCHAR(24) NOT NULL DEFAULT ''"),
+    # Lessons. 'code' is right for every earlier assignment: they were all
+    # code, and a lesson could not be made before this.
+    ("assignments", "kind",
+     "ALTER TABLE assignments ADD COLUMN kind VARCHAR(16) NOT NULL DEFAULT 'code'"),
+    # First and last name for Skyward. Empty is true, not merely valid, for
+    # every earlier user: nothing was ever stored, and every reader treats
+    # empty as "not known yet" and falls back rather than writing a blank.
+    ("users", "first_name",
+     "ALTER TABLE users ADD COLUMN first_name VARCHAR(80) NOT NULL DEFAULT ''"),
+    ("users", "last_name",
+     "ALTER TABLE users ADD COLUMN last_name VARCHAR(80) NOT NULL DEFAULT ''"),
+    # XP. Every default is true of everyone from before it: nobody had an
+    # avatar, hid from a board that didn't exist, or spent a token, and no
+    # assignment had a bonus.
+    ("users", "avatar",
+     "ALTER TABLE users ADD COLUMN avatar TEXT NOT NULL DEFAULT ''"),
+    ("users", "board_hidden",
+     "ALTER TABLE users ADD COLUMN board_hidden INTEGER NOT NULL DEFAULT 0"),
+    ("users", "tokens_used",
+     "ALTER TABLE users ADD COLUMN tokens_used INTEGER NOT NULL DEFAULT 0"),
+    ("assignments", "xp_bonus",
+     "ALTER TABLE assignments ADD COLUMN xp_bonus INTEGER NOT NULL DEFAULT 0"),
+    # Editor themes. Empty is true of everyone and every shop item from
+    # before them: nobody owned or chose one, and no item was a theme.
+    ("users", "themes_owned",
+     "ALTER TABLE users ADD COLUMN themes_owned VARCHAR(400) NOT NULL DEFAULT ''"),
+    ("users", "editor_theme",
+     "ALTER TABLE users ADD COLUMN editor_theme VARCHAR(24) NOT NULL DEFAULT ''"),
+    ("shop_items", "theme",
+     "ALTER TABLE shop_items ADD COLUMN theme VARCHAR(24) NOT NULL DEFAULT ''"),
+]
+
+
+def create_all(engine) -> None:
+    """Create only the tables defined here, then bring them up to date.
+
+    Uses this module's own metadata, so it never touches `snippets` or
+    anything WebIDE owns in the same database.
+    """
+    Base.metadata.create_all(engine)
+
+    from sqlalchemy import inspect, text
+    inspector = inspect(engine)
+    for table, column, ddl in LATER_COLUMNS:
+        try:
+            existing = {c["name"] for c in inspector.get_columns(table)}
+        except Exception:
+            continue
+        if column in existing:
+            continue
+        with engine.begin() as conn:
+            try:
+                conn.execute(text(ddl))
+            except Exception:
+                pass
+
+
+# --------------------------------------------------------------------------
+# Who is allowed in
+# --------------------------------------------------------------------------
+
+def _split_env(name) -> list:
+    raw = os.environ.get(name, "")
+    return [part.strip().lower() for part in re.split(r"[,\s]+", raw) if part.strip()]
+
+
+def allowed_domains() -> list:
+    """Email domains permitted to sign in. Empty means no restriction."""
+    return [d.lstrip("@") for d in _split_env("ALLOWED_EMAIL_DOMAINS")]
+
+
+def teacher_emails() -> list:
+    """Addresses that get the dashboard.
+
+    Kept in the environment rather than a column on users, so nobody can
+    promote themselves by finding a hole in the app. Changing who teaches is
+    a deploy setting, not a database write.
+    """
+    return _split_env("TEACHER_EMAILS")
+
+
+def email_allowed(email: str) -> bool:
+    if not email or "@" not in email:
+        return False
+    domains = allowed_domains()
+    if not domains:
+        return True                      # unconfigured: let anyone in (local dev)
+    return email.lower().rsplit("@", 1)[1] in domains
+
+
+def is_teacher(email: str) -> bool:
+    return bool(email) and email.lower() in teacher_emails()
+
+
+def login_configured() -> bool:
+    """Is Google sign-in set up at all? If not, the app hides every trace."""
+    return bool(os.environ.get("GOOGLE_CLIENT_ID") and
+                os.environ.get("GOOGLE_CLIENT_SECRET"))

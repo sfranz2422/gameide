@@ -12,7 +12,7 @@ Pyodide; runs headless in node), `src/engine/render/` (PixiJS), `src/python/`
 (the bridge, `runtime.py`, the game worker, `codegen.ts`), `src/catalog/`
 (the API catalog), `src/store/` (the project format, IndexedDB, templates),
 `src/editor/` (the React UI). `blocks/`, `eventsheets/` wait for their
-phases. `backend/` arrives in Phase 3.
+phases. `backend/` is the Flask server.
 
 ## The game runs in a worker
 
@@ -71,18 +71,66 @@ holds one deliberate bug per guarded behaviour, applies each, confirms the
 named test fails, and restores. Add a case whenever you add a check; a case
 that prints MISS is a test that lets the bug through. A sabotage must still
 compile (strict TypeScript refuses unused names), and a case can run a
-Playwright test instead of Vitest. Its usual traps, all hit already: the
+Playwright test (`E2E`) or one of the server's checks (`PY`) instead of
+Vitest. Its usual traps, all hit already: the
 bug lands where the check can't see it (an error on an event's last line
-hides an off-by-one), or the test never produced the condition it names.
+hides an off-by-one), the test never produced the condition it names, a
+test setting left changed by an earlier check (a lowered cap) hides the
+next one's failure, or stale Python bytecode runs the previous sabotage's
+code (the harness turns bytecode caching off for that reason).
 
-## Backend (Phase 3) — decided, not in the spec
+Server tests are plain scripts, as in PyIDE: `backend/tests/test_server.py`
+prints ok/FAIL per check and exits non-zero. Browser tests use Playwright in
+two projects: `editor` (the build alone) and `account` (served by Flask with
+the dev sign-in and a throwaway SQLite database).
 
-**Flask + SQLAlchemy + Authlib, sharing PyIDE's `accounts.py`, database and
-Google client** — not Django as the spec says — so one sign-in and one XP
-total cover PyIDE, WebIDE, FlaskIDE and this. `accounts.py` then becomes a
-fourth byte-identical copy; GameIDE's own tables are prefixed `gameide_`.
-The PyIDE CLAUDE.md's rules about `accounts.py`, `LATER_COLUMNS`, two
-gunicorn workers and `TEACHER_EMAILS` all apply here too.
+Waiting for a save in a test: wait for "Saving…" **then** "Saved". "Saved"
+alone is already showing before an edit, and passes before the save starts.
+
+## Backend — Flask, sharing PyIDE's database
+
+`backend/app.py` is **Flask + SQLAlchemy + Authlib sharing PyIDE's
+`accounts.py`, database and Google client** — not Django as the spec says —
+so one sign-in and one XP total cover PyIDE, WebIDE, FlaskIDE and this. It
+also serves the built editor (`frontend/dist`). Deployed by `render.yaml`
+(the dashboard wins where they differ, as with PyIDE).
+
+- **`backend/accounts.py` is a fourth byte-identical copy** of PyIDE's.
+  Never edit it here first; change it in PyIDE and copy to all four.
+- **GameIDE's tables are not in accounts.py.** They are in
+  `backend/gamestore.py`, declared on `accounts.Base`, so `create_all`
+  makes them only in this app and the other three never see them. Every
+  name starts `gameide_`. New columns still need an `ALTER TABLE` path
+  (create_all never adds columns) — put it in gamestore.py, not
+  accounts.py's LATER_COLUMNS, unless the column is on a shared table.
+- **Pictures are bytes in Postgres** (`gameide_assets`), as PyIDE's
+  `images` are: Render's disk is wiped on deploy. The user wants everything
+  on Render. Limits are in gamestore.py and every one answers in words.
+- **Every JSON body is packed** as `{"_packed": base64}` (`store/api.ts` ↔
+  `PackedRequest`), because Render's firewall refuses bodies that look like
+  attacks and a project is code. Go through `api()` for every request.
+- Sign-in, `TEACHER_EMAILS`, `ALLOWED_EMAIL_DOMAINS` and the two-hour idle
+  sign-out for students are PyIDE's (signing in only adds abilities; GET
+  /api/ is never activity). `/dev/login` exists only with
+  `GAMEIDE_DEV_LOGIN=1` **and** no `DATABASE_URL`.
+- **The isolation headers go on every response** (`_headers`); without them
+  the endless-loop interrupt silently loses its line numbers.
+
+## Saving, signed in
+
+`store/cloudStore.ts`: every save goes to a per-user IndexedDB cache first
+(marked dirty), then to the server; the mark clears only when the server
+accepts it. Offline or signed out, work stays in the browser and is sent on
+`online`, every 30 s, and on next open. Each save carries the server
+version it was based on; a stale one makes the server keep the replaced
+version in History before accepting (`save_project`).
+
+- **The base version belongs to the tab, not the browser** (`bases`). Two
+  tabs share one cache; using the cache's base let tab two overwrite tab
+  one with nothing kept. Caught by a test, fixed, pinned.
+- Sync-state changes go through `updateMeta` (one at a time per project),
+  or a picture added mid-save can drop off the upload list. **No test
+  covers that race** — it needs a fake IndexedDB the repo doesn't have.
 
 ## Style
 

@@ -15,6 +15,7 @@ import { ResourceTree, type TabRef } from "./ResourceTree";
 import { ConsolePane, DocsPane, GamePane, type ConsoleLine } from "./RunPanes";
 import { Icon } from "./ui/icons";
 import { ThemeToggle } from "./ui/ThemeToggle";
+import { AccountMenu, ExportButton, HistoryButton, SaveStatusView } from "./AccountBits";
 import { Splitter, usePaneSize } from "./ui/Splitter";
 import { ProjectContext, useProjectState, type ProjectApi } from "./useProject";
 
@@ -29,7 +30,7 @@ const TAB_ICON = { sprites: Icon.sprite, objects: Icon.object, rooms: Icon.room,
 
 export function EditorPage({ store, id }: { store: ProjectStore; id: string }) {
   const state = useProjectState(store, id);
-  const { project, assets, mutate, addAssets, status, saveError, loadError } = state;
+  const { project, assets, mutate, addAssets, status, saveError, saveNote, setSaveNote, loadError, replace } = state;
 
   const [tabs, setTabs] = useState<TabRef[]>([]);
   const [active, setActive] = useState<TabRef | null>(null);
@@ -134,9 +135,16 @@ export function EditorPage({ store, id }: { store: ProjectStore; id: string }) {
   );
 
   const api: ProjectApi | null = useMemo(
-    () => (project ? { project, assets, mutate, addAssets, status, saveError } : null),
-    [project, assets, mutate, addAssets, status, saveError],
+    () => (project ? { project, assets, mutate, addAssets, status, saveError, saveNote, replace, store } : null),
+    [project, assets, mutate, addAssets, status, saveError, saveNote, replace, store],
   );
+
+  // "Another tab saved too" and the like: worth a line in the console.
+  useEffect(() => {
+    if (!saveNote) return;
+    addLines([{ kind: "warn", text: saveNote }]);
+    setSaveNote(null);
+  }, [saveNote, setSaveNote, addLines]);
 
   if (loadError)
     return (
@@ -164,10 +172,11 @@ export function EditorPage({ store, id }: { store: ProjectStore; id: string }) {
             aria-label="Game name"
             data-tutorial="project-name"
           />
-          <span className={`save-status ${status}`} data-testid="save-status" title={saveError ?? ""}>
-            {status === "saved" ? "Saved" : status === "saving" ? "Saving…" : "Not saved!"}
-          </span>
+          <SaveStatusView status={status} error={saveError} />
           <span className="spacer" />
+          <HistoryButton />
+          <ExportButton />
+          <AccountMenu />
           <ThemeToggle />
         </header>
 

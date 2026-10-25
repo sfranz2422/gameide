@@ -1,6 +1,92 @@
 # Progress
 
-## Phase 2 — Project model + object editor (Python only) ✅ (2026-10-25, waiting for review)
+## Phase 3 — Backend core ✅ (2026-10-25, waiting for review)
+
+### Done
+
+- **The server** is `backend/app.py`, Flask sharing PyIDE's database, Google client and `accounts.py` (a fourth identical copy). Nothing in PyIDE, WebIDE or FlaskIDE had to change.
+  - GameIDE's own tables, `gameide_projects`, `gameide_assets` and `gameide_versions`, live in `backend/gamestore.py`. They are created only by this app.
+- **Signing in** works exactly as in PyIDE: Google only, the account chooser every time, `TEACHER_EMAILS` for teachers, `ALLOWED_EMAIL_DOMAINS` for who may sign in. Students are signed out after two idle hours; polls don't count as activity.
+  - Signing in only adds abilities. Signed out, or with no Google settings at all, the editor keeps projects in the browser as before.
+- **Projects in your account:** autosave goes to the server through an offline cache.
+  - The top bar says Saved / Saving… / "Offline — saved in this browser" / "Signed out — saved in this browser · Sign in" / Not saved! (with the reason).
+  - Work made offline goes up by itself when the connection comes back.
+- **Two tabs or two computers** editing one game can't destroy each other's work. The server keeps the version being replaced in History, and the console says so.
+- **Pictures** are stored as bytes in Postgres. Only real PNG, JPEG, GIF or WebP files are accepted, judged by their contents. They can't be overwritten once stored.
+- **History:**
+  - versions are kept automatically about every ten minutes of work, and whenever you press **Save a version** (with an optional name);
+  - **Go back to this** restores one, and first keeps what you had, so going back can be undone;
+  - versions saved by hand are never pruned; automatic ones keep the newest 40.
+- **Size limits**, each with a sentence that names the number: 2 MB of project JSON, 2 MB per picture, 40 MB of pictures per game, 200 MB per person, 300 games per person.
+- **Games made before signing in** appear under "In this browser only" with **Move to my account**, so signing in never makes earlier work vanish.
+- **Project .zip export and import**, signed in or not. Export is in the editor's top bar; Import is on the front page. An import always becomes a new game and never overwrites one.
+- **Render's firewall:** every JSON body is sent base64-packed from the start (FlaskIDE's fix, built in). A test checks the code never appears in a request body.
+- **Deployment:** `render.yaml` describes the service. Render's build image has Node, so one build command builds the editor and installs the server.
+  - Flask serves the editor with the isolation headers on every response, hashed bundles cached for a year, Pyodide for a day, and the page itself never cached.
+
+### Tests
+
+```
+cd frontend
+npm test                                                  # Vitest: 57
+npm run e2e                                               # Playwright: 11 editor + 7 account tests
+../backend/.venv/bin/python ../backend/tests/test_server.py   # 50 server checks
+python3 scripts/sabotage.py                               # 82 deliberate bugs, all caught
+```
+
+The account tests run the real build served by Flask, with a sign-in that needs no Google and a throwaway database. They cover:
+- work opening on a second computer with nothing cached;
+- going offline and coming back;
+- History, including undoing a restore;
+- moving browser games into the account;
+- a picture reaching the server;
+- two tabs editing one game;
+- someone else's project URL being refused.
+
+What the tests and sabotage run found:
+- **A real bug: two tabs in the same browser could silently overwrite each other.** They shared the cache's record of which version they were based on, so the server saw no conflict and kept no copy. Each tab now speaks only for what it loaded. This is pinned by a test.
+- A race where a picture added during a save could drop off the upload list. I fixed it by inspection; no test covers it (see known issues).
+- Three test-side traps:
+  - a test checked "Saved" before the save had started;
+  - an earlier check left the snapshot cap lowered, which hid a later failure;
+  - stale Python bytecode made one sabotage run the previous one's code.
+
+  `CLAUDE.md` now records all three.
+
+### Setting it up on Render (your steps)
+
+1. **New → Web Service** from the `gameide` repo. Use `render.yaml`'s build and start commands, or **New → Blueprint** to read them from the file. Pick the plan in the dashboard.
+2. **Environment variables:**
+   - `DATABASE_URL`: PyIDE's database **Internal** URL (pyide-db → Connect).
+   - `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `ALLOWED_EMAIL_DOMAINS` and `TEACHER_EMAILS`: the same values as PyIDE.
+   - `SECRET_KEY`: generated.
+3. **Google Cloud Console → the OAuth client → Authorized redirect URIs:** add `https://<the GameIDE address>/auth/callback`. The exact string is printed in the service's logs on the first sign-in attempt.
+4. The first boot creates the three `gameide_*` tables in the shared database. This only adds tables; nothing existing changes.
+
+### Known issues and gaps
+
+1. **The race fix in `updateMeta` has no test.** Testing it needs a fake IndexedDB the repo doesn't have (it would be one small dev dependency, `fake-indexeddb`; say if you want it).
+2. **Teachers approved by an admin** (the spec) is `TEACHER_EMAILS`, as in PyIDE: changing who teaches is a deploy setting. There's no in-app approval queue.
+3. Teachers can't see students' projects yet. That arrives with classrooms in Phase 10, and the server refuses anyone but the owner for now.
+4. **Deleting is soft:** a deleted game is hidden, not erased, so it can be recovered by hand. There's no Trash page yet. Pictures are kept as long as their game exists, even if no sprite uses them any more.
+5. History needs signing in. Signed out, the History button offers sign-in.
+6. **`accounts.py` now has four copies.** PyIDE's, WebIDE's and FlaskIDE's `CLAUDE.md` still say three, so a future change there might not be copied here. That's a one-line edit in each repo, not made yet; say if you want it.
+
+### Exports (agreed 2026-10-25)
+
+| Export | When |
+|---|---|
+| Project .zip import/export | ✅ done in this phase |
+| HTML5 .zip, installable web app, Windows/macOS/Linux (Electron shell, unsigned on macOS) | Phase 9 |
+| Android APK | dropped |
+
+## Next: Phase 4 — Sprites
+
+Import pictures (PNG/JPG/GIF, file picker and drag-and-drop), the sprite sheet slicer, origin, collision masks (box or circle), and animation, all saved through the server.
+
+---
+
+## Phase 2 — Project model + object editor (Python only) ✅ (2026-10-25, reviewed)
 
 ### Done
 
@@ -88,14 +174,10 @@ Bugs the tests found and fixed: a keystroke made just before closing the tab was
 6. Play runs in the pane only. Playing in a new tab comes with publishing in Phase 9.
 7. Phase 1's gaps remain: rotated collision masks and `move_and_collide` on slopes.
 
-### Decisions needed before Phase 3
+### Decisions needed before Phase 3 (resolved: everything on Render, pictures in Postgres)
 
 - **Where uploaded images and sounds live:** a Render disk, or S3-compatible storage such as Cloudflare R2. I recommend R2: it's backed up, isn't tied to one server, and has a 10 GB free tier with no download fees.
 - The Flask server will need to send `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: credentialless` on the GameIDE pages. Google sign-in uses redirects (as PyIDE does), so COOP doesn't break it, but anything that opens a popup to another site would need checking.
-
-## Next: Phase 3 — Backend core
-
-Flask + SQLAlchemy + Authlib sharing PyIDE's accounts.py, database and Google client; teacher/student roles; CloudStore; asset uploads; autosave with offline cache; version history; Render config.
 
 ---
 

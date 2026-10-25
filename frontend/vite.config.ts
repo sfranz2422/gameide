@@ -66,8 +66,18 @@ const ISOLATION = {
 
 export default defineConfig({
   plugins: [react(), servePyodide()],
-  server: { headers: ISOLATION },
-  preview: { headers: ISOLATION },
+  // In development the editor is served by Vite and the API by Flask
+  // (backend/app.py on 5001); these go through to Flask so both share one
+  // origin, as they do in production where Flask serves everything.
+  server: {
+    headers: ISOLATION,
+    proxy: Object.fromEntries(
+      ["/api", "/login", "/logout", "/auth", "/dev"].map((p) => [p, { target: "http://127.0.0.1:5001", changeOrigin: false }]),
+    ),
+  },
+  // Not the dev proxy (preview would inherit it): the editor tests run the
+  // build on its own, with no server behind it, as a static host would.
+  preview: { headers: ISOLATION, proxy: {} },
   // The game worker imports Pixi and Pyodide; ES modules let it split them.
   worker: { format: "es" },
   // Pre-bundling pyodide breaks its own lookup of the files next to it.

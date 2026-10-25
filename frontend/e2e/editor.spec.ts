@@ -4,43 +4,9 @@
  * the React UI, the worker and the watchdog, so each one names the thing
  * it would catch.
  */
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
-const SHOTS = process.env.SHOT_DIR;
-
-function watchErrors(page: Page): string[] {
-  const errors: string[] = [];
-  page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
-  page.on("pageerror", (e) => errors.push(String(e)));
-  return errors;
-}
-
-async function fromTemplate(page: Page, key: string, query = "") {
-  await page.goto(`/${query}`);
-  await page.getByTestId(`template-${key}`).click();
-  await page.waitForURL(/#\/p\//);
-}
-
-const treeItem = (page: Page, name: string) =>
-  page.getByRole("navigation", { name: "Resources" }).getByRole("button", { name, exact: true });
-const nameBox = (page: Page) => page.getByRole("textbox", { name: "Name", exact: true });
-
-/** Replaces the code in the open event (or script) with `text`, exactly as given. */
-async function setCode(page: Page, text: string, testId = "event-code") {
-  const content = page.getByTestId(testId).locator(".cm-content");
-  await content.click();
-  await page.keyboard.press("ControlOrMeta+a");
-  // insertText arrives as one input: no auto-indent, no auto-closed brackets.
-  if (text) await page.keyboard.insertText(text);
-  else await page.keyboard.press("Backspace");
-}
-
-const py = (page: Page, code: string) => page.evaluate((c) => (window as any).__gameide.host.evalPython(c), code);
-
-async function playAndWait(page: Page) {
-  await page.getByTestId("play").click();
-  await expect(page.getByTestId("fps")).toBeVisible({ timeout: 30_000 });
-}
+import { fromTemplate, nameBox, playAndWait, py, setCode, SHOTS, treeItem, watchErrors } from "./helpers";
 
 test("a game built from an empty project runs", async ({ page }) => {
   const errors = watchErrors(page);
@@ -191,4 +157,29 @@ test("the stress test runs 300+ instances, and a second Play starts fast", async
   console.log(`second Play: ${Date.now() - t0} ms`);
   expect(Date.now() - t0).toBeLessThan(3000);
   expect(errors).toEqual([]);
+});
+
+test("a game exported as a .zip imports as a new game that plays", async ({ page }) => {
+  const errors = watchErrors(page);
+  await fromTemplate(page, "coins");
+  const download = page.waitForEvent("download");
+  await page.getByTestId("export-zip").click();
+  const file = await download;
+  expect(file.suggestedFilename()).toBe("Collect-the-coins.zip");
+  const path = await file.path();
+
+  await page.goto("/");
+  await page.getByTestId("import-file").setInputFiles(path!);
+  await page.waitForURL(/#\/p\//);
+  await expect(page.getByRole("textbox", { name: "Game name" })).toHaveValue("Collect the coins (imported)");
+  await expect(treeItem(page, "coin")).toBeVisible();
+  await playAndWait(page);
+  expect(await py(page, "instance_number('Coin')")).toBe(15);
+  expect(errors).toEqual([]);
+});
+
+test("importing something that isn't a game says so", async ({ page }) => {
+  await page.goto("/");
+  await page.getByTestId("import-file").setInputFiles({ name: "notes.zip", mimeType: "application/zip", buffer: Buffer.from("not a zip") });
+  await expect(page.getByRole("alert")).toHaveText("That isn't a .zip file GameIDE can open.");
 });
