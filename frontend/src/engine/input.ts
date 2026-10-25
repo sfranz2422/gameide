@@ -29,6 +29,19 @@ for (let i = 1; i <= 12; i++) CODE_TO_KEY[`F${i}`] = `f${i}` as KeyName;
 export const KEY_CODE = new Map<string, number>(KEY_NAMES.map((k, i) => [k, i]));
 
 /**
+ * Where attachInput sends what the page sees. InputState is one; in the IDE
+ * the sink posts to the game's worker, which feeds the InputState there.
+ */
+export interface InputSink {
+  keyDown(code: number): void;
+  keyUp(code: number): void;
+  mouseDown(button: number): void;
+  mouseUp(button: number): void;
+  mouseMove(x: number, y: number): void;
+  releaseAll(): void;
+}
+
+/**
  * Collects input between steps and hands each step a consistent picture.
  *
  * "Pressed" and "released" are latched until the next step reads them: a
@@ -36,7 +49,7 @@ export const KEY_CODE = new Map<string, number>(KEY_NAMES.map((k, i) => [k, i]))
  * Chromebook) still shows up as pressed for one step, rather than being
  * missed entirely. "Held" is what is down at the moment the step starts.
  */
-export class InputState {
+export class InputState implements InputSink {
   private held = new Uint8Array(KEY_COUNT);
   private pressed = new Uint8Array(KEY_COUNT);
   private released = new Uint8Array(KEY_COUNT);
@@ -48,6 +61,11 @@ export class InputState {
   /** Presses and releases this step, for the engine's instance mouse events. */
   readonly mouseEdges: { button: number; released: boolean }[] = [];
   private pendingEdges: { button: number; released: boolean }[] = [];
+
+  mouseMove(x: number, y: number) {
+    this.mouseX = x;
+    this.mouseY = y;
+  }
 
   keyDown(code: number) {
     if (!this.held[code]) this.pressed[code] = 1;
@@ -125,7 +143,7 @@ export class InputState {
  * scaled to fit its pane).
  */
 export function attachInput(
-  input: InputState,
+  input: InputSink,
   canvas: HTMLElement,
   active: () => boolean,
   toRoom: (e: PointerEvent) => { x: number; y: number },
@@ -146,8 +164,7 @@ export function attachInput(
   };
   const move = (e: PointerEvent) => {
     const p = toRoom(e);
-    input.mouseX = p.x;
-    input.mouseY = p.y;
+    input.mouseMove(p.x, p.y);
   };
   const press = (e: PointerEvent) => {
     move(e);

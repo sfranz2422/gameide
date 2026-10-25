@@ -66,6 +66,8 @@ export interface PythonGameError {
   line: number | null; // line in that object's code
   message: string; // "NameError: name 'spead' is not defined"
   traceback: string; // only the student's own frames
+  /** The game stopped responding and was interrupted (an endless loop, usually). */
+  hang?: boolean;
 }
 
 const scratch: Box = { left: 0, top: 0, right: 0, bottom: 0 };

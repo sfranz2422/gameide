@@ -42,6 +42,7 @@ function servePyodide(): Plugin {
         const ext = file.slice(file.lastIndexOf("."));
         res.setHeader("Content-Type", types[ext] ?? "application/octet-stream");
         res.setHeader("Content-Length", String(statSync(path).size));
+        for (const [k, v] of Object.entries(ISOLATION)) res.setHeader(k, v);
         createReadStream(path).pipe(res);
       });
     },
@@ -53,10 +54,27 @@ function servePyodide(): Plugin {
   };
 }
 
+// Cross-origin isolation, so SharedArrayBuffer exists and a stuck game can
+// be interrupted at the line it is on (see editor/gameHost.ts). The server
+// in Phase 3 must send the same two headers. "credentialless" rather than
+// "require-corp", so pictures from other sites (Google profile photos) still
+// load without each one opting in.
+const ISOLATION = {
+  "Cross-Origin-Opener-Policy": "same-origin",
+  "Cross-Origin-Embedder-Policy": "credentialless",
+};
+
 export default defineConfig({
   plugins: [react(), servePyodide()],
+  server: { headers: ISOLATION },
+  preview: { headers: ISOLATION },
+  // The game worker imports Pixi and Pyodide; ES modules let it split them.
+  worker: { format: "es" },
   // Pre-bundling pyodide breaks its own lookup of the files next to it.
-  optimizeDeps: { exclude: ["pyodide"] },
+  // Pixi is listed because only the game worker imports it: the dev server
+  // would otherwise find it on the first Play and reload the page, losing
+  // whatever the student had open.
+  optimizeDeps: { exclude: ["pyodide"], include: ["pixi.js"] },
   test: {
     environment: "node",
     include: ["src/**/*.test.ts"],

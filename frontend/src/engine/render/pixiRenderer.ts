@@ -15,15 +15,26 @@ import { boxOf, type Box } from "../sprites";
 
 const DEG = Math.PI / 180;
 
-function paintFrames(def: SpriteDef): Texture[] {
+/**
+ * Each frame's picture as a texture. A sprite whose pictures are missing (an
+ * asset that failed to load) gets a magenta placeholder of the right size
+ * rather than nothing: an invisible player is much harder to diagnose.
+ */
+async function loadFrames(def: SpriteDef): Promise<Texture[]> {
+  const count = Math.max(1, def.frameCount);
   const frames: Texture[] = [];
-  for (let i = 0; i < Math.max(1, def.frameCount); i++) {
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.max(1, def.width);
-    canvas.height = Math.max(1, def.height);
-    const ctx = canvas.getContext("2d")!;
-    def.paint?.(ctx, i);
-    const tex = Texture.from(canvas);
+  for (let i = 0; i < count; i++) {
+    const img = def.images?.[i];
+    let source: ImageBitmap | OffscreenCanvas;
+    if (img) {
+      source = img instanceof Blob ? await createImageBitmap(img) : img;
+    } else {
+      source = new OffscreenCanvas(Math.max(1, def.width), Math.max(1, def.height));
+      const ctx = source.getContext("2d")!;
+      ctx.fillStyle = "#ff00ff";
+      ctx.fillRect(0, 0, def.width, def.height);
+    }
+    const tex = Texture.from(source);
     // Students' art is mostly pixel art; smoothing would blur it when the
     // game is scaled up to fill the pane.
     tex.source.scaleMode = "nearest";
@@ -56,8 +67,9 @@ export class PixiRenderer {
     readonly app: Application,
     private readonly def: GameDefinition,
     private readonly engine: Engine,
+    frames: Texture[][],
   ) {
-    this.frames = def.sprites.map(paintFrames);
+    this.frames = frames;
     this.anchors = def.sprites.map((s) => ({
       x: s.width ? s.originX / s.width : 0,
       y: s.height ? s.originY / s.height : 0,
@@ -67,10 +79,17 @@ export class PixiRenderer {
     this.debugLabel.position.set(6, 4);
   }
 
-  static async create(host: HTMLElement, def: GameDefinition, engine: Engine): Promise<PixiRenderer> {
+  /**
+   * Draws into `canvas`. In the IDE that is an OffscreenCanvas inside the
+   * game's worker (pixi's WebWorkerAdapter must be set first, see
+   * gameWorker.ts); a plain canvas works too.
+   */
+  static async create(canvas: OffscreenCanvas | HTMLCanvasElement, def: GameDefinition, engine: Engine): Promise<PixiRenderer> {
     const room = def.rooms[0]!;
+    const frames = await Promise.all(def.sprites.map(loadFrames));
     const app = new Application();
     await app.init({
+      canvas: canvas as HTMLCanvasElement,
       width: room.width,
       height: room.height,
       background: room.background ?? 0x000000,
@@ -78,24 +97,11 @@ export class PixiRenderer {
       autoStart: false, // the game loop decides when to draw, not Pixi's ticker
       preference: "webgl",
     });
-    app.canvas.dataset.tutorial = "game-canvas";
-    app.canvas.tabIndex = 0;
-    host.appendChild(app.canvas);
-    return new PixiRenderer(app, def, engine);
+    return new PixiRenderer(app, def, engine, frames);
   }
 
-  get canvas(): HTMLCanvasElement {
-    return this.app.canvas;
-  }
-
-  /** Room coordinates of a pointer event, allowing for the canvas being scaled by CSS. */
-  toRoom(e: PointerEvent): { x: number; y: number } {
-    const r = this.app.canvas.getBoundingClientRect();
-    return {
-      x: ((e.clientX - r.left) / r.width) * this.app.renderer.width,
-      y: ((e.clientY - r.top) / r.height) * this.app.renderer.height,
-    };
-  }
+  /** The room being shown changed size; the page needs to know to fit the canvas. */
+  onRoomSize: (w: number, h: number) => void = () => {};
 
   private syncRoom() {
     const i = this.engine.roomIndex;
@@ -103,6 +109,7 @@ export class PixiRenderer {
     this.roomShown = i;
     const room = this.def.rooms[i]!;
     this.app.renderer.resize(room.width, room.height);
+    this.onRoomSize(room.width, room.height);
     this.app.renderer.background.color = room.background ?? 0x000000;
   }
 
@@ -246,6 +253,6 @@ export class PixiRenderer {
   }
 
   destroy() {
-    this.app.destroy({ removeView: true }, { children: true, texture: true, textureSource: true });
+    this.app.destroy({ removeView: false }, { children: true, texture: true, textureSource: true });
   }
 }

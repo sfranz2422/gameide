@@ -12,9 +12,6 @@ export interface MaskRect {
   bottom: number; // exclusive
 }
 
-/** One frame of a sprite, ready to draw: a canvas or a loaded image. */
-export type FrameSource = HTMLCanvasElement | HTMLImageElement | ImageBitmap | OffscreenCanvas;
-
 export interface SpriteDef {
   name: string;
   width: number;
@@ -26,11 +23,11 @@ export interface SpriteDef {
   /** Number of animation frames. */
   frameCount: number;
   /**
-   * Paints frame `i` into a 2D context of width × height. The engine core
-   * never calls this — only the renderer does — so a headless test can
-   * describe sprites without a canvas.
+   * The frames' pictures, in order. Only the renderer reads them, so a
+   * headless test can describe sprites with none. Blobs can be posted to the
+   * game's worker as they are; it decodes them there.
    */
-  paint?: (ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D, frame: number) => void;
+  images?: (Blob | ImageBitmap)[];
 }
 
 export interface ObjectDef {
@@ -71,6 +68,8 @@ export interface GameDefinition {
    * so a traceback says which object an error came from.
    */
   code: Record<string, string>;
+  /** Steps per second (GameMaker's room speed). Default 60. */
+  stepsPerSecond?: number;
   /** Shared functions every object can call (the Scripts folder). */
   scripts?: Record<string, string>;
 }

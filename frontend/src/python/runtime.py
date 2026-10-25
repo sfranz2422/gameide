@@ -995,7 +995,7 @@ def _frame():
         _draw_events()
         _end_of_frame()
         return _commands()
-    except Exception as e:  # noqa: BLE001 — every student error must reach the IDE
+    except (Exception, KeyboardInterrupt) as e:  # noqa: BLE001 — every student error must reach the IDE
         _cur = None
         _in_draw = False
         return _error_json(e)
@@ -1007,7 +1007,7 @@ def _start():
         _goto(0, first=True)
         _reap()
         return _commands()
-    except Exception as e:  # noqa: BLE001
+    except (Exception, KeyboardInterrupt) as e:  # noqa: BLE001
         return _error_json(e)
 
 
@@ -1037,9 +1037,18 @@ def _error_report(e):
     if where:
         # "<object Player>" -> ("object", "Player")
         kind, _, obj = where[1:-1].partition(" ")
-    message = "".join(traceback.format_exception_only(type(e), e)).strip()
+    hang = isinstance(e, KeyboardInterrupt)
+    if hang:
+        # Raised by the editor through Pyodide's interrupt buffer when the
+        # game stops answering. "KeyboardInterrupt" means nothing to a
+        # student; where it was when it was stopped means a great deal.
+        message = ("This game stopped responding, so GameIDE stopped it. The line shown was "
+                   "still running — is there a loop that never ends?")
+    else:
+        message = "".join(traceback.format_exception_only(type(e), e)).strip()
     tb = "".join(traceback.format_list(frames)) if frames else ""
-    return {"kind": kind, "object": obj, "event": event, "line": line, "message": message, "traceback": tb}
+    return {"kind": kind, "object": obj, "event": event, "line": line, "message": message,
+            "traceback": tb, "hang": hang}
 
 
 def _error_json(e):
@@ -1094,7 +1103,7 @@ def _setup(layout_json, game_json):
 
     try:
         return _load_game(game)
-    except Exception as e:  # noqa: BLE001
+    except (Exception, KeyboardInterrupt) as e:  # noqa: BLE001
         return _error_json(e)
 
 

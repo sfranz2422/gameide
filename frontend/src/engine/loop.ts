@@ -11,6 +11,15 @@
  */
 const MAX_STEPS_PER_FRAME = 4;
 
+// Workers have requestAnimationFrame in Chrome and Firefox; anywhere that
+// doesn't, a 60 Hz timer stands in.
+const raf: (cb: (now: number) => void) => number =
+  typeof requestAnimationFrame === "function"
+    ? (cb) => requestAnimationFrame(cb)
+    : (cb) => setTimeout(() => cb(performance.now()), 1000 / 60) as unknown as number;
+const cancelRaf: (id: number) => void =
+  typeof cancelAnimationFrame === "function" ? (id) => cancelAnimationFrame(id) : (id) => clearTimeout(id);
+
 export interface LoopStats {
   fps: number; // frames drawn per second
   stepsPerSecond: number;
@@ -43,7 +52,7 @@ export class GameLoop {
     this.acc = 0;
     const dt = 1000 / this.stepsPerSecond;
     const tick = (now: number) => {
-      this.raf = requestAnimationFrame(tick);
+      this.raf = raf(tick);
       this.acc += Math.min(now - this.last, 250);
       this.last = now;
       let n = 0;
@@ -68,11 +77,11 @@ export class GameLoop {
         this.windowStart = now;
       }
     };
-    this.raf = requestAnimationFrame(tick);
+    this.raf = raf(tick);
   }
 
   stop() {
-    cancelAnimationFrame(this.raf);
+    cancelRaf(this.raf);
     this.raf = 0;
   }
 }

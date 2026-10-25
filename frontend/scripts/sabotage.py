@@ -8,6 +8,10 @@ the source back. Run it after changing a test or the code it guards:
     python3 scripts/sabotage.py                 # every case
     python3 scripts/sabotage.py "gravity sign"  # just these
 
+A sabotage must still compile — strict TypeScript refuses an unused
+variable, and a build that fails runs no test and proves nothing (it prints
+"no test matched"). Break behaviour, not syntax.
+
 "pattern found 0 times" means the code moved on and the case needs its
 `old` text updated — not that the test is fine. A case that prints MISS is a
 test that would let that bug through.
@@ -21,6 +25,8 @@ import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 RT, EN, IN, BR = "src/python/runtime.py", "src/engine/engine.ts", "src/engine/input.ts", "src/python/bridge.ts"
+CG, PJ, HOST, UP = "src/python/codegen.ts", "src/store/project.ts", "src/editor/gameHost.ts", "src/editor/useProject.ts"
+E2E = "e2e"  # a sixth item: run the Playwright test of that name instead of Vitest
 CASES = [
  ("layout drift", RT, '"x": boxy(F.X)', '"x": boxy(F.Y)', "every built-in property"),
  ("no polar sync", RT, "            _st[b + i] = v\n            set_polar(b)", "            _st[b + i] = v", "two views of one motion"),
@@ -59,17 +65,52 @@ CASES = [
  ("repeat is a press", IN, "    if (!this.held[code]) this.pressed[code] = 1;", "    this.pressed[code] = 1;", "reports the press once"),
  ("no any", IN, "    keys[0] = any;", "    keys[0] = 0;", "while any key"),
  ("blur keeps mouse", IN, "    for (let b = 0; b < 3; b++) if (this.mouseHeld[b]) this.mouseUp(b);", "", "loses focus"),
+ # Phase 2: code generation and error mapping
+ ("tabs kept", CG, r'const detab = (line: string) => line.replace(/^\t+/, (tabs) => "    ".repeat(tabs.length));', "const detab = (line: string) => line;", "tabs at the start"),
+ ("no pass for comments", CG, '    if (!hasCode(body)) lines.push("        pass");', '    if (!body.length) lines.push("        pass");', "only comments"),
+ ("children first", CG, "    if (parent) visit(parent, path);\n", "", "children come after parents"),
+ ("map off by one", CG, "    spans.push({ eventId: ev.id, label: eventLabel(project, ev.key), defLine, firstLine: defLine + 1, lineCount: body.length });", "    spans.push({ eventId: ev.id, label: eventLabel(project, ev.key), defLine, firstLine: defLine, lineCount: body.length });", "third event, line 2"),
+ ("traceback not rewritten", CG, '  const traceback = e.traceback.replace(', '  const traceback = e.traceback; void (', "third event, line 2"),
+ ("script not targeted", CG, "    if (script) target = { kind: \"script\", scriptId: script.id, line: e.line ?? 1 };", "", "inside a script"),
+ ("def line unmapped", CG, "    if (line === s.defLine) return { span: s, bodyLine: 1 };", "", "def line and an empty event"),
+ # project operations
+ ("case-sensitive names", PJ, "  const clash = list.find((r) => r.id !== renaming && r.name.toLowerCase() === lower);", "  const clash = list.find((r) => r.id !== renaming && r.name === name);", "objects must be Python names"),
+ ("orphans kept", PJ, "      o.events = o.events.filter((e) => !(e.key.type === \"collision\" && e.key.object === id));", "", "takes its room instances"),
+ ("loop allowed", PJ, "    if (cur === child || seen.has(cur)) return true;", "    if (seen.has(cur)) return true;", "would make a loop"),
+ ("unquoted replaced", PJ, "  const re = new RegExp(`([\"'])${from.replace(/[.*+?^${}()|[\\]\\\\]/g, \"\\\\$&\")}\\\\1`, \"g\");", "  const re = new RegExp(`()${from}()`, \"g\");", "in quotes only"),
+ ("commas ignored", "src/editor/code/pythonHelp.ts", "    } else if (c === \",\" && depth === 0) commas++;", "    }", "counting commas"),
+ # Phase 2: the editor, in the browser
+ ("no interrupt", HOST, "      this.interrupt[0] = 2; // SIGINT: Pyodide raises KeyboardInterrupt", "      this.interrupt[0] = 0;", "stopped at its line", E2E),
+ ("never killed", HOST, "    if (!this.interrupt || now - this.interruptedAt > KILL_MS) this.kill();", "    if (now < 0) this.kill();", "freeze the page", E2E),
+ ("no close backup", UP, "          if (p) localStorage.setItem(backupKey(p.id), JSON.stringify(p));", "          if (p && p.id === \"never\") localStorage.setItem(backupKey(p.id), JSON.stringify(p));", "just before the page closes", E2E),
+ ("error not followed", "src/editor/EditorPage.tsx", "        setFocus({ eventId: t.eventId, line: t.line, nonce: Date.now() });", "        setFocus(null);", "clicking it goes there", E2E),
+ ("rename leaves quotes", "src/editor/ResourceTree.tsx", "                            if (alsoCode) replaceQuoted(p, r.name, name);", "                            if (alsoCode && name === \"\\u0000\") replaceQuoted(p, r.name, name);", "update its name in quotes", E2E),
+ ("no project names", "src/editor/code/CodeEditor.tsx", "completionSource(() => namesRef.current?.() ?? { objects: [], sprites: [], rooms: [] })", "completionSource(() => ({ objects: [], sprites: [], rooms: [] }))", "object names inside the quotes", E2E),
+ # Both guards gone at once: either one alone keeps the cursor where it is typed.
+ ("jump on every render", "src/editor/code/CodeEditor.tsx",
+  "    if (!v || !err || usedJumps.has(err.nonce)) return;\n    usedJumps.add(err.nonce);",
+  "    if (!v || !err || usedJumps.size < 0) return;", "clicking it goes there", E2E,
+  ("  }, [err?.nonce]);", "  }, [err]);")),
+ ("no isolation", "vite.config.ts", '  "Cross-Origin-Embedder-Policy": "credentialless",', "", "stopped at its line", E2E),
 ]
 only = sys.argv[1:]
 bad = []
-for name, f, old, new, test in CASES:
+for name, f, old, new, test, *extra in CASES:
+    runner = extra[:1]
+    more = extra[1:]  # further (old, new) pairs in the same file
     if only and name not in only: continue
     p = ROOT / f; src = p.read_text()
-    if src.count(old) != 1:
-        print(f"!! {name}: pattern found {src.count(old)} times"); bad.append(name); continue
-    p.write_text(src.replace(old, new))
+    pairs = [(old, new), *more]
+    counts = [src.count(o) for o, _ in pairs]
+    if counts != [1] * len(pairs):
+        print(f"!! {name}: pattern found {counts} times"); bad.append(name); continue
+    broken = src
+    for o, n in pairs:
+        broken = broken.replace(o, n)
+    p.write_text(broken)
     try:
-        r = subprocess.run(["npx", "vitest", "run", "-t", test], cwd=ROOT, capture_output=True, text=True)
+        cmd = ["npx", "playwright", "test", "-g", test] if runner == [E2E] else ["npx", "vitest", "run", "-t", test]
+        r = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True)
         out = r.stdout + r.stderr
         failed = r.returncode != 0 and "failed" in out
         ran = "passed" in out or "failed" in out
