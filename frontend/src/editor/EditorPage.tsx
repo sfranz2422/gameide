@@ -10,7 +10,12 @@ import type { ProjectStore } from "../store/store";
 import { addStarterSprite } from "../store/templates";
 import { GameHost } from "./gameHost";
 import { ObjectEditor, type EventFocus } from "./ObjectEditor";
-import { RoomEditor, ScriptEditor, SettingsEditor, SpriteEditor, SpritePicker } from "./OtherEditors";
+import { RoomEditor, ScriptEditor, SettingsEditor, SpritePicker } from "./OtherEditors";
+import { SpriteEditor } from "./sprites/SpriteEditor";
+import { SpriteImport, type ImportResult } from "./sprites/SpriteImport";
+import { decodeImage, type Decoded } from "../store/imageTools";
+import { refitMask, spriteFromFrames } from "../store/spriteOps";
+import { newId } from "../store/project";
 import { ResourceTree, type TabRef } from "./ResourceTree";
 import { ConsolePane, DocsPane, GamePane, type ConsoleLine } from "./RunPanes";
 import { Icon } from "./ui/icons";
@@ -38,6 +43,8 @@ export function EditorPage({ store, id }: { store: ProjectStore; id: string }) {
   const [focus, setFocus] = useState<EventFocus | null>(null);
   const [scriptFocus, setScriptFocus] = useState<{ id: string; line: number; nonce: number } | null>(null);
   const [picking, setPicking] = useState(false);
+  const [importing, setImporting] = useState<{ source: Decoded; fileName: string; appendTo?: string } | null>(null);
+  const [dropping, setDropping] = useState(false);
 
   const [lines, setLines] = useState<ConsoleLine[]>([]);
   const [bottom, setBottom] = useState<"console" | "docs">("console");
@@ -134,6 +141,101 @@ export function EditorPage({ store, id }: { store: ProjectStore; id: string }) {
     [open],
   );
 
+  /** Opens a picture in the importer (as a new sprite, or more frames for `appendTo`). */
+  const startImport = useCallback(
+    async (file: File, appendTo?: string) => {
+      setPicking(false);
+      try {
+        setImporting({ source: await decodeImage(file), fileName: file.name || "pasted picture", ...(appendTo ? { appendTo } : {}) });
+      } catch (e) {
+        addLines([{ kind: "err", text: e instanceof Error ? e.message : String(e) }]);
+        setBottom("console");
+      }
+    },
+    [addLines],
+  );
+
+  const chooseFile = useCallback(
+    (appendTo?: string) => {
+      const input = document.createElement("input");
+      input.type = "file";
+      input.accept = "image/png,image/jpeg,image/gif,image/webp";
+      input.onchange = () => input.files?.[0] && void startImport(input.files[0], appendTo);
+      input.click();
+    },
+    [startImport],
+  );
+
+  const finishImport = useCallback(
+    async (r: ImportResult) => {
+      const job = importing;
+      setImporting(null);
+      const p = projectRef.current;
+      if (!job || !p) return;
+      if (job.appendTo) {
+        const target = p.sprites.find((s) => s.id === job.appendTo);
+        if (!target) return;
+        const added = new Map(r.frames.map((b) => [newId(), b] as const));
+        await addAssets(added);
+        const frames = [...target.frames, ...added.keys()];
+        const all = frames.map((id) => assets.get(id) ?? added.get(id)).filter((b): b is Blob => !!b);
+        const mask = await refitMask(target.mask, all, target.width, target.height);
+        mutate((d) => {
+          const s = d.sprites.find((x) => x.id === target.id)!;
+          s.frames = frames;
+          if (mask) s.mask = mask;
+        });
+        return;
+      }
+      const { sprite, assets: made } = await spriteFromFrames(r, p.sprites.map((s) => s.name));
+      await addAssets(made);
+      mutate((d) => void d.sprites.push(sprite));
+      open({ kind: "sprites", id: sprite.id });
+    },
+    [importing, addAssets, assets, mutate, open],
+  );
+
+  // A picture dropped anywhere on the editor, or pasted while not typing in
+  // a box, becomes a sprite — the quickest way from a drawing to a game.
+  useEffect(() => {
+    const hasFiles = (e: DragEvent) => !!e.dataTransfer && [...e.dataTransfer.types].includes("Files");
+    const over = (e: DragEvent) => {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      setDropping(true);
+    };
+    const leave = (e: DragEvent) => {
+      if (!e.relatedTarget) setDropping(false);
+    };
+    const drop = (e: DragEvent) => {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      setDropping(false);
+      const f = [...(e.dataTransfer?.files ?? [])].find((x) => x.type.startsWith("image/"));
+      if (f) void startImport(f);
+      else addLines([{ kind: "err", text: "Only pictures (PNG, JPG, GIF) can be dropped here." }]);
+    };
+    const paste = (e: ClipboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && (t.closest(".cm-editor") || t.tagName === "INPUT" || t.tagName === "TEXTAREA")) return;
+      const f = [...(e.clipboardData?.files ?? [])].find((x) => x.type.startsWith("image/"));
+      if (f) {
+        e.preventDefault();
+        void startImport(f);
+      }
+    };
+    window.addEventListener("dragover", over);
+    window.addEventListener("dragleave", leave);
+    window.addEventListener("drop", drop);
+    window.addEventListener("paste", paste);
+    return () => {
+      window.removeEventListener("dragover", over);
+      window.removeEventListener("dragleave", leave);
+      window.removeEventListener("drop", drop);
+      window.removeEventListener("paste", paste);
+    };
+  }, [startImport, addLines]);
+
   const api: ProjectApi | null = useMemo(
     () => (project ? { project, assets, mutate, addAssets, status, saveError, saveNote, replace, store } : null),
     [project, assets, mutate, addAssets, status, saveError, saveNote, replace, store],
@@ -208,7 +310,7 @@ export function EditorPage({ store, id }: { store: ProjectStore; id: string }) {
                   focus={focus}
                 />
               )}
-              {current?.kind === "sprites" && <SpriteEditor key={current.id} spriteId={current.id} />}
+              {current?.kind === "sprites" && <SpriteEditor key={current.id} spriteId={current.id} addFrames={() => chooseFile(current.id)} />}
               {current?.kind === "rooms" && <RoomEditor key={current.id} roomId={current.id} />}
               {current?.kind === "scripts" && (
                 <ScriptEditor key={current.id} scriptId={current.id} focus={scriptFocus?.id === current.id ? scriptFocus : null} />
@@ -235,8 +337,21 @@ export function EditorPage({ store, id }: { store: ProjectStore; id: string }) {
           </aside>
         </div>
 
+        {dropping && <div className="drop-overlay">Drop a picture to make a sprite</div>}
+        {importing && (
+          <SpriteImport
+            source={importing.source}
+            fileName={importing.fileName}
+            {...(importing.appendTo && project.sprites.some((s) => s.id === importing.appendTo)
+              ? { appendTo: project.sprites.find((s) => s.id === importing.appendTo)! }
+              : {})}
+            onDone={(r) => void finishImport(r)}
+            onClose={() => setImporting(null)}
+          />
+        )}
         {picking && (
           <SpritePicker
+            onImport={() => chooseFile()}
             onClose={() => setPicking(false)}
             onPick={async (key) => {
               setPicking(false);

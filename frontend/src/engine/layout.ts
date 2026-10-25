@@ -35,7 +35,7 @@ export const F = {
   FRICTION: 13,
   SPRITE: 14, // index into the sprite table, -1 for none
   IMAGE_INDEX: 15,
-  IMAGE_SPEED: 16, // frames advanced per step
+  IMAGE_SPEED: 16, // multiplier on the sprite's own speed (1 = as the sprite says)
   XSCALE: 17,
   YSCALE: 18,
   ANGLE: 19,

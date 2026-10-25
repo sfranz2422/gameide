@@ -12,14 +12,35 @@ export interface MaskRect {
   bottom: number; // exclusive
 }
 
+/**
+ * A collision mask, in the sprite's own pixels (sprites.ts has how each is
+ * tested). `precise` carries the box around the opaque pixels for the
+ * spatial hash; the pixels themselves come in SpriteDef.pixelMasks.
+ */
+export type MaskShape =
+  | ({ kind: "rect" } & MaskRect)
+  | { kind: "circle"; cx: number; cy: number; r: number }
+  | ({ kind: "precise" } & MaskRect);
+
 export interface SpriteDef {
   name: string;
   width: number;
   height: number;
   originX: number;
   originY: number;
-  /** The collision box. Omitted means the whole image. */
-  mask?: MaskRect;
+  /** The collision mask. Omitted means a box around the whole image. */
+  mask?: MaskShape | MaskRect;
+  /**
+   * Animation speed in frames per second, at image_speed 1. Omitted means
+   * one frame per step (what image_speed meant before sprites had a speed).
+   */
+  fps?: number;
+  /**
+   * For a precise mask, one byte per pixel per frame (1 = solid), made from
+   * the pictures in the game's worker (python/spritePrep.ts). Never sent to
+   * Python.
+   */
+  pixelMasks?: Uint8Array[];
   /** Number of animation frames. */
   frameCount: number;
   /**

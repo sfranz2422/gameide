@@ -13,6 +13,7 @@ import {
   type Project,
   type SpriteResource,
 } from "./project";
+import { boundsOfBlobs } from "./imageTools";
 import { paintStarter, STARTER_SPRITES } from "./starterArt";
 
 export interface Built {
@@ -29,6 +30,7 @@ export async function addStarterSprite(project: Project, assets: Map<string, Blo
     assets.set(id, b);
     return id;
   });
+  const box = await boundsOfBlobs(blobs);
   const sprite: SpriteResource = {
     id: newId(),
     name: name ?? s.name,
@@ -37,6 +39,10 @@ export async function addStarterSprite(project: Project, assets: Map<string, Blo
     originX: s.originX,
     originY: s.originY,
     frames,
+    mask: s.circle
+      ? { kind: "circle", cx: s.width / 2, cy: s.height / 2, r: Math.min(s.width, s.height) / 2 }
+      : { kind: "auto", ...(box ?? { left: 0, top: 0, right: s.width, bottom: s.height }) },
+    ...(s.fps ? { fps: s.fps } : {}),
   };
   project.sprites.push(sprite);
   return sprite;
@@ -88,7 +94,6 @@ dy = (keyboard_check("down") - keyboard_check("up")) * self.move_speed
 move_and_collide(dx, dy, "Wall")
 `);
   ev(player, { type: "collision", object: coin.id }, "other.destroy()\nglobal_vars.score += 1\n");
-  ev(coin, { type: "create" }, "self.image_speed = 0.15\n");
   ev(hud, { type: "game_start" }, 'global_vars.score = 0\nglobal_vars.total = instance_number("Coin")\n');
   ev(hud, { type: "draw" }, `draw_set_color("white")
 draw_text(8, 452, f"Coins: {global_vars.score} / {global_vars.total}")

@@ -4,113 +4,15 @@
  * picker. Sprite import and slicing (Phase 4) and the drag-and-drop room
  * editor (Phase 5) replace parts of these.
  */
-import { useEffect, useMemo, useState } from "react";
-import { find, newId, type RoomInstance, type SpriteResource } from "../store/project";
+import { useEffect, useState } from "react";
+import { find, newId, type RoomInstance } from "../store/project";
 import { STARTER_SPRITES } from "../store/starterArt";
 import { CodeEditor } from "./code/CodeEditor";
 import { projectNames } from "./ObjectEditor";
 import { Icon } from "./ui/icons";
 import { useProjectApi } from "./useProject";
 
-/** Object URLs for a sprite's frames, revoked when no longer shown. */
-function useFrameUrls(sprite: SpriteResource | undefined, assets: Map<string, Blob>): string[] {
-  // Keyed on the frame ids, not the sprite: every edit to the project makes
-  // a new sprite object, and remaking URLs on each keystroke would flicker.
-  const frames = sprite?.frames.join(",") ?? "";
-  const urls = useMemo(
-    () => (frames ? frames.split(",").map((id) => (assets.get(id) ? URL.createObjectURL(assets.get(id)!) : "")) : []),
-    [frames, assets],
-  );
-  useEffect(() => () => urls.forEach((u) => u && URL.revokeObjectURL(u)), [urls]);
-  return urls;
-}
-
-export function SpriteThumb({ spriteId, size = 32 }: { spriteId: string | null; size?: number }) {
-  const { project, assets } = useProjectApi();
-  const sprite = find(project, "sprites", spriteId);
-  const [url] = useFrameUrls(sprite, assets);
-  if (!url) return <span className="thumb empty" style={{ width: size, height: size }} />;
-  return <img className="thumb" src={url} alt="" style={{ width: size, height: size }} />;
-}
-
-export function SpriteEditor({ spriteId }: { spriteId: string }) {
-  const { project, assets, mutate } = useProjectApi();
-  const sprite = find(project, "sprites", spriteId);
-  const urls = useFrameUrls(sprite, assets);
-  const [speed, setSpeed] = useState(8);
-  const [frame, setFrame] = useState(0);
-  useEffect(() => {
-    if (!sprite || sprite.frames.length < 2 || speed <= 0) return;
-    const t = setInterval(() => setFrame((f) => (f + 1) % sprite.frames.length), 1000 / speed);
-    return () => clearInterval(t);
-  }, [sprite, speed]);
-  if (!sprite) return <div className="empty-pane">This sprite was deleted.</div>;
-  const set = (recipe: (s: SpriteResource) => void) => mutate((p) => recipe(find(p, "sprites", spriteId)!));
-  const zoom = Math.max(1, Math.floor(192 / Math.max(sprite.width, sprite.height)));
-  const presets: [string, number, number][] = [
-    ["Top-left", 0, 0],
-    ["Center", Math.floor(sprite.width / 2), Math.floor(sprite.height / 2)],
-    ["Bottom-center", Math.floor(sprite.width / 2), sprite.height],
-  ];
-  const usedBy = project.objects.filter((o) => o.sprite === sprite.id).map((o) => o.name);
-
-  return (
-    <div className="sprite-editor" data-tutorial="sprite-editor">
-      <div className="sprite-preview">
-        <div
-          className="checker"
-          style={{ width: sprite.width * zoom, height: sprite.height * zoom }}
-          onClick={(e) => {
-            const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
-            const x = Math.round((e.clientX - r.left) / zoom), y = Math.round((e.clientY - r.top) / zoom);
-            set((s) => ((s.originX = x), (s.originY = y)));
-          }}
-          title="Click to set the origin"
-        >
-          {urls[frame % Math.max(1, urls.length)] && <img src={urls[frame % urls.length]} alt={sprite.name} style={{ width: "100%", height: "100%" }} />}
-          <span className="origin-mark" style={{ left: sprite.originX * zoom, top: sprite.originY * zoom }} />
-        </div>
-        <div className="frames">
-          {urls.map((u, i) => (
-            <img key={i} src={u} alt={`frame ${i}`} className={i === frame % urls.length ? "on" : ""} onClick={() => setFrame(i)} />
-          ))}
-        </div>
-      </div>
-      <div className="sprite-props">
-        <p className="muted">
-          {sprite.width} × {sprite.height} px, {sprite.frames.length} frame{sprite.frames.length === 1 ? "" : "s"}
-          {usedBy.length ? ` · used by ${usedBy.join(", ")}` : ""}
-        </p>
-        <fieldset>
-          <legend>Origin</legend>
-          <p className="muted small">The point that sits at the instance's x, y. Click the picture to set it.</p>
-          <label>
-            x <input type="number" value={sprite.originX} onChange={(e) => set((s) => void (s.originX = Number(e.target.value) || 0))} />
-          </label>
-          <label>
-            y <input type="number" value={sprite.originY} onChange={(e) => set((s) => void (s.originY = Number(e.target.value) || 0))} />
-          </label>
-          <div className="row">
-            {presets.map(([label, x, y]) => (
-              <button key={label} className="btn small" onClick={() => set((s) => ((s.originX = x), (s.originY = y)))}>
-                {label}
-              </button>
-            ))}
-          </div>
-        </fieldset>
-        {sprite.frames.length > 1 && (
-          <fieldset>
-            <legend>Preview speed</legend>
-            <input type="range" min={0} max={30} value={speed} onChange={(e) => setSpeed(Number(e.target.value))} /> {speed} frames/second
-          </fieldset>
-        )}
-        <p className="muted small">Importing your own pictures and slicing sprite sheets arrive in a later phase.</p>
-      </div>
-    </div>
-  );
-}
-
-export function SpritePicker({ onPick, onClose }: { onPick: (key: string) => void; onClose: () => void }) {
+export function SpritePicker({ onPick, onImport, onClose }: { onPick: (key: string) => void; onImport: () => void; onClose: () => void }) {
   const [thumbs, setThumbs] = useState<Record<string, string>>({});
   useEffect(() => {
     const out: Record<string, string> = {};
@@ -127,7 +29,11 @@ export function SpritePicker({ onPick, onClose }: { onPick: (key: string) => voi
     <div className="modal-back" onPointerDown={onClose}>
       <div className="modal" role="dialog" aria-label="Add a sprite" onPointerDown={(e) => e.stopPropagation()}>
         <h3>Add a sprite</h3>
-        <p className="muted">Pick a starter picture. Importing your own art comes in a later phase.</p>
+        <button className="import-own" onClick={onImport} data-testid="import-picture">
+          <b>Import your own picture…</b>
+          <span className="muted small">PNG, JPG or GIF — one picture, a sprite sheet, or an animated GIF. You can also drop a picture anywhere in the editor, or paste one.</span>
+        </button>
+        <p className="muted small">Or start with one of these:</p>
         <div className="sprite-grid">
           {STARTER_SPRITES.map((s) => (
             <button key={s.key} className="sprite-card" onClick={() => onPick(s.key)} data-testid={`starter-${s.key}`}>

@@ -662,63 +662,213 @@ button:focus-visible {
 }
 
 /* sprite, room, settings */
+.checker-bg {
+  background: repeating-conic-gradient(#2a3446 0% 25%, #222b3a 0% 50%) 50% / 16px 16px;
+}
 .sprite-editor {
   display: flex;
   gap: 24px;
-  padding: 18px;
+  padding: 16px 18px;
   overflow: auto;
   flex-wrap: wrap;
   align-content: flex-start;
 }
+.sprite-stage {
+  display: grid;
+  gap: 10px;
+  justify-items: start;
+}
 .checker {
   position: relative;
-  cursor: crosshair;
-  background: repeating-conic-gradient(#2a3446 0% 25%, #222b3a 0% 50%) 50% / 16px 16px;
   image-rendering: pixelated;
+  touch-action: none;
+}
+.checker.tool-origin {
+  cursor: crosshair;
+}
+.checker.tool-mask {
+  cursor: cell;
 }
 .checker img {
   image-rendering: pixelated;
   display: block;
+  pointer-events: none;
+}
+.mask-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+.mask-overlay rect,
+.mask-overlay circle {
+  fill: rgba(61, 214, 140, 0.15);
+  stroke: var(--accent-2);
+  stroke-width: 1.5px;
+  vector-effect: non-scaling-stroke;
+}
+.mask-overlay .dashed {
+  stroke-dasharray: 4 3;
 }
 .origin-mark {
   position: absolute;
   width: 11px;
   height: 11px;
   margin: -5px 0 0 -5px;
-  border: 2px solid var(--accent-2);
+  border: 2px solid #ffcc66;
   border-radius: 50%;
   pointer-events: none;
 }
 .frames {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
-  margin-top: 10px;
+  max-width: 560px;
 }
-.frames img {
-  width: 36px;
-  height: 36px;
-  object-fit: contain;
-  image-rendering: pixelated;
+.frame {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 2px;
   background: #222b3a;
   border: 2px solid transparent;
-  border-radius: 4px;
+  border-radius: 6px;
   cursor: pointer;
+  color: var(--muted);
 }
-.frames img.on {
+.frame img {
+  max-width: 100%;
+  max-height: 100%;
+  image-rendering: pixelated;
+}
+.frame span {
+  position: absolute;
+  right: 3px;
+  bottom: 1px;
+  font-size: 10px;
+}
+.frame.on {
   border-color: var(--accent);
 }
+.frame.add {
+  border-style: dashed;
+  border-color: var(--border);
+}
 .sprite-props {
-  min-width: 240px;
-  max-width: 360px;
+  min-width: 260px;
+  max-width: 380px;
+}
+.num {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin: 3px 10px 3px 0;
+  color: var(--muted);
+}
+.num input:not([type]) {
+  width: 160px;
+}
+.seg {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  margin: 8px 0;
+}
+.seg button {
+  padding: 5px 12px;
+  border: 0;
+  background: var(--panel-2);
+  color: var(--muted);
+  cursor: pointer;
+}
+.seg button + button {
+  border-left: 1px solid var(--border);
+}
+.seg button.on {
+  background: var(--accent);
+  color: #fff;
+}
+.seg.small {
+  margin: 0;
+}
+.btn.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.modal.wide {
+  width: min(900px, calc(100vw - 32px));
+}
+.slice-params {
+  display: flex;
+  flex-wrap: wrap;
+  margin: 4px 0 8px;
+}
+.slice-params input[type="number"] {
+  width: 62px;
+}
+.slice-body {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+.slice-sheet {
+  max-width: 580px;
+  max-height: 360px;
+  overflow: auto;
+  border-radius: 6px;
+}
+.slice-sheet canvas {
+  display: block;
+  cursor: pointer;
+  image-rendering: pixelated;
+}
+.slice-side {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+}
+.slice-anim {
+  image-rendering: pixelated;
+  border-radius: 6px;
+  max-width: 120px;
+}
+.import-own {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  margin: 12px 0 6px;
+  padding: 14px;
+  text-align: left;
+  background: var(--panel-2);
+  border: 1px dashed var(--accent);
+  border-radius: 10px;
+  cursor: pointer;
+}
+.drop-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  place-items: center;
+  background: rgba(79, 140, 255, 0.18);
+  border: 3px dashed var(--accent);
+  color: var(--text);
+  font-size: 20px;
+  font-weight: 600;
+  pointer-events: none;
 }
 fieldset {
   border: 1px solid var(--border);
   border-radius: 8px;
   margin: 0 0 12px;
   padding: 8px 12px 12px;
-}
-fieldset label {
-  margin-right: 12px;
 }
 legend {
   padding: 0 4px;

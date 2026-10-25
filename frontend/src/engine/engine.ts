@@ -26,7 +26,7 @@ import { EV, EVENTS_HEADER, F, G, HANDLES, STRIDE } from "./layout";
 import type { GameDefinition } from "./game";
 import { InputState } from "./input";
 import { SpatialHash } from "./spatialHash";
-import { boxOf, overlaps, spriteInfo, type Box, type SpriteInfo } from "./sprites";
+import { boxOf, containsPoint, masksOverlap, overlaps, spriteInfo, type Box, type SpriteInfo } from "./sprites";
 
 /** The shared arrays, as JavaScript sees them. See layout.ts. */
 export interface SharedViews {
@@ -107,7 +107,7 @@ export class Engine {
      */
     private readonly acquire: () => SharedViews,
   ) {
-    this.sprites = def.sprites.map(spriteInfo);
+    this.sprites = def.sprites.map((s) => spriteInfo(s, def.stepsPerSecond ?? 60));
     def.sprites.forEach((s, i) => this.spriteIndex.set(s.name, i));
     this.typeNames = def.objects.map((o) => o.name);
     this.typeNames.forEach((n, i) => this.typeIndex.set(n, i));
@@ -191,8 +191,10 @@ export class Engine {
       if (c === self || !this.matches(st, c, t)) return false;
       if (solidOnly && !st[c * STRIDE + F.SOLID]) return false;
       const cb = c * STRIDE;
-      if (!boxOf(st, c, st[cb + F.X]!, st[cb + F.Y]!, this.sprites, scratch2)) return false;
+      const cx = st[cb + F.X]!, cy = st[cb + F.Y]!;
+      if (!boxOf(st, c, cx, cy, this.sprites, scratch2)) return false;
       if (!overlaps(scratch, scratch2)) return false;
+      if (!masksOverlap(st, self, x, y, c, cx, cy, this.sprites, scratch, scratch2)) return false;
       found = c;
       return true;
     });
@@ -222,8 +224,7 @@ export class Engine {
     this.hash.query(x, y, x + 1, y + 1, (c) => {
       if (!this.matches(st, c, t)) return false;
       const cb = c * STRIDE;
-      if (!boxOf(st, c, st[cb + F.X]!, st[cb + F.Y]!, this.sprites, scratch2)) return false;
-      if (x < scratch2.left || x >= scratch2.right || y < scratch2.top || y >= scratch2.bottom) return false;
+      if (!containsPoint(st, c, st[cb + F.X]!, st[cb + F.Y]!, this.sprites, x, y)) return false;
       found = c;
       return true;
     });
@@ -354,8 +355,7 @@ export class Engine {
         this.hash.query(mx, my, mx + 1, my + 1, (c) => {
           const cb = c * STRIDE;
           if (!st[cb + F.ALIVE] || !(this.flags[st[cb + F.TYPE]!]! & HANDLES.MOUSE)) return false;
-          if (!boxOf(st, c, st[cb + F.X]!, st[cb + F.Y]!, this.sprites, scratch2)) return false;
-          if (mx < scratch2.left || mx >= scratch2.right || my < scratch2.top || my >= scratch2.bottom) return false;
+          if (!containsPoint(st, c, st[cb + F.X]!, st[cb + F.Y]!, this.sprites, mx, my)) return false;
           this.pushEvent(events, EV.MOUSE, c, edge.button * 2 + (edge.released ? 1 : 0));
           return false;
         });
@@ -415,7 +415,7 @@ export class Engine {
       const speed = st[b + F.IMAGE_SPEED]!;
       if (spr && speed !== 0) {
         const count = spr.frameCount;
-        let idx = st[b + F.IMAGE_INDEX]! + speed;
+        let idx = st[b + F.IMAGE_INDEX]! + speed * spr.framesPerStep;
         if (idx >= count || idx < 0) {
           idx = ((idx % count) + count) % count;
           if (this.flags[st[b + F.TYPE]!]! & HANDLES.ANIMATION_END) this.pushEvent(events, EV.ANIMATION_END, s, 0);
@@ -437,8 +437,10 @@ export class Engine {
             if (c === s) return false;
             const cb = c * STRIDE;
             if (!st[cb + F.ALIVE] || !this.collides[t * nt + st[cb + F.TYPE]!]) return false;
-            if (!boxOf(st, c, st[cb + F.X]!, st[cb + F.Y]!, this.sprites, scratch2)) return false;
-            if (overlaps(scratch, scratch2)) this.pushEvent(events, EV.COLLISION, s, c);
+            const cx = st[cb + F.X]!, cy = st[cb + F.Y]!;
+            if (!boxOf(st, c, cx, cy, this.sprites, scratch2) || !overlaps(scratch, scratch2)) return false;
+            if (masksOverlap(st, s, st[b + F.X]!, st[b + F.Y]!, c, cx, cy, this.sprites, scratch, scratch2))
+              this.pushEvent(events, EV.COLLISION, s, c);
             return false;
           });
         }

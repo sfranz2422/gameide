@@ -1,6 +1,71 @@
 # Progress
 
-## Phase 3 — Backend core ✅ (2026-10-25, waiting for review)
+## Phase 4 — Sprites ✅ (2026-10-25, waiting for review)
+
+### Done
+
+- **Import your own pictures:** PNG, JPG, GIF or WebP, from **Add a sprite → Import your own picture…**, by **dropping a file anywhere on the editor**, or by **pasting** one.
+  - Animated GIFs come in frame by frame in Chrome and Edge. Elsewhere you get their first frame.
+  - Pictures over 4096 px on a side are refused, and the message says why.
+- **The sprite sheet slicer** cuts a picture one of three ways:
+  - **Whole picture**;
+  - **Equal frames**: N frames across, or stacked;
+  - **Grid**: frame width and height, columns and rows (0 = as many as fit), offset, spacing.
+
+  The grid is drawn over the picture as the numbers change, with every frame numbered. Clicking a frame leaves it out or puts it back. The chosen frames play beside it at the speed you set. You also pick the name and the origin (center, bottom-center for feet, or top-left). Half frames at the edge are left out, not cut.
+- **The sprite editor:**
+  - the picture with its origin and mask drawn over it;
+  - a frame strip with add frames (only frames of the sprite's size), move and delete;
+  - play and pause, and an **animation speed** in frames per second;
+  - the origin by click, numbers or presets;
+  - the **collision mask**:
+    - **Box fitted to the picture**: the default, kept fitted as frames change;
+    - **Box I draw**: drag on the picture;
+    - **Circle**: drag from the middle out;
+    - **Exact pixels**: frame by frame.
+- **Masks turn with `image_angle` and scale with `image_xscale`/`image_yscale`** (added to this phase). A circle under uneven scale is an exact ellipse.
+  - A test checks that a turned mask sits exactly where the renderer draws the sprite.
+  - The common case, unrotated boxes, costs what it always did.
+- **Animation speed belongs to the sprite now**, as in GameMaker. `image_speed` multiplies it: 1 is the sprite's speed, 2 twice as fast, 0 stopped. Sprites made before this phase have no speed and keep the old meaning (one frame per step), so existing games animate exactly as before.
+- **Starter sprites** have their own speeds and fitted masks; the ball and coin collide as circles. The coins template no longer needs code to slow its coin down.
+- Imported frames are saved like every other picture: in the browser, and in Postgres when signed in.
+
+### Tests
+
+```
+cd frontend
+npm test                      # Vitest: 85
+npm run e2e                   # Playwright: 16 editor and sprite tests + 7 account tests
+../backend/.venv/bin/python ../backend/tests/test_server.py   # 50 server checks
+python3 scripts/sabotage.py   # 103 deliberate bugs
+```
+
+New this phase:
+- the slicing arithmetic: grid, spacing, offsets, strips, half frames;
+- finding the opaque part of a picture, ignoring soft edges;
+- every mask shape, turned and scaled, against the renderer's transform;
+- the separating-axis test;
+- circles missing a box's corner;
+- exact pixels, using the frame on screen;
+- slivers thinner than a pixel;
+- collision events and queries using the exact shapes;
+- per-sprite animation speed;
+- refitting automatic masks while keeping hand-drawn ones.
+
+In the browser: dropping a sheet and skipping a frame; a grid with spacing; adding frames of the wrong size and then the right one; drawing a mask; and a ring whose hole really isn't part of it in a running game.
+
+What the sabotage run caught in my own tests: the "touching boxes" check never reached the shape test, because the bounding-box check already rejected those boxes; and one test name was read as a regular expression. Fixed: the touching check now uses squares turned 45°, whose bounding boxes overlap. One real bug was found by looking: frame thumbnails went blank because React runs effects twice in development and my cleanup revoked pictures still on screen.
+
+### Known issues and gaps
+
+1. **Exact-pixel masks are tested by sampling** the overlap one point per pixel, at most 4096 points. Two huge sprites overlapping slightly can, in principle, miss a one-pixel touch. Boxes and circles use exact arithmetic or sampling the same way.
+2. GIF frames need Chrome or Edge (`ImageDecoder`); other browsers get the first frame. A GIF's own frame timing becomes one average speed.
+3. There's no built-in pixel editor (the spec lists it as nice to have later).
+4. Replacing a single frame's picture means deleting it and adding another, then moving it into place.
+
+---
+
+## Phase 3 — Backend core ✅ (2026-10-25, reviewed and deployed at https://gameide.onrender.com/)
 
 ### Done
 
@@ -80,9 +145,28 @@ What the tests and sabotage run found:
 | HTML5 .zip, installable web app, Windows/macOS/Linux (Electron shell, unsigned on macOS) | Phase 9 |
 | Android APK | dropped |
 
-## Next: Phase 4 — Sprites
+## The plan from here (amended 2026-10-25)
 
-Import pictures (PNG/JPG/GIF, file picker and drag-and-drop), the sprite sheet slicer, origin, collision masks (box or circle), and animation, all saved through the server.
+The spec's phases 4–11, plus **game feel**, added so student games can look
+and feel like GameMaker's showcase (Hyper Light Drifter, Katana Zero, Nuclear
+Throne…). Small pieces go into the phase they belong to; the rest is a phase
+of its own after Phase 9.
+
+| Phase | Spec | Added |
+|---|---|---|
+| 4 Sprites | import, sheet slicer, origin, masks, animation | **rotated and pixel-precise masks** |
+| 5 Room editor | placement, layers, camera, rooms | **screen shake, smooth camera, full screen and clean pixel scaling** |
+| 6 Tiles | tile painting, solid tiles | |
+| 7 Blocks | Blockly | |
+| 8 Event sheets | conditions → actions | |
+| 9 Sounds, export, publishing | audio, HTML5, zip, publish, Explore | **gamepad, save files (progress, high scores), custom fonts**; desktop exports; installable web app (Android APK dropped) |
+| 9½ Game feel (new) | — | **particles, lighting and blend modes, ready-made shader effects (glow, CRT, flash, outline), tweening and easing, a dialogue-box helper, hit-pause** |
+| 10 Classrooms | classes, assignments, dashboard | |
+| 11 Tutorials | tutorial panel, checks, library | |
+
+## Next: Phase 5 — Room editor
+
+Drag-and-drop instance placement, layers, room settings, camera and multiple rooms; plus (added) screen shake, a smooth camera, full screen and clean pixel scaling.
 
 ---
 

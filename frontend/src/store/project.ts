@@ -49,9 +49,25 @@ export interface SpriteResource {
   originY: number;
   /** Asset ids, one per animation frame. */
   frames: string[];
-  /** Collision box in image pixels; absent means the whole image. */
-  mask?: { left: number; top: number; right: number; bottom: number };
+  /** The collision mask; absent means a box around the whole image. */
+  mask?: SpriteMask;
+  /**
+   * Animation speed, frames per second, at image_speed 1. Absent means one
+   * frame per step — sprites made before sprites had a speed.
+   */
+  fps?: number;
 }
+
+/**
+ * A collision mask, in the sprite's own pixels. "auto" is a box the editor
+ * keeps fitted to the opaque pixels of all frames; "precise" stores the box
+ * around them too (the engine uses it to find candidates fast) and takes the
+ * pixels themselves from the pictures when the game starts. A mask saved
+ * before masks had kinds has no `kind` and is a box.
+ */
+export type SpriteMask =
+  | { kind: "auto" | "rect" | "precise"; left: number; top: number; right: number; bottom: number }
+  | { kind: "circle"; cx: number; cy: number; r: number };
 
 export interface ObjectResource {
   id: string;

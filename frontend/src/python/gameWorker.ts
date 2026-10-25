@@ -8,6 +8,7 @@ import { DOMAdapter, WebWorkerAdapter } from "pixi.js";
 import { GameLoop } from "../engine/loop";
 import { PixiRenderer } from "../engine/render/pixiRenderer";
 import { getPyodide, PythonGame } from "./bridge";
+import { prepareSprites } from "./spritePrep";
 import type { FromWorker, InputMessage, ToWorker } from "./protocol";
 
 // Pixi looks for `document` unless told it is in a worker.
@@ -78,6 +79,8 @@ async function play(msg: Extract<ToWorker, { type: "play" }>) {
   post({ type: "state", state: "loading" });
   // An interrupt left over from a previous run must not hit this one.
   if (interrupt) interrupt[0] = 0;
+  await prepareSprites(msg.def);
+  if (mine !== run) return;
   const { game: g, error } = await PythonGame.load(msg.def, {
     stdout: (t) => emit(t, "out"),
     stderr: (t) => emit(t, "err"),

@@ -320,6 +320,69 @@ describe("collisions", () => {
   });
 });
 
+describe("sprites in the game", () => {
+  it("image_angle turns the collision mask", async () => {
+    // A 40 × 4 bar with its origin at the left end; a block straight above that end.
+    const { game } = await load({
+      objects: [{ name: "Bar", sprite: "bar" }, { name: "Block", sprite: "box" }],
+      code: { Bar: one("Bar", "    pass\n") },
+      instances: [{ object: "Bar", x: 100, y: 100 }, { object: "Block", x: 98, y: 70 }],
+      sprites: [{ name: "bar", width: 40, height: 4, originX: 0, originY: 2, frameCount: 1 }],
+    });
+    expect(py(game, "instances('Bar')[0].place_meeting(100, 100, 'Block')")).toBe(false);
+    py(game, "instances('Bar')[0].image_angle = 90"); // now it points up, into the block
+    expect(py(game, "instances('Bar')[0].place_meeting(100, 100, 'Block')")).toBe(true);
+  });
+
+  it("a sprite's own speed sets how fast it animates", async () => {
+    const { game } = await load({
+      objects: [{ name: "S", sprite: "walk" }],
+      code: { S: one("S", "    pass\n") },
+      instances: [{ object: "S", x: 0, y: 0 }],
+      sprites: [{ name: "walk", width: 8, height: 8, originX: 0, originY: 0, frameCount: 4, fps: 15 }],
+    });
+    run(game, 8); // 15 fps at 60 steps a second: a frame every 4 steps
+    expect(py(game, "instances('S')[0].image_index")).toBe(2);
+    py(game, "instances('S')[0].image_speed = 2");
+    run(game, 2);
+    expect(py(game, "instances('S')[0].image_index")).toBe(3);
+  });
+
+  it("collision events use the shapes: two circles whose boxes touch but which don't, don't collide", async () => {
+    const ball = { name: "ballmask", width: 20, height: 20, originX: 10, originY: 10, frameCount: 1, mask: { kind: "circle" as const, cx: 10, cy: 10, r: 10 } };
+    const { game } = await load({
+      objects: [{ name: "A", sprite: "ballmask" }, { name: "B", sprite: "ballmask" }],
+      code: { A: one("A", "    def on_create(self):\n        self.hits = 0\n    def on_collision_b(self, other):\n        self.hits += 1\n") },
+      // 16 px apart on both axes: the boxes overlap by 4 px, the circles are 22.6 px apart.
+      instances: [{ object: "A", x: 100, y: 100 }, { object: "B", x: 116, y: 116 }],
+      sprites: [ball],
+    });
+    run(game, 1);
+    expect(py(game, "instances('A')[0].hits")).toBe(0);
+    py(game, "instances('B')[0].x = 110; instances('B')[0].y = 105");
+    run(game, 1);
+    expect(py(game, "instances('A')[0].hits")).toBe(1);
+  });
+
+  it("an exact-pixel mask collides only where the picture is drawn", async () => {
+    // A 12 × 12 ring, 2 px thick: inside the hole is not a collision.
+    const ring = new Uint8Array(144);
+    for (let y = 0; y < 12; y++) for (let x = 0; x < 12; x++) if (x < 2 || x > 9 || y < 2 || y > 9) ring[y * 12 + x] = 1;
+    const sprites = [
+      { name: "ring", width: 12, height: 12, originX: 0, originY: 0, frameCount: 1, mask: { kind: "precise" as const, left: 0, top: 0, right: 12, bottom: 12 }, pixelMasks: [ring] },
+      { name: "dot", width: 2, height: 2, originX: 0, originY: 0, frameCount: 1 },
+    ];
+    const { game } = await load({
+      objects: [{ name: "Ring", sprite: "ring" }, { name: "Dot", sprite: "dot" }],
+      code: { Dot: one("Dot", "    pass\n") },
+      instances: [{ object: "Ring", x: 50, y: 50 }, { object: "Dot", x: 0, y: 0 }],
+      sprites,
+    });
+    expect(py(game, "instances('Dot')[0].place_meeting(55, 55, 'Ring')")).toBe(false); // in the hole
+    expect(py(game, "instances('Dot')[0].place_meeting(50, 55, 'Ring')")).toBe(true); // on the rim
+  });
+});
+
 describe("instances", () => {
   it("a destroyed instance keeps reading its own values after its slot is reused", async () => {
     const { game } = await load({

@@ -140,7 +140,10 @@ export class PythonGame {
 
     // JSON both ways at load: one crossing each, and no proxies to leak.
     const setup = module._setup as ((a: string, b: string) => string | undefined) & PyProxy;
-    const loadOut = setup(JSON.stringify(layoutForPython()), JSON.stringify(def));
+    // Pictures and pixel masks stay on this side: Python never needs them,
+    // and a pixel mask stringified is a key per pixel.
+    const forPython = JSON.stringify(def, (k, v) => (k === "images" || k === "pixelMasks" ? undefined : v));
+    const loadOut = setup(JSON.stringify(layoutForPython()), forPython);
     setup.destroy();
     let error = game.handle(loadOut);
     if (!error) {

@@ -83,6 +83,25 @@ describe("generated classes", () => {
   });
 });
 
+describe("sprites in the built game", () => {
+  it("carry their speed, and their mask in the engine's terms", () => {
+    const p = project();
+    const base = { width: 10, height: 10, originX: 0, originY: 0, frames: [] as string[] };
+    p.sprites.push(
+      { ...base, id: "a", name: "auto", fps: 12, mask: { kind: "auto", left: 1, top: 2, right: 9, bottom: 8 } },
+      { ...base, id: "c", name: "round", mask: { kind: "circle", cx: 5, cy: 5, r: 4 } },
+      { ...base, id: "x", name: "exact", mask: { kind: "precise", left: 0, top: 0, right: 10, bottom: 10 } },
+      { ...base, id: "n", name: "none" },
+    );
+    const s = buildGame(p, new Map()).def.sprites;
+    expect(s[0]).toMatchObject({ fps: 12, mask: { kind: "rect", left: 1, top: 2, right: 9, bottom: 8 } });
+    expect(s[1]!.mask).toEqual({ kind: "circle", cx: 5, cy: 5, r: 4 });
+    expect(s[2]!.mask).toEqual({ kind: "precise", left: 0, top: 0, right: 10, bottom: 10 });
+    expect(s[3]!.mask).toBeUndefined();
+    expect(s[3]!.fps).toBeUndefined(); // old sprites keep one frame per step
+  });
+});
+
 describe("errors point at what the student typed", () => {
   it("a runtime error in the third event, line 2", async () => {
     const p = project();

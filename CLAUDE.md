@@ -27,6 +27,24 @@ server must send them too**, or the interrupt silently degrades to killing
 the worker with no line number. `?nointerrupt` forces that fallback, for
 testing.
 
+## Sprites and masks
+
+- A mask is a box, a circle or exact pixels (`engine/sprites.ts`). All of
+  them turn with `image_angle` and scale with the instance, using the
+  **renderer's own transform** (Pixi rotation = -image_angle), inverted in
+  `containsPoint`. "a rotated mask is where the sprite is drawn" pins the
+  two together; change one and that test must change with it.
+- Exact-pixel masks are not stored: the game's worker reads them from the
+  pictures as a game starts (`python/spritePrep.ts`). They are never sent to
+  Python (`bridge.ts` strips `images` and `pixelMasks` from its copy).
+- "auto" masks are a box the editor refits whenever frames change
+  (`store/spriteOps.ts`); a mask the student drew stays.
+- `image_speed` multiplies the sprite's `fps`. A sprite with no `fps` (made
+  before Phase 4) animates one frame per step, so old games are unchanged.
+- Object URLs for pictures are made inside the effect that revokes them
+  (`useFrameUrls`), never in a useMemo: React runs effect cleanups twice in
+  development and revoked pictures still on screen.
+
 ## Projects and code generation
 
 - The project is plain JSON (`store/project.ts`), resources linked by id.

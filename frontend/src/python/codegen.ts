@@ -24,8 +24,8 @@
  *     no events, so a child always has its parent to inherit from.
  */
 import type { PythonGameError } from "../engine/engine";
-import type { GameDefinition, SpriteDef } from "../engine/game";
-import { eventLabel, find, type EventKey, type ObjectResource, type Project } from "../store/project";
+import type { GameDefinition, MaskShape, SpriteDef } from "../engine/game";
+import { eventLabel, find, type EventKey, type ObjectResource, type Project, type SpriteResource } from "../store/project";
 
 /** One event's lines in the generated source. Lines are 1-based. */
 export interface EventSpan {
@@ -116,6 +116,13 @@ export function generateObject(project: Project, obj: ObjectResource): ObjectSou
   return { objectId: obj.id, source: lines.join("\n") + "\n", spans };
 }
 
+/** The editor's mask as the engine's: "auto" is just a box by the time a game runs. */
+function engineMask(m: NonNullable<SpriteResource["mask"]>): MaskShape {
+  if (m.kind === "circle") return m;
+  const { left, top, right, bottom } = m;
+  return { kind: m.kind === "precise" ? "precise" : "rect", left, top, right, bottom };
+}
+
 export interface BuiltGame {
   def: GameDefinition;
   /** Object name → its generated source and line map, for errors. */
@@ -138,7 +145,8 @@ export function buildGame(project: Project, images: Map<string, Blob>): BuiltGam
       originY: s.originY,
       frameCount: Math.max(1, s.frames.length),
       images: frames,
-      ...(s.mask ? { mask: s.mask } : {}),
+      ...(s.mask ? { mask: engineMask(s.mask) } : {}),
+      ...(s.fps !== undefined ? { fps: s.fps } : {}),
     };
   });
   const sources: Record<string, ObjectSource> = {};

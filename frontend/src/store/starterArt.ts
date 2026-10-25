@@ -12,6 +12,10 @@ export interface StarterSprite {
   originX: number;
   originY: number;
   frames: number;
+  /** Frames per second, for the animated ones. */
+  fps?: number;
+  /** A round thing collides as a circle; everything else as its fitted box. */
+  circle?: boolean;
   paint: (ctx: OffscreenCanvasRenderingContext2D, frame: number) => void;
 }
 
@@ -62,6 +66,8 @@ export const STARTER_SPRITES: StarterSprite[] = [
     originX: 8,
     originY: 8,
     frames: 4,
+    fps: 9,
+    circle: true,
     paint(ctx, frame) {
       const w = [8, 5, 2, 5][frame]!;
       ctx.fillStyle = "#facc15";
@@ -80,6 +86,7 @@ export const STARTER_SPRITES: StarterSprite[] = [
     originX: 12,
     originY: 12,
     frames: 2,
+    fps: 4,
     paint(ctx, frame) {
       ctx.fillStyle = "#ef4444";
       ctx.beginPath();
@@ -120,6 +127,7 @@ export const STARTER_SPRITES: StarterSprite[] = [
     originX: 6,
     originY: 6,
     frames: 1,
+    circle: true,
     paint(ctx) {
       ctx.fillStyle = "#f472b6";
       ctx.beginPath();

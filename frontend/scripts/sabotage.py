@@ -62,7 +62,7 @@ CASES = [
  ("far edge inclusive", "src/engine/spatialHash.ts", "    const cx1 = Math.max(cx0, Math.ceil(right / cs) - 1);\n    const cy1 = Math.max(cy0, Math.ceil(bottom / cs) - 1);\n    const r = this.ranges;", "    const cx1 = Math.floor(right / cs);\n    const cy1 = Math.floor(bottom / cs);\n    const r = this.ranges;", "far edge as exclusive"),
  ("duplicates", "src/engine/spatialHash.ts", "          if (stamps[s] === stamp) continue;", "", "once per query"),
  ("remove leaves it", "src/engine/spatialHash.ts", "          bucket[i] = bucket[bucket.length - 1]!;\n          bucket.pop();", "", "moves and removes"),
- ("no mirror swap", "src/engine/sprites.ts", "  out.left = l < r ? l : r;\n  out.right = l < r ? r : l;", "  out.left = l;\n  out.right = r;", "mirror when the scale"),
+ ("no mirror swap", "src/engine/sprites.ts", "    out.left = x + Math.min(l, r);\n    out.right = x + Math.max(l, r);", "    out.left = x + l;\n    out.right = x + r;", "mirror when the scale"),
  ("edges touch", "src/engine/sprites.ts", "return a.left < b.right && b.left < a.right", "return a.left <= b.right && b.left <= a.right", "share an edge"),
  ("repeat is a press", IN, "    if (!this.held[code]) this.pressed[code] = 1;", "    this.pressed[code] = 1;", "reports the press once"),
  ("no any", IN, "    keys[0] = any;", "    keys[0] = 0;", "while any key"),
@@ -120,12 +120,36 @@ CASES = [
  ("pictures never uploaded", "src/store/cloudStore.ts", "        if (blob) await api(`/api/projects/", "        if (blob && !blob) await api(`/api/projects/", "picture added in the editor reaches", E2E),
  ("import overwrites", "src/store/zip.ts", "  project.id = newId();", "  project.id = project.id || newId();", "round-trips a project"),
  ("no folder prefix", "src/store/zip.ts", '  const prefix = Object.keys(entries).find((k) => k.endsWith("project.json"))?.slice(0, -"project.json".length);', '  const prefix = "project.json" in entries ? "" : undefined;', "inside a folder"),
+ # Phase 4: masks and sprites
+ ("turned the wrong way", "src/engine/sprites.ts", "    const c = Math.cos(angle * DEG), sn = Math.sin(angle * DEG);\n    const rx", "    const c = Math.cos(-angle * DEG), sn = Math.sin(-angle * DEG);\n    const rx", "where the sprite is drawn"),
+ ("box ignores angle", "src/engine/sprites.ts", "  if (angle % 360 === 0) {\n    // A negative scale", "  if (angle === angle) {\n    // A negative scale", "turn with the instance"),
+ ("no separating axes", "src/engine/sprites.ts", "    if (!turnedA && !turnedB) return true; // the boxes are the masks", "    if (turnedA || !turnedA) return true; // the boxes are the masks", "collide by their shapes"),
+ ("touching overlaps", "src/engine/sprites.ts", "  return maxA <= minB + 1e-9 || maxB <= minA + 1e-9;", "  return maxA < minB - 1e-9 || maxB < minA - 1e-9;", "only touch along an edge"),
+ ("circles are boxes", "src/engine/sprites.ts", "    return ex * ex + ey * ey < s.r * s.r;", "    return ex * ex + ey * ey < 4 * s.r * s.r;", "misses a box's corner"),
+ ("first frame only", "src/engine/sprites.ts", "  const f = ((Math.floor(st[b + F.IMAGE_INDEX]!) % frames.length) + frames.length) % frames.length;", "  const f = 0;", "frame being shown"),
+ ("slivers skipped", "src/engine/sprites.ts", "  const nx = Math.max(1, Math.ceil(w / step)), ny = Math.max(1, Math.ceil(h / step));", "  const nx = Math.floor(w / step), ny = Math.floor(h / step);", "sliver of overlap"),
+ # Doubly guarded (normalise, then the branch), so both go at once.
+ ("old masks are circles", "src/engine/sprites.ts", '  if (m.kind === "circle") {\n    info.kind = SHAPE.CIRCLE;', '  if (m.kind !== "rect" && m.kind !== "precise") {\n    info.kind = SHAPE.CIRCLE;', "saved before masks had kinds", "vitest",
+  ('  if (!m.kind) return { ...(m as object), kind: "rect" } as MaskShape;\n', "")),
+ ("fps ignored", "src/engine/sprites.ts", "    framesPerStep: (def.fps ?? stepsPerSecond) / stepsPerSecond,", "    framesPerStep: stepsPerSecond / stepsPerSecond,", "own speed sets how fast"),
+ ("events by box", EN, "            if (masksOverlap(st, s, st[b + F.X]!, st[b + F.Y]!, c, cx, cy, this.sprites, scratch, scratch2))", "            if (cx === cx)", "collision events use the shapes"),
+ ("queries by box", EN, "      if (!masksOverlap(st, self, x, y, c, cx, cy, this.sprites, scratch, scratch2)) return false;\n      found = c;", "      if (!masksOverlap(st, self, x, y, c, cx, cy, this.sprites, scratch, scratch2) && false) return false;\n      found = c;", "only where the picture is drawn"),
+ ("spacing ignored", "src/store/imageTools.ts", "  const stepX = fw + Math.max(0, p.spacingX), stepY = fh + Math.max(0, p.spacingY);", "  const stepX = fw, stepY = fh;", "offset and spacing"),
+ ("half frames kept", "src/store/imageTools.ts", "  const fitCols = Math.floor((imageWidth - p.offsetX + Math.max(0, p.spacingX)) / stepX);", "  const fitCols = Math.ceil((imageWidth - p.offsetX + Math.max(0, p.spacingX)) / stepX);", "offset and spacing"),
+ ("faint pixels count", "src/store/imageTools.ts", "export const SOLID_ALPHA = 128;", "export const SOLID_ALPHA = 1;", "faint pixels"),
+ ("auto reaches engine", CG, '  return { kind: m.kind === "precise" ? "precise" : "rect", left, top, right, bottom };', "  return { kind: m.kind as \"rect\", left, top, right, bottom };", "carry their speed"),
+ ("hand masks refitted", "src/store/spriteOps.ts", '  if (kind !== "auto" && kind !== "precise") return mask;', '  if (kind === "circle" && kind !== "circle") return mask;', "stays as they made it"),
+ ("no pixels in the worker", "src/python/spritePrep.ts", '    if (mask?.kind === "precise" && s.images.length) {', '    if (mask?.kind === "precise" && s.images.length < 0) {', "hole in a ring", E2E),
+ ("drops ignored", "src/editor/EditorPage.tsx", "      if (f) void startImport(f);\n      else addLines", "      if (f && !f) void startImport(f);\n      else if (!f) addLines", "dropped on the editor", E2E),
+ ("frames not skippable", "src/editor/sprites/SpriteImport.tsx", "      if (n.has(i)) n.delete(i);\n      else n.add(i);", "      void n;", "dropped on the editor", E2E),
+ ("any size appended", "src/editor/sprites/SpriteImport.tsx", "  const wrongSize = appendTo && (fw !== appendTo.width || fh !== appendTo.height);", "  const wrongSize = appendTo && fw < 0;", "must be its size", E2E),
+ ("drag doesn't draw", "src/editor/sprites/SpriteEditor.tsx", '    if (right > left && bottom > top) set((s) => void (s.mask = { kind: "rect", left, top, right, bottom }));', '    if (right > left && bottom < top) set((s) => void (s.mask = { kind: "rect", left, top, right, bottom }));', "drawn by hand", E2E),
  ("no isolation", "vite.config.ts", '  "Cross-Origin-Embedder-Policy": "credentialless",', "", "stopped at its line", E2E),
 ]
 only = sys.argv[1:]
 bad = []
 for name, f, old, new, test, *extra in CASES:
-    runner = extra[:1]
+    runner = [r for r in extra[:1] if r != "vitest"]  # "vitest" just holds the place for extra pairs
     more = extra[1:]  # further (old, new) pairs in the same file
     if only and name not in only: continue
     p = ROOT / f; src = p.read_text()

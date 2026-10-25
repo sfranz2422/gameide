@@ -14,6 +14,7 @@ export const SPRITES: SpriteDef[] = [
 ];
 
 export interface MiniGame {
+  sprites?: SpriteDef[];
   objects?: ObjectDef[];
   code?: Record<string, string>;
   instances?: RoomInstance[];
@@ -34,7 +35,7 @@ export async function load(m: MiniGame): Promise<Loaded> {
   const code = m.code ?? {};
   const objects = m.objects ?? Object.keys(code).map((name) => ({ name, sprite: "box" }));
   const def: GameDefinition = {
-    sprites: SPRITES,
+    sprites: [...SPRITES, ...(m.sprites ?? [])],
     objects,
     rooms: m.rooms ?? [{ name: "Room1", width: 320, height: 240, instances: m.instances ?? [] }],
     code,
