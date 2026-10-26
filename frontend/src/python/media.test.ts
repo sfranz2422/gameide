@@ -226,3 +226,30 @@ describe("in the project", () => {
     expect([old.sounds, old.fonts]).toEqual([[], []]);
   });
 });
+
+describe("names in quotes", () => {
+  it("a room, sprite or sound used without quotes gets a hint saying how to write it", async () => {
+    const run1 = async (code: string) => {
+      const { game: g, error } = await PythonGame.load({
+        sprites: [{ name: "hero", width: 8, height: 8, originX: 0, originY: 0, frameCount: 1 }],
+        objects: [{ name: "Thing" }],
+        rooms: [
+          { name: "Level1", width: 100, height: 100, instances: [{ object: "Thing", x: 0, y: 0 }] },
+          { name: "Level2", width: 100, height: 100, instances: [] },
+        ],
+        code: { Thing: `class Thing(GameObject):\n    def on_step(self):\n        ${code}\n` },
+        sounds: [{ name: "jump", duration: 1 }],
+      });
+      expect(error).toBeNull();
+      const e = g.step();
+      g.dispose();
+      return e?.message ?? "";
+    };
+    if (process.env["SHOW"]) console.log(await run1("room_goto(Level2)"));
+    expect(await run1("room_goto(Level2)")).toContain('Level2 is a room. A room is named in quotes, as text: "Level2" — for example room_goto("Level2").');
+    expect(await run1("self.sprite = hero")).toContain('self.sprite = "hero"');
+    expect(await run1("sound_play(jump)")).toContain('sound_play("jump")');
+    // A name that isn't any of them: Python's own message, nothing added.
+    expect(await run1("room_goto(Level9)")).not.toContain("quotes");
+  });
+});

@@ -30,6 +30,10 @@ Phase 9 is in three parts, as agreed:
 
 The project format is now **version 8** (Sounds and Fonts folders). Older projects load unchanged.
 
+### After review: names in quotes
+
+`room_goto(Level2)` gave only Python's "name 'Level2' is not defined". Objects are Python names (each is a class) but rooms, sprites, sounds and fonts are text, and students mix them up. Such an error now adds what the name is and how to write it: *Level2 is a room. A room is named in quotes, as text: "Level2" — for example room_goto("Level2").*
+
 ### Found along the way
 
 - **A font that failed to load was drawn in the browser's default font**, though its warning said "the built-in font". The renderer now uses a game font only if it really loaded, and the built-in font otherwise. The sabotage run found this: the font test passed even with fonts never loaded, because the fallback still looked different.
@@ -39,10 +43,10 @@ The project format is now **version 8** (Sounds and Fonts folders). Older projec
 
 ```
 cd frontend
-npm test                      # Vitest: 190
+npm test                      # Vitest: 191
 npm run e2e                   # Playwright: 54 editor tests + 7 account tests
 ../backend/.venv/bin/python ../backend/tests/test_server.py   # 62 server checks
-python3 scripts/sabotage.py   # 276 deliberate bugs
+python3 scripts/sabotage.py   # 277 deliberate bugs
 ```
 
 New:

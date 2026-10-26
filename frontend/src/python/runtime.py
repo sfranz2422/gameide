@@ -1330,6 +1330,32 @@ def _student_frame(filename):
     return filename.startswith(("<object ", "<script ", "<instance "))
 
 
+def _quotes_hint(e):
+    """
+    room_goto(Level2) instead of room_goto("Level2"): the commonest slip of
+    all, because objects *are* Python names (each is a class) while rooms,
+    sprites, sounds and fonts are only text. Python's own message, "name
+    'Level2' is not defined", is true and no help; this says what it is.
+    """
+    name = getattr(e, "name", None)
+    if not isinstance(e, NameError) or not isinstance(name, str):
+        return ""
+    for kind, names in (("room", [r["name"] for r in _rooms]), ("sprite", _sprite_names),
+                        ("sound", _sound_length), ("font", _font_index)):
+        if name in names:
+            return (f"\n{name} is a {kind}. A {kind} is named in quotes, as text: "
+                    f'"{name}" — for example {_QUOTE_EXAMPLE[kind].format(name)}.')
+    return ""
+
+
+_QUOTE_EXAMPLE = {
+    "room": 'room_goto("{}")',
+    "sprite": 'self.sprite = "{}"',
+    "sound": 'sound_play("{}")',
+    "font": 'draw_set_font("{}")',
+}
+
+
 def _error_report(e):
     """
     A Python exception as Object → Event → line, using only the student's
@@ -1358,7 +1384,7 @@ def _error_report(e):
         message = ("This game stopped responding, so GameIDE stopped it. The line shown was "
                    "still running — is there a loop that never ends?")
     else:
-        message = "".join(traceback.format_exception_only(type(e), e)).strip()
+        message = "".join(traceback.format_exception_only(type(e), e)).strip() + _quotes_hint(e)
     tb = "".join(traceback.format_list(frames)) if frames else ""
     return {"kind": kind, "object": obj, "event": event, "line": line, "message": message,
             "traceback": tb, "hang": hang}

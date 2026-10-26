@@ -337,6 +337,7 @@ CASES = [
  ("a category left out", "src/catalog/api.ts", 'export const CATEGORIES: Category[] = ["Instances", "Collision", "Input", "Motion", "Drawing", "Sound", "Saving",', 'export const CATEGORIES: Category[] = ["Instances", "Collision", "Input", "Motion", "Drawing", "Saving",', "every category is in the docs"),
  ("WAV says the wrong length", "src/store/starterSounds.ts", "  v.setUint32(40, samples.length * 2, true);", "  v.setUint32(40, samples.length, true);", "real WAV files"),
  ("MP3 without a tag refused", AT, "  if (ascii(b, 0, \"ID3\") || (b[0] === 0xff && ((b[1] ?? 0) & 0xe0) === 0xe0)) return \"audio/mpeg\";", "  if (ascii(b, 0, \"ID3\")) return \"audio/mpeg\";", "known by their first bytes"),
+ ("no hint for a name without quotes", RT, '        message = "".join(traceback.format_exception_only(type(e), e)).strip() + _quotes_hint(e)', '        message = "".join(traceback.format_exception_only(type(e), e)).strip() + _quotes_hint(None)', "gets a hint saying how to write it"),
 ]
 only = sys.argv[1:]
 # A name that matches no case would otherwise run nothing and still say
