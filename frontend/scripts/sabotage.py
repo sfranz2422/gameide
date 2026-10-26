@@ -364,6 +364,12 @@ CASES = [
  ("no picture sent", PD, "        json: { ...form, classId: form.visibility === \"class\" ? form.classId : null, ...(thumbnail ? { thumbnail } : {}) },", "        json: { ...form, classId: form.visibility === \"class\" ? form.classId : null, ...(thumbnail ? {} : {}) },", "on Explore with its picture", E2E),
  ("no manifest", APP, '        "display": "standalone",\n', "", "it has a manifest", E2E),
  ("other editors' classes count", PUB, "    return db.query(accounts.Course).filter(accounts.Course.app == APP_NAME)", "    return db.query(accounts.Course)", "another editor's classes are never offered", PY),
+ # Home and My Games
+ ("sheet sounds start empty", SE, "    sound: names.sounds?.[0],\n", "", "starts with one of the game's own sounds", E2E),
+ ("icon by exact name only", GS, '        if str(s.get("name", "")).lower() == "icon" and s.get("frames"):', '        if str(s.get("name", "")) == "icon" and s.get("frames"):', "sprite named icon", PY),
+ ("published not shown on My Games", APP, '        return jsonify(projects=[_summary(p, pubs.get(p.id)) for p in rows], used=_user_bytes(db, user.id),', '        return jsonify(projects=[_summary(p, None) for p in rows], used=_user_bytes(db, user.id),', "shows that a game is published", PY),
+ ("clone shares the original", "src/editor/ProjectsPage.tsx", "      const copy: Project = { ...structuredClone(project), id: newId(),", "      const copy: Project = { ...structuredClone(project), id: project.id,", "clones a game", E2E),
+ ("search does nothing", "src/editor/ProjectsPage.tsx", "  const shown = (list ?? []).filter((p) => p.name.toLowerCase().includes(search.trim().toLowerCase()));", "  const shown = (list ?? []).filter((p) => p.name.length >= 0 || search === \"\");", "clones a game", E2E),
 ]
 only = sys.argv[1:]
 # A name that matches no case would otherwise run nothing and still say

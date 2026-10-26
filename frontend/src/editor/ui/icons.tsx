@@ -30,4 +30,11 @@ export const Icon = {
   home: () => svg(<path d="M2.5 7.5L8 3l5.5 4.5V13h-4V9.5h-3V13h-4z" />),
   code: () => svg(<><path d="M5.5 4.5L2.5 8l3 3.5M10.5 4.5l3 3.5-3 3.5M9 3l-2 10" /></>),
   clear: () => svg(<><circle cx="8" cy="8" r="5.5" /><path d="M4.2 11.8l7.6-7.6" /></>),
+  search: (size = 16) => svg(<><circle cx="7" cy="7" r="4.5" /><path d="M10.5 10.5l3.5 3.5" /></>, size),
+  create: (size = 16) => svg(<><path d="M5.5 4.5L2.5 8l3 3.5M10.5 4.5l3 3.5-3 3.5M9 3l-2 10" /></>, size),
+  approve: (size = 16) => svg(<><path d="M3 8.5l3 3 7-7" /></>, size),
+  docsBig: (size = 16) => svg(<><path d="M2 3.5c2-1 4-1 6 .5 2-1.5 4-1.5 6-.5v9c-2-1-4-1-6 .5-2-1.5-4-1.5-6-.5z" /><path d="M8 4v9" /></>, size),
+  upload: () => svg(<><path d="M8 11V3M4.5 6.5L8 3l3.5 3.5M3 13h10" /></>),
+  download: () => svg(<><path d="M8 3v8M4.5 7.5L8 11l3.5-3.5M3 13h10" /></>),
+  copy: () => svg(<><rect x="5" y="5" width="8.5" height="8.5" rx="1" /><path d="M3 10.5V3.5a1 1 0 0 1 1-1h6.5" /></>),
 };

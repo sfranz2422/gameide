@@ -10,8 +10,15 @@ export function watchErrors(page: Page): string[] {
   return errors;
 }
 
+/** A new game from a template: My Games, Create New Game, then the template. */
 export async function fromTemplate(page: Page, key: string, query = "") {
-  await page.goto(`/${query}`);
+  await page.goto(`/${query}#/games`);
+  await chooseTemplate(page, key);
+}
+
+/** On My Games already: Create New Game, then the template. */
+export async function chooseTemplate(page: Page, key: string) {
+  await page.getByTestId("create-game").click();
   await page.getByTestId(`template-${key}`).click();
   await page.waitForURL(/#\/p\//);
 }

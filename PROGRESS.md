@@ -55,6 +55,19 @@ New:
   - a report, a take-down, and the note the student sees;
   - the install manifest.
 
+### After review: the home page and My Games
+
+The editor's layout stays exactly as it is. The pages around it changed:
+- **The home page** (`#/`) is laid out like gdevelop.io, in GameIDE's fonts and colours: a big "Make your own game. Code it in real Python." with **Start your game now** and **Explore games**, a screenshot of the editor, games made with GameIDE (once there are some on Explore), the three ways to write a game (Python, blocks, event sheets, each with a screenshot), what GameIDE gives a game, how sharing works, and a last call to start. Everything it says is something GameIDE does now. The screenshots are of GameIDE itself, made by `e2e/home-images.editor.spec.ts` (`MAKE_HOME_IMAGES=1 npx playwright test home-images`).
+- **My Games** (`#/games`) is laid out like microStudio's My Projects:
+  - a big title, green **Create New Game** (opens the templates), blue **Import Game**, and a search box;
+  - a card per game, with its name, its picture, a size pill, a pill saying how it's published, and blue **Export**, green **Clone**, red **Delete**.
+  - The picture is the game's sprite named "icon", as in microStudio, or a pixel game controller.
+- **A bar across the top** of every page but the editor: the GameIDE name, then Explore, Create and (for teachers and admins) Approvals, each an icon over a word as in microStudio.
+- The editor's GameIDE link now goes back to My Games.
+
+**Also fixed:** a sheet's `sound_play` (or `draw_set_font`) started with an empty name instead of one of the game's own sounds or fonts.
+
 ### After review: microStudio's look
 
 The dark theme now follows microStudio's own stylesheets, read from its source (github.com/pmgl/microstudio):

@@ -4,7 +4,7 @@
  * that plays offline once installed (its service worker).
  */
 import { expect, test, type Browser, type Page } from "@playwright/test";
-import { playAndWait, watchErrors } from "./helpers";
+import { chooseTemplate, playAndWait, watchErrors } from "./helpers";
 
 async function signedIn(browser: Browser, email: string) {
   const ctx = await browser.newContext({ viewport: { width: 1366, height: 768 } });
@@ -14,8 +14,8 @@ async function signedIn(browser: Browser, email: string) {
 }
 
 async function newGame(page: Page) {
-  await page.getByTestId("template-coins").click();
-  await page.waitForURL(/#\/p\//);
+  await page.goto("/#/games");
+  await chooseTemplate(page, "coins");
   await expect(page.getByTestId("save-status")).toHaveText("Saved");
 }
 

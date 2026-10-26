@@ -283,7 +283,7 @@ export function EditorPage({ store, id }: { store: ProjectStore; id: string }) {
     return (
       <div className="center-message">
         <p>{loadError}</p>
-        <a href="#/">Back to your games</a>
+        <a href="#/games">Back to your games</a>
       </div>
     );
   if (!api || !project) return <div className="center-message">Opening…</div>;
@@ -295,7 +295,7 @@ export function EditorPage({ store, id }: { store: ProjectStore; id: string }) {
     <ProjectContext.Provider value={api}>
       <div className="ide">
         <header className="topbar">
-          <a className="brand" href="#/" title="Your games">
+          <a className="brand" href="#/games" title="Your games">
             {Icon.home()} GameIDE
           </a>
           <input

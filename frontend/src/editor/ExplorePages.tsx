@@ -8,6 +8,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../store/api";
 import { useSession } from "./session";
+import { SiteNav, type NavPlace } from "./SiteNav";
 
 interface Card {
   id: string;
@@ -36,15 +37,15 @@ function GameCard({ g, extra }: { g: Card; extra?: React.ReactNode }) {
   );
 }
 
-function PageHead({ title, children }: { title: string; children?: React.ReactNode }) {
+function PageHead({ title, children, at = "" }: { title: string; children?: React.ReactNode; at?: NavPlace }) {
   return (
-    <header className="page-head">
-      <a href="#/" className="muted">
-        ← My games
-      </a>
-      <h1>{title}</h1>
-      {children}
-    </header>
+    <>
+      <SiteNav at={at} />
+      <header className="page-head">
+        <h1>{title}</h1>
+        {children}
+      </header>
+    </>
   );
 }
 
@@ -73,7 +74,8 @@ export function ExplorePage() {
   };
   return (
     <div className="explore-page">
-      <PageHead title="Explore games" />
+      <PageHead title="Explore games" at="explore" />
+      <ClassGalleryLinks />
       <div className="explore-controls">
         {(["featured", "new", "popular"] as const).map((s) => (
           <button key={s} className={`btn small${sort === s ? " on" : ""}`} onClick={() => choose(() => setSort(s))} data-testid={`explore-${s}`}>
@@ -151,7 +153,7 @@ export function ModerationPage() {
   );
   return (
     <div className="explore-page">
-      <PageHead title="Published games: approvals" />
+      <PageHead title="Published games: approvals" at="moderation" />
       {problem && <p className="error-text">{problem}</p>}
       {data && (
         <>
@@ -230,28 +232,21 @@ export function ModerationPage() {
   );
 }
 
-/** Links on the front page: Explore, the galleries of your classes, and (teachers) Approvals. */
-export function PublishedLinks() {
+/** Your classes' galleries, on Explore: GameIDE's own classes only (publishing.py). */
+function ClassGalleryLinks() {
   const { me } = useSession();
   const [classes, setClasses] = useState<{ id: number; name: string }[]>([]);
   useEffect(() => {
     if (me.user) void api<{ classes: { id: number; name: string }[] }>("/api/my-classes").then((r) => setClasses(r.classes), () => undefined);
   }, [me.user]);
+  if (!classes.length) return null;
   return (
-    <nav className="published-links" aria-label="Published games">
-      <a className="btn small" href="#/explore" data-testid="link-explore">
-        Explore games
-      </a>
+    <nav className="published-links" aria-label="Your classes' games">
       {classes.map((c) => (
         <a key={c.id} className="btn small" href={`#/gallery/${c.id}`}>
-          {c.name} games
+          {c.name}'s games
         </a>
       ))}
-      {(me.user?.teacher || me.user?.admin) && (
-        <a className="btn small" href="#/moderation" data-testid="link-moderation">
-          Approvals
-        </a>
-      )}
     </nav>
   );
 }

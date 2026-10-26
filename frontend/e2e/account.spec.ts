@@ -5,15 +5,15 @@
  * in is lost.
  */
 import { expect, test, type Browser, type Page } from "@playwright/test";
-import { setCode, treeItem, watchErrors } from "./helpers";
+import { chooseTemplate, setCode, treeItem, watchErrors } from "./helpers";
 
 async function signIn(page: Page, email: string, next = "/") {
   await page.goto(`/dev/login?email=${encodeURIComponent(email)}&next=${encodeURIComponent(next)}`);
 }
 
 async function newGame(page: Page, template = "coins") {
-  await page.getByTestId(`template-${template}`).click();
-  await page.waitForURL(/#\/p\//);
+  await page.goto("/#/games");
+  await chooseTemplate(page, template);
   await expect(page.getByTestId("save-status")).toHaveText("Saved");
   return page.url().split("#/p/")[1]!;
 }
@@ -46,7 +46,7 @@ const playerCreate = async (page: Page, id: string) =>
 async function freshComputer(browser: Browser, email: string) {
   const ctx = await browser.newContext({ viewport: { width: 1366, height: 768 } });
   const page = await ctx.newPage();
-  await signIn(page, email);
+  await signIn(page, email, "/#/games");
   return { ctx, page };
 }
 
@@ -108,15 +108,14 @@ test("History keeps versions, and going back can itself be undone", async ({ pag
 });
 
 test("games made before signing in can be moved into the account", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/#/games");
   await expect(page.getByTestId("sign-in")).toBeVisible();
-  await page.getByTestId("template-empty").click();
-  await page.waitForURL(/#\/p\//);
+  await chooseTemplate(page, "empty");
   await page.getByRole("textbox", { name: "Game name" }).fill("Made while signed out");
   await expect(page.getByTestId("save-status")).toHaveText("Saved");
   await page.goto("/");
 
-  await signIn(page, "linus@example.com");
+  await signIn(page, "linus@example.com", "/#/games");
   const browserOnly = page.getByTestId("browser-only");
   await expect(browserOnly).toContainText("Made while signed out");
   await browserOnly.getByTestId("move-to-account").click();

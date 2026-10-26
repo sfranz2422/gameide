@@ -1,7 +1,8 @@
 /**
- * Pages chosen by the URL's hash: #/ lists your games, #/p/<id> edits one,
- * #/explore, #/gallery/<class id> and #/moderation are about published games
- * (whose own pages, /play/<id>, are the player's — play.html). A hash rather than a path so the static build works from any server
+ * Pages chosen by the URL's hash: #/ is the front door (HomePage), #/games
+ * lists your games, #/p/<id> edits one, #/explore, #/gallery/<class id> and
+ * #/moderation are about published games (whose own pages, /play/<id>, are
+ * the player's — play.html). A hash rather than a path so the static build works from any server
  * without rewrite rules.
  *
  * Who is signed in is asked once, as the page opens, and decides where
@@ -12,6 +13,7 @@ import { fetchMe, type Me } from "../store/api";
 import { CloudStore } from "../store/cloudStore";
 import { LocalStore } from "../store/store";
 import { EditorPage } from "./EditorPage";
+import { HomePage } from "./HomePage";
 import { ExplorePage, GalleryPage, ModerationPage } from "./ExplorePages";
 import { useIdleSignOut } from "./idle";
 import { ProjectsPage } from "./ProjectsPage";
@@ -54,8 +56,10 @@ export function App() {
         <GalleryPage classId={Number(gallery[1])} />
       ) : hash.startsWith("#/moderation") ? (
         <ModerationPage />
-      ) : (
+      ) : hash.startsWith("#/games") ? (
         <ProjectsPage />
+      ) : (
+        <HomePage />
       )}
     </SessionContext.Provider>
   );

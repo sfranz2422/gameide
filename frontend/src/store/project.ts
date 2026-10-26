@@ -325,6 +325,15 @@ export function blankProject(name: string): Project {
   };
 }
 
+/**
+ * A game's picture on "My games": the first frame of its sprite named
+ * "icon", as in microStudio — or null, for the default picture. The server
+ * has the same rule (gamestore.icon_asset).
+ */
+export function projectIcon(project: Project): string | null {
+  return project.sprites.find((s) => s.name.toLowerCase() === "icon")?.frames[0] ?? null;
+}
+
 export function newSound(name: string): SoundResource {
   return { id: newId(), name, asset: null, volume: 1 };
 }

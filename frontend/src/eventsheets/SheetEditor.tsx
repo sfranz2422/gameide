@@ -662,8 +662,16 @@ function AddButton({ what, row, ops }: { what: "condition" | "action"; row: Even
 function Picker({ what, ops, onPick, onClose }: { what: "condition" | "action"; ops: Ops; onPick: (item: Condition | Action) => void; onClose: () => void }) {
   const [filter, setFilter] = useState("");
   const names = ops.names();
-  const first = (kind: string) =>
-    kind === "object" ? names.objects[0] : kind === "sprite" ? names.sprites[0] : kind === "room" ? names.rooms[0] : kind === "layer" ? names.layers?.[0] : undefined;
+  // A name parameter starts as the project's first of that kind — a real one, so the action works as it is.
+  const firsts: Record<string, string | undefined> = {
+    object: names.objects[0],
+    sprite: names.sprites[0],
+    room: names.rooms[0],
+    layer: names.layers?.[0],
+    sound: names.sounds?.[0],
+    font: names.fonts?.[0],
+  };
+  const first = (kind: string) => firsts[kind];
   const call = (f: ApiFunction) => ({ id: newId(), type: "call" as const, fn: f.name, args: f.params.map((p) => defaultArg(p, first)) });
   const fns = what === "condition" ? CONDITION_FUNCTIONS : ACTION_FUNCTIONS;
   const special: { label: string; hint: string; make: () => Condition | Action; testid: string }[] =

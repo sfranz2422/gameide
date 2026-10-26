@@ -17,6 +17,8 @@ Pictures live in Postgres rather than on a disk for the reason PyIDE's
 `images` table does: Render's disk is wiped on every deploy, and a database
 row is backed up with everything else.
 """
+import json
+
 from sqlalchemy import Column, DateTime, ForeignKey, Integer, LargeBinary, String, Text, UniqueConstraint
 
 import accounts
@@ -251,6 +253,20 @@ class ClassSettings(Base):
     class_id = Column(Integer, unique=True, nullable=False)
     #: Students' public games go up without waiting for approval.
     auto_approve = Column(Integer, nullable=False, default=0)
+
+
+def icon_asset(text: str):
+    """A game's picture on "My games": the first frame of its sprite named
+    "icon" (microStudio's convention), or None. The same rule as projectIcon
+    in store/project.ts, for games kept only in the browser."""
+    try:
+        sprites = json.loads(text).get("sprites") or []
+    except ValueError:
+        return None
+    for s in sprites:
+        if str(s.get("name", "")).lower() == "icon" and s.get("frames"):
+            return s["frames"][0]
+    return None
 
 
 def project_asset_ids(data: dict) -> list:

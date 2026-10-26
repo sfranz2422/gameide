@@ -167,7 +167,7 @@ test("a game exported as a .zip imports as a new game that plays", async ({ page
   expect(file.suggestedFilename()).toBe("Collect-the-coins.zip");
   const path = await file.path();
 
-  await page.goto("/");
+  await page.goto("/#/games");
   await page.getByTestId("import-file").setInputFiles(path!);
   await page.waitForURL(/#\/p\//);
   await expect(page.getByRole("textbox", { name: "Game name" })).toHaveValue("Collect the coins (imported)");
@@ -177,8 +177,23 @@ test("a game exported as a .zip imports as a new game that plays", async ({ page
   expect(errors).toEqual([]);
 });
 
+test("My Games clones a game, with its own copies of the pictures, and searches by name", async ({ page }) => {
+  await fromTemplate(page, "coins");
+  await page.goto("/#/games");
+  await expect(page.getByTestId("project-card")).toHaveCount(1);
+  await page.getByTestId("clone-game").click();
+  await expect(page.getByTestId("project-card")).toHaveCount(2);
+  await page.getByRole("textbox", { name: "Search your games" }).fill("copy");
+  await expect(page.getByTestId("project-card")).toHaveCount(1);
+  await page.getByTestId("project-link").filter({ hasText: "Collect the coins (copy)" }).click();
+  await page.waitForURL(/#\/p\//);
+  await expect(page.getByRole("textbox", { name: "Game name" })).toHaveValue("Collect the coins (copy)");
+  await playAndWait(page);
+  expect(await py(page, "instance_number('Coin')")).toBe(15);
+});
+
 test("importing something that isn't a game says so", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/#/games");
   await page.getByTestId("import-file").setInputFiles({ name: "notes.zip", mimeType: "application/zip", buffer: Buffer.from("not a zip") });
   await expect(page.getByRole("alert")).toHaveText("That isn't a .zip file GameIDE can open.");
 });

@@ -3,7 +3,7 @@
  * actions, type into their boxes, watch the Python beside them, and play.
  */
 import { expect, test, type Page } from "@playwright/test";
-import { nameBox, placeInRoom, playAndWait, py, screenAt, SHOTS, treeItem, watchErrors } from "./helpers";
+import { nameBox, placeInRoom, playAndWait, py, screenAt, SHOTS, treeItem, watchErrors, fromTemplate } from "./helpers";
 
 async function newObjectWithEvent(page: Page, name: string, event = "pick-step") {
   await page.getByTestId("add-objects").click();
@@ -17,9 +17,7 @@ async function newObjectWithEvent(page: Page, name: string, event = "pick-step")
 const python = (page: Page) => page.getByTestId("sheet-code").locator(".cm-content");
 
 async function emptyGame(page: Page) {
-  await page.goto("/");
-  await page.getByTestId("template-empty").click();
-  await page.waitForURL(/#\/p\//);
+  await fromTemplate(page, "empty");
 }
 
 /** Replaces what's in a box (the nth with this label) with `text`. */

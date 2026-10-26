@@ -405,9 +405,11 @@ def _prune(db, p):
             db.query(GameVersion).filter(GameVersion.id.in_([o.id for o in old])).delete(synchronize_session=False)
 
 
-def _summary(p):
+def _summary(p, published=None):
+    """One game on the "My games" page: its name, size, picture and whether it's published."""
     return {"id": p.slug, "name": p.name, "modified": p.updated_at.isoformat() + "Z" if p.updated_at.tzinfo is None
-            else p.updated_at.isoformat(), "version": p.version, "size": p.size}
+            else p.updated_at.isoformat(), "version": p.version, "size": p.size, "icon": gamestore.icon_asset(p.data),
+            "published": published}
 
 
 @app.get("/api/projects")
@@ -417,7 +419,9 @@ def list_projects():
         user = _need_user(db)
         rows = (db.query(GameProject).filter_by(owner_id=user.id).filter(GameProject.deleted_at.is_(None))
                 .order_by(GameProject.updated_at.desc()).all())
-        return jsonify(projects=[_summary(p) for p in rows], used=_user_bytes(db, user.id),
+        pubs = {g.project_id: ("taken down" if g.taken_down else g.visibility)
+                for g in db.query(gamestore.Published).filter(gamestore.Published.project_id.in_([p.id for p in rows] or [-1])).all()}
+        return jsonify(projects=[_summary(p, pubs.get(p.id)) for p in rows], used=_user_bytes(db, user.id),
                        limit=gamestore.MAX_USER_BYTES)
     finally:
         db.close()
@@ -733,6 +737,14 @@ def play_manifest(slug):
     }
     r = jsonify(manifest)
     r.mimetype = "application/manifest+json"
+    return r
+
+
+@app.get("/home/<path:name>")
+def home_pictures(name):
+    """The front page's pictures (screenshots of GameIDE, public/home/)."""
+    r = send_from_directory(DIST / "home", name)
+    r.headers["Cache-Control"] = "public, max-age=86400"
     return r
 
 

@@ -6,12 +6,10 @@
 import { readdirSync } from "node:fs";
 import { join } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
-import { nameBox, placeInRoom, playAndWait, py, setCode, treeItem, watchErrors } from "./helpers";
+import { nameBox, placeInRoom, playAndWait, py, setCode, treeItem, watchErrors, fromTemplate } from "./helpers";
 
 async function emptyGame(page: Page) {
-  await page.goto("/");
-  await page.getByTestId("template-empty").click();
-  await page.waitForURL(/#\/p\//);
+  await fromTemplate(page, "empty");
 }
 
 async function add(page: Page, kind: string, name: string) {
@@ -44,6 +42,18 @@ test("a starter sound plays when the game says so", async ({ page }) => {
   // Decoded and really started through Web Audio, not just asked for.
   expect(await host(page, "host.sound.started")).toBeGreaterThan(0);
   expect(errors).toEqual([]);
+});
+
+test("a sheet's sound_play starts with one of the game's own sounds", async ({ page }) => {
+  await fromTemplate(page, "platformer");
+  await add(page, "objects", "Bell");
+  await page.getByTestId("add-event").click();
+  await page.getByTestId("pick-create").click();
+  await page.getByTestId("tab-sheet").click();
+  await page.getByTestId("sheet-add-row").click();
+  await page.getByTestId("add-action").click();
+  await page.getByTestId("pick-sound_play").click();
+  await expect(page.getByTestId("sheet-code").locator(".cm-content")).toHaveText('sound_play("coin")');
 });
 
 test("a file that isn't a sound is turned away, saying what is wanted", async ({ page }) => {

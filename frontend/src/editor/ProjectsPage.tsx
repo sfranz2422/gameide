@@ -1,37 +1,37 @@
 /**
- * The front page: your games, new ones from templates, and Import.
+ * "My Games": a grid of cards, as microStudio's My Projects is — each game's
+ * name, its picture, its size and whether it's published, and Export,
+ * Clone and Delete. Create New Game (from a template) and Import Game above,
+ * with a search box.
  *
- * Signed in, "Your games" are the account's, and anything made in this
+ * Signed in, these are the account's games, and anything made in this
  * browser before signing in is listed apart, with Move to my account — the
  * same idea as PyIDE's rescue: signing in must never make earlier work
  * vanish from view, and moving it is one click.
  */
-import { PublishedLinks } from "./ExplorePages";
 import { useEffect, useRef, useState } from "react";
 import { signInUrl } from "../store/api";
 import { newId, type Project } from "../store/project";
 import { loadAssets, type ProjectStore, type ProjectSummary } from "../store/store";
 import { TEMPLATES } from "../store/templates";
-import { importZip } from "../store/zip";
-import { AccountMenu } from "./AccountBits";
+import { download, exportZip, importZip, safeFileName } from "../store/zip";
 import { useSession } from "./session";
+import { SiteNav } from "./SiteNav";
 import { Icon } from "./ui/icons";
-import { ThemeToggle } from "./ui/ThemeToggle";
 
-function ago(iso: string): string {
-  const s = (Date.now() - Date.parse(iso)) / 1000;
-  if (s < 60) return "just now";
-  if (s < 3600) return `${Math.floor(s / 60)} min ago`;
-  if (s < 86400) return `${Math.floor(s / 3600)} h ago`;
-  return new Date(iso).toLocaleDateString();
-}
-
-/** Saves a project and its pictures into a store, and confirms it got there. */
+/** Saves a project and its files into a store, and confirms it got there. */
 async function putProject(store: ProjectStore, project: Project, assets: Map<string, Blob>) {
   for (const [id, blob] of assets) await store.putAsset(project.id, id, blob);
   const outcome = await store.save(project);
   if (outcome.state === "error") throw new Error(outcome.message ?? "It couldn't be saved.");
   return outcome;
+}
+
+function sizeText(bytes: number | undefined) {
+  if (bytes === undefined) return null;
+  if (bytes < 1000) return `${bytes} bytes`;
+  if (bytes < 1_000_000) return `${Math.round(bytes / 1000)} KB`;
+  return `${(bytes / 1_000_000).toFixed(1)} MB`;
 }
 
 export function ProjectsPage() {
@@ -40,6 +40,8 @@ export function ProjectsPage() {
   const [local, setLocal] = useState<ProjectSummary[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [search, setSearch] = useState("");
   const fileInput = useRef<HTMLInputElement>(null);
 
   const refresh = async () => {
@@ -82,6 +84,32 @@ export function ProjectsPage() {
       location.hash = `#/p/${project.id}`;
     });
 
+  const exportGame = (p: ProjectSummary) =>
+    act(async () => {
+      const project = await store.load(p.id);
+      if (!project) throw new Error("That game couldn't be opened.");
+      download(await exportZip(project, (id) => store.getAsset(p.id, id)), `${safeFileName(project.name)}.zip`);
+    });
+
+  /** A copy with a new id and its own copies of the files: changing one never changes the other. */
+  const clone = (p: ProjectSummary) =>
+    act(async () => {
+      const project = await store.load(p.id);
+      if (!project) throw new Error("That game couldn't be opened.");
+      const assets = await loadAssets(store, project);
+      const now = new Date().toISOString();
+      const copy: Project = { ...structuredClone(project), id: newId(), name: `${project.name} (copy)`, created: now, modified: now };
+      await putProject(store, copy, assets);
+      await refresh();
+    });
+
+  const remove = (p: ProjectSummary) =>
+    act(async () => {
+      if (!confirm(`Delete "${p.name}"?`)) return;
+      await store.remove(p.id);
+      await refresh();
+    });
+
   /** A game from this browser into the account, then out of the browser. */
   const move = (summary: ProjectSummary) =>
     act(async () => {
@@ -99,32 +127,19 @@ export function ProjectsPage() {
       await refresh();
     });
 
+  const shown = (list ?? []).filter((p) => p.name.toLowerCase().includes(search.trim().toLowerCase()));
+
   return (
-    <div className="projects-page">
-      <header className="topbar">
-        <span className="brand">GameIDE</span>
-        <span className="spacer" />
-        <AccountMenu />
-        <ThemeToggle />
-      </header>
-      <main className="projects-main">
-        <PublishedLinks />
-        {error && (
-          <p className="banner error" role="alert">
-            {error}
-          </p>
-        )}
-        <h2>Make a new game</h2>
-        <div className="template-grid">
-          {TEMPLATES.map((t) => (
-            <button key={t.key} className="template-card" disabled={busy} onClick={() => create(t.key)} data-testid={`template-${t.key}`}>
-              <b>{t.label}</b>
-              <span>{t.description}</span>
-            </button>
-          ))}
-          <button className="template-card" disabled={busy} onClick={() => fileInput.current?.click()} data-testid="import-zip">
-            <b>Import a game</b>
-            <span>Open a .zip exported from GameIDE.</span>
+    <div className="site-page">
+      <SiteNav at="games" />
+      <main className="games-main">
+        <div className="games-head">
+          <h1>My Games</h1>
+          <button className="btn big go" disabled={busy} onClick={() => setCreating(true)} data-testid="create-game">
+            {Icon.plus()} Create New Game
+          </button>
+          <button className="btn big blue" disabled={busy} onClick={() => fileInput.current?.click()} data-testid="import-zip">
+            {Icon.upload()} Import Game
           </button>
           <input
             ref={fileInput}
@@ -138,19 +153,40 @@ export function ProjectsPage() {
               if (f) void importFile(f);
             }}
           />
+          <span className="spacer" />
+          <label className="games-search">
+            <input value={search} onChange={(e) => setSearch(e.target.value)} aria-label="Search your games" />
+            {Icon.search(18)}
+          </label>
         </div>
-
-        <h2>Your games</h2>
-        {cloud ? (
-          <p className="muted small">Saved to your account, so they're there on any computer you sign in on.</p>
-        ) : me.loginEnabled ? (
-          <p className="muted small">
-            Saved in this browser only. <a href={signInUrl(me)}>Sign in</a> to keep them in your account and use them anywhere.
+        <p className="muted small games-where">
+          {cloud ? (
+            "Saved to your account, so they're there on any computer you sign in on."
+          ) : me.loginEnabled ? (
+            <>
+              Saved in this browser only. <a href={signInUrl(me)}>Sign in</a> to keep them in your account and use them anywhere.
+            </>
+          ) : (
+            "Saved in this browser."
+          )}
+        </p>
+        {error && (
+          <p className="banner error" role="alert">
+            {error}
           </p>
-        ) : (
-          <p className="muted small">Saved in this browser.</p>
         )}
-        <ProjectList items={list} store={store} refresh={refresh} />
+
+        {list === null ? (
+          <p className="muted">Loading…</p>
+        ) : list.length === 0 ? (
+          <p className="muted">No games yet. Press Create New Game to start one.</p>
+        ) : (
+          <div className="game-cards">
+            {shown.map((p) => (
+              <GameCard key={p.id} p={p} store={store} busy={busy} exportGame={exportGame} clone={clone} remove={remove} />
+            ))}
+          </div>
+        )}
 
         {cloud && local.length > 0 && (
           <section className="local-section" data-testid="browser-only">
@@ -161,7 +197,6 @@ export function ProjectsPage() {
                 <li key={p.id}>
                   <span className="project-link">
                     <b>{p.name}</b>
-                    <span className="muted small">{ago(p.modified)}</span>
                   </span>
                   <button className="btn small" disabled={busy} onClick={() => move(p)} data-testid="move-to-account">
                     Move to my account
@@ -172,41 +207,117 @@ export function ProjectsPage() {
           </section>
         )}
       </main>
+      {creating && (
+        <div className="modal-back" onPointerDown={() => setCreating(false)}>
+          <div className="modal wide" role="dialog" aria-label="Create a new game" onPointerDown={(e) => e.stopPropagation()}>
+            <h2>Create a new game</h2>
+            <p className="muted">Start from nothing, or from a game that already works and change it.</p>
+            <div className="template-grid">
+              {TEMPLATES.map((t) => (
+                <button key={t.key} className="template-card" disabled={busy} onClick={() => void create(t.key)} data-testid={`template-${t.key}`}>
+                  <b>{t.label}</b>
+                  <span>{t.description}</span>
+                </button>
+              ))}
+            </div>
+            <div className="modal-foot">
+              <span className="spacer" />
+              <button className="btn" onClick={() => setCreating(false)}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-function ProjectList({ items, store, refresh }: { items: ProjectSummary[] | null; store: ProjectStore; refresh: () => Promise<void> }) {
-  if (items === null) return <p className="muted">Loading…</p>;
-  if (items.length === 0) return <p className="muted">None yet.</p>;
+/** The game's picture: its "icon" sprite, or a game controller like microStudio's. */
+function useIcon(store: ProjectStore, p: ProjectSummary): string | null {
+  const [url, setUrl] = useState<string | null>(null);
+  useEffect(() => {
+    if (!p.icon) return setUrl(null);
+    let made: string | null = null;
+    let alive = true;
+    void store.getAsset(p.id, p.icon).then((b) => {
+      if (!alive || !b) return;
+      made = URL.createObjectURL(b);
+      setUrl(made);
+    });
+    return () => {
+      alive = false;
+      if (made) URL.revokeObjectURL(made);
+    };
+  }, [store, p.id, p.icon]);
+  return url;
+}
+
+/** A pixel-art game controller, for games with no "icon" sprite. */
+export function ControllerIcon() {
+  // 16 × 10 cells: # body, + d-pad, a/b buttons, . empty.
+  const rows = [
+    "................",
+    "..############..",
+    ".##############.",
+    "##+#########a###",
+    "#+++########b###",
+    "##+#############",
+    "################",
+    "####..####..####",
+    "###....##....###",
+    "................",
+  ];
+  const fill: Record<string, string> = { "#": "#2a3d4d", "+": "#e8eef2", a: "#e05a5a", b: "#5cc46b" };
   return (
-    <ul className="project-list">
-      {items.map((p) => (
-        <li key={p.id}>
-          <a href={`#/p/${p.id}`} className="project-link" data-testid="project-link">
-            <b>{p.name}</b>
-            <span className="muted small">
-              {p.unsynced && <span className="unsynced">not yet in your account · </span>}
-              {ago(p.modified)}
-            </span>
-          </a>
-          <button
-            className="icon-btn"
-            aria-label={`Delete ${p.name}`}
-            onClick={async () => {
-              if (!confirm(`Delete "${p.name}"?`)) return;
-              try {
-                await store.remove(p.id);
-              } catch (e) {
-                alert(e instanceof Error ? e.message : String(e));
-              }
-              await refresh();
-            }}
-          >
-            {Icon.trash()}
+    <svg viewBox="0 0 16 10" className="controller-icon" aria-hidden="true" shapeRendering="crispEdges">
+      {rows.flatMap((r, y) => [...r].map((c, x) => (fill[c] ? <rect key={`${x},${y}`} x={x} y={y} width="1" height="1" fill={fill[c]} /> : null)))}
+    </svg>
+  );
+}
+
+function GameCard({
+  p,
+  store,
+  busy,
+  exportGame,
+  clone,
+  remove,
+}: {
+  p: ProjectSummary;
+  store: ProjectStore;
+  busy: boolean;
+  exportGame: (p: ProjectSummary) => void;
+  clone: (p: ProjectSummary) => void;
+  remove: (p: ProjectSummary) => void;
+}) {
+  const icon = useIcon(store, p);
+  return (
+    <div className="project-card" data-testid="project-card">
+      <a href={`#/p/${p.id}`} className="project-card-title" data-testid="project-link">
+        {p.name}
+      </a>
+      <div className="project-card-body">
+        <a href={`#/p/${p.id}`} className={`project-card-icon${icon ? " has-icon" : ""}`} tabIndex={-1} title={icon ? undefined : 'Name a sprite "icon" to make it this game\'s picture'}>
+          {icon ? <img src={icon} alt="" /> : <ControllerIcon />}
+        </a>
+        <div className="project-card-side">
+          <div className="pills">
+            {sizeText(p.size) && <span className="pill">{sizeText(p.size)}</span>}
+            {p.published && <span className={`pill published ${p.published.replace(" ", "-")}`}>{p.published}</span>}
+            {p.unsynced && <span className="pill warn">not yet in your account</span>}
+          </div>
+          <button className="btn card-btn blue" disabled={busy} onClick={() => exportGame(p)}>
+            {Icon.download()} Export
           </button>
-        </li>
-      ))}
-    </ul>
+          <button className="btn card-btn go" disabled={busy} onClick={() => clone(p)} data-testid="clone-game">
+            {Icon.copy()} Clone
+          </button>
+          <button className="btn card-btn red" disabled={busy} onClick={() => remove(p)} aria-label={`Delete ${p.name}`}>
+            {Icon.trash()} Delete
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }

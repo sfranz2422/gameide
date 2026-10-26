@@ -4,7 +4,7 @@
  * CloudStore (cloudStore.ts) keeps it on the server, with a LocalStore of
  * its own as the offline cache (signed in).
  */
-import { assetIds, migrate, type Project } from "./project";
+import { assetIds, migrate, projectIcon, type Project } from "./project";
 
 export interface ProjectSummary {
   id: string;
@@ -12,6 +12,12 @@ export interface ProjectSummary {
   modified: string;
   /** Changes made offline that haven't reached the server yet. */
   unsynced?: boolean;
+  /** Bytes of the project's JSON (its pictures and sounds not counted). */
+  size?: number;
+  /** Asset id of its picture on "My games" (projectIcon), or null for the default. */
+  icon?: string | null;
+  /** How it's published, if it is: "unlisted", "class", "public" or "taken down". */
+  published?: string | null;
 }
 
 /**
@@ -101,7 +107,7 @@ export class LocalStore implements ProjectStore {
     const db = await this.db;
     const all = (await request(db.transaction("projects").objectStore("projects").getAll())) as Project[];
     return all
-      .map((p) => ({ id: p.id, name: p.name, modified: p.modified }))
+      .map((p) => ({ id: p.id, name: p.name, modified: p.modified, size: JSON.stringify(p).length, icon: projectIcon(p) }))
       .sort((a, b) => b.modified.localeCompare(a.modified));
   }
 

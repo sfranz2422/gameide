@@ -4,7 +4,7 @@
  * convert to Python.
  */
 import { expect, test, type Page } from "@playwright/test";
-import { nameBox, placeInRoom, playAndWait, py, screenAt, SHOTS, treeItem, watchErrors } from "./helpers";
+import { nameBox, placeInRoom, playAndWait, py, screenAt, SHOTS, treeItem, watchErrors, fromTemplate } from "./helpers";
 
 async function newObjectWithEvent(page: Page, name: string, event = "pick-step") {
   await page.getByTestId("add-objects").click();
@@ -92,9 +92,7 @@ test("blocks build an event, its Python shows beside them, and the game runs it"
   // Blockly's sounds and icons, from our own origin (vite.config.ts copies them in).
   const media: [string, number][] = [];
   page.on("response", (r) => r.url().includes("/blockly-media/") && media.push([r.url(), r.status()]));
-  await page.goto("/");
-  await page.getByTestId("template-empty").click();
-  await page.waitForURL(/#\/p\//);
+  await fromTemplate(page, "empty");
   await newObjectWithEvent(page, "Mover");
   await openBlocks(page);
   await addUnderHat(page, "Motion", "change");
@@ -128,9 +126,7 @@ test("blocks build an event, its Python shows beside them, and the game runs it"
 });
 
 test("Python never becomes blocks; blocks become Python once, after a warning", async ({ page }) => {
-  await page.goto("/");
-  await page.getByTestId("template-empty").click();
-  await page.waitForURL(/#\/p\//);
+  await fromTemplate(page, "empty");
   await newObjectWithEvent(page, "Thing", "pick-create");
   await page.getByTestId("event-code").locator(".cm-content").click();
   await page.keyboard.insertText("self.x = 1");
@@ -169,9 +165,7 @@ test("Python never becomes blocks; blocks become Python once, after a warning", 
 });
 
 test("an error in blocks shows its line and selects the block that made it", async ({ page }) => {
-  await page.goto("/");
-  await page.getByTestId("template-empty").click();
-  await page.waitForURL(/#\/p\//);
+  await fromTemplate(page, "empty");
   await newObjectWithEvent(page, "Mover");
   await openBlocks(page);
   await addUnderHat(page, "Motion", "change");
@@ -188,9 +182,7 @@ test("an error in blocks shows its line and selects the block that made it", asy
 });
 
 test("Ctrl+Z in the blocks undoes blocks; elsewhere it undoes the project and leaves blocks alone", async ({ page }) => {
-  await page.goto("/");
-  await page.getByTestId("template-empty").click();
-  await page.waitForURL(/#\/p\//);
+  await fromTemplate(page, "empty");
   await newObjectWithEvent(page, "Mover");
   await openBlocks(page);
   await page.getByRole("checkbox", { name: "Solid" }).check();
@@ -220,9 +212,7 @@ test("Ctrl+Z in the blocks undoes blocks; elsewhere it undoes the project and le
 test("renaming an object renames it in the blocks' pickers too", async ({ page }) => {
   const errors = watchErrors(page);
   page.on("dialog", (d) => void d.accept());
-  await page.goto("/");
-  await page.getByTestId("template-empty").click();
-  await page.waitForURL(/#\/p\//);
+  await fromTemplate(page, "empty");
   await page.getByTestId("add-objects").click();
   await nameBox(page).fill("Coin");
   await nameBox(page).press("Enter");
@@ -249,9 +239,7 @@ test("renaming an object renames it in the blocks' pickers too", async ({ page }
 
 test("a script made with blocks defines a function, and an event's blocks call it", async ({ page }) => {
   const errors = watchErrors(page);
-  await page.goto("/");
-  await page.getByTestId("template-empty").click();
-  await page.waitForURL(/#\/p\//);
+  await fromTemplate(page, "empty");
   await page.getByTestId("add-scripts").click();
   await nameBox(page).fill("helpers");
   await nameBox(page).press("Enter");
@@ -280,16 +268,15 @@ test("a script made with blocks defines a function, and an event's blocks call i
 
   await placeInRoom(page, "Room1 start", "Counter", 100, 100);
   await playAndWait(page);
-  await page.waitForTimeout(300);
-  expect((await py(page, "global_vars.score")) as number).toBeGreaterThan(10);
+  // Counted by steps, not time: under the whole suite's load fewer steps
+  // fit in a fixed wait (7 in 300 ms once), so wait for the count instead.
+  await expect.poll(async () => (await py(page, "global_vars.score")) as number, { timeout: 15_000 }).toBeGreaterThan(10);
   expect(errors).toEqual([]);
 });
 
 test("creation code can be blocks too, built in a dialog", async ({ page }) => {
   const errors = watchErrors(page);
-  await page.goto("/");
-  await page.getByTestId("template-empty").click();
-  await page.waitForURL(/#\/p\//);
+  await fromTemplate(page, "empty");
   await page.getByTestId("add-sprites").click();
   await page.getByTestId("starter-coin").click();
   await expect(treeItem(page, "coin")).toBeVisible(); // its tab opens when it's made; wait, or it takes over from Gem's

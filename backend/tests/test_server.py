@@ -257,6 +257,11 @@ db.close()
 
 GAME = project("pub1", "Coin Run", sprites=[{"frames": ["pic1"]}])
 check("a game to publish is saved", put(alice, "pub1", GAME, 0).status_code == 200)
+listing = {x["id"]: x for x in alice.get("/api/projects").get_json()["projects"]}
+check("My games lists a game's size, not yet published", listing["pub1"]["size"] > 0 and listing["pub1"]["published"] is None)
+put(alice, "ico1", project("ico1", "With an icon", sprites=[{"name": "hero", "frames": ["h1"]}, {"name": "Icon", "frames": ["i1", "i2"]}]), 0)
+check("…and its picture: the first frame of the sprite named icon",
+      {x["id"]: x for x in alice.get("/api/projects").get_json()["projects"]}["ico1"]["icon"] == "i1")
 alice.put("/api/projects/pub1/assets/pic1", data=PNG)
 settings = alice.get("/api/projects/pub1/publish").get_json()
 check("publishing offers the student's own classes", [c["name"] for c in settings["classes"]] == ["Period 4"], settings["classes"])
@@ -321,6 +326,7 @@ check("only a class's own teacher can change that", other_teacher.post(f"/api/mo
 put(teacher, "tch1", project("tch1", "Demo"), 0)
 r = teacher.post("/api/projects/tch1/publish", json={"title": "Demo", "visibility": "public"})
 check("a teacher's public game needs no approval", r.get_json()["published"]["status"] == "approved")
+check("My games shows that a game is published, and how", {x["id"]: x for x in alice.get("/api/projects").get_json()["projects"]}["pub1"]["published"] == "public")
 
 # Playing: plays, likes, remixes, reports.
 p1 = anon.post(f"/api/play/{SLUG}/played").get_json()["plays"]
