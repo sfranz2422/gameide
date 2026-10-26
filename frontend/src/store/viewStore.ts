@@ -54,6 +54,10 @@ export class ViewStore implements ProjectStore {
     this.added.set(assetId, blob);
   }
 
+  async putAssets(_projectId: string, assets: Map<string, Blob>): Promise<void> {
+    for (const [assetId, blob] of assets) this.added.set(assetId, blob);
+  }
+
   async getAsset(projectId: string, assetId: string): Promise<Blob | null> {
     const mine = this.added.get(assetId);
     if (mine) return mine;

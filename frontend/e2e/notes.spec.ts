@@ -52,7 +52,9 @@ Player has event draw
 
 test("notes: slides, a question, Check my work in the game pane, and the teacher's Check all", async ({ browser }) => {
   test.setTimeout(180_000);
-  const { ctx: tctx, page: teacher } = await signedIn(browser, "teach@example.com");
+  // A teacher of its own: it picks its game by name ("Collect the coins"),
+  // and the other specs' teacher makes games of that name in parallel.
+  const { ctx: tctx, page: teacher } = await signedIn(browser, "teach3@example.com");
   await teacher.goto("/#/games");
   await chooseTemplate(teacher, "coins");
   await expect(teacher.getByTestId("save-status")).toHaveText("Saved");

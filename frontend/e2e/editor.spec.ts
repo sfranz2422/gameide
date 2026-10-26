@@ -269,3 +269,18 @@ test("the Add event menu closes without picking anything: ×, Escape, or a click
   await page.getByTestId("pick-draw").click();
   await expect(page.getByTestId("event-Draw")).toBeVisible();
 });
+
+test("a long event scrolls inside its pane, which stays in the window", async ({ page }) => {
+  await fromTemplate(page, "coins");
+  await treeItem(page, "Player").click();
+  await page.getByTestId("event-Step").click();
+  await setCode(page, Array.from({ length: 200 }, (_, i) => `x${i} = ${i}`).join("\n") + "\n");
+  const scroller = page.getByTestId("event-code").locator(".cm-scroller");
+  const size = await scroller.evaluate((s) => ({ client: s.clientHeight, content: s.scrollHeight, bottom: s.getBoundingClientRect().bottom }));
+  expect(size.content).toBeGreaterThan(size.client);
+  expect(size.bottom).toBeLessThanOrEqual(page.viewportSize()!.height);
+  await scroller.hover();
+  await page.mouse.wheel(0, 2000);
+  await expect.poll(() => scroller.evaluate((s) => s.scrollTop)).toBeGreaterThan(0);
+});
+

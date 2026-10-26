@@ -34,10 +34,11 @@ room_goto(LEVELS[global_vars.level][0])
 
 # === draw_gui
 draw_sprite("bg_sky", 0, 0, 0)
-draw_sprite("bg_pines_far", 0, 0 - (self.t * 0.1) % 352, 40)
-draw_sprite("bg_pines_far", 0, 352 - (self.t * 0.1) % 352, 40)
-draw_sprite("bg_pines_near", 0, 0 - (self.t * 0.25) % 352, 84)
-draw_sprite("bg_pines_near", 0, 352 - (self.t * 0.25) % 352, 84)
+for name, width, speed, drop in (("bg_ridge", 96, 0.04, 30), ("bg_pines_far", 416, 0.1, 44), ("bg_pines_near", 416, 0.25, 90)):
+    x = -((self.t * speed) % width)
+    while x < 480:
+        draw_sprite(name, 0, x, drop)
+        x += width
 draw_sprite("hero_idle", int(self.t / 8) % 4, 240, 236)
 draw_words_centered(240, 44, "THORNWOOD", size=2, gold=True)
 draw_words_centered(240, 70, "a sword, a forest, and what lives in it")

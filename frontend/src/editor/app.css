@@ -251,6 +251,10 @@ button:focus-visible {
 }
 .workspace {
   display: grid;
+  /* One row, no taller than the window. Left implicit, the row was sized
+     to its content, so a long event made the middle column as tall as the
+     code and the page cut it off: no pane could scroll. */
+  grid-template-rows: minmax(0, 1fr);
   min-height: 0;
 }
 .splitter {

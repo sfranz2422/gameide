@@ -8,8 +8,7 @@
 
 # === draw
 draw_sprite("bg_sky", 0, view_x, view_y)
-for name, speed, drop in (("bg_pines_far", 0.15, 40), ("bg_pines_near", 0.35, 84)):
-    width = 352
+for name, width, speed, drop in (("bg_ridge", 96, 0.06, 30), ("bg_pines_far", 416, 0.15, 44), ("bg_pines_near", 416, 0.35, 90)):
     x = view_x - (view_x * speed) % width
     while x < view_x + view_width:
         draw_sprite(name, 0, x, view_y + drop)

@@ -110,14 +110,21 @@ CHARS = "".join(G)          # frame n of the font sprites is CHARS[n]
 CELL_W, CELL_H = 6, 10
 
 
-def frames(color, Image, scale=1):
-    """One picture per character, in `color` (r, g, b)."""
+def frames(color, Image, scale=1, shadow=None):
+    """
+    One picture per character, in `color` (r, g, b), with a `shadow` colour
+    one pixel down and right baked in. (A separate shadow sprite doubled the
+    font's frames, and every frame is a file a game uploads.)
+    """
     out = []
     for ch in CHARS:
-        im = Image.new("RGBA", (CELL_W, CELL_H), (0, 0, 0, 0))
-        for y, row in enumerate(G[ch]):
-            for x, px in enumerate(row):
-                if px == "#":
-                    im.putpixel((x, y), (*color, 255))
-        out.append(im.resize((CELL_W * scale, CELL_H * scale), Image.NEAREST) if scale > 1 else im)
+        im = Image.new("RGBA", (CELL_W + 1, CELL_H + 1), (0, 0, 0, 0))
+        for layer, (dx, rgb) in enumerate(((1, shadow), (0, color))):
+            if rgb is None:
+                continue
+            for y, row in enumerate(G[ch]):
+                for x, px in enumerate(row):
+                    if px == "#":
+                        im.putpixel((x + dx, y + dx), (*rgb, 255))
+        out.append(im.resize((im.width * scale, im.height * scale), Image.NEAREST) if scale > 1 else im)
     return out

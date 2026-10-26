@@ -37,6 +37,8 @@ interface SyncMeta {
 }
 
 const NO_META: SyncMeta = { base: 0, dirty: false, pending: [] };
+/** Pictures sent at once by a save: enough to be quick, few enough not to swamp a free server. */
+const UPLOADS_AT_ONCE = 6;
 const RETRY_MS = 30_000;
 
 export function cacheName(userId: number) {
@@ -47,6 +49,7 @@ export class CloudStore implements ProjectStore {
   readonly kind = "cloud" as const;
   readonly cache: LocalStore;
   private listeners = new Set<(id: string, o: SaveOutcome) => void>();
+  private uploads = new Set<(id: string, done: number, total: number) => void>();
   /** One sync at a time per project; a save during one asks for another after it. */
   private running = new Map<string, Promise<SaveOutcome>>();
   private again = new Set<string>();
@@ -67,6 +70,11 @@ export class CloudStore implements ProjectStore {
   onSync(listener: (id: string, o: SaveOutcome) => void) {
     this.listeners.add(listener);
     return () => void this.listeners.delete(listener);
+  }
+
+  onUpload(listener: (id: string, done: number, total: number) => void) {
+    this.uploads.add(listener);
+    return () => void this.uploads.delete(listener);
   }
 
   private meta(id: string) {
@@ -176,6 +184,14 @@ export class CloudStore implements ProjectStore {
     void this.sync(projectId);
   }
 
+  /** Cached and queued; the save that follows sends them (see push). No upload run per picture. */
+  async putAssets(projectId: string, assets: Map<string, Blob>): Promise<void> {
+    await this.cache.putAssets(projectId, assets);
+    await this.updateMeta(projectId, (m) => {
+      for (const assetId of assets.keys()) if (!m.pending.includes(assetId)) m.pending.push(assetId);
+    });
+  }
+
   async remove(id: string): Promise<void> {
     try {
       await api(`/api/projects/${encodeURIComponent(id)}`, { method: "DELETE" });
@@ -223,11 +239,23 @@ export class CloudStore implements ProjectStore {
         const stillDirty = !!now && now.modified !== project.modified;
         await this.updateMeta(id, (m) => ((m.base = r.version), (m.dirty = stillDirty)));
       }
-      for (const assetId of (await this.meta(id)).pending) {
-        const blob = await this.cache.getAsset(id, assetId);
-        if (blob) await api(`/api/projects/${encodeURIComponent(id)}/assets/${encodeURIComponent(assetId)}`, { method: "PUT", body: blob });
-        await this.updateMeta(id, (m) => void (m.pending = m.pending.filter((a) => a !== assetId)));
-      }
+      // Several pictures at a time: one after another, a game of 600 frames
+      // took minutes on the real server. updateMeta queues its changes, so
+      // the uploads can each take their picture off `pending` safely.
+      const queue = [...(await this.meta(id)).pending];
+      const total = queue.length;
+      let sent = 0;
+      const upload = async () => {
+        for (let assetId = queue.shift(); assetId !== undefined; assetId = queue.shift()) {
+          const blob = await this.cache.getAsset(id, assetId);
+          if (blob) await api(`/api/projects/${encodeURIComponent(id)}/assets/${encodeURIComponent(assetId)}`, { method: "PUT", body: blob });
+          const done = assetId;
+          await this.updateMeta(id, (m) => void (m.pending = m.pending.filter((a) => a !== done)));
+          sent++;
+          for (const l of this.uploads) l(id, sent, total);
+        }
+      };
+      await Promise.all(Array.from({ length: Math.min(UPLOADS_AT_ONCE, total) }, upload));
       return note ? { state: "saved", note } : { state: "saved" };
     } catch (e) {
       if (e instanceof OfflineError) return { state: "offline" };

@@ -52,6 +52,14 @@ export interface ProjectStore {
   save(project: Project): Promise<SaveOutcome>;
   remove(id: string): Promise<void>;
   putAsset(projectId: string, assetId: string, blob: Blob): Promise<void>;
+  /**
+   * Many pictures at once — an import, a template, a copy — written in one
+   * go and, for an account, sent up by the next save, several at a time.
+   * Adding them one by one with putAsset started an upload run per picture,
+   * one request after another: a game with 600 frames sat on My Games for
+   * minutes with nothing on screen, and looked hung.
+   */
+  putAssets(projectId: string, assets: Map<string, Blob>): Promise<void>;
   getAsset(projectId: string, assetId: string): Promise<Blob | null>;
   /** Version history; only stores that keep one have these. */
   versions?(id: string): Promise<VersionInfo[]>;
@@ -59,6 +67,8 @@ export interface ProjectStore {
   restoreVersion?(id: string, versionId: number): Promise<Project>;
   /** Hear about saves that finish later, in the background (back online). */
   onSync?(listener: (id: string, outcome: SaveOutcome) => void): () => void;
+  /** Hear how a save's pictures are going up: `done` of `total`. */
+  onUpload?(listener: (id: string, done: number, total: number) => void): () => void;
 }
 
 const DB_NAME = "gameide";
@@ -164,6 +174,14 @@ export class LocalStore implements ProjectStore {
     const db = await this.db;
     const tx = db.transaction("assets", "readwrite");
     tx.objectStore("assets").put(blob, [projectId, assetId]);
+    await done(tx);
+  }
+
+  async putAssets(projectId: string, assets: Map<string, Blob>): Promise<void> {
+    const db = await this.db;
+    const tx = db.transaction("assets", "readwrite");
+    const os = tx.objectStore("assets");
+    for (const [assetId, blob] of assets) os.put(blob, [projectId, assetId]);
     await done(tx);
   }
 

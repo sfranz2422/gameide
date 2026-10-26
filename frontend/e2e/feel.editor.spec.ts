@@ -79,9 +79,11 @@ test("game feel is drawn: flash, outline, tint, particles, lighting, a screen ef
   if (SHOTS) await page.screenshot({ path: `${SHOTS}/feel-particles.png` });
 
   await playWith(page, "lighting(1)", STEP + "light(self.x + 12, self.y + 12, 90)\n");
-  const [lit, far] = await pixels(page, [[48, 48], [600, 420]]);
+  // Polled: under a full parallel run the first frames with the light can
+  // come after playWith's short wait, and a single read then saw black.
+  await expect.poll(async () => (await pixels(page, [[48, 48]]))[0]!.reduce((a, b) => a + b), { timeout: 10_000 }).toBeGreaterThan(120);
+  const [far] = await pixels(page, [[600, 420]]);
   expect(far).toEqual([0, 0, 0]);
-  expect(lit!.reduce((a, b) => a + b)).toBeGreaterThan(120);
   if (SHOTS) await page.screenshot({ path: `${SHOTS}/feel-lighting.png` });
 
   await playWith(page, 'self.flash("red", 100000)\nscreen_effect("grayscale")');

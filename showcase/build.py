@@ -363,6 +363,10 @@ def build_level(project, theme_ts, theme, meta, rows, objects):
     H, W = len(rows), len(rows[0])
     at = lambda c, r: rows[r][c] if 0 <= r < H and 0 <= c < W else "#"
     solid = lambda ch: ch in SOLID
+    # For choosing edge pieces, water counts as rock: a pool's bed and sides
+    # are inside the ground, not a grass top and a cliff edge with sky
+    # showing through its see-through bits.
+    walled = lambda ch: ch in SOLID or ch == "~"
     back, ground, front, planks = {}, {}, {}, {}
     instances = []
 
@@ -383,8 +387,8 @@ def build_level(project, theme_ts, theme, meta, rows, objects):
                 back[key] = theme.back[(r % 2) * 2 + (c % 2)]
             if solid(ch):
                 set_ = theme.ground if ch == "#" else theme.stone
-                up, down = not solid(at(c, r - 1)), not solid(at(c, r + 1))
-                left, right = not solid(at(c - 1, r)), not solid(at(c + 1, r))
+                up, down = not walled(at(c, r - 1)), not walled(at(c, r + 1))
+                left, right = not walled(at(c - 1, r)), not walled(at(c + 1, r))
                 ground[key] = edge_tile(set_, up, down, left, right, c, r)
                 # Grass over a grass top, on the Front layer, if the cell above is air.
                 if ch == "#" and up and theme.tips and at(c, r - 1) in " .":
@@ -524,9 +528,20 @@ def build(assets_dir, out, check=True, strict=True):
     sky = Image.open(HF / "Background/Background.png").convert("RGBA")
     P.sprite("bg_sky", [sky], (0, 0))
     trees = Image.open(HF / "Trees/Background.png").convert("RGBA")
-    for name, x0 in (("bg_pines_far", 448), ("bg_pines_near", 0)):
-        strip = trees.crop((x0, 0, x0 + 352, 256))
-        P.sprite(name, [strip], (0, 0))
+    # The sheet is pieces with gaps between them, in a dark set and a light
+    # one: a slope up (L), a run of pines (M), a slope down (R); and a
+    # mountain ridge. Cutting it straight across shows the gaps as stripes
+    # of sky. Each strip here is M R L M, which repeats without a seam.
+    def strip(pieces):
+        width = sum(b - a for a, b in pieces)
+        out, x = Image.new("RGBA", (width, 256)), 0
+        for a, b in pieces:
+            out.alpha_composite(trees.crop((a, 0, b, 256)), (x, 0))
+            x += b - a
+        return out
+    P.sprite("bg_pines_near", [strip([(112, 208), (224, 352), (0, 96), (112, 208)])], (0, 0))
+    P.sprite("bg_pines_far", [strip([(464, 560), (576, 704), (352, 448), (464, 560)])], (0, 0))
+    P.sprite("bg_ridge", [trees.crop((800, 0, 896, 256))], (0, 0))   # the light one of two ridges side by side
 
     # ---- the HUD, from the pack's own sheet: rounded squares for life points.
     hud = Image.open(HF / "HUD/Base-01.png").convert("RGBA")
@@ -555,8 +570,8 @@ def build(assets_dir, out, check=True, strict=True):
     # ---- the pixel font (font.py): cream, gold and a dark shadow, at 1× and 2×.
     import font
     for scale in (1, 2):
-        for tone_name, rgb in (("", (255, 246, 213)), ("_gold", (255, 209, 102)), ("_shadow", (20, 16, 12))):
-            P.sprite(f"font{scale}{tone_name}", font.frames(rgb, Image, scale), (0, 0))
+        for tone_name, rgb in (("", (255, 246, 213)), ("_gold", (255, 209, 102))):
+            P.sprite(f"font{scale}{tone_name}", font.frames(rgb, Image, scale, shadow=(20, 16, 12)), (0, 0))
 
     # ---- an icon for My Games: the hero mid-swing.
     icon = Image.new("RGBA", (64, 64), (0, 0, 0, 0))

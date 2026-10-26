@@ -5,6 +5,7 @@
  * in is lost.
  */
 import { expect, test, type Browser, type Page } from "@playwright/test";
+import { strToU8, zipSync } from "fflate";
 import { chooseTemplate, setCode, treeItem, watchErrors } from "./helpers";
 
 async function signIn(page: Page, email: string, next = "/") {
@@ -135,6 +136,51 @@ test("a picture added in the editor reaches the server", async ({ page }) => {
     return frame ? (await fetch(`/api/projects/${id}/assets/${frame}`)).status : "no sprite on the server";
   }, id);
   expect(status).toBe(200);
+});
+
+/**
+ * A .zip with one sprite of `frames` frames, as exportZip makes them. Each
+ * frame is its own small PNG, so the bytes differ and none can be skipped.
+ */
+function bigGameZip(frames: number) {
+  const png = (n: number) => {
+    // A 1×1 PNG; the colour byte differs per frame (its CRC is not checked by browsers that only decode it).
+    const b = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==", "base64");
+    b[b.length - 20] = n % 256;
+    return new Uint8Array(b);
+  };
+  const ids = Array.from({ length: frames }, (_, i) => `f${String(i).padStart(4, "0")}`);
+  const project = {
+    format: "gameide-project", schemaVersion: 8, id: "bigzip", name: "Many pictures", created: "2026-01-01T00:00:00Z", modified: "2026-01-01T00:00:00Z",
+    settings: { stepsPerSecond: 60 },
+    sprites: [{ id: "s1", name: "strip", width: 1, height: 1, originX: 0, originY: 0, frames: ids }],
+    tilesets: [], objects: [], scripts: [], sounds: [], fonts: [],
+    rooms: [{ id: "r1", name: "Room1", width: 64, height: 64, background: "#000000", gridWidth: 16, gridHeight: 16, snap: true,
+      layers: [{ id: "L", name: "Instances", kind: "instances", depth: 0, visible: true, locked: false }],
+      camera: { enabled: false, width: 64, height: 64, follow: null, smoothing: 1 }, instances: [] }],
+  };
+  const files: Record<string, Uint8Array> = { "project.json": strToU8(JSON.stringify(project)) };
+  const index: Record<string, string> = {};
+  ids.forEach((id, i) => ((files[`assets/${id}.png`] = png(i)), (index[id] = `assets/${id}.png`)));
+  files["assets/index.json"] = strToU8(JSON.stringify(index));
+  return Buffer.from(zipSync(files));
+}
+
+// Importing used to send a big game's pictures one request after another
+// before opening it: on the real server a game of 600 frames sat on My
+// Games for minutes with nothing on screen.
+test("an imported game's pictures all reach the server, and its editor opens", async ({ page }) => {
+  await signIn(page, "grace@example.com", "/#/games");
+  await page.getByTestId("import-file").setInputFiles({ name: "big.zip", mimeType: "application/zip", buffer: bigGameZip(60) });
+  await page.waitForURL(/#\/p\//, { timeout: 30_000 });
+  const id = page.url().split("#/p/")[1]!;
+  const missing = await page.evaluate(async (id) => {
+    const project = await (await fetch(`/api/projects/${id}`)).json();
+    const frames: string[] = project.data.sprites[0].frames;
+    const status = await Promise.all(frames.map((f) => fetch(`/api/projects/${id}/assets/${f}`).then((r) => r.status)));
+    return { count: frames.length, missing: status.filter((s) => s !== 200).length };
+  }, id);
+  expect(missing).toEqual({ count: 60, missing: 0 });
 });
 
 test("two tabs editing one game both keep their work", async ({ page, context }) => {

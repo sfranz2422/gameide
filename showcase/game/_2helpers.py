@@ -262,27 +262,23 @@ def save_progress():
 
 
 # ---------------------------------------------------------------- text
-# The game's own pixel font: sprites "font1", "font1_gold", "font1_shadow"
-# (and "font2…" at twice the size), one frame per character (FONT_CHARS,
-# in the font script). draw_text would do, but a smooth font at 8 pixels
-# blurs; these stay as sharp as the art.
+# The game's own pixel font: sprites "font1" and "font1_gold" (and "font2…"
+# at twice the size), one frame per character (FONT_CHARS, in the font
+# script), each with its shadow drawn in. draw_text would do, but a smooth
+# font at 8 pixels blurs; these stay as sharp as the art.
 
 def text_width(text, size=1):
     return len(str(text)) * 6 * size
 
 
-def draw_words(x, y, text, size=1, gold=False, shadow=True):
+def draw_words(x, y, text, size=1, gold=False):
     """Draws text with its top-left at (x, y). Use inside a Draw or Draw GUI event."""
-    name = f"font{size}"
+    name = f"font{size}" + ("_gold" if gold else "")
     for i, ch in enumerate(str(text)):
         n = FONT_INDEX.get(ch, -1)
-        if n <= 0:                 # a space, or a character the font doesn't have
-            continue
-        cx = x + i * 6 * size
-        if shadow:
-            draw_sprite(name + "_shadow", n, cx + size, y + size)
-        draw_sprite(name + ("_gold" if gold else ""), n, cx, y)
+        if n > 0:                  # 0 is a space; -1 a character the font doesn't have
+            draw_sprite(name, n, x + i * 6 * size, y)
 
 
-def draw_words_centered(cx, y, text, size=1, gold=False, shadow=True):
-    draw_words(cx - text_width(text, size) // 2, y, text, size, gold, shadow)
+def draw_words_centered(cx, y, text, size=1, gold=False):
+    draw_words(cx - text_width(text, size) // 2, y, text, size, gold)

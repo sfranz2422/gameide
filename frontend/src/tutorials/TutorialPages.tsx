@@ -55,7 +55,7 @@ async function makeStarter(store: ProjectStore, key: string, md: string): Promis
   const { project, assets } = await build();
   project.name = t.meta.title;
   project.tutorial = { key, title: t.meta.title, step: 0, steps: t.steps.length };
-  for (const [id, blob] of assets) await store.putAsset(project.id, id, blob);
+  await store.putAssets(project.id, assets);
   const outcome = await store.save(project);
   if (outcome.state === "error") throw new Error(outcome.message ?? "It couldn't be saved.");
   return project;

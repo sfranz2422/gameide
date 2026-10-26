@@ -16,7 +16,10 @@ async function signedIn(browser: Browser, email: string) {
 }
 
 test("a class: an assignment from a game, a student's own copy, turned in, viewed, commented on and scored", async ({ browser }) => {
-  const { ctx: tctx, page: teacher } = await signedIn(browser, "teach@example.com");
+  // A teacher of its own: it counts the games on My Games, and the other
+  // specs' teacher (teach@) makes games in parallel, so sharing one failed
+  // now and then with 2 where 1 was right.
+  const { ctx: tctx, page: teacher } = await signedIn(browser, "teach2@example.com");
   const errors = watchErrors(teacher);
   await teacher.goto("/#/games");
   await chooseTemplate(teacher, "coins");

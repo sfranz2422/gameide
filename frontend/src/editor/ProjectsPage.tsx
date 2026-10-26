@@ -24,7 +24,7 @@ import { Icon } from "./ui/icons";
 
 /** Saves a project and its files into a store, and confirms it got there. */
 async function putProject(store: ProjectStore, project: Project, assets: Map<string, Blob>) {
-  for (const [id, blob] of assets) await store.putAsset(project.id, id, blob);
+  await store.putAssets(project.id, assets);
   const outcome = await store.save(project);
   if (outcome.state === "error") throw new Error(outcome.message ?? "It couldn't be saved.");
   return outcome;
@@ -43,6 +43,9 @@ export function ProjectsPage() {
   const [local, setLocal] = useState<ProjectSummary[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  /** "Uploading pictures: 120 of 640" while a big game goes up, so it doesn't look hung. */
+  const [progress, setProgress] = useState<string | null>(null);
+  useEffect(() => store.onUpload?.((_id, done, total) => setProgress(total > 12 && done < total ? `Uploading the game's pictures: ${done} of ${total}…` : null)), [store]);
   const [creating, setCreating] = useState(false);
   const [search, setSearch] = useState("");
   const fileInput = useRef<HTMLInputElement>(null);
@@ -63,6 +66,7 @@ export function ProjectsPage() {
   const act = async (f: () => Promise<void>) => {
     setBusy(true);
     setError(null);
+    setProgress(null);
     try {
       await f();
     } catch (e) {
@@ -173,6 +177,11 @@ export function ProjectsPage() {
         {error && (
           <p className="banner error" role="alert">
             {error}
+          </p>
+        )}
+        {busy && progress && (
+          <p className="banner" role="status" data-testid="upload-progress">
+            {progress}
           </p>
         )}
 
