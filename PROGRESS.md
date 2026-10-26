@@ -10,6 +10,12 @@ Asked for after Thornwood's level 1 needed workarounds for most of these.
 - Each one is in the catalog, so it has docs, autocomplete, a block and an event-sheet entry.
 - Tests: `src/python/drawing.test.ts` (6, real Pyodide); `e2e/drawing.editor.spec.ts` reads the game's own pixels for every shape, the scaled and tinted sprite, the gradient and centred text. 12 sabotage cases, all caught. Two existing tests compared whole text commands and now allow for the two alignment fields.
 
+### 12b — Line of sight, one-way platforms, pathfinding ✅
+- **`collision_line(x1, y1, x2, y2, obj=None)`**: the first instance (or tile layer's name) a straight line touches, nearest its start; with no object named, anything solid. None is a clear line. Instances are tested by their boxes, tiles every 2 px along the line. The instance asking is never the answer, and one-way platforms don't block a line.
+- **One-way platforms**: a tileset's tiles can be marked **One-way** instead of Solid (the tileset editor's new Solid / One-way choice; blue, with a bar along the top). They stop something coming down onto them from above, and nothing else: jumped up through, walked along, and stood on, so `place_free(x, y + 1)` is False on one. **`self.drop_through = 12`** falls through them for 12 steps; it counts down by itself. A tile is never both (marking one takes the other off). Stored as `oneWay` on the tileset, optional, so older projects need no change.
+- **`path_find(x1, y1, x2, y2, cell=16)`**: the points of a way round every solid tile and solid instance on a grid of `cell` px, by A* with diagonal steps that never cut a corner. [] when there is no way, or either end is in a wall. For games seen from above. The instance asking isn't an obstacle; a room over 250 000 cells is refused rather than frozen.
+- Tests: `src/python/paths.test.ts` (8, real Pyodide); `e2e/tiles.spec.ts` marks tiles one-way and back; the codegen test sends `oneWay`. 12 sabotage cases, all caught.
+
 ## Phase 9½ — Game feel ✅ (2026-10-26, waiting for review)
 
 The phase planned in October "so student games can look and feel like GameMaker's showcase", built before the showcase platformer that will use it. Everything is in a new **Effects** category of the catalog, so it's in the docs, the blocks palette, event sheets and autocomplete.

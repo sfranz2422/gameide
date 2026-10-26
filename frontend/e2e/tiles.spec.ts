@@ -59,6 +59,19 @@ test("a tileset is cut from a picture and its solid tiles chosen", async ({ page
   await makeTileset(page);
 });
 
+test("a tile can be marked a one-way platform instead, and a tile is never both", async ({ page }) => {
+  await fromTemplate(page, "empty");
+  await makeTileset(page); // tile 0 solid
+  await page.getByTestId("mark-oneway").click();
+  await page.getByTestId("tileset-canvas").click({ position: { x: 150, y: 10 } }); // tile 1 (the picture is shown 4× its size)
+  await expect(page.getByTestId("tileset-count")).toHaveText("2 × 1 = 2 tiles, 1 solid, 1 one-way");
+  await page.getByTestId("tileset-canvas").click({ position: { x: 10, y: 10 } }); // tile 0: from solid to one-way
+  await expect(page.getByTestId("tileset-count")).toHaveText("2 × 1 = 2 tiles, 0 solid, 2 one-way");
+  await page.getByTestId("mark-solid").click();
+  await page.getByTestId("tileset-canvas").click({ position: { x: 10, y: 10 } }); // and back
+  await expect(page.getByTestId("tileset-count")).toHaveText("2 × 1 = 2 tiles, 1 solid, 1 one-way");
+});
+
 test("painting a level: brush, rectangle, bucket, eyedropper, erase, undo", async ({ page }) => {
   await fromTemplate(page, "empty");
   await makeTileset(page);

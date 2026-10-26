@@ -108,6 +108,13 @@ export const API: ApiEntry[] = [
   fn("Collision", "tile_set", [p("x", "number"), p("y", "number"), p("tile", "number"), p("layer", "layer", "None")], "nothing",
     "Changes the tile at (x, y) — None removes it. Breakable blocks, doors that open."),
 
+  fn("Collision", "collision_line", [p("x1", "number"), p("y1", "number"), p("x2", "number"), p("y2", "number"), p("obj", "object", "None")],
+    "an instance, a tile layer's name, or None",
+    "The first thing a straight line from (x1, y1) to (x2, y2) touches, nearest the start: an instance of that object, or that tile layer's solid tiles — or, with none named, anything solid. None means a clear line: can the guard see the player?"),
+  fn("Collision", "path_find", [p("x1", "number"), p("y1", "number"), p("x2", "number"), p("y2", "number"), p("cell", "number", "16")],
+    "a list of (x, y) points, or an empty list",
+    "A way from (x1, y1) to (x2, y2) round every solid tile and solid instance, on a grid of `cell` pixels: the points to walk through, in order. Empty when there is no way. For games seen from above; follow it with move_towards."),
+
   // Input
   fn("Input", "keyboard_check", [p("key", "key")], "True or False", "Is this key held down?"),
   fn("Input", "keyboard_check_pressed", [p("key", "key")], "True or False", "Was this key pressed this step?"),
@@ -292,6 +299,7 @@ export const PROPERTIES: { name: string; description: string }[] = [
   { name: "image_alpha", description: "1 is solid, 0 is invisible." },
   { name: "visible", description: "Whether it is drawn." },
   { name: "solid", description: "Whether place_free and move_and_collide treat it as a wall." },
+  { name: "drop_through", description: "Steps left of falling through one-way platforms: self.drop_through = 12 when Down is pressed drops off one. Counts down by itself." },
   { name: "depth", description: "Lower depth draws on top." },
   { name: "image_blend", description: 'A colour the sprite is tinted with: "red" makes it reddish; "white" is as drawn.' },
   { name: "blend_mode", description: '"normal", "add" (glowing: fire, lasers, magic), "multiply" (darker) or "screen" (lighter).' },

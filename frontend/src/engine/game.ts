@@ -88,6 +88,12 @@ export interface TilesetDef {
   count: number;
   /** Tile numbers that collide. */
   solid: number[];
+  /**
+   * Tile numbers that are one-way platforms: solid only to something coming
+   * down onto them from above. Jumped up through, walked along, and dropped
+   * through while an instance's drop_through is counting down.
+   */
+  oneWay?: number[];
 }
 
 /**

@@ -39,6 +39,8 @@ export interface LiveTiles {
   tileset: TilesetDef;
   cells: Int32Array;
   solid: Uint8Array;
+  /** One-way platforms (TilesetDef.oneWay); never also solid. */
+  oneWay: Uint8Array;
 }
 
 /**
@@ -46,6 +48,27 @@ export interface LiveTiles {
  * or tile layer L as -2 - L. Python turns the last into the layer's name.
  */
 export const tileCode = (layer: number) => -2 - layer;
+
+/**
+ * How far along the segment (0 its start, 1 its end) it first enters `box`,
+ * or null if it never does: the Liang–Barsky clip. A start inside the box is 0.
+ */
+export function segmentEntersBox(x1: number, y1: number, x2: number, y2: number, box: Box): number | null {
+  let t0 = 0, t1 = 1;
+  const dx = x2 - x1, dy = y2 - y1;
+  const edges: [number, number][] = [[-dx, x1 - box.left], [dx, box.right - x1], [-dy, y1 - box.top], [dy, box.bottom - y1]];
+  for (const [p, q] of edges) {
+    if (p === 0) {
+      if (q < 0) return null;
+    } else {
+      const r = q / p;
+      if (p < 0) t0 = Math.max(t0, r);
+      else t1 = Math.min(t1, r);
+      if (t0 > t1) return null;
+    }
+  }
+  return t0;
+}
 
 /** The shared arrays, as JavaScript sees them. See layout.ts. */
 export interface SharedViews {
@@ -136,6 +159,7 @@ export interface CameraState {
 const scratch: Box = { left: 0, top: 0, right: 0, bottom: 0 };
 const scratch2: Box = { left: 0, top: 0, right: 0, bottom: 0 };
 const tileBox: Box = { left: 0, top: 0, right: 0, bottom: 0 };
+const scratch3: Box = { left: 0, top: 0, right: 0, bottom: 0 };
 
 export class Engine {
   readonly sprites: SpriteInfo[];
@@ -261,16 +285,28 @@ export class Engine {
    * self's mask at (x, y), or -1. `scratch` must already be self's box there.
    */
   private tileHit(st: Float64Array, self: number, x: number, y: number, only: number): number {
+    // Where self is now, for one-way tiles: one blocks only what is above it
+    // now and would sink into it. Worked out once, the first time it's needed.
+    let nowBottom = NaN;
+    const sb = self * STRIDE;
+    const dropping = st[sb + F.DROP]! > 0;
     for (let L = 0; L < this.tiles.length; L++) {
       if (only >= 0 && L !== only) continue;
-      const { def, tileset, cells, solid } = this.tiles[L]!;
+      const { def, tileset, cells, solid, oneWay } = this.tiles[L]!;
       const tw = tileset.tileWidth, th = tileset.tileHeight;
       const c0 = Math.max(0, Math.floor(scratch.left / tw)), c1 = Math.min(def.columns - 1, Math.ceil(scratch.right / tw) - 1);
       const r0 = Math.max(0, Math.floor(scratch.top / th)), r1 = Math.min(def.rows - 1, Math.ceil(scratch.bottom / th) - 1);
       for (let r = r0; r <= r1; r++) {
         for (let c = c0; c <= c1; c++) {
           const tile = cells[r * def.columns + c]!;
-          if (tile < 0 || !solid[tile]) continue;
+          if (tile < 0 || !(solid[tile] || oneWay[tile])) continue;
+          if (oneWay[tile]) {
+            // A platform: only from above, onto its top, and not while dropping through.
+            if (dropping) continue;
+            if (Number.isNaN(nowBottom)) nowBottom = boxOf(st, self, st[sb + F.X]!, st[sb + F.Y]!, this.sprites, scratch3) ? scratch3.bottom : Infinity;
+            const top = r * th;
+            if (nowBottom > top + 0.001 || scratch.bottom <= top) continue;
+          }
           tileBox.left = c * tw;
           tileBox.top = r * th;
           tileBox.right = tileBox.left + tw;
@@ -448,6 +484,160 @@ export class Engine {
     return hits;
   }
 
+  /**
+   * The first thing the segment from (x1, y1) to (x2, y2) touches, nearest
+   * the start: t ≥ 0 an instance of that type (or its children); t = -1
+   * anything solid (solid instances and solid tiles); t ≤ -2 the solid tiles
+   * of that tile layer. Never `self`. Instances are tested by their boxes;
+   * tiles cell by cell along the line. One-way tiles don't stop a line.
+   */
+  collision_line(x1: number, y1: number, x2: number, y2: number, t: number, self: number): number {
+    const { st } = this.fresh();
+    this.flushDirty();
+    let best = Infinity;
+    let found = -1;
+    if (t >= -1) {
+      this.hash.query(Math.min(x1, x2), Math.min(y1, y2), Math.max(x1, x2) + 1, Math.max(y1, y2) + 1, (c) => {
+        if (c === self || !this.matches(st, c, t)) return false;
+        if (t === -1 && !st[c * STRIDE + F.SOLID]) return false;
+        if (!boxOf(st, c, st[c * STRIDE + F.X]!, st[c * STRIDE + F.Y]!, this.sprites, scratch2)) return false;
+        const hit = segmentEntersBox(x1, y1, x2, y2, scratch2);
+        if (hit !== null && hit < best) {
+          best = hit;
+          found = c;
+        }
+        return false;
+      });
+    }
+    if (t === -1 || t <= -2) {
+      const only = t <= -2 ? -2 - t : -1;
+      const length = Math.hypot(x2 - x1, y2 - y1);
+      const steps = Math.max(1, Math.ceil(length / 2)); // every 2 px: thinner than any tile
+      for (let L = 0; L < this.tiles.length; L++) {
+        if (only >= 0 && L !== only) continue;
+        const { def, tileset, cells, solid } = this.tiles[L]!;
+        for (let i = 0; i <= steps; i++) {
+          const k = i / steps;
+          if (k >= best) break;
+          const c = Math.floor((x1 + (x2 - x1) * k) / tileset.tileWidth), r = Math.floor((y1 + (y2 - y1) * k) / tileset.tileHeight);
+          if (c < 0 || r < 0 || c >= def.columns || r >= def.rows) continue;
+          const tile = cells[r * def.columns + c]!;
+          if (tile >= 0 && solid[tile]) {
+            best = k;
+            found = tileCode(L);
+            break;
+          }
+        }
+      }
+    }
+    return found;
+  }
+
+  /**
+   * A way from (x1, y1) to (x2, y2) round everything solid — solid tiles and
+   * solid instances — on a grid of `cell` pixels, as JSON: [[x, y], …], the
+   * middles of the cells from the start's to the goal's, or [] when there is
+   * no way (or either end is inside a wall). A* with diagonal steps that
+   * never cut a corner. For games seen from above; a platformer's enemy
+   * can't fly along the answer.
+   */
+  path_find(x1: number, y1: number, x2: number, y2: number, cell: number, self: number): string {
+    const { st, g } = this.fresh();
+    this.flushDirty();
+    const roomW = g[G.ROOM_WIDTH]!, roomH = g[G.ROOM_HEIGHT]!;
+    const cols = Math.max(1, Math.ceil(roomW / cell)), rows = Math.max(1, Math.ceil(roomH / cell));
+    if (cols * rows > 250_000) return "[]"; // a cell that small in a room that big: refuse rather than freeze
+    const blocked = new Uint8Array(cols * rows);
+    const mark = (left: number, top: number, right: number, bottom: number) => {
+      const c0 = Math.max(0, Math.floor(left / cell)), c1 = Math.min(cols - 1, Math.ceil(right / cell) - 1);
+      const r0 = Math.max(0, Math.floor(top / cell)), r1 = Math.min(rows - 1, Math.ceil(bottom / cell) - 1);
+      for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) blocked[r * cols + c] = 1;
+    };
+    for (const { def, tileset, cells, solid } of this.tiles) {
+      for (let i = 0; i < cells.length; i++) {
+        const tile = cells[i]!;
+        if (tile < 0 || !solid[tile]) continue;
+        const tc = i % def.columns, tr = Math.floor(i / def.columns);
+        mark(tc * tileset.tileWidth + 0.01, tr * tileset.tileHeight + 0.01, (tc + 1) * tileset.tileWidth - 0.01, (tr + 1) * tileset.tileHeight - 0.01);
+      }
+    }
+    const n = g[G.SLOTS]!;
+    for (let s = 0; s < n; s++) {
+      const b = s * STRIDE;
+      if (s === self || !st[b + F.ALIVE] || !st[b + F.SOLID]) continue;
+      if (boxOf(st, s, st[b + F.X]!, st[b + F.Y]!, this.sprites, scratch2)) mark(scratch2.left + 0.01, scratch2.top + 0.01, scratch2.right - 0.01, scratch2.bottom - 0.01);
+    }
+    const at = (x: number, y: number) => Math.min(rows - 1, Math.max(0, Math.floor(y / cell))) * cols + Math.min(cols - 1, Math.max(0, Math.floor(x / cell)));
+    const start = at(x1, y1), goal = at(x2, y2);
+    if (blocked[start] || blocked[goal]) return "[]";
+    const cost = new Float64Array(cols * rows).fill(Infinity);
+    const from = new Int32Array(cols * rows).fill(-1);
+    const done = new Uint8Array(cols * rows);
+    const gx = goal % cols, gy = Math.floor(goal / cols);
+    const guess = (i: number) => {
+      const dx = Math.abs((i % cols) - gx), dy = Math.abs(Math.floor(i / cols) - gy);
+      return Math.max(dx, dy) + (Math.SQRT2 - 1) * Math.min(dx, dy);
+    };
+    // A binary heap of [priority, cell].
+    const heap: [number, number][] = [];
+    const push = (p: number, i: number) => {
+      heap.push([p, i]);
+      for (let k = heap.length - 1; k > 0; ) {
+        const up = (k - 1) >> 1;
+        if (heap[up]![0] <= heap[k]![0]) break;
+        [heap[up], heap[k]] = [heap[k]!, heap[up]!];
+        k = up;
+      }
+    };
+    const pop = () => {
+      const top = heap[0]!;
+      const last = heap.pop()!;
+      if (heap.length) {
+        heap[0] = last;
+        for (let k = 0; ; ) {
+          const l = 2 * k + 1, r = l + 1;
+          let m = k;
+          if (l < heap.length && heap[l]![0] < heap[m]![0]) m = l;
+          if (r < heap.length && heap[r]![0] < heap[m]![0]) m = r;
+          if (m === k) break;
+          [heap[m], heap[k]] = [heap[k]!, heap[m]!];
+          k = m;
+        }
+      }
+      return top[1];
+    };
+    cost[start] = 0;
+    push(guess(start), start);
+    while (heap.length) {
+      const i = pop();
+      if (done[i]) continue;
+      done[i] = 1;
+      if (i === goal) break;
+      const cx = i % cols, cy = Math.floor(i / cols);
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          if (!dx && !dy) continue;
+          const nx = cx + dx, ny = cy + dy;
+          if (nx < 0 || ny < 0 || nx >= cols || ny >= rows) continue;
+          const j = ny * cols + nx;
+          if (blocked[j] || done[j]) continue;
+          // A diagonal step needs both cells beside it open: no squeezing through a corner.
+          if (dx && dy && (blocked[cy * cols + nx] || blocked[ny * cols + cx])) continue;
+          const c = cost[i]! + (dx && dy ? Math.SQRT2 : 1);
+          if (c < cost[j]!) {
+            cost[j] = c;
+            from[j] = i;
+            push(c + guess(j), j);
+          }
+        }
+      }
+    }
+    if (!done[goal]) return "[]";
+    const out: [number, number][] = [];
+    for (let i = goal; i !== -1; i = from[i]!) out.push([(i % cols) * cell + cell / 2, Math.floor(i / cols) * cell + cell / 2]);
+    return JSON.stringify(out.reverse());
+  }
+
   // ---------------------------------------------------------------- the step
 
   private pushEvent(events: Int32Array, kind: number, a: number, b: number) {
@@ -477,7 +667,9 @@ export class Engine {
       if (!tileset) return [];
       const solid = new Uint8Array(tileset.count);
       for (const n of tileset.solid) if (n >= 0 && n < tileset.count) solid[n] = 1;
-      return [{ def: l, tileset, cells: Int32Array.from(l.cells), solid }];
+      const oneWay = new Uint8Array(tileset.count);
+      for (const n of tileset.oneWay ?? []) if (n >= 0 && n < tileset.count && !solid[n]) oneWay[n] = 1;
+      return [{ def: l, tileset, cells: Int32Array.from(l.cells), solid, oneWay }];
     });
     this.tileChanges = [];
     const cam = room.camera;
@@ -673,6 +865,8 @@ export class Engine {
         st[b + F.Y] = st[b + F.Y]! + v;
         this.refile(st, s);
       }
+
+      if (st[b + F.DROP]! > 0) st[b + F.DROP] = st[b + F.DROP]! - 1;
 
       const spr = this.sprites[st[b + F.SPRITE]!];
       const speed = st[b + F.IMAGE_SPEED]!;

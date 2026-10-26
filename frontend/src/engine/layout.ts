@@ -57,10 +57,11 @@ export const F = {
   FLASH_COLOR: 43, // …which colour
   OUTLINE: 44, // 0 none, 1 outline, 2 glow (outline / glow properties)
   OUTLINE_COLOR: 45,
+  DROP: 46, // drop_through: steps left of falling through one-way tiles (counts down each step)
 } as const;
 
 export const ALARM_COUNT = 12;
-export const STRIDE = F.OUTLINE_COLOR + 1; // 46
+export const STRIDE = F.DROP + 1; // 47
 
 /** blend_mode's names, by the number F.BLEND holds. */
 export const BLEND_MODES = ["normal", "add", "multiply", "screen"] as const;

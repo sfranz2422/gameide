@@ -60,6 +60,8 @@ export function TilesetEditor({ tilesetId }: { tilesetId: string }) {
   const [notice, setNotice] = useState<string | null>(null);
   /** The autotile set being filled in, and which of its 16 slots a click on the picture fills. */
   const [editing, setEditing] = useState<{ set: string; slot: number } | null>(null);
+  /** What a click on a tile marks: a wall, or a one-way platform (jumped up through, stood on). */
+  const [marking, setMarking] = useState<"solid" | "oneway">("solid");
   const grid = tileset ? tilesetGrid(tileset) : { columns: 0, rows: 0 };
   const zoom = tileset && tileset.imageWidth ? Math.max(1, Math.min(4, Math.floor(560 / tileset.imageWidth))) : 1;
 
@@ -72,12 +74,20 @@ export function TilesetEditor({ tilesetId }: { tilesetId: string }) {
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(img, 0, 0, c.width, c.height);
     const solid = new Set(tileset.solid);
+    const oneWay = new Set(tileset.oneWay ?? []);
     ctx.font = "10px system-ui";
     for (let n = 0; n < grid.columns * grid.rows; n++) {
       const r = tileRect(tileset, n, grid.columns);
       if (solid.has(n)) {
         ctx.fillStyle = "rgba(255,90,90,0.35)";
         ctx.fillRect(r.x * zoom, r.y * zoom, r.w * zoom, r.h * zoom);
+      }
+      if (oneWay.has(n)) {
+        // A platform: tinted blue, with a bar along the top it is stood on.
+        ctx.fillStyle = "rgba(80,170,255,0.25)";
+        ctx.fillRect(r.x * zoom, r.y * zoom, r.w * zoom, r.h * zoom);
+        ctx.fillStyle = "#4fb3ff";
+        ctx.fillRect(r.x * zoom, r.y * zoom, r.w * zoom, Math.max(2, zoom * 2));
       }
       ctx.strokeStyle = solid.has(n) ? "#ff6b6b" : "rgba(255,255,255,0.35)";
       ctx.strokeRect(r.x * zoom + 0.5, r.y * zoom + 0.5, r.w * zoom - 1, r.h * zoom - 1);
@@ -151,7 +161,18 @@ export function TilesetEditor({ tilesetId }: { tilesetId: string }) {
           setEditing({ set: id, slot: (slot + 1) % 16 });
           return;
         }
-        set((t) => void (t.solid = t.solid.includes(n) ? t.solid.filter((s) => s !== n) : [...t.solid, n].sort((a, b) => a - b)));
+        // A tile is a wall or a platform, never both: marking it one takes the other off.
+        set((t) => {
+          const solid = new Set(t.solid), oneWay = new Set(t.oneWay ?? []);
+          const [mine, other] = marking === "solid" ? [solid, oneWay] : [oneWay, solid];
+          if (mine.has(n)) mine.delete(n);
+          else {
+            mine.add(n);
+            other.delete(n);
+          }
+          t.solid = [...solid].sort((a, b) => a - b);
+          t.oneWay = [...oneWay].sort((a, b) => a - b);
+        });
         return;
       }
     }
@@ -196,22 +217,34 @@ export function TilesetEditor({ tilesetId }: { tilesetId: string }) {
             {num("Spacing y", "spacingY", 0)}
           </div>
           <p className="muted small" data-testid="tileset-count">
-            {tileset.image ? `${grid.columns} × ${grid.rows} = ${grid.columns * grid.rows} tiles, ${tileset.solid.length} solid` : "No picture yet."}
+            {tileset.image
+              ? `${grid.columns} × ${grid.rows} = ${grid.columns * grid.rows} tiles, ${tileset.solid.length} solid${tileset.oneWay?.length ? `, ${tileset.oneWay.length} one-way` : ""}`
+              : "No picture yet."}
           </p>
         </fieldset>
         <AutotileSets tileset={tileset} img={img} columns={grid.columns} editing={editing} setEditing={setEditing} change={set} />
         <fieldset>
           <legend>Solid tiles</legend>
+          <div className="seg" role="radiogroup" aria-label="What a click marks">
+            <button className={marking === "solid" ? "on" : ""} role="radio" aria-checked={marking === "solid"} onClick={() => setMarking("solid")} data-testid="mark-solid">
+              Solid
+            </button>
+            <button className={marking === "oneway" ? "on" : ""} role="radio" aria-checked={marking === "oneway"} onClick={() => setMarking("oneway")} data-testid="mark-oneway">
+              One-way
+            </button>
+          </div>
           <p className="muted small">
             {editing
               ? "Filling an autotile set: clicks on the picture go into its slots. Press Done to mark solid tiles again."
-              : "Click a tile to make it solid (red) — what players stand on and bump into. Click again to undo."}
+              : marking === "solid"
+                ? "Click a tile to make it solid (red): what players stand on and bump into, from every side. Click again to undo."
+                : "Click a tile to make it a one-way platform (blue): jumped up through from below, stood on from above. Something with drop_through set falls through it."}
           </p>
           <div className="row">
-            <button className="btn small" onClick={() => set((t) => void (t.solid = Array.from({ length: grid.columns * grid.rows }, (_, i) => i)))}>
+            <button className="btn small" onClick={() => set((t) => ((t.solid = Array.from({ length: grid.columns * grid.rows }, (_, i) => i)), (t.oneWay = [])))}>
               All solid
             </button>
-            <button className="btn small" onClick={() => set((t) => void (t.solid = []))}>
+            <button className="btn small" onClick={() => set((t) => ((t.solid = []), (t.oneWay = [])))}>
               None
             </button>
           </div>

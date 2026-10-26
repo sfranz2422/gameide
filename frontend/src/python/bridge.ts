@@ -176,6 +176,8 @@ export class PythonGame {
       tile_at: (x: number, y: number, layer: number) => e().tile_at(x, y, layer),
       tile_set: (x: number, y: number, tile: number, layer: number) => e().tile_set(x, y, tile, layer),
       text_size: (text: string, font: number, size: number, which: number) => measureText(text, font, size)[which]!,
+      collision_line: (x1: number, y1: number, x2: number, y2: number, t: number, self: number) => e().collision_line(x1, y1, x2, y2, t, self),
+      path_find: (x1: number, y1: number, x2: number, y2: number, cell: number, self: number) => e().path_find(x1, y1, x2, y2, cell, self),
     };
     py.registerJsModule("_engine", api);
     const fresh = py.runPython(FRESH_MODULE) as PyProxy & ((src: string) => PyProxy);

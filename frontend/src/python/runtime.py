@@ -55,6 +55,7 @@ __all__ = [
     "instance_create", "instance_exists", "instance_number", "instance_nearest", "instances",
     # collision
     "place_meeting", "place_free", "instance_place", "collision_point", "tile_at", "tile_set",
+    "collision_line", "path_find",
     # input
     "keyboard_check", "keyboard_check_pressed", "keyboard_check_released",
     "mouse_check", "mouse_check_pressed", "mouse_check_released", "mouse_x", "mouse_y",
@@ -482,7 +483,7 @@ def _install_properties():
         "image_index": plain(F.IMAGE_INDEX), "image_speed": plain(F.IMAGE_SPEED),
         "image_xscale": boxy(F.XSCALE), "image_yscale": boxy(F.YSCALE),
         "image_angle": plain(F.ANGLE), "image_alpha": plain(F.ALPHA),
-        "visible": flag(F.VISIBLE), "solid": flag(F.SOLID),
+        "visible": flag(F.VISIBLE), "solid": flag(F.SOLID), "drop_through": plain(F.DROP),
         "depth": plain(F.DEPTH),
         "image_blend": property(blend_get, blend_set), "blend_mode": property(mode_get, mode_set),
         "outline": edge(1, "outline"), "glow": edge(2, "glow"),
@@ -656,6 +657,26 @@ def collision_point(x, y, obj):
 
 def move_and_collide(dx, dy, obj=None):
     return _me("move_and_collide").move_and_collide(dx, dy, obj)
+
+
+def collision_line(x1, y1, x2, y2, obj=None):
+    """The first instance (or tile layer's name) the line touches, nearest (x1, y1); None for a clear line."""
+    me = _cur._slot if _cur is not None else -1
+    c = _js.collision_line(x1, y1, x2, y2, -1 if obj is None else _target_of(obj), me)
+    if c >= 0:
+        return _objs[c]
+    if c <= -2:
+        return _tile_layer_names()[-2 - c]
+    return None
+
+
+def path_find(x1, y1, x2, y2, cell=16):
+    """The points of a way round everything solid, from (x1, y1) to (x2, y2) — or [] when there is none."""
+    cell = _num(cell, "path_find", "cell")
+    if cell < 2:
+        raise ValueError("path_find: cell is the size of the grid's squares in pixels, 2 or more (16 is usual).")
+    me = _cur._slot if _cur is not None else -1
+    return [tuple(p) for p in json.loads(_js.path_find(x1, y1, x2, y2, cell, me))]
 
 
 def move_towards(x, y, speed):

@@ -130,6 +130,8 @@ export interface TilesetResource {
   spacingY: number;
   /** Tile numbers that are solid: walls and floors, for collisions. */
   solid: number[];
+  /** Tile numbers that are one-way platforms (game.ts TilesetDef.oneWay). Absent in older projects: none. */
+  oneWay?: number[];
   /**
    * Autotile sets: 16 tiles each, one per way a cell joins its neighbours
    * (editor/tiles/tileOps.ts), so painting "grass" picks edges and corners
@@ -437,6 +439,11 @@ export function remapTileset(project: Project, tilesetId: string, before: Tilese
     const m = move(n);
     return m === null ? [] : [m];
   });
+  if (after.oneWay)
+    after.oneWay = after.oneWay.flatMap((n) => {
+      const m = move(n);
+      return m === null ? [] : [m];
+    });
   for (const set of after.autotiles) set.tiles = set.tiles.map((n) => (n < 0 ? n : move(n) ?? -1));
   return lost;
 }
