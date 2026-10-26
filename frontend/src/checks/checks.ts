@@ -6,6 +6,7 @@
  *   Player has sprite
  *   Player has event step                   the event's name as the editor shows it
  *   Player.step uses keyboard_check         or "Player uses …", or "uses …" anywhere; "avoids …"
+ *   Player.step is written in blocks        or in python, or in an event sheet
  *   room Level1 has 3 Coin                  or "has at least 3 Coin"
  *   game runs 2 seconds without errors
  *   after 1 second holding right, Player.x increased     (decreased, changed, stayed the same)
@@ -97,6 +98,7 @@ export type Check =
   | { kind: "exists"; what: "object" | "sprite" | "room" | "sound" | "font" | "script" | "tileset"; name: string }
   | { kind: "has-sprite"; object: string }
   | { kind: "has-event"; object: string; event: string }
+  | { kind: "mode"; object: string; event: string; mode: "python" | "blocks" | "sheet" }
   | { kind: "uses"; avoid: boolean; word: string; object: string | null; event: string | null }
   | { kind: "count"; room: string; atLeast: boolean; n: number; object: string }
   | { kind: "runs"; seconds: number }
@@ -115,6 +117,10 @@ export function readCheck(line: string): Check {
     return { kind: "exists", what: m[1]!.toLowerCase() as "object", name: m[2]! };
   if ((m = new RegExp(String.raw`^${NAME}\s+has\s+(?:a\s+)?sprite$`, "i").exec(s))) return { kind: "has-sprite", object: m[1]! };
   if ((m = new RegExp(String.raw`^${NAME}\s+has\s+(?:an?\s+)?event\s+(.+)$`, "i").exec(s))) return { kind: "has-event", object: m[1]!, event: m[2]! };
+  if ((m = new RegExp(String.raw`^${NAME}\.(.+?)\s+is\s+(?:written\s+)?in\s+(python|blocks|code blocks|an event sheet|event sheets?|a sheet)$`, "i").exec(s))) {
+    const how = m[3]!.toLowerCase();
+    return { kind: "mode", object: m[1]!, event: m[2]!, mode: how === "python" ? "python" : how.includes("block") ? "blocks" : "sheet" };
+  }
   if ((m = new RegExp(String.raw`^${NAME}\.(.+?)\s+(uses|avoids)\s+(\S+)$`, "i").exec(s)))
     return { kind: "uses", avoid: m[3]!.toLowerCase() === "avoids", word: m[4]!, object: m[1]!, event: m[2]! };
   if ((m = new RegExp(String.raw`^${NAME}\s+(uses|avoids)\s+(\S+)$`, "i").exec(s)) && !/^(uses|avoids)$/i.test(m[1]!))
@@ -180,6 +186,15 @@ export function checkProject(p: Project, c: Check): { ok: boolean; detail: strin
       return o.events.some((e) => eventName(eventLabel(p, e.key)) === eventName(c.event))
         ? { ok: true, detail: "" }
         : { ok: false, detail: `${o.name} doesn't have a ${c.event} event yet.` };
+    }
+    case "mode": {
+      const o = p.objects.find((x) => same(x.name, c.object));
+      if (!o) return { ok: false, detail: `There's no object called ${c.object}.` };
+      const ev = o.events.find((e) => eventName(eventLabel(p, e.key)) === eventName(c.event));
+      if (!ev) return { ok: false, detail: `${o.name} doesn't have a ${c.event} event yet.` };
+      const say = { python: "Python", blocks: "blocks", sheet: "an event sheet" };
+      const is = ev.mode ?? "python";
+      return is === c.mode ? { ok: true, detail: "" } : { ok: false, detail: `${o.name}'s ${c.event} event is written in ${say[is]}, not ${say[c.mode]}.` };
     }
     case "uses": {
       const { code, missing } = codeOf(p, c.object, c.event);

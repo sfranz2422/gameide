@@ -1,6 +1,68 @@
 # Progress
 
-## Phase 11a — Notes, questions and tests ✅ (2026-10-26, waiting for review)
+## Phase 11b — Tutorials ✅ (2026-10-26, waiting for review)
+
+Built on 11a, as agreed: the tutorial panel **is** the Notes tab, steps are **strict**, a tutorial assigned to a class **is an assignment** whose notes are the tutorial, and **tutorial code can't be copied** (no Copy button; code can't be selected).
+
+### Done
+
+- **The format** (`src/tutorials/tutorial.ts`):
+  - A header (`title`, `level`, `time`, `starter`, `description`, and `locked: no` to let students skip), then one step per `---`, exactly as notes are cut into slides.
+  - A step has ` ```check ` blocks in the check language, and a `highlight:` line naming part of the editor.
+- **In the editor**, the Notes tab shows a tutorial one step at a time: "Step 3 of 8", a progress strip, the step's words and code, its checks with **✔ Check my work** (game checks play in the game pane), and Back / Next.
+  - **Next stays locked** until the step's checks pass, or the student passed them before.
+  - A step's **spotlight** is a pulsing ring round the part of the editor it's about. It never blocks a click and goes at the first one.
+- **Progress lives in the game** (`Project.tutorial`), so it saves offline and signed out like any change. A reload carries on, and the library reads it from the games.
+- **The library** (`#/tutorials`, **Learn** in the top bar):
+  - Shelved by level (the spec's five).
+  - Each tutorial shows not started / step k of n / finished ✓, with Start or Resume. Start builds its starting game.
+  - Teachers get **Write a tutorial**, Edit on their own, and **Assign to…** a class.
+- **Writing one** (`#/tutorials/edit/…`): the markdown with a step-by-step preview, warnings for any check GameIDE can't read or spotlight on nothing, who can see it (only me / my classes / everyone, admins only), Try it, and Delete.
+- **Assigning** makes an assignment from the tutorial's starting game with the tutorial as its notes. Its checks are what Check all checks and count toward the grade. The results page shows each student's step.
+- **XP**: 2 for each step with checks passed (once ever), 20 for finishing (once). Only for tutorials the student can open.
+- **The four starters**, each from a starting game made for it:
+  - **Your First Game** (8 steps): sprite, object, room, arrow keys.
+  - **Collect the Coins** (6): collisions, score, a HUD, sound. It starts from the maze with no scoring.
+  - **Simple Platformer** (7): speed, `move_and_collide`, gravity, jumping, coins. It starts from the level with a still Player.
+  - **Blocks to Python** (7): an event in blocks, its Python, then turned into Python.
+- New check: `Player.step is written in blocks` (or python, or an event sheet).
+
+### Tests
+
+```
+cd frontend
+npm test                      # Vitest: 213
+npm run e2e                   # Playwright: 64 editor tests + 17 account tests (4 opt-in, skipped)
+../backend/.venv/bin/python ../backend/tests/test_server.py   # 345 server checks
+python3 scripts/sabotage.py   # 407 deliberate bugs
+```
+
+- Unit tests:
+  - the format
+  - the problems it reports
+  - **every built-in tutorial**: it reads cleanly, its starter exists, all its checks are readable, all its spotlights are real, and it never says "copy"
+  - **every spotlight target is still in the editor**
+  - step counts match the server's (shared cases).
+- **26 new server checks**: sharing (private / classes / site, admins only for site), only its author edits, step XP (once, only steps with checks, finishing, no steps that aren't there, no sneaky paths), an assigned tutorial's checks graded, progress on My Games and the results, the files served.
+- **`e2e/tutorials.editor.spec.ts`**:
+  - **"Your First Game" done the whole way through**, as a student would: each Next locked until its check passes, a check failing with its reason first, the spotlight on the Sprites +, step 6's checks playing the game holding the arrow keys, finished, a reload carrying on, and the library saying Finished ✓.
+  - Code can't be selected.
+- **`e2e/tutorials.spec.ts`**: a teacher writes one and shares it with a class; the student does it and gets the XP; the teacher assigns a built-in one and sees "step 3 of 8".
+- 19 new sabotage cases, each caught. Along the way:
+  - **Flask didn't serve the built-in tutorials** (found by the account test; the editor-only tests' static host hid it).
+  - The library crashed on a static host with no API.
+  - Three cases were fixed: one sabotage didn't compile, one was aimed at the wrong check, and one check crashed instead of failing.
+
+### Known issues and gaps
+
+- Only **Your First Game** is played through end to end by a test. The other three's checks are all readable and their spotlights real, and Collect the Coins' first game check is the one 11a's test runs on the same maze. Playing each through once yourself is worth it.
+- Spotlights point at what's on screen. If the part isn't open (a tab not chosen), there's no ring. The step's words still say where.
+- A tutorial's step XP trusts the page (the checks run in the browser), like Check my work; the most a faked claim takes is 2 per step and 20 a tutorial.
+- Tutorials can't hold questions yet (they can, as an assigned tutorial's notes are notes, but the step view shows only words and checks).
+
+---
+
+## Phase 11a — Notes, questions and tests ✅ (2026-10-26, reviewed)
 
 Phase 11 is split like Phase 9: **11a** builds the Notes tab, questions and the check language; **11b** builds tutorials on them (library, strict steps, spotlights, authoring, assigning, the four starters). Agreed: the Notes tab is the tutorial panel, steps are strict, a tutorial is an assignment, and **tutorial code can't be copied**.
 
@@ -909,7 +971,9 @@ of its own after Phase 9.
 | 11 Tutorials | tutorial panel, checks, library | |
 | 12 Retro mode (new, agreed 2026-10-26) | — | **export to .gb, then .nes** (SNES left out): a restricted Python subset translated to C (GBDK-2020 / cc65), editor limits (4 shades, 8×8 tiles, 160×144), chiptune sound, tested in a browser emulator |
 
-## Next: Phase 11 — Tutorials, with the notes tab, questions and tests
+## Next: Phase 12 — Retro mode (see the table above)
+
+## Phase 11 — Tutorials, with the notes tab, questions and tests (the plan; built as 11a and 11b above)
 
 Agreed 2026-10-26: a **Notes** tab beside Console and Docs (the editor's layout unchanged) showing an assignment's markdown and slides, questions in PyIDE's format, and game-shaped tests ("Player has a Step event", "uses keyboard_check", "after setup there are 15 Coins") with Check my work and Check all — built with the tutorials, which need the same panel and step checks.
 

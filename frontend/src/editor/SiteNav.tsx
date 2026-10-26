@@ -10,7 +10,7 @@ import { useSession } from "./session";
 import { Icon } from "./ui/icons";
 import { ThemeToggle } from "./ui/ThemeToggle";
 
-export type NavPlace = "home" | "explore" | "games" | "classes" | "moderation" | "";
+export type NavPlace = "home" | "explore" | "games" | "learn" | "classes" | "moderation" | "";
 
 /** GameIDE's mark: the pixel cartridge (scripts/make_logo.py, also the favicon). */
 export function LogoMark({ size = 30 }: { size?: number }) {
@@ -48,6 +48,7 @@ export function SiteNav({ at }: { at: NavPlace }) {
       <nav className="site-nav-items" aria-label="Site">
         {item("explore", "#/explore", Icon.search(20), "Explore", "nav-explore")}
         {item("games", "#/games", Icon.create(20), "Create", "nav-games")}
+        {item("learn", "#/tutorials", Icon.docsBig(20), "Learn", "nav-learn")}
         {me.user && item("classes", "#/classes", Icon.classes(20), "Classes", "nav-classes")}
         {(me.user?.teacher || me.user?.admin) && item("moderation", "#/moderation", Icon.approve(20), "Approvals", "link-moderation")}
       </nav>

@@ -900,6 +900,55 @@ xb.post(f"/api/assignments/{N2}/start")
 r = xb.post("/api/quiz/answer", json={"assignment": N2, "question": qid2, "response": "one"}).get_json()
 check("with no points set, earning everything in the notes is full marks, and pays the quest", r.get("xp", 0) >= 25 + xp.XP_PER_POINT, r)
 
+# ---------------------------------------------------------------- tutorials (tutorials.py)
+import tutorials as tutmod  # noqa: E402
+
+TUT = "---\ntitle: Bounce\nlevel: Top-Down\nstarter: empty\n---\n# Start\nHello\n---\n## Make a ball\n```check\nobject Ball exists\n```\n---\n## Done\nYay"
+r = xa.post("/api/tutorials", json={"markdown": TUT})
+check("only a teacher writes a tutorial", r.status_code == 403)
+check("a tutorial needs its header", teacher.post("/api/tutorials", json={"markdown": "# no header"}).status_code == 400)
+check("only an admin publishes one for everyone", teacher.post("/api/tutorials", json={"markdown": TUT, "visibility": "site"}).status_code == 400)
+TS = teacher.post("/api/tutorials", json={"markdown": TUT}).get_json()["slug"]
+listed = {t["slug"]: t for t in teacher.get("/api/tutorials").get_json()["tutorials"]}
+check("a teacher's tutorial is listed for them, with its steps", listed.get(TS, {}).get("steps") == 3 and listed[TS]["level"] == "Top-Down", listed.get(TS))
+check("…private at first: not for their students", TS not in [t["slug"] for t in xa.get("/api/tutorials").get_json()["tutorials"]]
+      and xa.get(f"/api/tutorials/{TS}").status_code == 404)
+check("only its author changes it", other_teacher.post(f"/api/tutorials/{TS}", json={"markdown": TUT, "visibility": "classes"}).status_code == 403)
+teacher.post(f"/api/tutorials/{TS}", json={"markdown": TUT, "visibility": "classes"})
+check("shared with classes, the author's students see it", TS in [t["slug"] for t in xa.get("/api/tutorials").get_json()["tutorials"]]
+      and "Make a ball" in xa.get(f"/api/tutorials/{TS}").get_json().get("markdown", ""))
+check("…and nobody else", TS not in [t["slug"] for t in bob.get("/api/tutorials").get_json()["tutorials"]] and bob.get(f"/api/tutorials/{TS}").status_code == 404)
+check("an admin can publish it for everyone", admin.post(f"/api/tutorials/{TS}", json={"markdown": TUT, "visibility": "site"}).status_code == 200
+      and TS in [t["slug"] for t in anon.get("/api/tutorials").get_json()["tutorials"]])
+
+# XP for steps: once each, only steps with checks, and a bonus at the end.
+before = xa.get("/api/me/xp").get_json()["xp"]
+check("a step with no check pays nothing", xa.post("/api/tutorials/step", json={"key": "builtin:first-game", "step": 0}).get_json().get("xp") == 0)
+check("a step with a check pays a little", xa.post("/api/tutorials/step", json={"key": "builtin:first-game", "step": 1}).get_json().get("xp") == xp.SELF_TEST_XP)
+check("…once", xa.post("/api/tutorials/step", json={"key": "builtin:first-game", "step": 1}).get_json().get("xp") == 0)
+last = len(tutmod.steps_of(tutmod.builtin("first-game"))) - 1
+check("finishing pays its bonus", xa.post("/api/tutorials/step", json={"key": "builtin:first-game", "step": last}).get_json().get("xp") == xp.ALL_ANSWERED_XP)
+check("a step that isn't there is refused", xa.post("/api/tutorials/step", json={"key": "builtin:first-game", "step": last + 1}).status_code == 400)
+check("…and a tutorial that isn't, however its name is spelled", xa.post("/api/tutorials/step", json={"key": "builtin:../tutorials/first-game", "step": 1}).status_code == 404)
+teacher.post(f"/api/tutorials/{TS}", json={"markdown": TUT, "visibility": "private"})
+check("a private tutorial pays no one else", bob.post("/api/tutorials/step", json={"key": "t:" + TS, "step": 1}).status_code == 404)
+check("teachers earn nothing from tutorials", teacher.post("/api/tutorials/step", json={"key": "builtin:first-game", "step": 2}).get_json().get("xp") == 0)
+
+# A tutorial assigned to a class: an assignment whose notes are the tutorial.
+put(teacher, "tg1", project("tg1", "Tutorial start"), 0)
+r = teacher.post(f"/api/classes/{XC}/assignments", json={"title": "Bounce", "project": "tg1", "notes": TUT})
+TA = r.get_json().get("slug")
+check("assigning a tutorial makes an assignment whose notes are the tutorial", r.status_code == 201 and teacher.get(f"/api/assignments/{TA}").get_json()["notes"] == TUT)
+check("…its checks are what Check all checks", [t["label"] for t in teacher.get(f"/api/assignments/{TA}").get_json()["tests"]] == ["object Ball exists"])
+check("…the assignment's tutorial pays only those who have it", xc.post("/api/tutorials/step", json={"key": "a:" + TA, "step": 1}).status_code == 404)
+TP = xc.post(f"/api/assignments/{TA}/start").get_json()["project"]
+check("…and them", xc.post("/api/tutorials/step", json={"key": "a:" + TA, "step": 1}).get_json().get("xp") == xp.SELF_TEST_XP)
+game = xc.get(f"/api/projects/{TP}").get_json()
+game["data"]["tutorial"] = {"key": "a:" + TA, "step": 2, "steps": 3, "title": "Bounce"}
+put(xc, TP, game["data"], game["version"])
+check("My Games knows a game's tutorial and how far it's got", ({g["id"]: g for g in xc.get("/api/projects").get_json()["projects"]}[TP].get("tutorial") or {}).get("step") == 2)
+check("…and so do the teacher's results", {x["email"]: x for x in teacher.get(f"/api/assignments/{TA}").get_json()["rows"]}["xc@example.com"]["tutorial"] == {"step": 2, "steps": 3})
+
 # ---------------------------------------------------------------- the built editor's files
 # The blocks editor's media come from our own origin (vite.config.ts copies
 # them into dist/blockly-media); without this route the trash can and drag
@@ -912,9 +961,14 @@ r = anon.get("/blockly-media/sprites.svg")
 check("Blockly's media are served from our origin", r.status_code == 200 and r.data == b"<svg/>", r.status_code)
 check("…and nothing outside that folder", anon.get("/blockly-media/../index.html").status_code == 404)
 (fake_dist / "favicon.svg").write_text("<svg>mark</svg>")
+(fake_dist / "tutorials").mkdir()
+(fake_dist / "tutorials" / "index.json").write_text('[{"key": "first-game"}]')
 real_dist, server.DIST = server.DIST, fake_dist
 r = anon.get("/favicon.svg")
 check("the favicon is served", r.status_code == 200 and b"mark" in r.data)
+r = anon.get("/tutorials/index.json")
+check("the built-in tutorials are served", r.status_code == 200 and b"first-game" in r.data)
+check("…and nothing beside them", anon.get("/tutorials/../favicon.svg").status_code == 404)
 server.DIST = real_dist
 
 print()

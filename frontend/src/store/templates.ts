@@ -329,6 +329,55 @@ async function empty(): Promise<Built> {
   return { project: blankProject("My game"), assets: new Map() };
 }
 
+/**
+ * The games tutorials start from (public/tutorials/*.md, `starter:`): each a
+ * template with the part the tutorial teaches taken out. Not offered on My
+ * Games' Create New Game — they're half a game on purpose.
+ */
+async function coinsStart(): Promise<Built> {
+  // The maze, walls, coins and a player who moves — but nothing happens on
+  // touching a coin, and there's no score: that's the tutorial.
+  const built = await coins();
+  const p = built.project;
+  const player = p.objects.find((o) => o.name === "Player")!;
+  player.events = player.events.filter((e) => e.key.type !== "collision");
+  const hud = p.objects.find((o) => o.name === "Hud")!;
+  p.objects = p.objects.filter((o) => o !== hud);
+  for (const r of p.rooms) r.instances = r.instances.filter((i) => i.object !== hud.id);
+  return built;
+}
+
+async function platformerStart(): Promise<Built> {
+  // The level, the hero and the coins — and a Player that doesn't move yet.
+  const built = await platformer();
+  const p = built.project;
+  for (const o of p.objects) if (o.name === "Player") o.events = [];
+  const gone = new Set(p.objects.filter((o) => o.name === "Enemy" || o.name === "Hud").map((o) => o.id));
+  p.objects = p.objects.filter((o) => !gone.has(o.id));
+  for (const r of p.rooms) r.instances = r.instances.filter((i) => !gone.has(i.object));
+  return built;
+}
+
+async function playerStart(): Promise<Built> {
+  // One room, one Player with a sprite, standing in the middle, doing nothing.
+  const p = blankProject("My game");
+  const assets = new Map<string, Blob>();
+  const s = await addStarterSprite(p, assets, "player");
+  const player = obj(p, "Player", s);
+  p.rooms[0]!.instances.push(newInstance(p.rooms[0]!, player.id, 304, 224));
+  return { project: p, assets };
+}
+
+/** Templates for tutorials only, by their `starter:` name. */
+export const TUTORIAL_STARTERS: Record<string, () => Promise<Built>> = {
+  empty,
+  coins,
+  platformer,
+  "coins-start": coinsStart,
+  "platformer-start": platformerStart,
+  "player-start": playerStart,
+};
+
 export const TEMPLATES: { key: string; label: string; description: string; build: () => Promise<Built> }[] = [
   { key: "empty", label: "Empty game", description: "One empty room. Start from nothing.", build: empty },
   { key: "coins", label: "Collect the coins", description: "A maze, arrow keys, walls and coins.", build: coins },

@@ -375,6 +375,27 @@ notes are `notes.md` in `Assignment.files`, shown in the editor's Notes tab.
 - Code in notes is `user-select: none` (the teacher's decision: no copying
   tutorial code). Don't add a Copy button.
 
+## Tutorials
+
+`src/tutorials/` and `backend/tutorials.py`; built-in ones are
+`frontend/public/tutorials/*.md` + `index.json` (served by Flask's
+`/tutorials/` route and by any static host). A tutorial is notes with a
+header; steps are `---` slides; ` ```check ` blocks gate Next (strict); a
+`highlight:` line spotlights a `data-tutorial` target.
+
+- **Progress is in the game** (`Project.tutorial`), not a table: it saves
+  offline/signed out, and My Games / the library / the results read it.
+- **Keys**: `builtin:<name>`, `t:<slug>` (a teacher's), `a:<slug>` (an
+  assignment made from one — its notes are the tutorial, and its checks
+  count in `grades.tests_of`).
+- **Keep `TARGETS` (tutorial.ts) true**: tutorials.test.ts fails on a target
+  no longer in the editor, and on any built-in tutorial with an unreadable
+  check, a spotlight on nothing, or a missing starter. Removing or renaming a
+  `data-tutorial` attribute breaks spotlights silently otherwise.
+- Starting games for tutorials are `TUTORIAL_STARTERS` in templates.ts
+  (kept off Create New Game: they're half a game on purpose).
+- **No Copy button on tutorial code**, ever (the teacher's decision).
+
 ## XP
 
 `backend/rewards.py` (a blueprint), `src/xp/`. **PyIDE's XP joined, not

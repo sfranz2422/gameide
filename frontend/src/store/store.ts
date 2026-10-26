@@ -18,6 +18,8 @@ export interface ProjectSummary {
   icon?: string | null;
   /** How it's published, if it is: "unlisted", "class", "public" or "taken down". */
   published?: string | null;
+  /** The tutorial it follows and how far it has got (Project.tutorial). */
+  tutorial?: import("./project").TutorialProgress | null;
 }
 
 /**
@@ -109,7 +111,7 @@ export class LocalStore implements ProjectStore {
     const db = await this.db;
     const all = (await request(db.transaction("projects").objectStore("projects").getAll())) as Project[];
     return all
-      .map((p) => ({ id: p.id, name: p.name, modified: p.modified, size: JSON.stringify(p).length, icon: projectIcon(p) }))
+      .map((p) => ({ id: p.id, name: p.name, modified: p.modified, size: JSON.stringify(p).length, icon: projectIcon(p), tutorial: p.tutorial ?? null }))
       .sort((a, b) => b.modified.localeCompare(a.modified));
   }
 

@@ -1,0 +1,34 @@
+[
+ {
+  "key": "first-game",
+  "title": "Your First Game",
+  "level": "Getting Started",
+  "time": "15 min",
+  "starter": "empty",
+  "description": "A sprite, an object, a room, and a player you move with the arrow keys."
+ },
+ {
+  "key": "collect-coins",
+  "title": "Collect the Coins",
+  "level": "Getting Started",
+  "time": "20 min",
+  "starter": "coins-start",
+  "description": "Touch a coin to collect it, keep score, and show it on screen."
+ },
+ {
+  "key": "blocks-to-python",
+  "title": "Blocks to Python",
+  "level": "Getting Started",
+  "time": "15 min",
+  "starter": "player-start",
+  "description": "Build an event from blocks, read the Python they make, then turn it into Python."
+ },
+ {
+  "key": "simple-platformer",
+  "title": "Simple Platformer",
+  "level": "Platformers",
+  "time": "25 min",
+  "starter": "platformer-start",
+  "description": "Gravity, solid ground, running and jumping."
+ }
+]

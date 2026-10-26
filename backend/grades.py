@@ -33,7 +33,14 @@ def quiz_possible(a):
 
 
 def tests_of(a):
-    return checks.tests(notes_of(a))
+    """The notes' tests: ```tests blocks, and a tutorial's ```check blocks —
+    an assigned tutorial's steps are what Check all checks, and count."""
+    seen, out = set(), []
+    for t in checks.tests(notes_of(a)) + checks.tests(notes_of(a), "check"):
+        if t["label"] not in seen:
+            seen.add(t["label"])
+            out.append(t)
+    return out
 
 
 def possible(a):

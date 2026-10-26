@@ -41,6 +41,22 @@ export interface Project {
   sounds: SoundResource[];
   /** For draw_set_font. */
   fonts: FontResource[];
+  /**
+   * The tutorial this game follows, and how far it has got: kept in the
+   * game, so it saves offline and signed out like any change, and My Games
+   * and the library can read progress from the games themselves. Absent on
+   * games that aren't a tutorial. (No schema change: older GameIDE ignores it.)
+   */
+  tutorial?: TutorialProgress;
+}
+
+export interface TutorialProgress {
+  /** builtin:<name>, t:<slug> (a teacher's) or a:<slug> (an assignment made from one) — backend/tutorials.py. */
+  key: string;
+  title: string;
+  /** Steps done: the step to go on from. Equal to `steps` when finished. */
+  step: number;
+  steps: number;
 }
 
 /** A sound from the Sounds folder: an MP3, OGG or WAV file, and how loud it plays. */

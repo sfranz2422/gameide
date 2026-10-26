@@ -28,6 +28,9 @@ import { AccountMenu, ExportButton, HistoryButton, SaveStatusView } from "./Acco
 import { AssignmentButtons, useAssignment, ViewBar } from "./AssignmentBits";
 import { NotesPane } from "../notes/NotesPane";
 import { hostRunner } from "../checks/hostRunner";
+import { TutorialPane } from "../tutorials/TutorialPane";
+import { isTutorial } from "../tutorials/tutorial";
+import { api as request } from "../store/api";
 import type { ViewStore } from "../store/viewStore";
 import { claimRun } from "../xp/runXp";
 import { useSession } from "./session";
@@ -327,13 +330,31 @@ export function EditorPage({ store, id }: { store: ProjectStore; id: string }) {
   // student, Turn in. The checks in the notes play this editor's own game.
   const { a: assignment, reload: reloadAssignment } = useAssignment(store, id);
   const notes = assignment?.notes?.trim() ? assignment.notes : "";
+  // A tutorial: the one this game follows (its own record of it), or the
+  // assignment's notes when they are one (a tutorial assigned to a class).
+  const tutorialKey = project?.tutorial?.key ?? (assignment && isTutorial(assignment.notes) ? `a:${assignment.slug}` : null);
+  const [tutorialMd, setTutorialMd] = useState<string | null>(null);
+  useEffect(() => {
+    if (!tutorialKey) return setTutorialMd(null);
+    const [kind, name] = [tutorialKey.slice(0, tutorialKey.indexOf(":")), tutorialKey.slice(tutorialKey.indexOf(":") + 1)];
+    let alive = true;
+    const got = (md: string | null) => alive && setTutorialMd(md);
+    if (kind === "a") got(assignment?.slug === name ? assignment.notes : null);
+    else if (kind === "builtin")
+      // From the editor's own files, so it works signed out and offline once loaded.
+      void fetch(new URL(`tutorials/${name}.md`, document.baseURI)).then((r) => (r.ok ? r.text() : null)).then(got, () => got(null));
+    else if (kind === "t") void request<{ markdown: string }>(`/api/tutorials/${encodeURIComponent(name)}`).then((r) => got(r.markdown), () => got(null));
+    return () => {
+      alive = false;
+    };
+  }, [tutorialKey, assignment]);
   const openedNotes = useRef(false);
   useEffect(() => {
-    if (notes && !openedNotes.current) {
+    if ((notes || tutorialMd) && !openedNotes.current) {
       openedNotes.current = true;
       setBottom("notes");
     }
-  }, [notes]);
+  }, [notes, tutorialMd]);
   const runner = useMemo(
     () => (host ? hostRunner(host, () => buildGame(projectRef.current!, assets).def, { state: () => gameStateRef.current, errors: checkErrors.current }, play) : null),
     [host, assets, play],
@@ -438,7 +459,7 @@ export function EditorPage({ store, id }: { store: ProjectStore; id: string }) {
                 <button role="tab" aria-selected={bottom === "console"} className={bottom === "console" ? "on" : ""} onClick={() => setBottom("console")}>
                   {Icon.console()} Console
                 </button>
-                {notes && (
+                {(notes || tutorialMd) && (
                   <button role="tab" aria-selected={bottom === "notes"} className={bottom === "notes" ? "on" : ""} onClick={() => setBottom("notes")} data-tutorial="notes-tab" data-testid="notes-tab">
                     {Icon.notes()} Notes
                   </button>
@@ -449,11 +470,23 @@ export function EditorPage({ store, id }: { store: ProjectStore; id: string }) {
               </div>
               {bottom === "console" ? <ConsolePane lines={lines} clear={() => setLines([])} jump={jump} /> : bottom === "docs" ? <DocsPane /> : null}
               {/* Kept mounted while hidden: answers being typed and check results stay. */}
-              {notes && assignment && (
+              {tutorialMd && tutorialKey ? (
+                <div className="notes-holder" hidden={bottom !== "notes"}>
+                  <TutorialPane
+                    md={tutorialMd}
+                    progress={project.tutorial ?? { key: tutorialKey, title: "", step: 0, steps: 0 }}
+                    // Their own game only: a game open read only shows how far its owner got.
+                    onProgress={store.kind === "view" || assignment?.teacher ? null : (t) => mutate((d) => void (d.tutorial = t), { history: "skip" })}
+                    project={project}
+                    runner={runner}
+                    earns={store.kind === "cloud" && !!me.user && !me.user.teacher}
+                  />
+                </div>
+              ) : notes && assignment ? (
                 <div className="notes-holder" hidden={bottom !== "notes"}>
                   <NotesPane notes={notes} assignment={assignment.slug} project={project} runner={runner} practice={!!assignment.teacher || store.kind !== "cloud"} />
                 </div>
-              )}
+              ) : null}
             </section>
           </aside>
         </div>

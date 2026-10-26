@@ -11,6 +11,7 @@ export const CHECK_EXAMPLES: [string, string][] = [
   ["Player has sprite", "The object has a sprite chosen."],
   ["Player has event step", "The event's name as the editor shows it: create, step, draw, collision with Coin, key pressed: space, alarm 0…"],
   ["Player.step uses keyboard_check", "The word is in that event's code (blocks and event sheets count: they make code too)."],
+  ["Player.step is written in blocks", "How the event is written: in blocks, in Python, or in an event sheet."],
   ["Player uses move_and_collide", "Anywhere in that object's events."],
   ["uses for", "Anywhere in the game. Python words work: for, while, if, def, return."],
   ["avoids instance_destroy", "The word appears nowhere in the game."],

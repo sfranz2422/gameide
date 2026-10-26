@@ -29,6 +29,7 @@ import accounts
 import classes
 import notes
 import rewards
+import tutorials
 import gamestore
 import publishing
 from gamestore import GameAsset, GameProject, GameVersion
@@ -431,7 +432,7 @@ def _summary(p, published=None):
     """One game on the "My games" page: its name, size, picture and whether it's published."""
     return {"id": p.slug, "name": p.name, "modified": p.updated_at.isoformat() + "Z" if p.updated_at.tzinfo is None
             else p.updated_at.isoformat(), "version": p.version, "size": p.size, "icon": gamestore.icon_asset(p.data),
-            "published": published}
+            "published": published, "tutorial": gamestore.tutorial_of(p.data)}
 
 
 @app.get("/api/projects")
@@ -783,6 +784,15 @@ def favicon():
     return r
 
 
+@app.get("/tutorials/<path:name>")
+def tutorial_files(name):
+    """The built-in tutorials (public/tutorials/): their list and markdown. The
+    editor fetches them itself — on a static host as much as here."""
+    r = send_from_directory(DIST / "tutorials", name)
+    r.headers["Cache-Control"] = "no-cache"
+    return r
+
+
 @app.get("/avatars/<path:name>")
 def avatar_pictures(name):
     """The avatars a student picks from (xp.AVATARS; public/avatars/, the same pictures as PyIDE's)."""
@@ -825,6 +835,8 @@ classes.init(app, _db, current_user, _scheme, _problem)
 rewards.init(app, _db, current_user)
 # An assignment's notes, its questions and its tests (notes.py).
 notes.init(app, _db, current_user)
+# Tutorials: built-in and teachers' own, shared, and their XP (tutorials.py).
+tutorials.init(app, _db, current_user, lambda: DIST)
 
 
 if __name__ == "__main__":

@@ -14,7 +14,7 @@ export default defineConfig({
   use: { viewport: { width: 1366, height: 768 } },
   projects: [
     { name: "editor", testMatch: /(editor|sprites|rooms|tiles|blocks|sheets|media|publish)\.spec\.ts/, use: { baseURL: "http://localhost:4173" } },
-    { name: "account", testMatch: /(account|published|classes|xp|notes)\.spec\.ts/, use: { baseURL: "http://127.0.0.1:5055" } },
+    { name: "account", testMatch: /(account|published|classes|xp|notes|tutorials)\.spec\.ts/, use: { baseURL: "http://127.0.0.1:5055" } },
   ],
   webServer: [
     {

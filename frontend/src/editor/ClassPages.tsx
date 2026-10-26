@@ -724,6 +724,8 @@ interface ResultRow {
   testsSelf: TestRun | null;
   testsVerified: TestRun | null;
   longs: { question: string; prompt: string; points: number; response: string; score: number | null }[];
+  /** How far they've got, when the assignment is a tutorial. */
+  tutorial: { step: number; steps: number } | null;
 }
 
 interface TestRun {
@@ -942,6 +944,11 @@ export function AssignmentPage({ slug }: { slug: string }) {
                       Open and play
                     </a>
                     <span className="muted small"> · changed {whenText(r.updated)}</span>
+                    {r.tutorial && (
+                      <span className="pill" data-testid="row-tutorial">
+                        {r.tutorial.step >= r.tutorial.steps ? "tutorial finished" : `step ${r.tutorial.step + 1} of ${r.tutorial.steps}`}
+                      </span>
+                    )}
                     {r.deleted && <span className="muted small"> (they deleted it)</span>}
                   </>
                 ) : (

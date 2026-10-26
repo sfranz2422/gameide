@@ -19,6 +19,7 @@ import { AssignmentPage, ClassesPage, ClassPage, StartAssignment } from "./Class
 import { ViewStore } from "../store/viewStore";
 import { ClassXpPage, ShopPage, XpLogPage, XpToasts } from "../xp/XpPages";
 import { HelpPage } from "../notes/HelpPage";
+import { TutorialEditPage, TutorialsPage } from "../tutorials/TutorialPages";
 import { useIdleSignOut } from "./idle";
 import { ProjectsPage } from "./ProjectsPage";
 import { SessionContext, type SessionInfo } from "./session";
@@ -68,6 +69,10 @@ export function App() {
         <StartAssignment key={start[1]} slug={start[1]!} />
       ) : classXp ? (
         <ClassXpPage key={classXp[1]} classId={Number(classXp[1])} />
+      ) : hash.match(/^#\/tutorials\/edit\/([\w-]+)/) ? (
+        <TutorialEditPage key={hash} slug={hash.match(/^#\/tutorials\/edit\/([\w-]+)/)![1]!} />
+      ) : hash.startsWith("#/tutorials") ? (
+        <TutorialsPage />
       ) : hash.startsWith("#/help") ? (
         <HelpPage />
       ) : hash.startsWith("#/xp") ? (

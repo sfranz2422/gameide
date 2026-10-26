@@ -3387,3 +3387,83 @@ a.btn {
   background: var(--code-bg);
   overflow-x: auto;
 }
+
+/* ---------------------------------------------------------------- tutorials (tutorials/) */
+.tutorial-pane {
+  padding: 10px 14px 20px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.tutorial-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+.tutorial-bar {
+  display: flex;
+  gap: 3px;
+  margin: 6px 0 4px;
+}
+.tutorial-bar span {
+  flex: 1;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--panel-2);
+}
+.tutorial-bar span.done {
+  background: var(--go);
+}
+.tutorial-bar span.here {
+  background: hsl(45, 90%, 60%);
+}
+.tutorial-nav {
+  display: flex;
+  align-items: center;
+  margin-top: 12px;
+}
+.spotlight {
+  position: fixed;
+  z-index: 150;
+  pointer-events: none;
+  border: 3px solid #ffd166;
+  border-radius: 10px;
+  box-shadow: 0 0 0 4000px rgba(3, 7, 15, 0.35);
+  animation: spot-pulse 1.4s ease-in-out infinite;
+}
+@keyframes spot-pulse {
+  50% {
+    border-color: #fff3c4;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .spotlight {
+    animation: none;
+  }
+}
+.tutorial-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 14px;
+}
+.tutorial-card {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+}
+.tutorial-card p {
+  margin: 0;
+}
+.tutorial-card .pill {
+  justify-self: start;
+}
+.tutorial-source {
+  width: 100%;
+  box-sizing: border-box;
+  font-family: var(--mono, "Ubuntu Mono", monospace);
+  font-size: 14px;
+}

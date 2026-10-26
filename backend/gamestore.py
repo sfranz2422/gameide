@@ -321,6 +321,40 @@ class Comment(Base):
     created_at = Column(DateTime, nullable=False, default=now)
 
 
+# ---------------------------------------------------------------- tutorials (Phase 11b)
+
+class Tutorial(Base):
+    """A tutorial a teacher wrote: markdown with a header and one step per
+    `---` slide (frontend/src/tutorials/tutorial.ts has the format). The
+    built-in ones aren't rows — they're files the editor ships with
+    (frontend/public/tutorials) — so a teacher can't change or lose them.
+
+    visibility: "private" (its author only), "classes" (the students of its
+    author's GameIDE classes), or "site" (everyone; only an admin can set it).
+    """
+    __tablename__ = "gameide_tutorials"
+
+    id = Column(Integer, primary_key=True)
+    slug = Column(String(16), unique=True, index=True, nullable=False)
+    owner_id = Column(Integer, ForeignKey("users.id"), index=True, nullable=False)
+    title = Column(String(200), nullable=False, default="")
+    level = Column(String(60), nullable=False, default="")
+    markdown = Column(Text, nullable=False, default="")
+    visibility = Column(String(12), nullable=False, default="private")
+    created_at = Column(DateTime, nullable=False, default=now)
+    updated_at = Column(DateTime, nullable=False, default=now)
+
+
+def tutorial_of(text: str):
+    """The tutorial a game is following and how far it has got, from the
+    game's own JSON ({key, step, steps, title}), or None."""
+    try:
+        t = json.loads(text).get("tutorial")
+    except ValueError:
+        return None
+    return t if isinstance(t, dict) and isinstance(t.get("key"), str) else None
+
+
 def icon_asset(text: str):
     """A game's picture on "My games": the first frame of its sprite named
     "icon" (microStudio's convention), or None. The same rule as projectIcon

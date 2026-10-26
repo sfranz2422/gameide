@@ -566,7 +566,15 @@ def new_assignment(class_id):
             return err(problem or problem2, 400)
         starter = copy_project(db, src, user, f"{title} (starter)")
         a = _make_assignment(db, user, course, title, starter, out_of, due_at)
+        # A tutorial assigned to the class arrives with its notes: the tutorial.
+        text = str(body.get("notes") or "")
+        if text:
+            if len(text) > notes.MAX_NOTES:
+                return err("Those notes are too long.", 413)
+            a.files = json.dumps({grades.NOTES: text})
         db.commit()
+        if text:
+            notes.store_quiz_keys(db, a, text)
         return jsonify(slug=a.slug, starter=starter.slug), 201
     finally:
         db.close()
@@ -722,7 +730,9 @@ def assignment_results(slug):
             version = int(s.snippet_slug[1:]) if s and s.snippet_slug.startswith("v") and s.snippet_slug[1:].isdigit() else None
             n = counts.get(p.id, [0, 0]) if p else [0, 0]
             total = grades.total(s.score if s else None, earned.get(u.id)) if u else None
+            tut = gamestore.tutorial_of(p.data) if p else None
             return {"quiz": quiz_got.get(u.id) if u else None, "total": total,
+                    "tutorial": {"step": tut.get("step", 0), "steps": tut.get("steps", 0)} if tut else None,
                     "testsSelf": test_out(u.id, "self", s) if u else None,
                     "testsVerified": test_out(u.id, "verified", s) if u else None,
                     "longs": longs.get(u.id, []) if u else [],"student": u.id if u else None, "name": _student_label(u, name) or email.split("@")[0], "email": email,

@@ -68,6 +68,9 @@ describe("checks of the project", () => {
     expect(run("Jumper uses keyboard_check_pressed")?.ok).toBe(true);
     expect(run("uses keyboard_check")?.ok).toBe(true);
     expect(run("avoids while")?.ok).toBe(true);
+    expect(run("Player.step is written in python")?.ok).toBe(true);
+    expect(run("Player.step is written in blocks")).toEqual({ ok: false, detail: "Player's step event is written in Python, not blocks." });
+    expect(readCheck("Player.step is in an event sheet")).toMatchObject({ kind: "mode", mode: "sheet" });
     expect(run("room Level1 has 2 Coin")?.ok).toBe(true);
     expect(run("room Level1 has 3 Coin")).toEqual({ ok: false, detail: "Level1 has 2 Coins, not 3." });
     expect(run("room Level1 has at least 1 Coin")?.ok).toBe(true);

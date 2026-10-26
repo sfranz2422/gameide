@@ -42,6 +42,7 @@ CM, BS = "src/editor/codeMode.tsx", "src/blocks/blockState.ts"
 CL, UPJ, EP = "../backend/classes.py", "src/editor/useProject.ts", "src/editor/EditorPage.tsx"
 RW, XPP, RX = "../backend/rewards.py", "src/xp/XpPages.tsx", "src/xp/runXp.ts"
 NT, GR, QZ, CK = "../backend/notes.py", "../backend/grades.py", "src/notes/quiz.ts", "src/checks/checks.ts"
+TU, TUP, TP = "../backend/tutorials.py", "src/tutorials/tutorial.ts", "src/tutorials/TutorialPane.tsx"
 CASES = [
  ("layout drift", RT, '"x": boxy(F.X)', '"x": boxy(F.Y)', "every built-in property"),
  ("no polar sync", RT, "            _st[b + i] = v\n            set_polar(b)", "            _st[b + i] = v", "two views of one motion"),
@@ -359,7 +360,7 @@ CASES = [
  ("students moderate", PUB, "    if not (is_teacher(user) or is_admin(user)):\n        fail(\"Only teachers can see this.\", 403)", "    if False:\n        fail(\"Only teachers can see this.\", 403)", "can't open the approval queue", PY),
  ("reports never shown", PUB, "            reported=[row(g) for g in games if g.id in by_game],", "            reported=[],", "its teacher sees the report", PY),
  ("take-down leaves reports open", PUB, '            pub.takedown_note = str(body.get("note") or "")[:300]\n            db.query(Report).filter_by(published_id=pub.id).update({"handled": 1})', '            pub.takedown_note = str(body.get("note") or "")[:300]', "its reports are handled", PY),
- ("export without Pyodide", "vite.config.ts", '      const files = ["play.html", ...built, ...PYODIDE_FILES.map((f) => `pyodide/${f}`)];', '      const files = ["play.html", ...built];', "plays from another site", E2E),
+ ("export without Pyodide", "vite.config.ts", '      const files = ["play.html", "favicon.svg", ...built, ...PYODIDE_FILES.map((f) => `pyodide/${f}`)];', '      const files = ["play.html", "favicon.svg", ...built];', "plays from another site", E2E),
  ("Pyodide from the site's root", GH, '    const indexURL = new URL("pyodide/", document.baseURI).href;', '    const indexURL = new URL("/pyodide/", document.baseURI).href;', "plays from another site", E2E),
  ("export without the game's files", "src/store/html5.ts", "    index.assets[id] = name;\n", "", "plays from another site", E2E),
  ("play page titled by project", PA, "        document.title = info ? `${info.title} — GameIDE` : p.project.name;", "        document.title = info ? `${p.project.name} — GameIDE` : p.project.name;", "plays from its link for anyone", E2E),
@@ -459,6 +460,24 @@ CASES = [
  ("check all sends nothing", "src/notes/TeacherNotes.tsx", "        await api(`/api/assignments/${slug}/tests/verify`, { json: { student: w.student, results } });", "        void results;", "notes: slides", E2E),
  ("check my work can't play", EP, "{ state: () => gameStateRef.current, errors: checkErrors.current }", '{ state: () => "crashed" as GameState, errors: checkErrors.current }', "notes: slides", E2E),
  ("notes tab closed", EP, '      openedNotes.current = true;\n      setBottom("notes");', "      openedNotes.current = true;", "notes: slides", E2E),
+ # Phase 11b: tutorials
+ ("highlight shown", TUP, "            return !h;", "            return true;", "are read: a header"),
+ ("one step only", TUP, "  const cut = slides(body);", "  const cut = slides(body).slice(0, 1);", "are read: a header"),
+ ("steps free by default", TUP, '      locked: !/^(no|false|off)$/i.test(fields.locked ?? ""),', '      locked: /^(yes)$/i.test(fields.locked ?? ""),', "are read: a header"),
+ ("any highlight goes", TUP, '    if (s.highlight && !targets.some((tg) =>', '    if (s.highlight && ![...targets, s.highlight].some((tg) =>', "say what's wrong with one"),
+ ("Next never locked", TP, "  const open = !t.meta.locked || !step.checks.length || at < progress.step || passedNow;", "  const open = t.meta.locked || !step.checks.length || at < progress.step || passedNow;", "Your First Game, step by step", E2E),
+ ("progress not kept", EP, '(t) => mutate((d) => void (d.tutorial = t), { history: "skip" })', "(t) => void t", "Your First Game, step by step", E2E),
+ ("no spotlight", TP, "{step.highlight && spot && <Spotlight", "{step.highlight && !spot && <Spotlight", "Your First Game, step by step", E2E),
+ ("tutorial code copyable", "src/editor/app.css", ".notes-md code {\n  font-family: var(--mono, \"Ubuntu Mono\", monospace);\n  user-select: none;\n  -webkit-user-select: none;\n}", ".notes-md code {\n  font-family: var(--mono, \"Ubuntu Mono\", monospace);\n}", "code can't be selected", E2E),
+ ("private tutorial seen", TU, '    return t.visibility == "classes" and t.owner_id in _teachers_of(db, user)', "    return True", "private at first", PY),
+ ("site by anyone", TU, '    if vis == "site" and not _is_admin(user) and not (t is not None and t.visibility == "site"):', "    if False:", "only an admin publishes", PY),
+ ("step XP repeats", TU, '"tutstep:%s:%d" % (key, n)', '"tutstep:%s:%d:%d" % (key, n, id(body))', "…once", PY),
+ ("unchecked steps pay", TU, '        if checks.blocks(steps[n], "check"):', "        if True:", "a step with no check pays nothing", PY),
+ ("assigned tutorial for anyone", TU, "        return grades.notes_of(a) if mine or a.teacher_id == user.id else None", "        return grades.notes_of(a)", "pays only those who have it", PY),
+ ("tutorial path escapes", TU, '    if not re.fullmatch(r"[a-z0-9-]{1,40}", name or ""):', "    if not name:", "a tutorial that isn't", PY),
+ ("tutorial checks not graded", GR, '    for t in checks.tests(notes_of(a)) + checks.tests(notes_of(a), "check"):', "    for t in checks.tests(notes_of(a)):", "its checks are what Check all checks", PY),
+ ("games forget their tutorial", APP, '"tutorial": gamestore.tutorial_of(p.data)}', '"tutorial": None}', "My Games knows a game's tutorial", PY),
+ ("tutorials not served", APP, '    r = send_from_directory(DIST / "tutorials", name)', '    r = send_from_directory(DIST / "tutorial", name)', "the built-in tutorials are served", PY),
  ("turn in does nothing", "src/editor/AssignmentBits.tsx", "            await api(`/api/projects/${encodeURIComponent(projectId)}/turn-in`, { json: {} });", "            void 0;", "a class:", E2E),
  ("no read-only bar", EP, '          {store.kind === "view" ? (', "          {store.kind !== store.kind ? (", "a class:", E2E),
 ]
