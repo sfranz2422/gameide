@@ -10,7 +10,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../store/api";
 import { useSession } from "./session";
-import { SiteNav } from "./SiteNav";
+import { Logo, SiteNav } from "./SiteNav";
 import { BadgeIcon } from "./ProjectsPage";
 
 /** A few of the faces My Games gives games without a picture (gameBadge.ts), lining up over the headline. */
@@ -167,10 +167,7 @@ export function HomePage() {
         </section>
       </main>
       <footer className="site-footer">
-        <span className="site-logo small">
-          <span className="site-logo-game">Game</span>
-          <span className="site-logo-ide">IDE</span>
-        </span>
+        <Logo small />
         <a href="#/explore">Explore</a>
         <a href="#/games">My games</a>
       </footer>

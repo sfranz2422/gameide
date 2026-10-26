@@ -911,6 +911,10 @@ real_dist, server.DIST = server.DIST, fake_dist
 r = anon.get("/blockly-media/sprites.svg")
 check("Blockly's media are served from our origin", r.status_code == 200 and r.data == b"<svg/>", r.status_code)
 check("…and nothing outside that folder", anon.get("/blockly-media/../index.html").status_code == 404)
+(fake_dist / "favicon.svg").write_text("<svg>mark</svg>")
+real_dist, server.DIST = server.DIST, fake_dist
+r = anon.get("/favicon.svg")
+check("the favicon is served", r.status_code == 200 and b"mark" in r.data)
 server.DIST = real_dist
 
 print()

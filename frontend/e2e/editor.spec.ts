@@ -227,3 +227,13 @@ test("undo reaches across tabs, never undoes typing, and brings back a deleted o
   await playAndWait(page);
   expect(await py(page, "instance_number('Coin')")).toBe(15);
 });
+
+test("the pages carry GameIDE's mark: a favicon, and the logo in the top bar", async ({ page, request }) => {
+  await page.goto("/#/");
+  const href = await page.locator('link[rel="icon"][type="image/svg+xml"]').getAttribute("href");
+  const icon = await request.get(href!);
+  expect(icon.ok()).toBe(true);
+  expect(await icon.text()).toContain("<rect");
+  await expect(page.getByTestId("site-logo").locator(".logo-mark rect").first()).toBeVisible();
+  await expect(page.getByTestId("site-logo")).toHaveText("GameIDE");
+});

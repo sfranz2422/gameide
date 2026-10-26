@@ -73,7 +73,7 @@ function servePyodide(): Plugin {
       // and a file missed here would be a blank exported game.
       const dir = options.dir ?? resolve("dist");
       const built = readdirSync(join(dir, "assets")).filter((f) => !f.endsWith(".map")).map((f) => `assets/${f}`);
-      const files = ["play.html", ...built, ...PYODIDE_FILES.map((f) => `pyodide/${f}`)];
+      const files = ["play.html", "favicon.svg", ...built, ...PYODIDE_FILES.map((f) => `pyodide/${f}`)];
       writeFileSync(join(dir, "player-files.json"), JSON.stringify(files));
     },
   };

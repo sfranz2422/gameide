@@ -57,6 +57,14 @@ python3 scripts/sabotage.py   # 388 deliberate bugs
   - a "prefix" case the test never had
   - one sabotage that didn't compile.
 
+### After review: a favicon, and GameIDE's own name
+
+- **GameIDE's mark** is a pixel cartridge with one of the badge creatures on its label, the cartridges of My Games and the badges in one picture. It's drawn once as a grid in `scripts/make_logo.py`, which writes the favicon (SVG, a 32px PNG, a phone icon) and the logo's cells.
+  - It's on every page and on published games' play pages.
+  - It's in HTML5 exports' file list, so an exported game carries it.
+- **The name in the top bar** is the mark, "Game" in bold, and "IDE" as a green chip of code. That replaces microStudio's two-tone word.
+- 1 e2e test and 1 server check; 2 sabotage cases, both caught.
+
 ### Known issues and gaps
 
 - **PyIDE, WebIDE and FlaskIDE load DOMPurify 3.2.4** from the CDN, which has published XSS advisories (fixed in 3.4.17, which GameIDE uses). Worth updating there; I haven't touched them.

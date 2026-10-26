@@ -432,6 +432,8 @@ CASES = [
  ("run claimed at once", EP, "      }, RUN_COUNTS_MS);", "      }, RUN_COUNTS_MS / 50);", "claimed for XP", E2E),
  ("stop keeps the claim", EP, "    cancelClaim();\n    host?.stop();", "    host?.stop();", "claimed for XP", E2E),
  ("hash ignores scripts", RX, "  for (const s of p.scripts) parts.push(`s:${s.id}:${s.code}`);\n", "", "changes when the game's code changes"),
+ ("no favicon", "index.html", '    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />\n', "", "carry GameIDE's mark", E2E),
+ ("export without favicon", "vite.config.ts", '"play.html", "favicon.svg", ...built', '"play.html", ...built', "HTML5 export plays", E2E),
  # Phase 11a: notes, questions, tests
  ("notes leak", CL, '                                   "notes": notes.student_notes(a),', '                                   "notes": grades.notes_of(a),', "without the right choice marked", PY),
  ("teacher answers kept", NT, "        if user.id == a.teacher_id:\n            return jsonify(_answer_reply(key, accounts.QuizAnswer(response=response), practice=True))", "        if False:\n            return jsonify(_answer_reply(key, accounts.QuizAnswer(response=response), practice=True))", "practice, kept nowhere", PY),

@@ -5,11 +5,32 @@
  * signed in and the light/dark button.
  */
 import { AccountMenu } from "./AccountBits";
+import { LOGO_CELLS, LOGO_COLORS } from "./logoCells";
 import { useSession } from "./session";
 import { Icon } from "./ui/icons";
 import { ThemeToggle } from "./ui/ThemeToggle";
 
 export type NavPlace = "home" | "explore" | "games" | "classes" | "moderation" | "";
+
+/** GameIDE's mark: the pixel cartridge (scripts/make_logo.py, also the favicon). */
+export function LogoMark({ size = 30 }: { size?: number }) {
+  return (
+    <svg className="logo-mark" width={size} height={size} viewBox="0 0 16 16" shapeRendering="crispEdges" aria-hidden="true">
+      {LOGO_CELLS.flatMap((row, y) => [...row].map((c, x) => (LOGO_COLORS[c] ? <rect key={`${x},${y}`} x={x} y={y} width="1" height="1" fill={LOGO_COLORS[c]} /> : null)))}
+    </svg>
+  );
+}
+
+/** The name: the mark, "Game", and "IDE" as a bit of code. GameIDE's own, not microStudio's two-tone word. */
+export function Logo({ small = false }: { small?: boolean }) {
+  return (
+    <span className={`logo${small ? " small" : ""}`}>
+      <LogoMark size={small ? 22 : 32} />
+      <span className="logo-game">Game</span>
+      <span className="logo-ide">IDE</span>
+    </span>
+  );
+}
 
 export function SiteNav({ at }: { at: NavPlace }) {
   const { me } = useSession();
@@ -21,9 +42,8 @@ export function SiteNav({ at }: { at: NavPlace }) {
   );
   return (
     <header className="site-nav">
-      <a className="site-logo" href="#/" aria-label="GameIDE home">
-        <span className="site-logo-game">Game</span>
-        <span className="site-logo-ide">IDE</span>
+      <a className="site-logo" href="#/" aria-label="GameIDE home" data-testid="site-logo">
+        <Logo />
       </a>
       <nav className="site-nav-items" aria-label="Site">
         {item("explore", "#/explore", Icon.search(20), "Explore", "nav-explore")}

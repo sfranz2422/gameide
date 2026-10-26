@@ -773,6 +773,16 @@ def home_pictures(name):
     return r
 
 
+@app.get("/favicon.svg")
+@app.get("/favicon-32.png")
+@app.get("/apple-touch-icon.png")
+def favicon():
+    """GameIDE's mark (frontend/scripts/make_logo.py)."""
+    r = send_from_directory(DIST, request.path.lstrip("/"))
+    r.headers["Cache-Control"] = "public, max-age=86400"
+    return r
+
+
 @app.get("/avatars/<path:name>")
 def avatar_pictures(name):
     """The avatars a student picks from (xp.AVATARS; public/avatars/, the same pictures as PyIDE's)."""

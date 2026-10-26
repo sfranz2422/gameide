@@ -28,7 +28,7 @@ test("an HTML5 export plays from another site, in a folder of its own", async ({
   await page.getByTestId("export-html5").click();
   const file = await (await download).path();
   const files = unzipSync(new Uint8Array(readFileSync(file)));
-  expect(Object.keys(files)).toEqual(expect.arrayContaining(["index.html", "README.txt", "game/project.json", "game/index.json", "pyodide/pyodide.asm.wasm"]));
+  expect(Object.keys(files)).toEqual(expect.arrayContaining(["index.html", "favicon.svg", "README.txt", "game/project.json", "game/index.json", "pyodide/pyodide.asm.wasm"]));
 
   // Served at http://elsewhere.test/my-games/coins/, from the zip alone.
   await context.route("http://elsewhere.test/**", (route) => {
