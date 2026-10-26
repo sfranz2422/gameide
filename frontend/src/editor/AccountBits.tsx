@@ -149,6 +149,8 @@ const KIND_TEXT: Record<VersionInfo["kind"], string> = {
   manual: "Saved by you",
   replaced: "From another tab or computer",
   restore: "Before going back",
+  "turned-in": "Turned in",
+  graded: "Scored by your teacher",
 };
 
 function when(iso: string) {

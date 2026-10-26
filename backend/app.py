@@ -26,6 +26,7 @@ from sqlalchemy.orm import sessionmaker
 from werkzeug.exceptions import BadRequest
 
 import accounts
+import classes
 import gamestore
 import publishing
 from gamestore import GameAsset, GameProject, GameVersion
@@ -374,7 +375,19 @@ def _own_project(db, user, slug, include_deleted=False):
     if p is None or (p.deleted_at is not None and not include_deleted):
         fail("There is no project here.", 404)
     if p.owner_id != user.id:
-        # Teachers looking at students' work arrive with classrooms (Phase 10).
+        fail("That project belongs to someone else.", 403)
+    return p
+
+
+def _readable_project(db, user, slug):
+    """A project this person may READ: their own, or — for a teacher — a
+    student's work for one of their assignments (classes.can_read). Every
+    write still goes through _own_project, so reading never becomes a way
+    to change someone's game."""
+    p = db.query(GameProject).filter_by(slug=slug).first()
+    if p is None or (p.deleted_at is not None and p.owner_id == user.id):
+        fail("There is no project here.", 404)
+    if not classes.can_read(db, user, p):
         fail("That project belongs to someone else.", 403)
     return p
 
@@ -417,8 +430,11 @@ def list_projects():
     db = _db()
     try:
         user = _need_user(db)
-        rows = (db.query(GameProject).filter_by(owner_id=user.id).filter(GameProject.deleted_at.is_(None))
-                .order_by(GameProject.updated_at.desc()).all())
+        # Not the starters of the teacher's assignments: those are opened from
+        # the class's page, and here they'd look like stray copies.
+        starters = classes.starter_ids(db, user.id)
+        rows = [p for p in (db.query(GameProject).filter_by(owner_id=user.id).filter(GameProject.deleted_at.is_(None))
+                            .order_by(GameProject.updated_at.desc()).all()) if p.id not in starters]
         pubs = {g.project_id: ("taken down" if g.taken_down else g.visibility)
                 for g in db.query(gamestore.Published).filter(gamestore.Published.project_id.in_([p.id for p in rows] or [-1])).all()}
         return jsonify(projects=[_summary(p, pubs.get(p.id)) for p in rows], used=_user_bytes(db, user.id),
@@ -432,8 +448,8 @@ def get_project(slug):
     db = _db()
     try:
         user = _need_user(db)
-        p = _own_project(db, user, slug)
-        return jsonify(data=json.loads(p.data), version=p.version)
+        p = _readable_project(db, user, slug)
+        return jsonify(data=json.loads(p.data), version=p.version, readOnly=p.owner_id != user.id)
     finally:
         db.close()
 
@@ -559,7 +575,7 @@ def get_asset(slug, asset_id):
     db = _db()
     try:
         user = _need_user(db)
-        p = _own_project(db, user, slug)
+        p = _readable_project(db, user, slug)
         a = db.query(GameAsset).filter_by(project_id=p.id, asset_id=asset_id).first()
         if a is None:
             return err("That asset isn't here.", 404)
@@ -613,7 +629,7 @@ def get_version(slug, vid):
     db = _db()
     try:
         user = _need_user(db)
-        p = _own_project(db, user, slug)
+        p = _readable_project(db, user, slug)
         v = db.query(GameVersion).filter_by(project_id=p.id, id=vid).first()
         if v is None:
             return err("That version isn't here.", 404)
@@ -776,6 +792,8 @@ def blockly_media(name):
 
 # Publishing, playing, Explore and moderation (publishing.py).
 publishing.init(app, _db, current_user)
+# Classes, assignments, turning in, comments and Google Classroom (classes.py).
+classes.init(app, _db, current_user, _scheme, _problem)
 
 
 if __name__ == "__main__":

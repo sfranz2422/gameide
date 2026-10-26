@@ -35,14 +35,16 @@ export interface SaveOutcome {
 export interface VersionInfo {
   id: number;
   version: number;
-  kind: "auto" | "manual" | "replaced" | "restore";
+  /** "turned-in" and "graded" are made by classes (backend/classes.py) and never pruned. */
+  kind: "auto" | "manual" | "replaced" | "restore" | "turned-in" | "graded";
   label: string;
   created: string;
   size: number;
 }
 
 export interface ProjectStore {
-  readonly kind: "local" | "cloud";
+  /** "view" is someone else's game, read only (viewStore.ts): never saved. */
+  readonly kind: "local" | "cloud" | "view";
   list(): Promise<ProjectSummary[]>;
   load(id: string): Promise<Project | null>;
   save(project: Project): Promise<SaveOutcome>;

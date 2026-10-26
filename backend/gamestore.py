@@ -255,6 +255,72 @@ class ClassSettings(Base):
     auto_approve = Column(Integer, nullable=False, default=0)
 
 
+# ---------------------------------------------------------------- classes (Phase 10)
+# Classes, rosters, assignments and turning in are the shared tables PyIDE
+# made (accounts.Course, Enrollment, ClassItem, Assignment, Submission,
+# ClassroomLink, ClassroomPost), every row GameIDE writes carrying
+# app="gameide". What those can't hold — a game isn't a map of text files —
+# is here: which project an assignment starts from, whose copy of it each
+# student is working in, and the comments on them.
+
+
+class AssignmentGame(Base):
+    """The game side of one assignment (accounts.Assignment, app "gameide").
+
+    `starter_id` is a project the TEACHER owns, copied from the game they
+    chose when they made the assignment — a copy, as PyIDE's starter code is,
+    so they can carry on changing their own game without changing what the
+    class was given. They edit the starter like any game ("Edit starter");
+    students who haven't opened the assignment yet get it as it is then.
+    It is kept off the teacher's My Games, where it would look like a stray
+    duplicate (app.py, list_projects).
+
+    `due_at` is UTC, or NULL for none. The shared Assignment has no due date
+    (PyIDE sends one to Classroom only when posting); a game assignment
+    shows it on the class page, so it is kept.
+    """
+    __tablename__ = "gameide_assignment_games"
+
+    id = Column(Integer, primary_key=True)
+    assignment_id = Column(Integer, ForeignKey("assignments.id"), unique=True, nullable=False)
+    starter_id = Column(Integer, ForeignKey("gameide_projects.id"), nullable=False)
+    due_at = Column(DateTime, nullable=True)
+
+
+class AssignmentWork(Base):
+    """A student's own copy of an assignment's game: an ordinary project of
+    theirs (on their My Games too), found again by (assignment, student) —
+    so opening the assignment's link a second time goes back to the same
+    game instead of making another, which was the whole problem PyIDE's
+    Draft solved. Their teacher may read it (classes.can_read); only they
+    can change it."""
+    __tablename__ = "gameide_assignment_work"
+    __table_args__ = (UniqueConstraint("assignment_id", "owner_id", name="uq_gameide_work"),)
+
+    id = Column(Integer, primary_key=True)
+    assignment_id = Column(Integer, ForeignKey("assignments.id"), index=True, nullable=False)
+    owner_id = Column(Integer, ForeignKey("users.id"), index=True, nullable=False)
+    project_id = Column(Integer, ForeignKey("gameide_projects.id"), unique=True, nullable=False)
+    created_at = Column(DateTime, nullable=False, default=now)
+
+
+class Comment(Base):
+    """A comment on a student's game: the teacher's, or the student's reply.
+
+    `seen` is whether the OTHER side has read it — the student, for the
+    teacher's comments; the teacher, for replies — which is what the
+    "new comments" counts on the class and assignment pages are.
+    """
+    __tablename__ = "gameide_comments"
+
+    id = Column(Integer, primary_key=True)
+    project_id = Column(Integer, ForeignKey("gameide_projects.id"), index=True, nullable=False)
+    author_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    text = Column(Text, nullable=False)
+    seen = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime, nullable=False, default=now)
+
+
 def icon_asset(text: str):
     """A game's picture on "My games": the first frame of its sprite named
     "icon" (microStudio's convention), or None. The same rule as projectIcon

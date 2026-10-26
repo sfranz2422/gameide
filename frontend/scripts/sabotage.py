@@ -39,6 +39,7 @@ GH, SND, AT = "src/editor/gameHost.ts", "src/editor/sound.ts", "src/store/assetT
 GS = "../backend/gamestore.py"
 PUB, PA, PD = "../backend/publishing.py", "src/player/PlayerApp.tsx", "src/editor/PublishDialog.tsx"
 CM, BS = "src/editor/codeMode.tsx", "src/blocks/blockState.ts"
+CL, UPJ, EP = "../backend/classes.py", "src/editor/useProject.ts", "src/editor/EditorPage.tsx"
 CASES = [
  ("layout drift", RT, '"x": boxy(F.X)', '"x": boxy(F.Y)', "every built-in property"),
  ("no polar sync", RT, "            _st[b + i] = v\n            set_polar(b)", "            _st[b + i] = v", "two views of one motion"),
@@ -104,7 +105,7 @@ CASES = [
   "    if (!v || !err || usedJumps.size < 0) return;", "clicking it goes there", E2E,
   ("  }, [err?.nonce]);", "  }, [err]);")),
  # Phase 3: the server (backend/tests/test_server.py)
- ("anyone reads any project", APP, "    if p.owner_id != user.id:\n        # Teachers", "    if False:\n        # Teachers", "someone else's project can't be read", PY),
+ ("anyone reads any project", APP, "    if not classes.can_read(db, user, p):", "    if False:", "someone else's project can't be read", PY),
  ("id hijack", APP, "            if p.owner_id != user.id:\n                # The id is someone else's", "            if False:\n                # The id is someone else's", "its id is taken", PY),
  ("replaced not kept", APP, '                _snapshot(db, p, "replaced", "Replaced by a save from another tab or computer")\n', "", "what it replaced is kept", PY),
  ("not unpacked", APP, '        if isinstance(data, dict) and set(data) == {"_packed"}:', "        if False:", "a packed body", PY),
@@ -119,7 +120,7 @@ CASES = [
  ("dev login on server", APP, 'DEV_LOGIN = os.environ.get("GAMEIDE_DEV_LOGIN") == "1" and not os.environ.get("DATABASE_URL")', 'DEV_LOGIN = os.environ.get("GAMEIDE_DEV_LOGIN") == "1"', "dev sign-in is off", PY),
  ("open redirect", APP, '    return nxt if nxt.startswith("/") and not nxt.startswith("//") else ""', '    return nxt if nxt.startswith("/") else ""', "never redirects off the site", PY),
  ("not isolated", APP, "        response.headers.setdefault(k, v)", "        pass", "cross-origin isolated", PY),
- ("deleted still listed", APP, "        rows = (db.query(GameProject).filter_by(owner_id=user.id).filter(GameProject.deleted_at.is_(None))", "        rows = (db.query(GameProject).filter_by(owner_id=user.id)", "a deleted project leaves the list", PY),
+ ("deleted still listed", APP, "        rows = [p for p in (db.query(GameProject).filter_by(owner_id=user.id).filter(GameProject.deleted_at.is_(None))", "        rows = [p for p in (db.query(GameProject).filter_by(owner_id=user.id)", "a deleted project leaves the list", PY),
  # Phase 3: the editor's side
  ("tab speaks for the browser", "src/store/cloudStore.ts", "          json: { data: project, base: this.bases.get(id) ?? meta.base },", "          json: { data: project, base: meta.base },", "two tabs editing one game", E2E),
  ("offline is an error", "src/store/cloudStore.ts", '      if (e instanceof OfflineError) return { state: "offline" };', '      if (e instanceof OfflineError) return { state: "error", message: "offline" };', "edits made offline", E2E),
@@ -375,6 +376,34 @@ CASES = [
  ("kit opens without autostart", "src/store/steamKit.ts", '  win.loadURL("app://game/index.html?autostart");', '  win.loadURL("app://game/index.html");', "gives a build kit", E2E),
  ("kit without isolation", "src/store/steamKit.ts", '          "Cross-Origin-Embedder-Policy": "require-corp",\n', "", "gives a build kit", E2E),
  ("kit versions unpinned", "src/store/steamKit.ts", 'export const ELECTRON_VERSION = "44.7.0";', 'export const ELECTRON_VERSION = "^44.7.0";', "gives a build kit", E2E),
+ # Phase 10: classes
+ ("any teacher reads", CL, "    return a is not None and a.teacher_id == user.id", "    return a is not None", "…nor another teacher", PY),
+ ("teacher reads anything", CL, "    if work is None:\n        return False", "    if work is None:\n        return is_teacher(user)", "aren't assignment work", PY),
+ ("reader adds files", APP, "        p = _own_project(db, user, slug)\n        if not (1 <= len(asset_id) <= 32", "        p = _readable_project(db, user, slug)\n        if not (1 <= len(asset_id) <= 32", "nor add files to it", PY),
+ ("not read only", APP, "readOnly=p.owner_id != user.id)", "readOnly=False)", "its teacher can open it — read only", PY),
+ ("class open to all", CL, "    if course is None or teaching_only or not _enrolled(db, user, class_id):", "    if course is None or teaching_only:", "closed to students not in it", PY),
+ ("other editors' classes", CL, "    return db.query(accounts.Course).filter(accounts.Course.app == APP_NAME)", "    return db.query(accounts.Course)", "another editor's class isn't here", PY),
+ ("starter not a copy", CL, '        starter = copy_project(db, src, user, f"{title} (starter)")', "        starter = src", "is a copy", PY),
+ ("starter on My Games", APP, "if p.id not in starters]", "if p.id or starters]", "kept off the teacher's My Games", PY),
+ ("a copy every time", CL, "        if work is not None:\n            p = db.query(GameProject).filter_by(id=work.project_id).first()", "        if False:\n            p = db.query(GameProject).filter_by(id=work.project_id).first()", "the same game the second time", PY),
+ ("turned in not kept", CL, '        v = _freeze(db, p, "turned-in", "Turned in")', '        v = _freeze(db, p, "auto", "Turned in")', "as turned in", PY),
+ ("hidden can start", CL, "        if a.archived or (item and item.hidden):", "        if a.archived:", "…and can't be started", PY),
+ ("archived turn in", CL, "        if a.archived:\n            return err(\"This assignment is closed. Ask your teacher.\", 403)", "        if False:\n            return err(\"This assignment is closed. Ask your teacher.\", 403)", "…and can't be turned in", PY),
+ ("turned-in deletable", CL, "        if db.query(accounts.Submission).filter_by(assignment_id=a.id).first() is not None:", "        if False:", "can't be deleted", PY),
+ ("comments never seen", CL, "                c.seen, changed = 1, True", "                changed = True", "then it isn't new", PY),
+ ("score counts as turn in", CL, '            v = _freeze(db, p, "graded", "Scored by your teacher")\n            s = accounts.Submission(assignment_id=a.id, student_id=sid, snippet_slug=f"v{v.id}", times_submitted=0)', '            v = _freeze(db, p, "graded", "Scored by your teacher")\n            s = accounts.Submission(assignment_id=a.id, student_id=sid, snippet_slug=f"v{v.id}", times_submitted=1)', "without calling it turned in", PY),
+ ("students duplicate", CL, "        user = _need_teacher(db)\n        p = _readable(db, user, slug)\n        if p.owner_id == user.id:", "        user = _need_user(db)\n        p = _readable(db, user, slug)\n        if p.owner_id == user.id:", "can't copy someone's game", PY),
+ ("order ignored", CL, "            items[iid].position = n", "            items[iid].position = -n", "teacher's order", PY),
+ ("class delete loses", CL, '{"archived": 1}, synchronize_session=False)', '{"archived": 0}, synchronize_session=False)', "deleting a class archives", PY),
+ ("roster never shrinks", CL, "        if email not in found:\n            db.delete(row)", "        if email not in found:\n            pass", "drops a student who left", PY),
+ ("typed into Classroom roster", CL, "        if course.course_id:\n            return err(\"This class's students come from Google Classroom. Add them", "        if False:\n            return err(\"This class's students come from Google Classroom. Add them", "can't be typed into", PY),
+ ("forged callback", CL, '        if not expected or request.args.get("state") != expected:', "        if not expected:", "didn't start here is refused", PY),
+ ("token in the clear", CL, "        link.refresh_token = _token_box().encrypt(refresh.encode()).decode()", "        link.refresh_token = refresh", "never stored as it came", PY),
+ ("no due date posted", CL, '            "maxPoints": a.out_of,\n            **due,', '            "maxPoints": a.out_of,', "points and due date", PY),
+ ("wrong grade sent", CL, 'body={"draftGrade": sub.score}', 'body={"draftGrade": sub.score_synced}', "Sync sends each score", PY),
+ ("view shows a backup", UPJ, "        const backup = store.kind === \"view\" ? null : readBackup(id);", "        const backup = readBackup(id);", "a class:", E2E),
+ ("turn in does nothing", "src/editor/AssignmentBits.tsx", "            await api(`/api/projects/${encodeURIComponent(projectId)}/turn-in`, { json: {} });", "            void 0;", "a class:", E2E),
+ ("no read-only bar", EP, '          {store.kind === "view" ? (', "          {store.kind !== store.kind ? (", "a class:", E2E),
 ]
 only = sys.argv[1:]
 # A name that matches no case would otherwise run nothing and still say

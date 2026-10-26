@@ -95,7 +95,7 @@ export function useProjectState(store: ProjectStore, id: string) {
         const stored = await store.load(id);
         if (cancelled) return;
         if (!stored) return setLoadError("There is no project here. It may have been deleted.");
-        const backup = readBackup(id);
+        const backup = store.kind === "view" ? null : readBackup(id);
         const newer = backup && backup.id === id && backup.modified > stored.modified ? migrate(backup) : null;
         const a = await loadAssets(store, stored);
         if (cancelled) return;
@@ -154,11 +154,13 @@ export function useProjectState(store: ProjectStore, id: string) {
   // hidden or closed, so switching tabs never leaves a change unsaved.
   useEffect(() => {
     latest.current = project;
-    if (!project || project === loaded.current) return;
+    // Someone else's game, read only (viewStore.ts): never saved, and never
+    // backed up — see there for why a backup would do harm.
+    if (!project || project === loaded.current || store.kind === "view") return;
     setStatus("saving");
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(save, SAVE_DELAY_MS);
-  }, [project, save]);
+  }, [project, save, store]);
 
   useEffect(() => {
     const now = () => {

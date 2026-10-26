@@ -32,6 +32,7 @@ export const Icon = {
   clear: () => svg(<><circle cx="8" cy="8" r="5.5" /><path d="M4.2 11.8l7.6-7.6" /></>),
   search: (size = 16) => svg(<><circle cx="7" cy="7" r="4.5" /><path d="M10.5 10.5l3.5 3.5" /></>, size),
   create: (size = 16) => svg(<><path d="M5.5 4.5L2.5 8l3 3.5M10.5 4.5l3 3.5-3 3.5M9 3l-2 10" /></>, size),
+  classes: (size = 16) => svg(<><circle cx="5.5" cy="5.5" r="2" /><circle cx="11" cy="6" r="1.7" /><path d="M1.8 13c.4-2.4 1.9-3.8 3.7-3.8s3.3 1.4 3.7 3.8M9.6 9.6c.4-.3.9-.4 1.4-.4 1.5 0 2.7 1.2 3 3.4" /></>, size),
   approve: (size = 16) => svg(<><path d="M3 8.5l3 3 7-7" /></>, size),
   docsBig: (size = 16) => svg(<><path d="M2 3.5c2-1 4-1 6 .5 2-1.5 4-1.5 6-.5v9c-2-1-4-1-6 .5-2-1.5-4-1.5-6-.5z" /><path d="M8 4v9" /></>, size),
   upload: () => svg(<><path d="M8 11V3M4.5 6.5L8 3l3.5 3.5M3 13h10" /></>),

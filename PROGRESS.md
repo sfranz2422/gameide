@@ -1,6 +1,75 @@
 # Progress
 
-## Phase 9c — Steam build kit ✅ (2026-10-26, waiting for review)
+## Phase 10 — Classrooms ✅ (2026-10-26, waiting for review)
+
+Built the way PyIDE's classes are, on the tables PyIDE made and shares (`classes`, `enrollments`, `class_items`, `assignments`, `submissions`, `classroom_links`, `classroom_posts`), every row carrying `app = "gameide"`. So there are no join codes: a class's students come from its Google Classroom roster, or are typed in by email.
+
+### Done
+
+- **Classes** (`#/classes`, a Classes button in the top bar when signed in).
+  - A teacher makes one class per period: from a Google Classroom class (its students come with it), or by name, adding students by the email they sign in with.
+  - A student sees the classes whose roster has their email. Only GameIDE's own classes are listed; never PyIDE's, WebIDE's or FlaskIDE's.
+  - Google Classroom: Connect, bring a class in, Sync roster. This is PyIDE's connection, with its own token, since each editor connects separately. The token is encrypted with `SECRET_KEY`.
+- **A class's page** (`#/class/<id>`).
+  - The teacher sees its assignments in their own order (↑ ↓), group headings, and Hide/Show, Link, Edit starter, Copy to another class, Archive and Delete.
+  - Below that: the roster, the class's **publishing switch** (auto-approve, moved here from Approvals) with links to Approvals and the class gallery, then Rename and Delete class.
+  - A student sees the same page minus hidden and archived assignments, with Start/Open, the due date, whether they turned it in, their score, and new comments.
+- **Assignments.**
+  - New assignment: pick one of your games, plus title, points and due date. The **starter is a copy**, so you can keep changing your own game. It's kept off My Games and opened with Edit starter.
+  - The link `/a/<slug>` gives each student **their own copy** the first time and the same game every time after. It's an ordinary game of theirs, on My Games too, and a game deleted by mistake comes back.
+  - Hidden and archived assignments can't be started; a game already started still opens.
+  - An assignment students turned in can't be deleted, only archived. Deleting a class archives its assignments.
+- **Turning in.**
+  - **Turn in** is in the editor's top bar, on assignment games only. It saves first, then freezes the game as it is: a version in History called "Turned in".
+  - The student carries on; "Turn in again" appears once they change it.
+- **The teacher's results** (`#/assignment/<slug>`).
+  - Everyone on the roster: their game, when they last changed it, what they turned in and when (and how many times), a score box, and comments.
+  - **Open and play** opens a student's game, or the version they turned in, **read only in the real editor**. The teacher can look at every event and press Play. Changes they try are never saved.
+  - **Copy to demo** (also **Copy to my games** in the editor) is a copy of the student's game in the teacher's own games, to show the class.
+  - Work never turned in can be scored too: that freezes it, so a score always points at what it was for.
+- **Comments**: the teacher comments on a student's game, from the results or the editor, and the student replies from the editor's Comments button. New ones are counted on both sides.
+- **Google Classroom grades**: **Post to Classroom** creates the coursework with the `/a/` link, the points and the due date (optionally as a draft). **Sync grades** sends scores as draft grades, naming any student it can't match.
+
+### Tests
+
+```
+cd frontend
+npm test                      # Vitest: 191
+npm run e2e                   # Playwright: 62 editor tests + 13 account tests (4 opt-in, skipped)
+../backend/.venv/bin/python ../backend/tests/test_server.py   # 220 server checks
+python3 scripts/sabotage.py   # 337 deliberate bugs
+```
+
+- **96 new server checks**, most of them **who may see what**:
+  - a class's page only to its teacher and roster
+  - a student's game only to them and their assignment's teacher, read only (that teacher can't save over it or add files)
+  - results, scores, Sync and duplicating only for the assignment's teacher
+  - another editor's classes never.
+- They also cover starters as copies, the same copy every time, frozen turn-ins, hidden and archived assignments, comments, and ordering.
+- Classroom runs with Google replaced, so nothing reaches the network. The checks cover connect (a forged callback refused, the token encrypted), bringing in a class, roster sync (a student who left is dropped), posting (link, points, due date) and grade sync.
+- **`e2e/classes.spec.ts`** covers the whole path in two browsers:
+  1. The teacher makes a class, students and an assignment.
+  2. The student starts it, renames it and turns it in, and the link opens the same game again.
+  3. The teacher opens it read only, plays it, comments, scores and copies it to demo.
+  4. The student sees the comment and the score, and replies.
+
+  It also checks that an outsider can't open the class or start a hidden assignment.
+- 27 new sabotage cases, each run and caught. Two found checks that **crashed instead of failing**; both were fixed.
+
+### Known issues and gaps
+
+- **Your step:** add `https://gameide.onrender.com/classroom/callback` to the shared OAuth client's redirect addresses in Google Cloud, as PyIDE's, WebIDE's and FlaskIDE's are. Until then Connect Google Classroom fails at Google, and classes work with students added by email.
+- Classroom is tested against a fake Google, not yet the real one. It is PyIDE's code, which works with real Classroom.
+- **Students find their classes under Classes in the top bar**, not under their name menu as in PyIDE. Say if you'd rather have them in the menu.
+- Changing a due date after posting doesn't change it in Classroom; PyIDE can't do that either.
+- An assignment posts to its own class's Classroom course only. One assignment per class, so that's the only one.
+- Comments are on the whole game, not on a line or an object.
+- Approvals stays its own page (reached from each class page) rather than a tab on it: it lists every student's game across classes, and an admin uses it too.
+- PyIDE features beyond the spec aren't here: live lessons, questions in notes, XP, tests, attendance and the view-only class link.
+
+---
+
+## Phase 9c — Steam build kit ✅ (2026-10-26, reviewed)
 
 As agreed: a build kit (one command on a computer with Node), achievements later.
 
@@ -682,12 +751,13 @@ of its own after Phase 9.
 | 8 Event sheets | conditions → actions | |
 | 9 Sounds, export, publishing | audio, HTML5, zip, publish, Explore | **gamepad, save files (progress, high scores), custom fonts**; desktop exports; installable web app (Android APK dropped) |
 | 9½ Game feel (new) | — | **particles, lighting and blend modes, ready-made shader effects (glow, CRT, flash, outline), tweening and easing, a dialogue-box helper, hit-pause** |
-| 10 Classrooms | classes, assignments, dashboard | |
+| 10 Classrooms | classes, assignments, dashboard | PyIDE's classes and Classroom instead of join codes |
 | 11 Tutorials | tutorial panel, checks, library | |
+| 12 Retro mode (new, agreed 2026-10-26) | — | **export to .gb, then .nes** (SNES left out): a restricted Python subset translated to C (GBDK-2020 / cc65), editor limits (4 shades, 8×8 tiles, 160×144), chiptune sound, tested in a browser emulator |
 
-## Next: Phase 9c — Steam-ready desktop export, then Phase 10
+## Next: Phase 11 — Tutorials
 
-(Phase 9's first two parts are above; the old plan for all of Phase 9 follows.)
+(Phase 9's parts are below; the old plan for all of Phase 9 follows them.)
 
 ## Phase 9 — Sounds, export, publishing (the plan)
 

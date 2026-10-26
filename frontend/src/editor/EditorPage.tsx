@@ -25,6 +25,8 @@ import { ConsolePane, DocsPane, GamePane, type ConsoleLine } from "./RunPanes";
 import { Icon } from "./ui/icons";
 import { ThemeToggle } from "./ui/ThemeToggle";
 import { AccountMenu, ExportButton, HistoryButton, SaveStatusView } from "./AccountBits";
+import { AssignmentButtons, ViewBar } from "./AssignmentBits";
+import type { ViewStore } from "../store/viewStore";
 import { Splitter, usePaneSize } from "./ui/Splitter";
 import { ProjectContext, useProjectState, type ProjectApi } from "./useProject";
 
@@ -305,7 +307,7 @@ export function EditorPage({ store, id }: { store: ProjectStore; id: string }) {
             aria-label="Game name"
             data-tutorial="project-name"
           />
-          <SaveStatusView status={status} error={saveError} />
+          {store.kind !== "view" && <SaveStatusView status={status} error={saveError} />}
           <button className="icon-btn" onClick={undo} disabled={!undoLabel} title={undoLabel ? `Undo ${undoLabel} (Ctrl+Z)` : "Nothing to undo"} aria-label="Undo" data-testid="undo">
             ↶
           </button>
@@ -313,8 +315,15 @@ export function EditorPage({ store, id }: { store: ProjectStore; id: string }) {
             ↷
           </button>
           <span className="spacer" />
-          <HistoryButton />
-          <PublishButton host={host} />
+          {store.kind === "view" ? (
+            <ViewBar projectId={id} versionId={(store as ViewStore).versionId} name={project.name} />
+          ) : (
+            <>
+              <AssignmentButtons store={store} projectId={id} modified={project.modified} />
+              <HistoryButton />
+              <PublishButton host={host} />
+            </>
+          )}
           <ExportButton />
           <AccountMenu />
           <ThemeToggle />

@@ -2522,3 +2522,185 @@ a.btn {
     grid-template-columns: 1fr;
   }
 }
+
+/* ---------------------------------------------------------------- classes (ClassPages.tsx, AssignmentBits.tsx) */
+.class-section {
+  margin: 22px 0;
+}
+.class-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 12px;
+}
+.class-card {
+  display: grid;
+  gap: 4px;
+  padding: 14px 16px;
+  border-radius: 10px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  color: var(--text);
+  text-decoration: none;
+}
+.class-card:hover {
+  border-color: var(--accent);
+}
+.class-new {
+  margin-top: 18px;
+  padding: 4px 16px 16px;
+  border-radius: 10px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  max-width: 520px;
+}
+.class-page input:not([type="checkbox"]),
+.class-page select,
+.class-page textarea,
+.modal input:not([type="checkbox"]),
+.modal select,
+.modal textarea {
+  font: inherit;
+  padding: 5px 8px;
+  background: var(--code-bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.modal textarea {
+  width: 100%;
+  box-sizing: border-box;
+}
+.class-items {
+  display: grid;
+  gap: 8px;
+}
+.class-item {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+}
+.class-item.group {
+  background: transparent;
+  border-color: transparent;
+  padding-top: 14px;
+}
+.class-item.hidden-item {
+  opacity: 0.6;
+  border-style: dashed;
+}
+.class-item-main {
+  display: grid;
+  gap: 2px;
+  flex: 1;
+  min-width: 200px;
+}
+.class-item-main p {
+  margin: 2px 0;
+}
+.class-item-title {
+  font-weight: 600;
+  font-size: 16px;
+}
+.class-group {
+  margin: 0;
+  font-size: 18px;
+}
+.class-move {
+  display: grid;
+  gap: 2px;
+}
+.class-move .icon-btn {
+  height: 16px;
+  line-height: 1;
+}
+.small-select {
+  font-size: 13px;
+}
+.btn.red {
+  color: #f08080;
+}
+.link-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: var(--accent);
+  cursor: pointer;
+  text-decoration: underline;
+}
+.roster-add .field {
+  max-width: 520px;
+}
+.roster-add textarea {
+  width: 100%;
+  box-sizing: border-box;
+}
+.assignment-settings {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+  margin-bottom: 6px;
+}
+.assignment-settings input[type="number"] {
+  width: 70px;
+}
+.classroom-box {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 12px 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+}
+.results-table th {
+  text-align: left;
+  padding: 5px 8px;
+  font-size: 13px;
+  color: var(--muted);
+  border-bottom: 1px solid var(--border);
+}
+.score-box input {
+  width: 64px;
+}
+.comment-list {
+  display: grid;
+  gap: 8px;
+  max-height: 45vh;
+  overflow: auto;
+  margin: 10px 0;
+}
+.comment {
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--panel-2);
+  margin-right: 40px;
+}
+.comment.mine {
+  margin: 0 0 0 40px;
+  background: var(--panel-3);
+}
+.comment p {
+  margin: 4px 0 0;
+  white-space: pre-wrap;
+}
+.view-pill {
+  white-space: nowrap;
+}
+.class-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0;
+}
+.modal-foot {
+  gap: 8px;
+}

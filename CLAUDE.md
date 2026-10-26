@@ -311,6 +311,38 @@ also serves the built editor (`frontend/dist`). Deployed by `render.yaml`
 - **The isolation headers go on every response** (`_headers`); without them
   the endless-loop interrupt silently loses its line numbers.
 
+## Classes
+
+`backend/classes.py` (a blueprint) and `editor/ClassPages.tsx`,
+`editor/AssignmentBits.tsx`. **PyIDE's classes, on PyIDE's shared tables**
+(`Course`, `Enrollment`, `ClassItem`, `Assignment`, `Submission`,
+`ClassroomLink`, `ClassroomPost`), every row `app = "gameide"` — no join
+codes. What those tables can't hold is in gamestore.py: `AssignmentGame`
+(the starter, a project the teacher owns, kept off their My Games; the due
+date), `AssignmentWork` (each student's copy, found again by assignment and
+student), `Comment`.
+
+- **Each editor sees only its own classes** (`Course.app`). Never list,
+  open or post to another editor's class.
+- **Reading is wider than writing.** `classes.can_read`: a project's owner,
+  or the teacher of the assignment it is work for — not any teacher of the
+  student. Every write still goes through `_own_project`. The teacher's
+  view is the real editor on a `ViewStore` (`store/viewStore.ts`), which
+  never saves; useProject neither autosaves it nor reads a close-time
+  backup for it, or a teacher's try-out could be shown in place of the
+  student's game.
+- **A turn-in is a frozen `GameVersion`** (kind "turned-in"; "graded" when a
+  score froze work never turned in), and `Submission.snippet_slug` is
+  `"v<id>"` — the shared column PyIDE points at a share snapshot. Only "auto"
+  versions are pruned, and assets are never deleted, so a turned-in version
+  always opens with its pictures.
+- **Turned-in work is never lost**: an assignment anything was turned in to
+  can only be archived; deleting a class archives its assignments; students'
+  games are theirs.
+- Google Classroom is PyIDE's code, with the three doors to Google
+  (`_google_post/_get/_api`) replaced in the tests. The connection is per
+  app; GameIDE's `/classroom/callback` must be on the OAuth client's list.
+
 ## Saving, signed in
 
 `store/cloudStore.ts`: every save goes to a per-user IndexedDB cache first
