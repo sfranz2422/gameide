@@ -25,6 +25,7 @@
 import { EV, EVENTS_HEADER, F, G, HANDLES, STRIDE } from "./layout";
 import type { GameDefinition, SoundOrder } from "./game";
 import { InputState } from "./input";
+import { Effects, type FxOrder, type Light } from "./effects";
 import { SpatialHash } from "./spatialHash";
 import { boxOf, containsPoint, maskOverlapsBox, masksOverlap, overlaps, spriteInfo, type Box, type SpriteInfo } from "./sprites";
 import type { TileLayerDef, TilesetDef } from "./game";
@@ -69,6 +70,10 @@ export interface FrameCommands {
   sounds?: SoundOrder[];
   /** The game's whole save data, when it changed this frame. */
   save?: Record<string, unknown>;
+  /** Particles, weather, lighting and screen-effect orders (effects.ts). */
+  fx?: FxOrder[];
+  /** This step's lights (light()); none sent is none shining. */
+  lights?: Light[];
 }
 
 /**
@@ -77,9 +82,9 @@ export interface FrameCommands {
  * event made it), so the renderer can put it in the right layer.
  */
 export type DrawCommand =
-  | ["text", number, number, number, string, number, number, number] // depth, x, y, text, color, font (-1 built-in), size
-  | ["rect", number, number, number, number, number, number, number] // depth, x1, y1, x2, y2, color, outline
-  | ["sprite", number, number, number, number, number]; // depth, sprite, frame, x, y
+  | ["text", number, number, number, string, number, number, number, number?] // depth, x, y, text, color, font (-1 built-in), size, alpha
+  | ["rect", number, number, number, number, number, number, number, number?] // depth, x1, y1, x2, y2, color, outline, alpha
+  | ["sprite", number, number, number, number, number, number?]; // depth, sprite, frame, x, y, alpha
 
 /** A Python exception, already traced back to the student's code. */
 export interface PythonGameError {
@@ -141,6 +146,8 @@ export class Engine {
 
   /** Last frame's drawing, for the renderer. */
   drawList: DrawCommand[] = [];
+  /** Particles, weather, lighting, screen effects, hit-pause (effects.ts). */
+  readonly effects = new Effects();
   guiList: DrawCommand[] = [];
   tiles: LiveTiles[] = [];
   /** Cells tile_set() changed since the renderer last looked: [layer, cell]. */
@@ -453,6 +460,7 @@ export class Engine {
   /** A new room: its camera settings, and a view that starts where it should, not glides there. */
   setRoom(index: number) {
     this.roomIndex = index;
+    this.effects.roomChanged();
     const room = this.def.rooms[index];
     if (!room) return;
     this.tiles = (room.tileLayers ?? []).flatMap((l) => {
@@ -493,6 +501,11 @@ export class Engine {
     c.y = y;
     this.clampCamera();
     this.publishView();
+  }
+
+  /** hit_pause(): the whole game stands still for `steps` steps (the bridge skips them), still drawn. */
+  hit_pause(steps: number) {
+    this.effects.pauseLeft = Math.max(this.effects.pauseLeft, Math.min(120, Math.round(steps)));
   }
 
   camera_shake(strength: number, steps: number) {
@@ -572,6 +585,7 @@ export class Engine {
       st[b + F.XPREV] = st[b + F.X]!;
       st[b + F.YPREV] = st[b + F.Y]!;
       st[b + F.DRAWN] = 0;
+      if (st[b + F.FLASH]! > 0) st[b + F.FLASH] = st[b + F.FLASH]! - 1;
       // GameMaker's alarms: a positive number counts down one per step and
       // fires on reaching zero, then rests at -1. Zero or below never fires,
       // so `self.alarm[0] = 0` does not trigger anything.
@@ -714,8 +728,16 @@ export class Engine {
     this.drawList = commands?.draw ?? [];
     this.guiList = commands?.gui ?? [];
     if (commands?.debug !== undefined) this.debugText = commands.debug;
+    // The room change first: it clears the old room's particles and darkness,
+    // and the new room's Create events — whose orders come in this same
+    // step — may have just asked for some. The other way round, a torch lit
+    // or a burst made in a room's first step was wiped out at once.
     if (commands?.room !== undefined) this.setRoom(commands.room);
     else this.updateCamera();
+    this.effects.apply(commands?.fx);
+    this.effects.lights = commands?.lights ?? [];
+    const c = this.camera;
+    this.effects.step({ x: c.x, y: c.y, w: c.w || this.def.rooms[this.roomIndex]!.width, h: c.h || this.def.rooms[this.roomIndex]!.height });
     return commands?.error ?? null;
   }
 

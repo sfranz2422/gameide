@@ -162,12 +162,11 @@ test("a camera follows the player, sized as set, and scales by whole numbers", a
   await page.getByTestId("camera-height").fill("150");
   await page.getByTestId("camera-follow").selectOption({ label: "Hero" });
   await playAndWait(page);
-  await page.waitForTimeout(200);
+  // Polled, not a fixed wait: on a busy computer the first steps come later.
   // The player's origin is its top-left, snapped to 288: centred, the view starts 100 to its left.
-  expect(await py(page, "(view_width, view_height, view_x)")).toEqual([200, 150, 288 - 100]);
+  await expect.poll(() => py(page, "(view_width, view_height, view_x)")).toEqual([200, 150, 288 - 100]);
   await py(page, "h = instances('Hero')[0]; h.x = 1500");
-  await page.waitForTimeout(300);
-  expect(await py(page, "view_x")).toBe(1500 - 100);
+  await expect.poll(() => py(page, "view_x")).toBe(1500 - 100);
   // The 200 × 150 view grows by a whole number to fit the pane.
   const width = await page.getByTestId("game-canvas").evaluate((c) => parseFloat((c as HTMLElement).style.width));
   expect(width % 200).toBe(0);

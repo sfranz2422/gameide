@@ -135,6 +135,7 @@ export class PythonGame {
       camera_follow: (s: number, smooth: number) => e().camera_follow(s, smooth),
       camera_set: (x: number, y: number) => e().camera_set(x, y),
       camera_shake: (strength: number, steps: number) => e().camera_shake(strength, steps),
+      hit_pause: (steps: number) => e().hit_pause(steps),
       tile_at: (x: number, y: number, layer: number) => e().tile_at(x, y, layer),
       tile_set: (x: number, y: number, tile: number, layer: number) => e().tile_set(x, y, tile, layer),
     };
@@ -209,6 +210,13 @@ export class PythonGame {
    */
   step(): PythonGameError | null {
     if (this.stopped) return null;
+    // hit_pause(): a few steps of nothing happening at all — no events, no
+    // motion, particles still — while the last frame stays on screen. Keys
+    // pressed meanwhile stay latched (beginStep isn't run), so none is lost.
+    if (this.engine.effects.pauseLeft > 0) {
+      this.engine.effects.pauseLeft--;
+      return null;
+    }
     this.engine.beginStep();
     const t0 = performance.now();
     let out: string | undefined;

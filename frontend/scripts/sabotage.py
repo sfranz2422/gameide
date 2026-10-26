@@ -43,6 +43,8 @@ CL, UPJ, EP = "../backend/classes.py", "src/editor/useProject.ts", "src/editor/E
 RW, XPP, RX = "../backend/rewards.py", "src/xp/XpPages.tsx", "src/xp/runXp.ts"
 NT, GR, QZ, CK = "../backend/notes.py", "../backend/grades.py", "src/notes/quiz.ts", "src/checks/checks.ts"
 TU, TUP, TP = "../backend/tutorials.py", "src/tutorials/tutorial.ts", "src/tutorials/TutorialPane.tsx"
+FX, FEEL, BRG = "src/engine/effects.ts", "src/engine/render/feel.ts", "src/python/bridge.ts"
+PXR = "src/engine/render/pixiRenderer.ts"
 CASES = [
  ("layout drift", RT, '"x": boxy(F.X)', '"x": boxy(F.Y)', "every built-in property"),
  ("no polar sync", RT, "            _st[b + i] = v\n            set_polar(b)", "            _st[b + i] = v", "two views of one motion"),
@@ -69,7 +71,7 @@ CASES = [
  ("warn every time", RT, "    if message not in _warned:\n        _warned.add(message)\n        _warnings.append(message)", "    _warnings.append(message)", "warned about, once"),
  ("no suggestion", RT, "    close = difflib.get_close_matches(word, list(choices), n=1)", "    close = []", "says what was meant"),
  ("slow getters", RT, "        def get(self):\n            return _st[self._b + i]\n\n        def set_(self, v):\n            b = self._b\n            _st[b + i] = v\n            if not", "        def get(self):\n            sum(range(3000))\n            return _st[self._b + i]\n\n        def set_(self, v):\n            b = self._b\n            _st[b + i] = v\n            if not", "frame's budget"),
- ("param renamed", RT, "def draw_text(x, y, text):\n    if _check_draw(\"draw_text\"):\n        _draw_list.append([\"text\", _draw_depth, x, y, str(text), _color, _font, _font_size])", "def draw_text(x, y, txt):\n    if _check_draw(\"draw_text\"):\n        _draw_list.append([\"text\", _draw_depth, x, y, str(txt), _color, _font, _font_size])", "matches runtime.py"),
+ ("param renamed", RT, "def draw_text(x, y, text):\n    if _check_draw(\"draw_text\"):\n        _draw_list.append([\"text\", _draw_depth, x, y, str(text), _color, _font, _font_size, _alpha])", "def draw_text(x, y, txt):\n    if _check_draw(\"draw_text\"):\n        _draw_list.append([\"text\", _draw_depth, x, y, str(txt), _color, _font, _font_size, _alpha])", "matches runtime.py"),
  ("undocumented function", RT, '    "show_debug",\n]', '    "show_debug", "point_distance2",\n]\npoint_distance2 = lambda a, b: 0', "matches runtime.py"),
  ("default differs", RT, 'def mouse_check(button="left"):', 'def mouse_check(button="right"):', "matches runtime.py"),
  ("property undocumented", "src/catalog/api.ts", '  { name: "depth", description: "Lower depth draws on top." },\n', "", "only properties"),
@@ -326,7 +328,7 @@ CASES = [
  ("save keeps the caller's list", RT, "    _save[key] = json.loads(text)", "    _save[key] = value", "are copies"),
  ("save sent every frame", RT, '        out["save"] = _save\n        _save_changed = False', '        out["save"] = _save', "keep values between plays"),
  ("save starts empty", RT, '    _save = json.loads(json.dumps(game.get("save") or {}))', "    _save = {}", "keep values between plays"),
- ("font not drawn", RT, '        _draw_list.append(["text", _draw_depth, x, y, str(text), _color, _font, _font_size])', '        _draw_list.append(["text", _draw_depth, x, y, str(text), _color, -1, 16])', "draw_set_font picks a font"),
+ ("font not drawn", RT, '        _draw_list.append(["text", _draw_depth, x, y, str(text), _color, _font, _font_size, _alpha])', '        _draw_list.append(["text", _draw_depth, x, y, str(text), _color, -1, 16, _alpha])', "draw_set_font picks a font"),
  ("fonts not loaded in the worker", "src/python/gameWorker.ts", "  const fonts = await loadFonts(msg.def);", "  const fonts = await loadFonts({ ...msg.def, fonts: [] });", "the game draws with it", E2E),
  ("renderer ignores the font", "src/engine/render/pixiRenderer.ts", '          const family = this.fonts.has(font) ? `gameide-font-${font}` : "monospace";', '          const family = this.fonts.has(font + 1e9) ? `gameide-font-${font}` : "monospace";', "the game draws with it", E2E),
  ("page plays nothing", GH, "      case \"sounds\":\n        this.sound.run(m.orders);", "      case \"sounds\":\n        void m.orders;", "a starter sound plays", E2E),
@@ -478,6 +480,30 @@ CASES = [
  ("tutorial checks not graded", GR, '    for t in checks.tests(notes_of(a)) + checks.tests(notes_of(a), "check"):', "    for t in checks.tests(notes_of(a)):", "its checks are what Check all checks", PY),
  ("games forget their tutorial", APP, '"tutorial": gamestore.tutorial_of(p.data)}', '"tutorial": None}', "My Games knows a game's tutorial", PY),
  ("tutorials not served", APP, '    r = send_from_directory(DIST / "tutorials", name)', '    r = send_from_directory(DIST / "tutorial", name)', "the built-in tutorials are served", PY),
+ # Phase 9½: game feel
+ ("particles stand still", FX, "      this.x[p] = this.x[p]! + this.vx[p]!;\n      this.y[p] = this.y[p]! + this.vy[p]!;", "      this.x[p] = this.x[p]!;\n      this.y[p] = this.y[p]!;", "a burst makes its particles"),
+ ("particles live forever", FX, "      if (--this.life[p]! <= 0) {", "      if (--this.life[p]! < -1e9) {", "a burst makes its particles"),
+ ("no particle cap", FX, "      if (this.count >= MAX_PARTICLES) this.remove(0);", "      if (this.count >= MAX_PARTICLES * 2) this.remove(0);", "never holds more than MAX_PARTICLES"),
+ ("weather follows rooms", FX, "    this.clear();\n    this.weather = null;\n    this.darkness = 0;", "    this.clear();\n    this.darkness = 0;", "a new room is clear"),
+ ("room wipes its creates", EN, "    if (commands?.room !== undefined) this.setRoom(commands.room);\n    else this.updateCamera();\n    this.effects.apply(commands?.fx);\n    this.effects.lights = commands?.lights ?? [];", "    this.effects.apply(commands?.fx);\n    this.effects.lights = commands?.lights ?? [];\n    if (commands?.room !== undefined) this.setRoom(commands.room);\n    else this.updateCamera();", "survives the room starting"),
+ ("lights linger", EN, "    this.effects.lights = commands?.lights ?? [];", "    if (commands?.lights) this.effects.lights = commands.lights;", "shines for the step it is called in"),
+ ("no hit pause", BRG, "    if (this.engine.effects.pauseLeft > 0) {", "    if (this.engine.effects.pauseLeft > 1e9) {", "hit_pause freezes the whole game"),
+ ("pause eats keys", BRG, "      this.engine.effects.pauseLeft--;\n      return null;", "      this.engine.effects.pauseLeft--;\n      this.engine.beginStep();\n      return null;", "pressed during a hit pause"),
+ ("flash forever", EN, "      if (st[b + F.FLASH]! > 0) st[b + F.FLASH] = st[b + F.FLASH]! - 1;", "", "counting down"),
+ ("glow reads as outline", RT, '            return "#%06x" % int(_st[b + F.OUTLINE_COLOR]) if _st[b + F.OUTLINE] == kind else None', '            return "#%06x" % int(_st[b + F.OUTLINE_COLOR]) if _st[b + F.OUTLINE] else None', "outline and glow are fields"),
+ ("tween runs slow", RT, "        k = min(1.0, t[5] / t[4])", "        k = min(1.0, t[5] / (t[4] + 1))", "lands exactly"),
+ ("tweens the dead", RT, "        if isinstance(target, GameObject) and not target._alive:\n            del _tweens[key]", "        if False:\n            del _tweens[key]", "destroyed just stops"),
+ ("out_quad is in_quad", RT, '    "out_quad": lambda t: 1 - (1 - t) ** 2,', '    "out_quad": lambda t: t * t,', "out_quad is fast then slow"),
+ ("the say key skips", RT, '        go = _dlg_age > 0 and (keyboard_check_pressed("space")', '        go = (keyboard_check_pressed("space")', "doesn't also skip it"),
+ ("fade jumps", RT, "        _fade[0] = _fade[1] + (_fade[2] - _fade[1]) * (_fade[3] / _fade[4])", "        _fade[0] = _fade[2]", "darkens step by step"),
+ ("alpha leaks", RT, "        _color = 0xFFFFFF\n        _alpha = 1.0", "        _color = 0xFFFFFF", "starts each Draw event solid"),
+ ("restart keeps tweens", RT, "    _tweens.clear()\n    dialogue_clear()", "    dialogue_clear()", "game_restart starts the feel over"),
+ ("shaders at two precisions", FEEL, '  GlProgram.from({ vertex: VERTEX, fragment, name, preferredVertexPrecision: "highp", preferredFragmentPrecision: "highp" });', "  GlProgram.from({ vertex: VERTEX, fragment, name });", "game feel is drawn", E2E),
+ ("no flash filter", PXR, "      filters.push(look.flash);", "", "game feel is drawn", E2E),
+ ("no darkness", FEEL, "    this.screen.visible = fx.darkness > 0;", "    this.screen.visible = false;", "game feel is drawn", E2E),
+ ("particles hidden", FEEL, "      l.container.visible = n > 0;", "      l.container.visible = false;", "game feel is drawn", E2E),
+ ("no screen effect", PXR, "      const f = name ? screenFilter(name) : null;", "      const f = name ? screenFilter(name + \"-off\") : null;", "game feel is drawn", E2E),
+ ("no tint", PXR, "      sp.tint = st[b + F.TINT]!;", "", "game feel is drawn", E2E),
  ("turn in does nothing", "src/editor/AssignmentBits.tsx", "            await api(`/api/projects/${encodeURIComponent(projectId)}/turn-in`, { json: {} });", "            void 0;", "a class:", E2E),
  ("no read-only bar", EP, '          {store.kind === "view" ? (', "          {store.kind !== store.kind ? (", "a class:", E2E),
 ]

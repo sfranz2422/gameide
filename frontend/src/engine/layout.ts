@@ -1,3 +1,5 @@
+import { EFFECTS, SCREEN_EFFECTS, WEATHER } from "./effects";
+
 /**
  * The memory both sides of the bridge share.
  *
@@ -48,10 +50,20 @@ export const F = {
   BOUNDARY: 26, // engine's memory of "was touching the room edge last step"
   DRAWN: 27, // set by draw_self() in a custom Draw event, cleared each frame
   ALARM0: 28, // ALARM0 .. ALARM0 + 11
+  // Game feel (after the alarms, so nothing before them moved when they came):
+  TINT: 40, // image_blend: 0xRRGGBB the sprite is multiplied by; white (0xFFFFFF) leaves it as drawn
+  BLEND: 41, // blend_mode: 0 normal, 1 add, 2 multiply, 3 screen (BLEND_MODES)
+  FLASH: 42, // flash(): steps left of drawing the sprite as one solid colour
+  FLASH_COLOR: 43, // …which colour
+  OUTLINE: 44, // 0 none, 1 outline, 2 glow (outline / glow properties)
+  OUTLINE_COLOR: 45,
 } as const;
 
 export const ALARM_COUNT = 12;
-export const STRIDE = F.ALARM0 + ALARM_COUNT; // 40
+export const STRIDE = F.OUTLINE_COLOR + 1; // 46
+
+/** blend_mode's names, by the number F.BLEND holds. */
+export const BLEND_MODES = ["normal", "add", "multiply", "screen"] as const;
 
 /**
  * Small Int32 arrays, also shared:
@@ -172,6 +184,11 @@ export function layoutForPython() {
     PAD_AXES: [...PAD_AXES],
     PAD_COUNT,
     HANDLES,
+    BLEND_MODES: [...BLEND_MODES],
+    // Names Python checks a student's spelling against (effects.ts has them).
+    EFFECT_NAMES: Object.keys(EFFECTS),
+    WEATHER: [...WEATHER],
+    SCREEN_EFFECTS: [...SCREEN_EFFECTS],
     KEY_NAMES: [...KEY_NAMES],
     MOUSE_BUTTONS: [...MOUSE_BUTTONS],
   };

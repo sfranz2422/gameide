@@ -22,6 +22,14 @@ const START_TIMEOUT_MS = 60_000;
 
 export function hostRunner(host: GameHost, def: () => GameDefinition, watch: HostWatch, play?: () => void): GameRunner {
   return {
+    get stepsPerSecond() {
+      return def().stepsPerSecond ?? 60;
+    },
+    async steps() {
+      // The runtime's own count of steps run: game time, whatever the clock says.
+      const n = await host.evalPython("__import__('gameide')._step_count");
+      return typeof n === "number" ? n : 0;
+    },
     async start() {
       watch.errors.length = 0;
       if (play) play();

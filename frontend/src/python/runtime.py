@@ -71,6 +71,10 @@ __all__ = [
     "sound_play", "sound_stop", "sound_playing", "music_play", "music_stop",
     # saving
     "save_set", "save_get", "save_delete", "save_clear",
+    # game feel
+    "particles", "effect", "weather", "particles_clear", "hit_pause", "lighting", "light", "screen_effect",
+    "screen_flash", "screen_fade", "tween", "tween_stop", "ease", "say", "dialogue_open", "dialogue_clear",
+    "draw_set_alpha",
     # debugging
     "show_debug",
 ]
@@ -136,6 +140,7 @@ _gui = []            # …and on the screen, from Draw GUI events (not moved by 
 _draw_list = _draw   # where draw_* functions are writing now
 _creation_fns = {}   # (room index, instance index) -> that instance's creation code
 _color = 0xFFFFFF
+_alpha = 1.0         # draw_set_alpha: how solid draw_* calls draw, 0 to 1
 _debug = None
 _debug_changed = False
 _pending_room = None
@@ -272,6 +277,12 @@ class GameObject:
         _dead.append(self)
         _call(self, "on_destroy")
         _call(self, "on_cleanup")
+
+    def flash(self, color="white", steps=6):
+        """Draws this instance as one solid colour for a few steps: the classic "I was hit"."""
+        b = self._b
+        _st[b + _L.F.FLASH_COLOR] = _parse_color(color, "flash")
+        _st[b + _L.F.FLASH] = max(0, int(steps))
 
     def once(self, key, condition):
         """
@@ -425,6 +436,37 @@ def _install_properties():
         _st[self._b + F.SPRITE] = _sprite_of(name)
         _mark_dirty(self._slot, self._b)
 
+    def blend_get(self):
+        return "#%06x" % int(_st[self._b + F.TINT])
+
+    def blend_set(self, color):
+        _st[self._b + F.TINT] = _parse_color(color, "image_blend")
+
+    def mode_get(self):
+        return _L.BLEND_MODES[int(_st[self._b + F.BLEND])]
+
+    def mode_set(self, mode):
+        if mode not in _L.BLEND_MODES:
+            raise ValueError(f"blend_mode is one of {', '.join(repr(m) for m in _L.BLEND_MODES)}, not {mode!r}."
+                             + _suggest(str(mode), _L.BLEND_MODES))
+        _st[self._b + F.BLEND] = _L.BLEND_MODES.index(mode)
+
+    def edge(kind, name):
+        # outline and glow are one setting, two looks: setting one replaces the other.
+        def get(self):
+            b = self._b
+            return "#%06x" % int(_st[b + F.OUTLINE_COLOR]) if _st[b + F.OUTLINE] == kind else None
+
+        def set_(self, color):
+            b = self._b
+            if color is None:
+                if _st[b + F.OUTLINE] == kind:
+                    _st[b + F.OUTLINE] = 0.0
+                return
+            _st[b + F.OUTLINE_COLOR] = _parse_color(color, name)
+            _st[b + F.OUTLINE] = kind
+        return property(get, set_)
+
     props = {
         "x": boxy(F.X), "y": boxy(F.Y),
         "xprevious": plain(F.XPREV), "yprevious": plain(F.YPREV),
@@ -438,6 +480,8 @@ def _install_properties():
         "image_angle": plain(F.ANGLE), "image_alpha": plain(F.ALPHA),
         "visible": flag(F.VISIBLE), "solid": flag(F.SOLID),
         "depth": plain(F.DEPTH),
+        "image_blend": property(blend_get, blend_set), "blend_mode": property(mode_get, mode_set),
+        "outline": edge(1, "outline"), "glow": edge(2, "glow"),
     }
     for name, prop in props.items():
         setattr(GameObject, name, prop)
@@ -480,6 +524,8 @@ _COLORS = {
     "ltgray": 0xC0C0C0, "maroon": 0x800000, "navy": 0x000080, "olive": 0x808000,
     "orange": 0xFFA040, "purple": 0x800080, "red": 0xFF0000, "silver": 0xC0C0C0,
     "teal": 0x008080, "white": 0xFFFFFF, "yellow": 0xFFFF00,
+    # Beyond GameMaker's list: colours effects and glows reach for.
+    "cyan": 0x00FFFF, "magenta": 0xFF00FF, "pink": 0xFF8FB1, "gold": 0xFFD166, "brown": 0x8B5A2B,
 }
 
 
@@ -661,12 +707,12 @@ def draw_self():
 
 def draw_sprite(sprite, frame, x, y):
     if _check_draw("draw_sprite"):
-        _draw_list.append(["sprite", _draw_depth, _sprite_of(sprite), frame, x, y])
+        _draw_list.append(["sprite", _draw_depth, _sprite_of(sprite), frame, x, y, _alpha])
 
 
 def draw_text(x, y, text):
     if _check_draw("draw_text"):
-        _draw_list.append(["text", _draw_depth, x, y, str(text), _color, _font, _font_size])
+        _draw_list.append(["text", _draw_depth, x, y, str(text), _color, _font, _font_size, _alpha])
 
 
 _font = -1        # index into the game's fonts, or -1 for the built-in one
@@ -691,33 +737,314 @@ def draw_set_font(font=None, size=16):
 
 def draw_rect(x1, y1, x2, y2, outline=False):
     if _check_draw("draw_rect"):
-        _draw_list.append(["rect", _draw_depth, x1, y1, x2, y2, _color, 1 if outline else 0])
+        _draw_list.append(["rect", _draw_depth, x1, y1, x2, y2, _color, 1 if outline else 0, _alpha])
+
+
+def _parse_color(color, fn="draw_set_color"):
+    """A colour as 0xRRGGBB: a name ("red"), "#rrggbb", an (r, g, b) tuple, or a number."""
+    if isinstance(color, str):
+        c = color.strip().lower()
+        if c.startswith("#") and len(c) == 7:
+            try:
+                return int(c[1:], 16)
+            except ValueError:
+                pass
+        if c in _COLORS:
+            return _COLORS[c]
+        raise ValueError(f'"{color}" is not a colour GameIDE knows.' + _suggest(c, _COLORS)
+                         + ' Use a name like "red", or "#ff8800".')
+    if isinstance(color, tuple) and len(color) == 3:
+        r, g, b = (max(0, min(255, int(v))) for v in color)
+        return (r << 16) | (g << 8) | b
+    if isinstance(color, int) and not isinstance(color, bool):
+        return color & 0xFFFFFF
+    raise TypeError(f"{fn} wants a colour: a name, \"#rrggbb\" or (r, g, b), not {color!r}")
 
 
 def draw_set_color(color):
     """A colour name ("red"), "#rrggbb", an (r, g, b) tuple, or 0xRRGGBB."""
     global _color
-    if isinstance(color, str):
-        c = color.strip().lower()
-        if c.startswith("#") and len(c) == 7:
-            try:
-                _color = int(c[1:], 16)
-                return
-            except ValueError:
-                pass
-        if c in _COLORS:
-            _color = _COLORS[c]
-            return
-        raise ValueError(f'"{color}" is not a colour GameIDE knows.' + _suggest(c, _COLORS)
-                         + ' Use a name like "red", or "#ff8800".')
-    if isinstance(color, tuple) and len(color) == 3:
-        r, g, b = (max(0, min(255, int(v))) for v in color)
-        _color = (r << 16) | (g << 8) | b
-        return
-    if isinstance(color, int):
-        _color = color & 0xFFFFFF
-        return
-    raise TypeError(f"draw_set_color wants a name, \"#rrggbb\" or (r, g, b), not {color!r}")
+    _color = _parse_color(color)
+
+
+def draw_set_alpha(alpha):
+    """How solid draw_* calls draw from now on in this event: 1 solid, 0.5 see-through, 0 invisible."""
+    global _alpha
+    if not isinstance(alpha, (int, float)) or isinstance(alpha, bool):
+        raise TypeError(f"draw_set_alpha wants a number from 0 to 1, not {alpha!r}.")
+    _alpha = max(0.0, min(1.0, float(alpha)))
+
+
+# ---------------------------------------------------------------- game feel
+# Particles, weather, lighting, screen effects and hit-pause are the engine's
+# (engine/effects.ts): per-particle work belongs there. Python only checks
+# what the student asked for — in words, at their line — and sends it on with
+# the step's commands (`fx`, `lights`). Tweens, dialogue and fades are plain
+# Python: a value or two a step, drawn with the ordinary draw commands.
+
+_fx = []             # orders for effects.ts this step
+_lights = []         # light() calls this step; none sent is none shining
+
+
+def _num(v, fn, name):
+    if isinstance(v, bool) or not isinstance(v, (int, float)):
+        raise TypeError(f"{fn}: {name} should be a number, not {v!r}.")
+    return float(v)
+
+
+def _named(value, names, fn, what):
+    if value not in names:
+        raise ValueError(f"{fn}: {value!r} isn't {what} GameIDE knows. Try one of: {', '.join(names)}."
+                         + _suggest(str(value), names))
+    return value
+
+
+def particles(x, y, count=12, color="white", speed=3, size=3, life=30, gravity=0, spread=360, direction=90,
+              shape="square", depth=-1000):
+    """A burst of particles at (x, y). color can be a list: each particle picks one."""
+    # A list is several colours, one picked per particle; anything else (a tuple included) is one colour.
+    colors = [_parse_color(c, "particles") for c in color] if isinstance(color, list) else _parse_color(color, "particles")
+    _named(shape, ("square", "circle"), "particles", "a shape")
+    _fx.append(["burst", {
+        "x": _num(x, "particles", "x"), "y": _num(y, "particles", "y"),
+        "count": max(0, min(500, int(_num(count, "particles", "count")))), "color": colors,
+        "speed": _num(speed, "particles", "speed"), "size": _num(size, "particles", "size"),
+        "life": max(1, int(_num(life, "particles", "life"))), "gravity": _num(gravity, "particles", "gravity"),
+        "spread": _num(spread, "particles", "spread"), "direction": _num(direction, "particles", "direction"),
+        "shape": shape, "depth": _num(depth, "particles", "depth"),
+    }])
+
+
+def effect(kind, x, y, color=None, scale=1):
+    """A ready-made effect at (x, y): "explosion", "sparkle", "dust", "smoke", "confetti" or "hit"."""
+    _named(kind, _L.EFFECT_NAMES, "effect", "an effect")
+    _fx.append(["effect", kind, _num(x, "effect", "x"), _num(y, "effect", "y"),
+                None if color is None else _parse_color(color, "effect"), _num(scale, "effect", "scale")])
+
+
+def weather(kind=None, amount=1):
+    """Rain or snow across the screen until changed: "rain", "snow", or None to stop. amount: 1 some, 3 a storm."""
+    if kind is not None:
+        _named(kind, _L.WEATHER, "weather", "weather")
+    _fx.append(["weather", kind, max(0.0, _num(amount, "weather", "amount"))])
+
+
+def particles_clear():
+    """Removes every particle, and stops the weather."""
+    _fx.append(["clear"])
+    _fx.append(["weather", None, 1])
+
+
+def hit_pause(steps=4):
+    """Freezes the whole game for a few steps — the little stop that makes a hit feel hard."""
+    _js.hit_pause(max(0, int(_num(steps, "hit_pause", "steps"))))
+
+
+def lighting(darkness=0.8, color="black"):
+    """Darkens this room (0 = daylight, 1 = pitch black) except where light() shines."""
+    _fx.append(["lighting", max(0.0, min(1.0, _num(darkness, "lighting", "darkness"))), _parse_color(color, "lighting")])
+
+
+def light(x, y, radius=100, color="white", strength=1):
+    """A light at (x, y) for this step — call it every step (in Step) to keep it shining."""
+    _lights.append([_num(x, "light", "x"), _num(y, "light", "y"), max(1.0, _num(radius, "light", "radius")),
+                    _parse_color(color, "light"), max(0.0, min(1.0, _num(strength, "light", "strength")))])
+
+
+def screen_effect(name=None):
+    """A look for the whole screen: "crt", "vignette", "grayscale", "pixelate", "sepia" — or None for none."""
+    if name is not None:
+        _named(name, _L.SCREEN_EFFECTS, "screen_effect", "a screen effect")
+    _fx.append(["screen", name])
+
+
+# Easings: how a tween gets from start to end. t goes 0 → 1; most give 0 → 1 too,
+# back and elastic overshoot on the way.
+_C1 = 1.70158
+_C3 = _C1 + 1
+_C2 = _C1 * 1.525
+
+
+def _out_bounce(t):
+    n, d = 7.5625, 2.75
+    if t < 1 / d:
+        return n * t * t
+    if t < 2 / d:
+        t -= 1.5 / d
+        return n * t * t + 0.75
+    if t < 2.5 / d:
+        t -= 2.25 / d
+        return n * t * t + 0.9375
+    t -= 2.625 / d
+    return n * t * t + 0.984375
+
+
+_EASES = {
+    "linear": lambda t: t,
+    "in_quad": lambda t: t * t,
+    "out_quad": lambda t: 1 - (1 - t) ** 2,
+    "in_out_quad": lambda t: 2 * t * t if t < 0.5 else 1 - (-2 * t + 2) ** 2 / 2,
+    "in_cubic": lambda t: t ** 3,
+    "out_cubic": lambda t: 1 - (1 - t) ** 3,
+    "in_out_cubic": lambda t: 4 * t ** 3 if t < 0.5 else 1 - (-2 * t + 2) ** 3 / 2,
+    "in_sine": lambda t: 1 - math.cos(t * math.pi / 2),
+    "out_sine": lambda t: math.sin(t * math.pi / 2),
+    "in_out_sine": lambda t: -(math.cos(math.pi * t) - 1) / 2,
+    "in_back": lambda t: _C3 * t ** 3 - _C1 * t * t,
+    "out_back": lambda t: 1 + _C3 * (t - 1) ** 3 + _C1 * (t - 1) ** 2,
+    "in_out_back": lambda t: ((2 * t) ** 2 * ((_C2 + 1) * 2 * t - _C2)) / 2 if t < 0.5
+    else ((2 * t - 2) ** 2 * ((_C2 + 1) * (t * 2 - 2) + _C2) + 2) / 2,
+    "in_bounce": lambda t: 1 - _out_bounce(1 - t),
+    "out_bounce": _out_bounce,
+    "out_elastic": lambda t: 0.0 if t <= 0 else 1.0 if t >= 1
+    else 2 ** (-10 * t) * math.sin((t * 10 - 0.75) * (2 * math.pi / 3)) + 1,
+}
+
+
+def ease(name, t):
+    """An easing's value at t (0 to 1): ease("out_bounce", 0.5). The curves tween() moves along."""
+    fn = _EASES.get(name)
+    if fn is None:
+        _named(name, list(_EASES), "ease", "an easing")
+    return float(fn(max(0.0, min(1.0, _num(t, "ease", "t")))))
+
+
+_tweens = {}   # (id(target), prop) -> [target, prop, start, end, steps, done, ease]
+
+
+def tween(target, prop, to, steps=30, ease="out_quad"):
+    """Moves target.prop smoothly to `to` over `steps` steps: tween(self, "y", 100, 30, "out_bounce")."""
+    if not isinstance(prop, str):
+        raise TypeError(f'tween: the property is named in quotes, like tween(self, "x", 200), not {prop!r}.')
+    if ease not in _EASES:
+        _named(ease, list(_EASES), "tween", "an easing")
+    try:
+        start = getattr(target, prop)
+    except AttributeError:
+        raise AttributeError(f"tween: {target!r} has no {prop!r} to move.") from None
+    start = _num(start, "tween", f"{prop} (now {start!r})")
+    setattr(target, prop, start)  # a read-only one says so here, at this line, not later
+    _tweens[(id(target), prop)] = [target, prop, start, _num(to, "tween", "to"), max(1, int(_num(steps, "tween", "steps"))), 0, _EASES[ease]]
+
+
+def tween_stop(target, prop=None):
+    """Stops target's tweens (or just the one moving prop), leaving it where it got to."""
+    for key in [k for k, t in _tweens.items() if t[0] is target and (prop is None or t[1] == prop)]:
+        del _tweens[key]
+
+
+def _step_tweens():
+    for key, t in list(_tweens.items()):
+        target = t[0]
+        if isinstance(target, GameObject) and not target._alive:
+            del _tweens[key]
+            continue
+        t[5] += 1
+        k = min(1.0, t[5] / t[4])
+        setattr(target, t[1], t[3] if k >= 1 else t[2] + (t[3] - t[2]) * t[6](k))
+        if k >= 1:
+            del _tweens[key]
+
+
+# Dialogue: say() queues lines; a box at the bottom of the screen types each
+# one out, and Space, Enter or a click shows it all, then goes on.
+_dialogue = []    # [(name or None, text)]
+_dlg_chars = 0.0
+_dlg_age = 0      # steps the current line has been up: the key that said it doesn't also skip it
+
+
+def say(text, name=None):
+    """Shows text in a box at the bottom of the screen, typed out. Space, Enter or a click goes on."""
+    _dialogue.append((None if name is None else str(name), str(text)))
+
+
+def dialogue_open():
+    """True while say() has something on screen: a good time to stop the player moving."""
+    return bool(_dialogue)
+
+
+def dialogue_clear():
+    """Closes the dialogue box and forgets lines still waiting."""
+    global _dlg_chars, _dlg_age
+    _dialogue.clear()
+    _dlg_chars = 0.0
+    _dlg_age = 0
+
+
+def _wrap(text, width):
+    out = []
+    for para in text.split("\n"):
+        line = ""
+        for word in para.split(" "):
+            if line and len(line) + 1 + len(word) > width:
+                out.append(line)
+                line = word
+            else:
+                line = f"{line} {word}" if line else word
+        out.append(line)
+    return out
+
+
+_fade = [0.0, 0.0, 0.0, 0, 1, 0]   # value, from, to, steps done, steps, colour
+_sflash = [0, 0, 0xFFFFFF]         # steps left, steps, colour
+
+
+def screen_fade(to=1.0, steps=30, color="black"):
+    """Fades the screen to a colour (to=1) or back (to=0) over `steps` steps. Lasts across rooms."""
+    _fade[1] = _fade[0]
+    _fade[2] = max(0.0, min(1.0, _num(to, "screen_fade", "to")))
+    _fade[3] = 0
+    _fade[4] = max(1, int(_num(steps, "screen_fade", "steps")))
+    _fade[5] = _parse_color(color, "screen_fade")
+
+
+def screen_flash(color="white", steps=8):
+    """Flashes the whole screen a colour, fading out over `steps` steps."""
+    _sflash[0] = _sflash[1] = max(1, int(_num(steps, "screen_flash", "steps")))
+    _sflash[2] = _parse_color(color, "screen_flash")
+
+
+def _overlays():
+    """After Draw GUI: the dialogue box, then flashes and fades over everything."""
+    global _dlg_chars, _dlg_age
+    w = view_width or room_width
+    h = view_height or room_height
+    if _dialogue:
+        name, text = _dialogue[0]
+        go = _dlg_age > 0 and (keyboard_check_pressed("space") or keyboard_check_pressed("enter") or mouse_check_pressed("left"))
+        if go and _dlg_chars < len(text):
+            _dlg_chars = len(text)
+        elif go:
+            _dialogue.pop(0)
+            _dlg_chars = 0.0
+            _dlg_age = 0
+        else:
+            _dlg_chars = min(len(text), _dlg_chars + 1)
+            _dlg_age += 1
+    if _dialogue:
+        name, text = _dialogue[0]
+        lines = _wrap(text[: int(_dlg_chars)], max(12, int((w - 56) / 8.6)))
+        all_lines = _wrap(text, max(12, int((w - 56) / 8.6)))
+        top = h - 20 - 24 * len(all_lines) - (26 if name else 12)
+        d = -1e6
+        _gui.append(["rect", d, 12, top, w - 12, h - 12, 0x10141F, 0, 0.9])
+        _gui.append(["rect", d + 0.1, 12, top, w - 12, h - 12, 0xFFFFFF, 1, 0.85])
+        y = top + 10
+        if name:
+            _gui.append(["text", d - 0.1, 26, y, name, 0xFFD166, -1, 16, 1.0])
+            y += 24
+        if lines:
+            _gui.append(["text", d - 0.1, 26, y, "\n".join(lines), 0xFFFFFF, -1, 16, 1.0])
+        if _dlg_chars >= len(text) and (_step_count // 20) % 2 == 0:
+            _gui.append(["text", d - 0.1, w - 34, h - 36, "▼", 0xFFD166, -1, 14, 1.0])
+    if _sflash[0] > 0:
+        _gui.append(["rect", -2e6, 0, 0, w, h, _sflash[2], 0, 0.85 * _sflash[0] / _sflash[1]])
+        _sflash[0] -= 1
+    if _fade[3] < _fade[4]:
+        _fade[3] += 1
+        _fade[0] = _fade[1] + (_fade[2] - _fade[1]) * (_fade[3] / _fade[4])
+    if _fade[0] > 0:
+        _gui.append(["rect", -3e6, 0, 0, w, h, _fade[5], 0, _fade[0]])
 
 
 def room_goto(room):
@@ -1131,6 +1458,12 @@ def _restart_game():
         _kill_quietly(o)
     _reap()
     global_vars.__dict__.clear()
+    # The game's feel starts over too: no tweens, lines, fades or effects left from the last go.
+    _tweens.clear()
+    dialogue_clear()
+    _fade[:] = [0.0, 0.0, 0.0, 0, 1, 0]
+    _sflash[0] = 0
+    _fx.append(["screen", None])
     _room_now = -1
     _goto(0, first=True)
 
@@ -1229,7 +1562,7 @@ def _input_events():
 
 def _draw_events():
     """Draw, into the room, then Draw GUI, onto the screen over everything."""
-    global _in_draw, _draw_depth, _cur, _color, _draw_list
+    global _in_draw, _draw_depth, _cur, _color, _draw_list, _alpha
     for name, target in (("on_draw", _draw), ("on_draw_gui", _gui)):
         lst = _lists[name]
         if not lst:
@@ -1237,6 +1570,7 @@ def _draw_events():
         _in_draw = True
         _draw_list = target
         _color = 0xFFFFFF
+        _alpha = 1.0
         try:
             for i in range(len(lst)):
                 o = lst[i]
@@ -1264,6 +1598,12 @@ def _commands():
     """What JavaScript must do after this frame, as JSON — or None for nothing."""
     global _draw, _gui, _debug_changed, _room_changed, _save_changed
     out = {}
+    if _fx:
+        out["fx"] = list(_fx)
+        _fx.clear()
+    if _lights:
+        out["lights"] = list(_lights)
+        _lights.clear()
     if _sound_orders:
         out["sounds"] = list(_sound_orders)
         _sound_orders.clear()
@@ -1298,6 +1638,7 @@ def _frame():
     try:
         _step_count += 1
         _publish_globals()
+        _step_tweens()
         _call_all(_lists["on_begin_step"], "on_begin_step")
         _dispatch_engine_events()        # alarms and mouse-on-instance
         _input_events()
@@ -1306,6 +1647,7 @@ def _frame():
         _dispatch_engine_events()        # collisions, animation end, outside room
         _call_all(_lists["on_end_step"], "on_end_step")
         _draw_events()
+        _overlays()
         _end_of_frame()
         return _commands()
     except (Exception, KeyboardInterrupt) as e:  # noqa: BLE001 — every student error must reach the IDE
@@ -1590,6 +1932,7 @@ def _load_game(game):
         tpl[F.SPRITE] = _sprite_of(o.get("sprite"))
         tpl[F.IMAGE_SPEED] = 1.0
         tpl[F.XSCALE] = tpl[F.YSCALE] = tpl[F.ALPHA] = 1.0
+        tpl[F.TINT] = 0xFFFFFF  # image_blend white: the sprite as drawn
         tpl[F.VISIBLE] = 1.0 if o.get("visible", True) else 0.0
         tpl[F.SOLID] = 1.0 if o.get("solid", False) else 0.0
         tpl[F.DEPTH] = o.get("depth", 0)

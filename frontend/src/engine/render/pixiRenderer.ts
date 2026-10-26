@@ -14,10 +14,11 @@
  * same. A slot handed to a new instance (GEN changed) gets its sprite reset,
  * so a bullet never briefly appears with the last bullet's frame.
  */
-import { Application, Container, Graphics, Rectangle, Sprite, Text, Texture, TilingSprite } from "pixi.js";
+import { Application, ColorMatrixFilter, Container, Filter, Graphics, Rectangle, Sprite, Text, Texture, TilingSprite } from "pixi.js";
+import { flashFilter, LightLayer, outlineFilter, ParticleLayer, screenFilter, setFlash, setOutline } from "./feel";
 import type { DrawCommand, Engine } from "../engine";
 import type { BackgroundDef, GameDefinition, SpriteDef, TilesetDef } from "../game";
-import { F, G, HANDLES, STRIDE } from "../layout";
+import { BLEND_MODES, F, G, HANDLES, STRIDE } from "../layout";
 import { boxOf, type Box } from "../sprites";
 
 const DEG = Math.PI / 180;
@@ -86,15 +87,15 @@ class DrawLayer {
     for (const cmd of list) {
       switch (cmd[0]) {
         case "rect": {
-          const [, depth, x1, y1, x2, y2, color, outline] = cmd;
+          const [, depth, x1, y1, x2, y2, color, outline, alpha = 1] = cmd;
           const gfx = this.graphicsAt(depth);
           gfx.rect(Math.min(x1, x2), Math.min(y1, y2), Math.abs(x2 - x1), Math.abs(y2 - y1));
-          if (outline) gfx.stroke({ color, width: 1, alignment: 1 });
-          else gfx.fill({ color });
+          if (outline) gfx.stroke({ color, width: 1, alignment: 1, alpha });
+          else gfx.fill({ color, alpha });
           break;
         }
         case "text": {
-          const [, depth, x, y, text, color, font = -1, size = 16] = cmd;
+          const [, depth, x, y, text, color, font = -1, size = 16, alpha = 1] = cmd;
           let t = this.texts[ti];
           if (!t) {
             t = new Text({ text: "", style: { fill: 0xffffff, fontFamily: "monospace", fontSize: 16 } });
@@ -114,11 +115,12 @@ class DrawLayer {
           if (t.style.fill !== color) t.style.fill = color;
           t.position.set(x, y);
           t.zIndex = -depth;
+          t.alpha = alpha;
           t.visible = true;
           break;
         }
         case "sprite": {
-          const [, depth, sprite, frame, x, y] = cmd;
+          const [, depth, sprite, frame, x, y, alpha = 1] = cmd;
           const frames = this.frames[sprite];
           if (!frames) break;
           let sp = this.sprites[si];
@@ -133,6 +135,7 @@ class DrawLayer {
           sp.anchor.set(a.x, a.y);
           sp.position.set(x, y);
           sp.zIndex = -depth;
+          sp.alpha = alpha;
           sp.visible = true;
           break;
         }
@@ -200,6 +203,11 @@ export class PixiRenderer {
   private readonly guiDraw: DrawLayer;
   private sprites: (Sprite | null)[] = [];
   private gens: number[] = [];
+  /** Each slot's flash and outline filters, made once and reused; and which of them it shows. */
+  private looks: { flash?: ColorMatrixFilter; edge?: Filter; key: string }[] = [];
+  private readonly particles: ParticleLayer;
+  private readonly lights: LightLayer;
+  private screenShown: string | null = null;
   private backdrops: Backdrop[] = [];
   private tileTextures = new Map<string, Texture[]>();
   private tileViews: TileView[] = [];
@@ -226,7 +234,10 @@ export class PixiRenderer {
     for (const t of def.tilesets ?? []) this.tileTextures.set(t.name, cutTiles(t));
     this.worldDraw = new DrawLayer(this.world, this.frames, this.anchors, fonts);
     this.guiDraw = new DrawLayer(this.gui, this.frames, this.anchors, fonts);
-    app.stage.addChild(this.world, this.gui, this.overlay);
+    this.particles = new ParticleLayer(this.world);
+    this.lights = new LightLayer(this.world);
+    // The darkness is over the room and under Draw GUI: a score never goes dark.
+    app.stage.addChild(this.world, this.lights.screen, this.gui, this.overlay);
     this.overlay.addChild(this.debugLabel);
     this.world.addChild(this.masks);
     this.masks.zIndex = 1e9; // collision boxes over everything in the room
@@ -450,12 +461,54 @@ export class PixiRenderer {
       sp.alpha = st[b + F.ALPHA]!;
       // Lower depth is drawn on top.
       sp.zIndex = -st[b + F.DEPTH]!;
+      sp.tint = st[b + F.TINT]!;
+      sp.blendMode = BLEND_MODES[st[b + F.BLEND]!] ?? "normal";
+      this.applyLook(sp, s, st[b + F.FLASH]! > 0 ? st[b + F.FLASH_COLOR]! : -1, st[b + F.OUTLINE]!, st[b + F.OUTLINE_COLOR]!);
     }
+    this.particles.draw(this.engine.effects);
+    this.lights.draw(this.app.renderer, this.engine.effects, vx, vy, cam.w, cam.h);
+    this.applyScreen(cam.w, cam.h);
 
     this.worldDraw.render(this.engine.drawList);
     this.guiDraw.render(this.engine.guiList);
     this.drawOverlay(st, n);
     this.app.renderer.render(this.app.stage);
+  }
+
+  /**
+   * A sprite's flash (one colour) and outline or glow, as filters — set only
+   * when what it shows changes, since a filter list is costly to rebuild
+   * and most sprites have neither.
+   */
+  private applyLook(sp: Sprite, slot: number, flash: number, edge: number, edgeColor: number) {
+    const look = (this.looks[slot] ??= { key: "" });
+    const key = `${flash}|${edge}|${edgeColor}`;
+    if (look.key === key) return;
+    look.key = key;
+    const filters: Filter[] = [];
+    if (flash >= 0) {
+      if (look.flash) setFlash(look.flash, flash);
+      else look.flash = flashFilter(flash);
+      filters.push(look.flash);
+    }
+    if (edge > 0) {
+      if (look.edge) setOutline(look.edge, edgeColor, edge === 2);
+      else look.edge = outlineFilter(edgeColor, edge === 2);
+      filters.push(look.edge);
+    }
+    sp.filters = filters.length ? filters : null;
+  }
+
+  /** screen_effect(): one filter over the whole game window, Draw GUI included. */
+  private applyScreen(w: number, h: number) {
+    const name = this.engine.effects.screen;
+    if (name !== this.screenShown) {
+      this.screenShown = name;
+      const f = name ? screenFilter(name) : null;
+      this.app.stage.filters = f ? [f] : null;
+    }
+    // The whole window, even where nothing is drawn — a vignette darkens empty sky too.
+    if (this.screenShown) this.app.stage.filterArea = new Rectangle(0, 0, w, h);
   }
 
   private drawOverlay(st: Float64Array, n: number) {

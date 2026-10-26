@@ -223,8 +223,17 @@ export function checkProject(p: Project, c: Check): { ok: boolean; detail: strin
 /**
  * A game the checks can play: fresh each start(), keys held and let go,
  * Python asked about its state, and the errors it raised since it started.
+ *
+ * "After 1 second" is GAME time — a second's worth of steps — not the
+ * clock's. On a busy or slow computer the game runs fewer steps a second,
+ * and a check timed by the clock failed there for a player who simply
+ * hadn't got as far yet (it did, five browsers at once in the tests).
  */
 export interface GameRunner {
+  /** Steps the game has run since start(). */
+  steps(): Promise<number>;
+  /** The game's steps per second (its setting; 60 unless changed). */
+  readonly stepsPerSecond: number;
   /** Plays the game from the start; resolves once it's running, or rejects with why not. */
   start(): Promise<void>;
   stop(): void;
@@ -234,6 +243,21 @@ export interface GameRunner {
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** However slow the computer, a check gives up rather than wait for ever. */
+const SLOWEST = 10;
+
+/** Waits until the game has run `seconds` of game time. False if it never did (stuck, or far too slow). */
+async function runFor(run: GameRunner, seconds: number): Promise<boolean> {
+  const from = await run.steps();
+  const want = Math.round(seconds * run.stepsPerSecond);
+  const until = performance.now() + Math.max(2000, seconds * 1000 * SLOWEST);
+  for (;;) {
+    if ((await run.steps()) - from >= want) return true;
+    if (run.errors().length || performance.now() > until) return false;
+    await sleep(Math.min(50, (seconds * 1000) / 4));
+  }
+}
 
 /** The first instance's property, from Python; null when there's no instance. */
 const propExpr = (object: string, prop: string) =>
@@ -252,14 +276,16 @@ export async function checkGame(run: GameRunner, c: Check): Promise<{ ok: boolea
   }
   try {
     if (c.kind === "runs") {
-      await sleep(c.seconds * 1000);
+      const ran = await runFor(run, c.seconds);
       const errs = run.errors();
+      if (!errs.length && !ran) return { ok: false, detail: "The game didn't keep running long enough to check." };
       return errs.length ? { ok: false, detail: `The game stopped with an error: ${errs[0]}` } : { ok: true, detail: "" };
     }
     const before = c.kind === "after" ? await run.py(propExpr(c.object, c.prop)) : null;
     for (const k of c.hold) run.hold(k, true);
-    await sleep(c.seconds * 1000);
+    const ran = await runFor(run, c.seconds);
     for (const k of c.hold) run.hold(k, false);
+    if (!ran && !run.errors().length) return { ok: false, detail: "The game didn't keep running long enough to check." };
     const errs = run.errors();
     if (errs.length) return { ok: false, detail: `The game stopped with an error: ${errs[0]}` };
     if (c.kind === "after-expr") {

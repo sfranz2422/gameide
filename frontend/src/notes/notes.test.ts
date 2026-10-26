@@ -90,15 +90,25 @@ describe("checks of the project", () => {
 });
 
 /** A pretend game: x grows while right is held. */
-function fakeRunner(opts: { error?: string } = {}): GameRunner & { held: Set<string> } {
+function fakeRunner(opts: { error?: string; slow?: number } = {}): GameRunner & { held: Set<string> } {
   let x = 0;
+  let steps = 0;
   let timer: ReturnType<typeof setInterval> | null = null;
   const held = new Set<string>();
   return {
     held,
+    stepsPerSecond: 60,
+    async steps() {
+      return steps;
+    },
     async start() {
       x = 0;
-      timer = setInterval(() => (x += held.has("right") ? 1 : 0), 10);
+      steps = 0;
+      // One step every `slow` ms: 16 is full speed; more is a busy computer.
+      timer = setInterval(() => {
+        steps++;
+        x += held.has("right") ? 1 : 0;
+      }, opts.slow ?? 16);
     },
     stop() {
       if (timer) clearInterval(timer);
@@ -120,6 +130,16 @@ describe("checks of the game running", () => {
     const still = await checkGame(fakeRunner(), readCheck("after 0.2 seconds, Player.x increased"));
     expect(still).toEqual({ ok: false, detail: "Player.x went from 0 to 0." });
   });
+  it("a second is a second of the game's steps, however slow the computer", async () => {
+    const run = fakeRunner({ slow: 40 }); // two and a half times slower than it should be
+    const t0 = performance.now();
+    const r = await checkGame(run, readCheck("after 0.25 seconds holding right, Player.x increased"));
+    expect(r.ok).toBe(true);
+    // 15 steps at 40 ms: about 600 ms of clock for a quarter-second of game.
+    expect(performance.now() - t0).toBeGreaterThan(450);
+    expect(run.held.size).toBe(0);
+  });
+
   it("an error in the game fails the check, with the error", async () => {
     expect(await checkGame(fakeRunner({ error: "NameError: name 'spead' is not defined" }), readCheck("game runs 0.1 seconds without errors"))).toEqual({
       ok: false,

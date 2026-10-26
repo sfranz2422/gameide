@@ -1,6 +1,63 @@
 # Progress
 
-## Phase 11b — Tutorials ✅ (2026-10-26, waiting for review)
+## Phase 9½ — Game feel ✅ (2026-10-26, waiting for review)
+
+The phase planned in October "so student games can look and feel like GameMaker's showcase", built before the showcase platformer that will use it. Everything is in a new **Effects** category of the catalog, so it's in the docs, the blocks palette, event sheets and autocomplete.
+
+### Done
+
+- **Particles** (`engine/effects.ts`, drawn by Pixi ParticleContainers):
+  - `particles(x, y, count, color, speed, size, life, gravity, spread, direction, shape, depth)`; a list of colours picks one per particle.
+  - `effect("explosion" / "sparkle" / "dust" / "smoke" / "confetti" / "hit", x, y, color, scale)`: ready-made bursts.
+  - `weather("rain" / "snow", amount)` across the screen.
+  - `particles_clear()`.
+  - At most 4000 particles, so a game never slows to a crawl.
+- **Hits**:
+  - `hit_pause(steps)` freezes the whole game, still drawn; keys pressed meanwhile aren't lost.
+  - `self.flash("white", 6)` draws the sprite as one colour.
+  - Both go with the existing `camera_shake`.
+- **How a sprite looks**: `self.image_blend` (tint), `self.blend_mode` ("add" for fire and magic), `self.outline` and `self.glow` (a colour, or None).
+- **Lighting**: `lighting(darkness, color)` darkens the room, and `light(x, y, radius, color)` each step cuts light out of it with a soft coloured glow. The score in Draw GUI never goes dark.
+- **The screen**:
+  - `screen_effect("crt" / "vignette" / "grayscale" / "sepia" / "pixelate")`.
+  - `screen_flash(color, steps)`.
+  - `screen_fade(to, steps, color)`, which lasts across rooms for fade-out / change room / fade-in.
+  - `draw_set_alpha(alpha)` for see-through drawing.
+- **Tweens**: `tween(self, "y", 100, 30, "out_bounce")` on anything with a number (global_vars too), `tween_stop`, and `ease(name, t)`. There are 16 easings: quad, cubic, sine, back, bounce, elastic.
+- **Dialogue**: `say("text", name="Owl")` types a line out in a box at the bottom. Space, Enter or a click goes on, and the key that starts a line never skips it. Also `dialogue_open()` and `dialogue_clear()`.
+- `game_restart()` starts all of it over. A new room starts in daylight with no weather or particles; a screen effect, being the game's whole look, stays.
+- Five more colour names: cyan, magenta, pink, gold, brown.
+
+### Found and fixed along the way
+
+- **A room's Create events lost their effects**: the room change was applied after them and wiped them (a torch lit in the first step went out at once). Found by the drawing test; now the room changes first.
+- **The outline and screen shaders failed to compile** (a uniform at two precisions) and silently drew nothing. They are now high precision throughout.
+- **Checks timed by the clock failed on a busy computer**: "after 1 second holding right" now means a second of the *game's* steps, however long that takes. Five browsers at once in the tests showed it; a slow Chromebook in class would have too. It's in 11a's checks, now steady.
+- The old camera test waited a fixed 200 ms for the game. It now polls.
+
+### Tests
+
+```
+cd frontend
+npm test                      # Vitest: 236
+npm run e2e                   # Playwright: 65 editor tests + 17 account tests (4 opt-in, skipped)
+../backend/.venv/bin/python ../backend/tests/test_server.py   # 345 server checks
+python3 scripts/sabotage.py   # 430 deliberate bugs
+```
+
+- **`src/python/feel.test.ts`** (22, real Pyodide): particles move and die, the cap, effects and misspellings, weather and rooms, Create events' effects surviving, lighting and per-step lights, screen effects, hit-pause (and keys during it), flash countdown, the four looks, tweens (landing exactly, global_vars, destroyed targets, errors), every easing 0→1, dialogue typing and advancing (and the same key not skipping), fades, alpha, restart.
+- **`e2e/feel.editor.spec.ts`** reads the game's own pixels: flash, outline, tint, particles, lighting, a screen effect, and the dialogue box are really drawn.
+- A unit test: checks wait for game time on a slow computer.
+- 23 new sabotage cases, each caught.
+
+### Known issues and gaps
+
+- Lights and glows draw in the room; a light on a moving camera follows it, but lights aren't blocked by walls (no shadows).
+- Effects are WebGL shaders: every Chromebook has WebGL, but a browser with it turned off draws the game without them.
+
+---
+
+## Phase 11b — Tutorials ✅ (2026-10-26, reviewed)
 
 Built on 11a, as agreed: the tutorial panel **is** the Notes tab, steps are **strict**, a tutorial assigned to a class **is an assignment** whose notes are the tutorial, and **tutorial code can't be copied** (no Copy button; code can't be selected).
 

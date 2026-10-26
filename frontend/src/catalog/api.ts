@@ -24,6 +24,7 @@ export type Category =
   | "Camera"
   | "Sound"
   | "Saving"
+  | "Effects"
   | "Debug";
 
 /**
@@ -31,7 +32,7 @@ export type Category =
  * blocks palette and the sheet pickers each list categories; catalog.test.ts
  * holds all three to this, so a new category can't go missing from one.
  */
-export const CATEGORIES: Category[] = ["Instances", "Collision", "Input", "Motion", "Drawing", "Sound", "Saving", "Rooms", "Camera", "Debug"];
+export const CATEGORIES: Category[] = ["Instances", "Collision", "Input", "Motion", "Drawing", "Sound", "Saving", "Rooms", "Camera", "Effects", "Debug"];
 
 export type ParamType =
   | "number" | "string" | "object" | "sprite" | "key" | "button" | "color" | "boolean" | "room" | "instance" | "layer" | "any"
@@ -149,6 +150,8 @@ export const API: ApiEntry[] = [
   fn("Drawing", "draw_rect",
     [p("x1", "number"), p("y1", "number"), p("x2", "number"), p("y2", "number"), p("outline", "boolean", "False")],
     "nothing", "Draws a rectangle between two corners, filled unless outline is True."),
+  fn("Drawing", "draw_set_alpha", [p("alpha", "number")], "nothing",
+    "How solid what you draw is from now on, in this event: 1 solid, 0.5 see-through, 0 invisible."),
   fn("Drawing", "draw_set_color", [p("color", "color")], "nothing",
     'Sets the colour for what is drawn next: "red", "#ff8800" or (255, 136, 0).'),
   fn("Drawing", "draw_set_font", [p("font", "font", "None"), p("size", "number", "16")], "nothing",
@@ -193,6 +196,39 @@ export const API: ApiEntry[] = [
   fn("Saving", "save_delete", [p("key", "string")], "nothing", "Forgets one saved value."),
   fn("Saving", "save_clear", [], "nothing", "Forgets everything this game saved."),
 
+  // Effects: game feel (engine/effects.ts, render/feel.ts)
+  fn("Effects", "effect", [p("kind", "string"), p("x", "number"), p("y", "number"), p("color", "color", "None"), p("scale", "number", "1")], "nothing",
+    'A ready-made effect at (x, y): "explosion", "sparkle", "dust", "smoke", "confetti" or "hit". scale makes it bigger or smaller; color changes its colours.'),
+  fn("Effects", "particles", [p("x", "number"), p("y", "number"), p("count", "number", "12"), p("color", "color", '"white"'), p("speed", "number", "3"),
+    p("size", "number", "3"), p("life", "number", "30"), p("gravity", "number", "0"), p("spread", "number", "360"), p("direction", "number", "90"),
+    p("shape", "string", '"square"'), p("depth", "number", "-1000")], "nothing",
+    'A burst of particles at (x, y): how many, their colour (or a list of colours), speed, size and life in steps. spread is how wide a fan, in degrees, around direction (90 is up); shape "square" or "circle".'),
+  fn("Effects", "weather", [p("kind", "string", "None"), p("amount", "number", "1")], "nothing",
+    'Rain or snow across the screen until changed: weather("rain"), weather("snow", 3) for a blizzard, weather(None) to stop.'),
+  fn("Effects", "particles_clear", [], "nothing", "Removes every particle, and stops the weather."),
+  fn("Effects", "hit_pause", [p("steps", "number", "4")], "nothing",
+    "Freezes the whole game for a few steps — the tiny stop that makes a hit feel hard. Pair it with camera_shake."),
+  fn("Effects", "lighting", [p("darkness", "number", "0.8"), p("color", "color", '"black"')], "nothing",
+    "Darkens this room (0 is daylight, 1 pitch black) everywhere light() doesn't shine. A new room starts in daylight."),
+  fn("Effects", "light", [p("x", "number"), p("y", "number"), p("radius", "number", "100"), p("color", "color", '"white"'), p("strength", "number", "1")], "nothing",
+    "A light at (x, y) for this step: call it every step (in Step) to keep it on — light(self.x, self.y, 120) carries a torch."),
+  fn("Effects", "screen_effect", [p("name", "string", "None")], "nothing",
+    'A look for the whole screen: "crt" (an old TV), "vignette" (dark corners), "grayscale", "sepia", "pixelate" — or None.'),
+  fn("Effects", "screen_flash", [p("color", "color", '"white"'), p("steps", "number", "8")], "nothing",
+    "Flashes the whole screen a colour, fading out over a few steps: a big hit, lightning, a power-up."),
+  fn("Effects", "screen_fade", [p("to", "number", "1.0"), p("steps", "number", "30"), p("color", "color", '"black"')], "nothing",
+    "Fades the screen to a colour (to=1) or back from it (to=0). Fade out, change room, fade in: it lasts across rooms."),
+  fn("Effects", "tween", [p("target", "any"), p("prop", "string"), p("to", "number"), p("steps", "number", "30"), p("ease", "string", '"out_quad"')], "nothing",
+    'Moves a property smoothly to a value over `steps` steps: tween(self, "y", 100, 30, "out_bounce"). Eases: linear, in_quad, out_quad, in_out_quad, in_cubic, out_cubic, in_out_cubic, in_sine, out_sine, in_out_sine, in_back, out_back, in_out_back, in_bounce, out_bounce, out_elastic.'),
+  fn("Effects", "tween_stop", [p("target", "any"), p("prop", "string", "None")], "nothing",
+    "Stops a target's tweens (or just the one moving prop), leaving it where it got to."),
+  fn("Effects", "ease", [p("name", "string"), p("t", "number")], "a number",
+    'An easing at t, from 0 to 1: the curve tween() moves along. ease("out_bounce", 0.5).'),
+  fn("Effects", "say", [p("text", "any"), p("name", "string", "None")], "nothing",
+    "Shows text in a box at the bottom of the screen, typed out. Space, Enter or a click goes on to the next say()."),
+  fn("Effects", "dialogue_open", [], "True or False", "True while say() has something on screen: stop the player moving while people talk."),
+  fn("Effects", "dialogue_clear", [], "nothing", "Closes the dialogue box and forgets lines still waiting."),
+
   // Debug
   fn("Debug", "show_debug", [p("text", "any")], "nothing",
     "Shows text in the corner of the game until it is changed. show_debug(None) hides it."),
@@ -225,6 +261,11 @@ export const PROPERTIES: { name: string; description: string }[] = [
   { name: "visible", description: "Whether it is drawn." },
   { name: "solid", description: "Whether place_free and move_and_collide treat it as a wall." },
   { name: "depth", description: "Lower depth draws on top." },
+  { name: "image_blend", description: 'A colour the sprite is tinted with: "red" makes it reddish; "white" is as drawn.' },
+  { name: "blend_mode", description: '"normal", "add" (glowing: fire, lasers, magic), "multiply" (darker) or "screen" (lighter).' },
+  { name: "outline", description: 'A coloured outline round the sprite: self.outline = "white"; None takes it off.' },
+  { name: "glow", description: 'A soft glow round the sprite: self.glow = "yellow"; None takes it off.' },
+  { name: "flash", description: 'self.flash("white", 6): drawn as one solid colour for a few steps — "I was hit".' },
   { name: "alarm", description: "Twelve countdowns: self.alarm[0] = 60 runs on_alarm_0 in 60 steps." },
   { name: "object_name", description: "The name of this instance's object." },
   { name: "once", description: 'self.once("key", condition): True the first step the condition is true, then not until it has been false. Event sheets\' "Trigger once".' },

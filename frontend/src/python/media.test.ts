@@ -174,9 +174,9 @@ describe("fonts", () => {
     expect(error).toBeNull();
     run(gd, 1);
     expect(gd.engine.guiList.map((c) => c.slice(4))).toEqual([
-      ["a", 0xffffff, -1, 16],
-      ["b", 0xffffff, 1, 32],
-      ["c", 0xffffff, -1, 16],
+      ["a", 0xffffff, -1, 16, 1],
+      ["b", 0xffffff, 1, 32, 1],
+      ["c", 0xffffff, -1, 16, 1],
     ]);
     expect(() => py(gd, 'draw_set_font("comic")')).toThrow(/no font called 'comic'. Fonts: pixel, title/);
     gd.dispose();

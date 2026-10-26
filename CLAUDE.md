@@ -375,6 +375,25 @@ notes are `notes.md` in `Assignment.files`, shown in the editor's Notes tab.
 - Code in notes is `user-select: none` (the teacher's decision: no copying
   tutorial code). Don't add a Copy button.
 
+## Game feel
+
+`engine/effects.ts` (state: particles, weather, lighting, screen effect,
+hit-pause), `engine/render/feel.ts` (drawing them; the shaders), and the
+"game feel" section of runtime.py (checks the student's request in words,
+sends orders as `fx`/`lights` with the step's commands; tweens, dialogue
+and fades are plain Python drawn with ordinary draw commands).
+
+- **Per-particle work stays in the engine**, never Python.
+- **In `endStep` the room changes before effect orders apply**: the new
+  room's Create events' orders come in the same step. Reversed, they were
+  wiped (a sabotage case holds it).
+- **Our shaders are high precision** (`program()` in feel.ts): a uniform at
+  two precisions fails to link and the effect silently isn't drawn.
+- New per-instance fields go AFTER the alarms in layout.ts (TINT..OUTLINE_COLOR),
+  so nothing before them moves.
+- Names Python checks against (effects, weather, screen effects, blend
+  modes) come from the engine through `layoutForPython`, never retyped.
+
 ## Tutorials
 
 `src/tutorials/` and `backend/tutorials.py`; built-in ones are
