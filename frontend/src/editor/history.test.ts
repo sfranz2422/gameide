@@ -18,6 +18,13 @@ describe("undo history", () => {
     expect(h.past.map((s) => s.project.name)).toEqual(["a", "c", "d"]);
   });
 
+  it("changes with no label are never merged", () => {
+    const h = new History();
+    h.record(at("a"), {}, 0);
+    h.record(at("b"), {}, 10);
+    expect(h.past.map((s) => s.project.name)).toEqual(["a", "b"]);
+  });
+
   it("a group is one step however long it takes, until it is ended", () => {
     const h = new History();
     h.record(at("a"), { group: "stroke1" }, 0);
@@ -50,5 +57,20 @@ describe("undo history", () => {
     expect(back.objects[0]!.sprite).toBeNull();
     expect(back.objects[0]!.events[0]!.code).toBe("typed since");
     expect(back.scripts[0]!.code).toBe("script typed since");
+  });
+
+  it("never changes blocks either, or whether an event is blocks", () => {
+    const before = blankProject("t");
+    const python = { ...newEvent({ type: "step" }), id: "p", code: "" };
+    const blocks = { ...newEvent({ type: "create" }), id: "b", mode: "blocks" as const, code: "self.x = 1", blocks: { variables: [] } };
+    before.objects.push({ ...newObject("Player"), events: [python, blocks] });
+    const now = structuredClone(before);
+    now.objects[0]!.sprite = "x";
+    Object.assign(now.objects[0]!.events[0]!, { mode: "blocks", code: "self.y = 2", blocks: { variables: [1] } }); // Python event became blocks
+    Object.assign(now.objects[0]!.events[1]!, { mode: "python", code: "converted" }); // and blocks converted to Python
+    delete now.objects[0]!.events[1]!.blocks;
+    const back = keepCode(before, now);
+    expect(back.objects[0]!.sprite).toBeNull();
+    expect(back.objects[0]!.events).toEqual(now.objects[0]!.events);
   });
 });

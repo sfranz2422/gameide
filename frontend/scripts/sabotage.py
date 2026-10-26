@@ -32,6 +32,8 @@ APP = "../backend/app.py"
 RO, RE = "src/editor/rooms/roomOps.ts", "src/editor/rooms/RoomEditor.tsx"
 SP, TO = "src/engine/sprites.ts", "src/editor/tiles/tileOps.ts"
 HI = "src/editor/history.ts"
+CB, PB, TB = "src/blocks/catalogBlocks.ts", "src/blocks/python.ts", "src/blocks/toolbox.ts"
+BE, OE = "src/blocks/BlocksEditor.tsx", "src/editor/ObjectEditor.tsx"
 CASES = [
  ("layout drift", RT, '"x": boxy(F.X)', '"x": boxy(F.Y)', "every built-in property"),
  ("no polar sync", RT, "            _st[b + i] = v\n            set_polar(b)", "            _st[b + i] = v", "two views of one motion"),
@@ -199,8 +201,8 @@ CASES = [
  ("palette single only", RE, "            if (n !== null) setStamp(stampFromPalette(anchor, n, grid.columns));", "            if (n !== null) setStamp(stampFromPalette(n, n, grid.columns));", "painting a level", E2E),
  # Phase 6 gaps: undo, remap, chunks, autotiling
  ("undo changes code", HI, "  const out = structuredClone(snapshot);\n  const events", "  const out = structuredClone(snapshot);\n  if (out) return out;\n  const events", "never changes code"),
- ("undo groups forever", HI, "    const same = this.group === group && (opts.group !== undefined || now - this.at < GROUP_MS);", "    const same = this.group === group;", "close together are one"),
- ("groups time out", HI, "    const same = this.group === group && (opts.group !== undefined || now - this.at < GROUP_MS);", "    const same = this.group === group && now - this.at < GROUP_MS;", "one step however long"),
+ ("undo groups forever", HI, "    const same = group !== null && this.group === group && (opts.group !== undefined || now - this.at < GROUP_MS);", "    const same = group !== null && this.group === group;", "close together are one"),
+ ("groups time out", HI, "    const same = group !== null && this.group === group && (opts.group !== undefined || now - this.at < GROUP_MS);", "    const same = group !== null && this.group === group && now - this.at < GROUP_MS;", "one step however long"),
  ("redo kept", HI, "    this.future = [];\n    this.group = group;", "    this.group = group;", "clears redo"),
  ("code edits are undo steps", "src/editor/ObjectEditor.tsx", '                    { history: "skip" },', '                    { history: "record" },', "never undoes typing", E2E),
  ("room edits not undoable", RE, "      mutate((p) => recipe(find(p, \"rooms\", roomId)!), { label, ...(stroke.current ? { group: stroke.current } : {}) }),", "      mutate((p) => recipe(find(p, \"rooms\", roomId)!), { label, history: \"skip\" }),", "never undoes typing", E2E),
@@ -219,6 +221,36 @@ CASES = [
  ("in order does nothing", "src/editor/tiles/TilesetEditor.tsx", "              onClick={() => change((t) => void (t.autotiles.find((x) => x.id === current.id)!.tiles = Array.from({ length: 16 }, (_, i) => from + i)))}", "              onClick={() => change((t) => void (t.autotiles.find((x) => x.id === current.id)!.tiles = t.autotiles.find((x) => x.id === current.id)!.tiles.map((n) => n + 0 * from)))}", "filled in order", E2E),
  ("picture closed early", "src/editor/tiles/TilesetEditor.tsx", "    return () => {\n      alive = false;\n    };\n  }, [blob]);", "    return () => {\n      alive = false;\n      shown.current?.close();\n    };\n  }, [blob]);", "wider replacement picture", E2E),
  ("no isolation", "vite.config.ts", '  "Cross-Origin-Embedder-Policy": "credentialless",', "", "stopped at its line", E2E),
+ # Phase 7: code blocks
+ ("catalog block missing", TB, "    for (const type of blocksFor(e)) out.push({ kind: \"block\", type, inputs });", "    for (const type of blocksFor(e).slice(1)) out.push({ kind: \"block\", type, inputs });", "every catalog entry's blocks"),
+ ("extra argument", CB, "  return `${f.name}(${args.map((a) => a.code).join(\", \")})`;", "  return `${f.name}(${args.map((a) => a.code).join(\", \")}${args.length ? \", 0\" : \"\"})`;", "calls with the catalog's parameters"),
+ ("bad Python", CB, "  return `${target} += ${arg(b, g, \"BY\", Order.ADDITIVE)}\\n`;", "  return `${target} +== ${arg(b, g, \"BY\", Order.ADDITIVE)}\\n`;", "calls with the catalog's parameters"),
+ ("defaults written out", CB, "  while (args.length && args[args.length - 1]!.isDefault) args.pop();", "", "optional arguments still at their default"),
+ ("negative added", CB, "Number(by.getFieldValue(\"NUM\")) < 0)", "Number(by.getFieldValue(\"NUM\")) < -1e9)", "what a person would type"),
+ ("two-space indent", PB, "    this.INDENT = \"    \";", "    this.INDENT = \"  \";", "what a person would type"),
+ ("single quotes", PB, "  override quote_(s: string): string {", "  quoteUnused(s: string): string {", "what a person would type"),
+ ("x = None lines", PB, "      .filter(([k]) => k !== \"variables\")", "      .filter(([k]) => k !== \"variables_\")", "no `x = None` lines"),
+ ("unused import", PB, "      return !m || body.includes(`${m[1]}.`);", "      return !m || body.length >= 0;", "imports only what it uses"),
+ ("no f-strings", CB, "generators[\"text_join\"] = (b, g) => {", "generators[\"text_join_unused\"] = (b, g) => {", "joins text into an f-string"),
+ ("braces not doubled", CB, ".replace(/[{}]/g, (c) => c + c)", ".replace(/[{}]/g, (c) => c)", "joins text into an f-string"),
+ ("loose blocks run", PB, "  const body = first ? (gen.blockToCode(first) as string) : \"\";", "  const body = ws.getTopBlocks(true).filter((b) => b !== hat).map((b) => gen.blockToCode(b) as string).join(\"\") + (first ? (gen.blockToCode(first) as string) : \"\");", "aren't under the hat"),
+ ("unknown name swapped", CB, "    return typeof value === \"string\" ? value : null;", "    return typeof value === \"string\" && currentNames().objects.includes(value) ? value : null;", "no longer has"),
+ ("no line map", PB, "    if (m) current = m[2]!;", "    if (m) current = null;", "which block made each line"),
+ ("error selects nothing", BE, "    Blockly.getFocusManager().focusNode(block);\n", "", "selects the block that made it", E2E),
+ ("rename skips blocks", PJ, "      if (e.blocks) renameInBlocks(e.blocks, from, to);", "      if (e.blocks && from === to) renameInBlocks(e.blocks, from, to);", "renames in blocks too"),
+ ("open blocks not reloaded", BE, "    if (!w || json === saved.current) return;", "    if (!w || json !== \"\") return;", "renames it in the blocks' pickers", E2E),
+ ("undo reverts blocks mode", HI, "      e.mode = now.mode;\n", "", "never changes blocks either"),
+ ("undo restores converted blocks", HI, "      else delete e.blocks;", "      else e.blocks = e.blocks;", "never changes blocks either"),
+ ("unlabelled merged", HI, "    const group = opts.group ?? (opts.label !== undefined ? `auto:${opts.label}` : null);", "    const group = opts.group ?? `auto:${opts.label ?? \"\"}`;", "never merged"),
+ ("object changes share a label", OE, '  const set = (recipe: (o: ObjectResource) => void, label: string) => mutate((p) => recipe(find(p, "objects", objectId)!), { label });', '  const set = (recipe: (o: ObjectResource) => void, label: string) => mutate((p) => recipe(find(p, "objects", objectId)!), { label: label.slice(0, 0) });', "elsewhere it undoes the project", E2E),
+ ("Python becomes blocks", OE, "              disabled={!current || (!isBlocks && !!current.code.trim())}", "              disabled={!current}", "Python never becomes blocks", E2E,
+  ("    if (ev.code.trim()) return; // the tab is disabled: Python never becomes blocks\n", "")),
+ ("converted without asking", OE, "      hasBlocks(ev.blocks) &&\n      !confirm(", "      false &&\n      !confirm(", "Python never becomes blocks", E2E),
+ ("Ctrl+Z in blocks undoes the project", "src/editor/EditorPage.tsx", '!!t.closest(".cm-editor, .blocks-editor, .blocklyWidgetDiv, .blocklyDropDownDiv")', '!!t.closest(".cm-editor")', "in the blocks undoes blocks", E2E),  # -g is a regex: no "+" in it
+ ("blocks not saved", BE, "        latest.current.onChange(state, py.code);", "        void state;", "the game runs it", E2E),
+ ("media not built", "vite.config.ts", "      for (const f of readdirSync(blocklyMediaDir)) copyFileSync", "      for (const f of readdirSync(blocklyMediaDir).slice(0, 0)) copyFileSync", "the game runs it", E2E),
+ ("media not served", APP, '    r = send_from_directory(DIST / "blockly-media", name)', '    r = send_from_directory(DIST / "blockly-medium", name)', "Blockly's media", PY),
+ ("still version 4", PJ, "  if (p.schemaVersion < 5) p.schemaVersion = 5;", "", "version 1 rooms"),
 ]
 only = sys.argv[1:]
 # A name that matches no case would otherwise run nothing and still say

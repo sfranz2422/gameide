@@ -9,13 +9,14 @@
  * or a burst of edits with the same label within GROUP_MS — typing "1280"
  * into a width box is one undo, not four.
  *
- * Code is not part of it. Code has its own undo, inside its editor, and an
- * undo here must never touch it: restoring an older snapshot keeps every
- * event's, script's and creation code's current text (`keepCode`). Without
+ * Code is not part of it, typed or made with blocks. Code has its own undo,
+ * inside its editor, and an undo here must never touch it: restoring an
+ * older snapshot keeps every event's, script's and creation code's current
+ * text, and an event's blocks (`keepCode`). Without
  * that, undoing a sprite change would quietly throw away ten minutes of
  * typing done since.
  */
-import type { Project } from "../store/project";
+import type { ObjectEvent, Project } from "../store/project";
 
 export const GROUP_MS = 1000;
 export const MAX_STEPS = 200;
@@ -35,9 +36,20 @@ export interface RecordOptions {
 /** `snapshot`, with all code as it is in `current` wherever the same thing still exists. */
 export function keepCode(snapshot: Project, current: Project): Project {
   const out = structuredClone(snapshot);
-  const events = new Map<string, string>();
-  for (const o of current.objects) for (const e of o.events) events.set(e.id, e.code);
-  for (const o of out.objects) for (const e of o.events) if (events.has(e.id)) e.code = events.get(e.id)!;
+  // An event's blocks are its code too, and so is whether it is blocks at
+  // all: undoing a sprite change must not turn blocks back into Python, or
+  // Python (after Convert) back into blocks.
+  const events = new Map<string, ObjectEvent>();
+  for (const o of current.objects) for (const e of o.events) events.set(e.id, e);
+  for (const o of out.objects)
+    for (const e of o.events) {
+      const now = events.get(e.id);
+      if (!now) continue;
+      e.code = now.code;
+      e.mode = now.mode;
+      if (now.blocks) e.blocks = structuredClone(now.blocks);
+      else delete e.blocks;
+    }
   const scripts = new Map(current.scripts.map((s) => [s.id, s.code]));
   for (const s of out.scripts) if (scripts.has(s.id)) s.code = scripts.get(s.id)!;
   const creation = new Map<string, string>();
@@ -54,8 +66,11 @@ export class History {
 
   /** A change is about to replace `before`. */
   record(before: Project, opts: RecordOptions = {}, now = Date.now()) {
-    const group = opts.group ?? `auto:${opts.label ?? ""}`;
-    const same = this.group === group && (opts.group !== undefined || now - this.at < GROUP_MS);
+    // A change with no label is a step of its own: two unlabelled changes
+    // can't be told apart, and grouping them merged adding an event with
+    // the tick made a moment later, so undoing the tick deleted the event.
+    const group = opts.group ?? (opts.label !== undefined ? `auto:${opts.label}` : null);
+    const same = group !== null && this.group === group && (opts.group !== undefined || now - this.at < GROUP_MS);
     if (!same) {
       this.past.push({ project: before, label: opts.label ?? "" });
       if (this.past.length > MAX_STEPS) this.past.shift();

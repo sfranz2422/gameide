@@ -671,5 +671,14 @@ def pyodide_files(name):
     return r
 
 
+@app.get("/blockly-media/<path:name>")
+def blockly_media(name):
+    # The blocks editor's cursors, icons and sounds (copied in by the build);
+    # see vite.config.ts for why they aren't fetched from Google.
+    r = send_from_directory(DIST / "blockly-media", name)
+    r.headers["Cache-Control"] = "public, max-age=86400"
+    return r
+
+
 if __name__ == "__main__":
     app.run(port=int(os.environ.get("PORT", "5001")), debug=True)

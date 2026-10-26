@@ -15,10 +15,11 @@
  * image bytes separately (IndexedDB now, the server in Phase 3), so saving a
  * keystroke does not rewrite every picture.
  */
+import { renameInBlocks, type BlocksState } from "../blocks/blockState";
 import { KEY_NAMES, MOUSE_BUTTONS, type KeyName } from "../engine/layout";
 
 /** Bump when the format changes, and teach `migrate` the old shape. */
-export const SCHEMA_VERSION = 4; // 2: room layers, grid, camera, instance overrides. 3: tilesets and tile layers. 4: autotile sets
+export const SCHEMA_VERSION = 5; // 2: room layers, grid, camera, instance overrides. 3: tilesets and tile layers. 4: autotile sets. 5: code blocks
 
 export interface Project {
   format: "gameide-project";
@@ -141,12 +142,16 @@ export interface ObjectEvent {
   id: string;
   key: EventKey;
   /**
-   * How the event is written. Only "python" exists yet; "blocks" (Phase 7)
-   * and "sheet" (Phase 8) will keep their own data here and generate `code`.
+   * How the event is written. "python" is typed; "blocks" keeps its blocks
+   * in `blocks` and writes the Python they make into `code` on every change,
+   * so the game, error mapping and export only ever read `code`. "sheet"
+   * (Phase 8) will do the same. Python never turns back into blocks.
    */
-  mode: "python";
-  /** The body of the method: what the student typed, without the def line. */
+  mode: "python" | "blocks";
+  /** The body of the method, without the def line: typed, or made by the blocks. */
   code: string;
+  /** Blockly's saved workspace, when mode is "blocks" (blocks/blockState.ts). */
+  blocks?: BlocksState;
 }
 
 export interface RoomResource {
@@ -504,7 +509,11 @@ export function quotedUses(project: Project, name: string): { where: string; cou
 export function replaceQuoted(project: Project, from: string, to: string) {
   const re = new RegExp(`(["'])${from.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\1`, "g");
   const sub = (code: string) => code.replace(re, (_m, q: string) => `${q}${to}${q}`);
-  for (const o of project.objects) for (const e of o.events) e.code = sub(e.code);
+  for (const o of project.objects)
+    for (const e of o.events) {
+      e.code = sub(e.code);
+      if (e.blocks) renameInBlocks(e.blocks, from, to);
+    }
   for (const s of project.scripts) s.code = sub(s.code);
 }
 
@@ -578,6 +587,7 @@ export function migrate(data: unknown): Project {
   if (p.schemaVersion < 2) upgradeTo2(p as Project);
   if (p.schemaVersion < 3) upgradeTo3(p as Project);
   if (p.schemaVersion < 4) upgradeTo4(p as Project);
+  if (p.schemaVersion < 5) p.schemaVersion = 5; // 4 → 5: events may be blocks; every older one is Python, as it says
   return p as Project;
 }
 

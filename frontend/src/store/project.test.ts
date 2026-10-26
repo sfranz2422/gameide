@@ -54,6 +54,14 @@ describe("renaming references in code", () => {
     replaceQuoted(p, "Coin", "Gem");
     expect(p.objects[1]!.events[0]!.code).toBe(`if place_meeting(x, y, "Gem") or instance_exists('Gem'):\n    Coin = "Coins"\n`);
   });
+
+  it("renames in blocks too, so the next change to them doesn't write the old name back", () => {
+    const p = withObjects("Coin", "Player");
+    const blocks = { blocks: { languageVersion: 0, blocks: [{ type: "gm_object", fields: { NAME: "Coin" } }] } };
+    p.objects[1]!.events.push({ ...newEvent({ type: "step" }), mode: "blocks", code: 'instance_number("Coin")', blocks });
+    replaceQuoted(p, "Coin", "Gem");
+    expect(p.objects[1]!.events[0]!.blocks).toEqual({ blocks: { languageVersion: 0, blocks: [{ type: "gm_object", fields: { NAME: "Gem" } }] } });
+  });
 });
 
 describe("loading an older project", () => {
@@ -66,7 +74,7 @@ describe("loading an older project", () => {
     };
     const p = migrate(old);
     const room = p.rooms[0]!;
-    expect(p.schemaVersion).toBe(4);
+    expect(p.schemaVersion).toBe(5);
     expect(p.tilesets).toEqual([]); // 2 → 3 added tilesets
     expect(room.camera).toEqual({ enabled: false, width: 800, height: 600, follow: null, smoothing: 1 });
     expect([room.gridWidth, room.snap]).toEqual([32, true]);

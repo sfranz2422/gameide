@@ -76,7 +76,7 @@ export function SettingsEditor() {
     <div className="settings-editor pad">
       <label className="field">
         Game name
-        <input value={project.name} onChange={(e) => mutate((p) => void (p.name = e.target.value))} />
+        <input value={project.name} onChange={(e) => mutate((p) => void (p.name = e.target.value), { label: "rename the game" })} />
       </label>
       <label className="field">
         Steps per second
@@ -85,7 +85,7 @@ export function SettingsEditor() {
           min={1}
           max={240}
           value={project.settings.stepsPerSecond}
-          onChange={(e) => mutate((p) => void (p.settings.stepsPerSecond = Math.min(240, Math.max(1, Number(e.target.value) || 60))))}
+          onChange={(e) => mutate((p) => void (p.settings.stepsPerSecond = Math.min(240, Math.max(1, Number(e.target.value) || 60))), { label: "change steps per second" })}
         />
         <span className="muted small">How many times a second Step runs. 60 is usual; speeds are in pixels per step.</span>
       </label>

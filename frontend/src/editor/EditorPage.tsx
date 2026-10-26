@@ -125,9 +125,9 @@ export function EditorPage({ store, id }: { store: ProjectStore; id: string }) {
       }
       // Ctrl+Z everywhere but where text is being typed: a code editor or a
       // box has its own undo, and taking the key there would undo the
-      // project instead of the typing.
+      // project instead of the typing. The blocks workspace has its own too.
       const t = e.target as HTMLElement | null;
-      const typing = !!t && (!!t.closest(".cm-editor") || t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable);
+      const typing = !!t && (!!t.closest(".cm-editor, .blocks-editor, .blocklyWidgetDiv, .blocklyDropDownDiv") || t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable);
       if (!typing && (e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === "z" || e.key.toLowerCase() === "y")) {
         e.preventDefault();
         if (e.key.toLowerCase() === "y" || e.shiftKey) redo();
@@ -289,7 +289,7 @@ export function EditorPage({ store, id }: { store: ProjectStore; id: string }) {
           <input
             className="project-name"
             value={project.name}
-            onChange={(e) => mutate((p) => void (p.name = e.target.value))}
+            onChange={(e) => mutate((p) => void (p.name = e.target.value), { label: "rename the game" })}
             aria-label="Game name"
             data-tutorial="project-name"
           />

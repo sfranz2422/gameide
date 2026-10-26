@@ -6,8 +6,8 @@
  * against the runtime both ways (catalog.test.ts: every entry exists in
  * runtime.py with exactly these parameters, and every public name in
  * runtime.py has an entry). Later phases read it to build autocomplete
- * (Phase 2), Blockly blocks (Phase 7), event-sheet pickers (Phase 8) and the
- * in-IDE docs — so a function added here and in runtime.py appears in all of
+ * (Phase 2), code blocks (Phase 7: blocks/catalogBlocks.ts makes one per
+ * entry), event-sheet pickers (Phase 8) and the in-IDE docs — so a function added here and in runtime.py appears in all of
  * them, and one added to only one of the two fails the test.
  *
  * Functions planned for later phases (camera_*, sound_*, tile_at) are not
@@ -40,6 +40,12 @@ export interface ApiFunction {
   params: Param[];
   returns: string; // in words: "an instance or None"
   description: string;
+  /**
+   * Also worth calling for what it does, ignoring what it gives back
+   * (instance_create, move_and_collide): code blocks then offer a statement
+   * version beside the value one.
+   */
+  alsoStatement?: boolean;
 }
 
 export interface ApiVariable {
@@ -58,14 +64,15 @@ const fn = (
   params: Param[],
   returns: string,
   description: string,
-): ApiFunction => ({ kind: "function", name, category, params, returns, description });
+  extra: Partial<ApiFunction> = {},
+): ApiFunction => ({ kind: "function", name, category, params, returns, description, ...extra });
 
 const p = (name: string, type: ParamType, def?: string): Param => (def === undefined ? { name, type } : { name, type, default: def });
 
 export const API: ApiEntry[] = [
   // Instances
   fn("Instances", "instance_create", [p("x", "number"), p("y", "number"), p("obj", "object")], "the new instance",
-    "Makes a new instance of an object at (x, y). Its Create event runs straight away."),
+    "Makes a new instance of an object at (x, y). Its Create event runs straight away.", { alsoStatement: true }),
   fn("Instances", "instance_exists", [p("obj", "object")], "True or False",
     "Is there at least one instance of this object? Also takes an instance, to ask if it is still alive."),
   fn("Instances", "instance_number", [p("obj", "object")], "a whole number",
@@ -110,7 +117,8 @@ export const API: ApiEntry[] = [
     "a number", "The distance between two points, in pixels."),
   fn("Motion", "move_and_collide", [p("dx", "number"), p("dy", "number"), p("obj", "object", "None")],
     "a list of the instances it bumped into",
-    "Moves by (dx, dy), stopping flush against the object or tile layer — or, with none named, anything solid, solid tiles included."),
+    "Moves by (dx, dy), stopping flush against the object or tile layer — or, with none named, anything solid, solid tiles included.",
+    { alsoStatement: true }),
 
   // Drawing
   fn("Drawing", "draw_self", [], "nothing", "Draws this instance's sprite as it would be drawn without a Draw event."),

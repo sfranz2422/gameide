@@ -1,4 +1,4 @@
-import { createReadStream, copyFileSync, existsSync, mkdirSync, statSync } from "node:fs";
+import { createReadStream, copyFileSync, existsSync, mkdirSync, readdirSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { createRequire } from "node:module";
 import type { Plugin } from "vite";
@@ -24,6 +24,12 @@ const PYODIDE_FILES = [
 const require = createRequire(import.meta.url);
 const pyodideDir = dirname(require.resolve("pyodide/package.json"));
 
+// Blockly's cursors, icons and sounds. It would fetch them from Google's
+// demo site unless told otherwise; served from here, a school filter can't
+// leave the blocks editor without its trash can and drag cursors.
+// (Found from Blockly's main file: its package doesn't export package.json.)
+const blocklyMediaDir = join(dirname(require.resolve("blockly")), "media");
+
 function servePyodide(): Plugin {
   const types: Record<string, string> = {
     ".mjs": "text/javascript",
@@ -35,6 +41,13 @@ function servePyodide(): Plugin {
     name: "gameide-pyodide",
     configureServer(server) {
       server.middlewares.use((req, res, next) => {
+        const media = req.url?.match(/^\/blockly-media\/([\w.-]+)/)?.[1];
+        if (media && existsSync(join(blocklyMediaDir, media))) {
+          res.setHeader("Content-Type", media.endsWith(".svg") ? "image/svg+xml" : media.endsWith(".mp3") ? "audio/mpeg" : "application/octet-stream");
+          for (const [k, v] of Object.entries(ISOLATION)) res.setHeader(k, v);
+          createReadStream(join(blocklyMediaDir, media)).pipe(res);
+          return;
+        }
         const m = req.url?.match(/^\/pyodide\/([^?]+)/);
         const file = m?.[1];
         if (!file || !PYODIDE_FILES.includes(file)) return next();
@@ -50,6 +63,9 @@ function servePyodide(): Plugin {
       const out = join(options.dir ?? resolve("dist"), "pyodide");
       if (!existsSync(out)) mkdirSync(out, { recursive: true });
       for (const f of PYODIDE_FILES) copyFileSync(join(pyodideDir, f), join(out, f));
+      const media = join(options.dir ?? resolve("dist"), "blockly-media");
+      if (!existsSync(media)) mkdirSync(media, { recursive: true });
+      for (const f of readdirSync(blocklyMediaDir)) copyFileSync(join(blocklyMediaDir, f), join(media, f));
     },
   };
 }
@@ -84,7 +100,8 @@ export default defineConfig({
   // Pixi is listed because only the game worker imports it: the dev server
   // would otherwise find it on the first Play and reload the page, losing
   // whatever the student had open.
-  optimizeDeps: { exclude: ["pyodide"], include: ["pixi.js"] },
+  // Blockly likewise: only the lazily loaded Blocks tab imports it.
+  optimizeDeps: { exclude: ["pyodide"], include: ["pixi.js", "blockly/core", "blockly/blocks", "blockly/python", "blockly/msg/en"] },
   test: {
     environment: "node",
     include: ["src/**/*.test.ts"],

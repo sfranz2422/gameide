@@ -214,6 +214,19 @@ for path in ("/api/me", "/", "/healthz"):
           r.headers.get("Cross-Origin-Opener-Policy") == "same-origin"
           and r.headers.get("Cross-Origin-Embedder-Policy") == "credentialless")
 
+# ---------------------------------------------------------------- the built editor's files
+# The blocks editor's media come from our own origin (vite.config.ts copies
+# them into dist/blockly-media); without this route the trash can and drag
+# cursors 404 in production only, where the dev server isn't there to serve them.
+fake_dist = Path(tempfile.mkdtemp())
+(fake_dist / "blockly-media").mkdir()
+(fake_dist / "blockly-media" / "sprites.svg").write_text("<svg/>")
+real_dist, server.DIST = server.DIST, fake_dist
+r = anon.get("/blockly-media/sprites.svg")
+check("Blockly's media are served from our origin", r.status_code == 200 and r.data == b"<svg/>", r.status_code)
+check("…and nothing outside that folder", anon.get("/blockly-media/../index.html").status_code == 404)
+server.DIST = real_dist
+
 print()
 if failures:
     print(f"FAILED: {len(failures)} — " + "; ".join(failures))

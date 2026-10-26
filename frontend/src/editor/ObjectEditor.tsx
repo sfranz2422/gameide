@@ -3,8 +3,15 @@
  * the selected event's code. Each event is the body of one method; the
  * `def` line it lives in is shown above the box, and "Python class" shows
  * the whole generated class, read-only, so students see the real Python.
+ *
+ * An event is written in Python or with blocks (its `mode`), and the tabs
+ * say which. An empty event can be switched either way freely. One with
+ * blocks can be converted to Python, once, after a warning; Python never
+ * goes back to blocks — that would mean reading arbitrary code as blocks,
+ * and a student's typing would come back changed.
  */
-import { useMemo, useState } from "react";
+import { lazy, Suspense, useMemo, useRef, useState } from "react";
+import { emptyBlocks, hasBlocks } from "../blocks/blockState";
 import { KEY_NAMES } from "../engine/layout";
 import { generateObject, methodSignature } from "../python/codegen";
 import {
@@ -15,6 +22,7 @@ import {
   sameEvent,
   wouldLoop,
   type EventKey,
+  type ObjectEvent,
   type ObjectResource,
   type Project,
 } from "../store/project";
@@ -22,6 +30,9 @@ import { CodeEditor } from "./code/CodeEditor";
 import type { ProjectNames } from "./code/pythonHelp";
 import { Icon } from "./ui/icons";
 import { useProjectApi } from "./useProject";
+
+// Blockly is about 700 KB: fetched the first time a Blocks tab opens.
+const BlocksEditor = lazy(() => import("../blocks/BlocksEditor"));
 
 export interface EventFocus {
   eventId: string;
@@ -54,9 +65,12 @@ export function ObjectEditor({
   const [showClass, setShowClass] = useState(false);
   const [adding, setAdding] = useState(false);
   const generated = useMemo(() => (obj && showClass ? generateObject(project, obj).source : ""), [project, obj, showClass]);
+  const projectRef = useRef(project);
+  projectRef.current = project;
   if (!obj) return <div className="empty-pane">This object was deleted.</div>;
 
-  const set = (recipe: (o: ObjectResource) => void) => mutate((p) => recipe(find(p, "objects", objectId)!));
+  /** `label` names the undo step ("Undo change depth"), and keeps different changes apart. */
+  const set = (recipe: (o: ObjectResource) => void, label: string) => mutate((p) => recipe(find(p, "objects", objectId)!), { label });
   const events = [...obj.events].sort((a, b) => eventSortKey(a.key) - eventSortKey(b.key));
   const current = obj.events.find((e) => e.id === selected) ?? events[0] ?? null;
 
@@ -65,16 +79,52 @@ export function ObjectEditor({
     const existing = obj.events.find((e) => sameEvent(e.key, key));
     if (existing) return select(existing.id);
     const ev = newEvent(key);
-    set((o) => void o.events.push(ev));
+    set((o) => void o.events.push(ev), `add ${eventLabel(project, key)} event`);
     select(ev.id);
   };
 
   const removeEvent = (id: string) => {
     const ev = obj.events.find((e) => e.id === id)!;
-    if (ev.code.trim() && !confirm(`Delete the ${eventLabel(project, ev.key)} event and its code?`)) return;
-    set((o) => void (o.events = o.events.filter((e) => e.id !== id)));
+    if ((ev.code.trim() || hasBlocks(ev.blocks)) && !confirm(`Delete the ${eventLabel(project, ev.key)} event and its code?`)) return;
+    set((o) => void (o.events = o.events.filter((e) => e.id !== id)), `delete ${eventLabel(project, ev.key)} event`);
     if (selected === id) select(null);
   };
+
+  // Changing how an event is written is a change to its code, so it stays
+  // out of the project's undo like typing does (history.ts).
+  const setEvent = (eventId: string, recipe: (e: ObjectEvent) => void) =>
+    mutate(
+      (p) => {
+        const ev = find(p, "objects", objectId)?.events.find((x) => x.id === eventId);
+        if (ev) recipe(ev);
+      },
+      { history: "skip" },
+    );
+  const toBlocks = (ev: ObjectEvent) => {
+    setShowClass(false);
+    if (ev.mode === "blocks") return;
+    if (ev.code.trim()) return; // the tab is disabled: Python never becomes blocks
+    setEvent(ev.id, (e) => {
+      e.mode = "blocks";
+      e.blocks = emptyBlocks();
+    });
+  };
+  const toPython = (ev: ObjectEvent) => {
+    setShowClass(false);
+    if (ev.mode === "python") return;
+    if (
+      hasBlocks(ev.blocks) &&
+      !confirm(
+        `Turn the ${eventLabel(project, ev.key)} event into Python?\n\nYou'll edit the Python from now on. It can't be turned back into blocks.`,
+      )
+    )
+      return;
+    setEvent(ev.id, (e) => {
+      e.mode = "python";
+      delete e.blocks;
+    });
+  };
+  const isBlocks = current?.mode === "blocks";
 
   return (
     <div className="object-editor" data-tutorial="object-editor">
@@ -83,7 +133,7 @@ export function ObjectEditor({
           Sprite
           <select
             value={obj.sprite ?? ""}
-            onChange={(e) => set((o) => void (o.sprite = e.target.value || null))}
+            onChange={(e) => set((o) => void (o.sprite = e.target.value || null), "change sprite")}
             data-tutorial="object-sprite"
             data-testid="object-sprite"
           >
@@ -97,7 +147,7 @@ export function ObjectEditor({
         </label>
         <label>
           Parent
-          <select value={obj.parent ?? ""} onChange={(e) => set((o) => void (o.parent = e.target.value || null))} data-tutorial="object-parent">
+          <select value={obj.parent ?? ""} onChange={(e) => set((o) => void (o.parent = e.target.value || null), "change parent")} data-tutorial="object-parent">
             <option value="">(none)</option>
             {project.objects
               .filter((o) => o.id !== obj.id)
@@ -113,7 +163,7 @@ export function ObjectEditor({
           <input
             type="number"
             value={obj.depth}
-            onChange={(e) => set((o) => void (o.depth = Number(e.target.value) || 0))}
+            onChange={(e) => set((o) => void (o.depth = Number(e.target.value) || 0), "change depth")}
             style={{ width: 64 }}
             data-tutorial="object-depth"
             title="Lower depth is drawn on top"
@@ -121,7 +171,7 @@ export function ObjectEditor({
         </label>
         {(["visible", "solid", "persistent"] as const).map((k) => (
           <label key={k} className="check" data-tutorial={`object-${k}`}>
-            <input type="checkbox" checked={obj[k]} onChange={(e) => set((o) => void (o[k] = e.target.checked))} />
+            <input type="checkbox" checked={obj[k]} onChange={(e) => set((o) => void (o[k] = e.target.checked), `change ${k}`)} />
             {k[0]!.toUpperCase() + k.slice(1)}
           </label>
         ))}
@@ -153,10 +203,30 @@ export function ObjectEditor({
 
         <section className="event-code">
           <div className="code-tabs" role="tablist">
-            <button role="tab" aria-selected={!showClass} className={!showClass ? "on" : ""} onClick={() => setShowClass(false)}>
+            <button
+              role="tab"
+              aria-selected={!showClass && !isBlocks}
+              className={!showClass && !isBlocks ? "on" : ""}
+              onClick={() => (current ? toPython(current) : setShowClass(false))}
+              data-testid="tab-python"
+              title={isBlocks ? "Turn these blocks into Python, to edit as Python from now on" : "Write this event in Python"}
+            >
               Python
             </button>
-            <button role="tab" disabled title="Code blocks arrive in a later phase">
+            <button
+              role="tab"
+              aria-selected={!showClass && isBlocks}
+              className={!showClass && isBlocks ? "on" : ""}
+              disabled={!current || (!isBlocks && !!current.code.trim())}
+              onClick={() => current && toBlocks(current)}
+              data-testid="tab-blocks"
+              data-tutorial="tab-blocks"
+              title={
+                current && !isBlocks && current.code.trim()
+                  ? "This event is written in Python. Python can't be turned into blocks — add a new event to use blocks."
+                  : "Build this event with code blocks"
+              }
+            >
               Blocks
             </button>
             <button role="tab" disabled title="Event sheets arrive in a later phase">
@@ -179,6 +249,25 @@ export function ObjectEditor({
               <div className="signature">The Python your events make. Read-only — edit the events instead.</div>
               <CodeEditor docKey={`class:${obj.id}`} value={generated} readOnly testId="generated-class" />
             </>
+          ) : current && isBlocks ? (
+            <Suspense fallback={<div className="empty-pane">Loading blocks…</div>}>
+              <BlocksEditor
+                key={current.id}
+                eventId={current.id}
+                signature={methodSignature(project, current.key)}
+                state={current.blocks ?? emptyBlocks()}
+                code={current.code}
+                onChange={(blocks, code) =>
+                  setEvent(current.id, (e) => {
+                    e.blocks = blocks;
+                    e.code = code;
+                  })
+                }
+                names={() => ({ layers: [], ...projectNames(projectRef.current) })}
+                onConvert={() => toPython(current)}
+                errorLine={focus && focus.eventId === current.id ? { line: focus.line, nonce: focus.nonce } : null}
+              />
+            </Suspense>
           ) : current ? (
             <>
               <div className="signature" title="Your code is the inside of this method">

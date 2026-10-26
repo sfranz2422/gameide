@@ -11,8 +11,8 @@ tests and updating PROGRESS.md.
 Pyodide; runs headless in node), `src/engine/render/` (PixiJS), `src/python/`
 (the bridge, `runtime.py`, the game worker, `codegen.ts`), `src/catalog/`
 (the API catalog), `src/store/` (the project format, IndexedDB, templates),
-`src/editor/` (the React UI). `blocks/`, `eventsheets/` wait for their
-phases. `backend/` is the Flask server.
+`src/editor/` (the React UI), `src/blocks/` (code blocks). `eventsheets/`
+waits for its phase. `backend/` is the Flask server.
 
 ## The game runs in a worker
 
@@ -94,15 +94,46 @@ testing.
 - One history per open project (`editor/history.ts`, held by
   `useProjectState`), not per tab. `mutate(recipe, { label, group,
   history })`: changes with the same label within 1 s, or with the same
-  explicit `group` (a drag), are one step.
+  explicit `group` (a drag), are one step. **An unlabelled change is always
+  a step of its own** — give a typed box a label, or every keystroke is a
+  step; give different changes different labels, or they merge (adding an
+  event and ticking Solid once merged, and undoing the tick deleted the event).
 - **Code edits pass `history: "skip"`** (their editor has its own undo), and
-  an undo restores a snapshot with *current* code (`keepCode`). A new place
-  that edits code must skip history too, or undo gains invisible steps.
+  an undo restores a snapshot with *current* code (`keepCode`) — an event's
+  `mode` and `blocks` count as code. A new place that edits code must skip
+  history too, or undo gains invisible steps.
 - `mutate` builds on `latest`, not a state updater: StrictMode runs updaters
   twice, which recorded every change twice.
 - Decoded pictures are closed only after their replacements are showing
   (`useBitmaps`, `useTilesetImage`); closing them in an effect's cleanup let
   the canvas draw a closed picture, which throws, and crashed the editor.
+
+## Code blocks
+
+- `src/blocks/`. An event with `mode: "blocks"` keeps Blockly's JSON in
+  `blocks` and **writes its Python into `code` on every change**, so the
+  game, error mapping, export and tutorial checks only ever read `code`.
+  Python never turns into blocks; blocks → Python is one way (Convert).
+- Blocks are made from the catalog (`catalogBlocks.ts`: one per function,
+  plus a statement version when `alsoStatement`), so a catalog entry needs
+  no block work. Hand-made ones: properties, my/global variables, self,
+  other, destroy, alarms, the event hat. Each block's look and Python sit
+  together in one `define`.
+- `blocks.test.ts` runs every palette block's Python through real Python
+  (compiles, right number of arguments). Generated Python must read like a
+  person's: 4 spaces, double quotes, `-= 4`, f-strings for joined text,
+  default arguments left out, no `x = None` lines, unused imports dropped.
+- Only blocks under the hat are code; loose ones are greyed and skipped.
+- Name pickers keep an unknown name (Blockly's dropdown silently swaps it
+  for the first option). Renaming walks blocks too (`renameInBlocks`), and
+  an open workspace reloads when its blocks change from outside.
+- Blockly (~220 KB gzipped) loads only when a Blocks tab opens; nothing
+  outside `BlocksEditor.tsx` and `python.ts`/`catalogBlocks.ts`/`toolbox.ts`
+  may import it (`blockState.ts` is the Blockly-free part). Its media are
+  served from `/blockly-media/` (dev: vite.config.ts; prod: app.py).
+- `blockly/core` has no words: `setLocale(En)` must run before a standard
+  block is made, or it throws. A theme colour Blockly can't read (one with
+  alpha) throws too, and the workspace never appears.
 
 ## Projects and code generation
 

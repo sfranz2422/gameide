@@ -1,6 +1,62 @@
 # Progress
 
-## Phase 6 gaps, fixed (2026-10-26, waiting for review)
+## Phase 7 — Code blocks ✅ (2026-10-26, waiting for review)
+
+### Done
+
+- **A Blocks tab for every event.** Drag blocks under the event's hat (`def on_step(self):`). The Python they make shows beside them, read-only, and changes as they do. On a narrow window it shows under them instead.
+- **The palette is made from the API catalog.** Every function and variable the runtime has is a block, in its catalog category, with its description as the tooltip. Adding a function to the catalog makes its block, with no other work. A test checks every catalog entry has its block and that each block's Python runs in real Python.
+- **Categories in Scratch's colours:** Motion, Instances, Collision, Input, Variables, Logic, Loops, Math, Text, Drawing, Rooms, Camera and Debug. Sound arrives with sounds in Phase 9, from the catalog like the rest. The blocks have Scratch's shapes (Blockly's "zelos" renderer).
+- **The Python reads like a person wrote it**, since students learn from it:
+  - `self.x -= 4`, not `self.x += -4`;
+  - `f"Score: {global_vars.score}"` for joined text;
+  - `camera_shake()` while its arguments are still the defaults;
+  - four-space indents and double quotes;
+  - no `x = None` lines, and no unused imports.
+  - The blocks say True, False, None, `and`, `or`, `not` and `print`.
+- **Variables:**
+  - "my" variables belong to the instance (`self.lives`) and keep their value between steps, which is what students almost always mean.
+  - "global" variables are shared by every object (`global_vars.score`).
+  - Local variables, for loops, live only inside the event.
+- **Blocks for the rest:** setting, changing and reading properties (x, hspeed, image_xscale…, also of `other` or a loop's `e`), `self` and `other`, destroy, alarms, and "for each e in instances(...)".
+- **Pickers for names:** objects, tile layers, sprites, rooms, keys, mouse buttons and colours, filled from the project. A name the project no longer has is kept, not swapped for another. The game then says "no object called Coin", which a student can act on.
+- **Renaming** an object or sprite changes it in blocks too, even in blocks open on screen.
+- **Convert to Python** turns a blocks event into ordinary Python, after a warning; it can't be undone. Python never turns into blocks: the Blocks tab is disabled for an event with Python in it. An empty event can switch either way freely.
+- **Loose blocks** lying beside the hat are greyed out and left out of the code, as in Scratch.
+- **Errors land on the block.** Clicking a game error selects the block that made the line and shows the line in the Python beside it.
+- **Undo:** Ctrl+Z inside the blocks undoes blocks, with Blockly's own undo. Anywhere else it undoes the project, and never changes blocks, just as it never changes typed code.
+- **Blockly 13.3.0** is the one new dependency. It adds about 220 KB gzipped, downloaded only the first time a Blocks tab opens. Students who only type Python never load it. Its icons and sounds come from our own server, not Google's, so a school filter can't break them.
+
+The project format is now **version 5**: an event can be `mode: "blocks"`, with its blocks beside its Python. Older projects load unchanged.
+
+### Found and fixed along the way
+
+- **Project undo merged unrelated changes.** Any two changes without a label made within a second became one undo step. Adding an event and then ticking Solid was one step, and undoing the tick deleted the event. Unlabelled changes are now always separate steps, and the object editor's changes have their own labels ("Undo change solid").
+
+### Tests
+
+```
+cd frontend
+npm test                      # Vitest: 148
+npm run e2e                   # Playwright: 40 editor tests + 7 account tests
+../backend/.venv/bin/python ../backend/tests/test_server.py   # 53 server checks
+python3 scripts/sabotage.py   # 198 deliberate bugs
+```
+
+New this phase:
+- `src/blocks/blocks.test.ts`: every catalog entry's block, every palette block's Python checked in real Pyodide, the exact text of typical programs, blocks running in a game, renaming.
+- `e2e/blocks.spec.ts`: building an event by dragging blocks and playing it; the Python/Blocks rules and Convert; an error selecting its block; Ctrl+Z in and out of the blocks; renaming with the blocks open.
+
+### Known issues and gaps
+
+- **Only object events have blocks.** Scripts and instance creation code stay Python, which suits what they're used for.
+- A function block shows its Python name and parameter names (`place_meeting x ( ) y ( ) obj ( )`) rather than a Scratch-style sentence. That's on purpose, so the block matches the Python beside it. Blockly's compare block shows `=` where the Python has `==`.
+- After a rename, a palette category still shows the old name until it is opened again. Blocks placed after that, and the code, use the new one.
+- No starter tutorial uses blocks yet. "Blocks to Python" is one of the four tutorials in Phase 11.
+
+---
+
+## Phase 6 gaps, fixed (2026-10-26, reviewed)
 
 You asked for Phase 6's known gaps to be fixed before Phase 7. Three of them are fixed, and one more turned out to be a crash.
 
@@ -345,9 +401,9 @@ of its own after Phase 9.
 | 10 Classrooms | classes, assignments, dashboard | |
 | 11 Tutorials | tutorial panel, checks, library | |
 
-## Next: Phase 7 — Code blocks
+## Next: Phase 8 — Event sheets
 
-Blockly, driven by the API catalog: custom block categories (Motion, Instances, Collision, Input, Variables, Logic, Loops, Math, Drawing, Rooms, Sound) in Scratch/MakeCode colours; blocks generate clean, readable Python shown beside them; "Convert to Python" (one way, with a warning).
+GDevelop-style rows of conditions → actions, with sub-events, "or" groups and comments, the pickers built from the same API catalog, compiled to Python shown beside the sheet.
 
 ---
 

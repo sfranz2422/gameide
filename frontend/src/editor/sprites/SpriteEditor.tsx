@@ -68,7 +68,8 @@ export function SpriteEditor({ spriteId, addFrames }: { spriteId: string; addFra
   if (!sprite) return <div className="empty-pane">This sprite was deleted.</div>;
   const n = sprite.frames.length;
   const cur = Math.min(frame, n - 1);
-  const set = (recipe: (s: SpriteResource) => void) => mutate((p) => recipe(find(p, "sprites", spriteId)!));
+  // One label for the sprite's settings: typing "24" into a box is one undo step.
+  const set = (recipe: (s: SpriteResource) => void) => mutate((p) => recipe(find(p, "sprites", spriteId)!), { label: "change the sprite" });
   const zoom = Math.max(1, Math.min(16, Math.floor(320 / Math.max(sprite.width, sprite.height))));
   const mask: SpriteMask = sprite.mask ?? { kind: "auto", left: 0, top: 0, right: sprite.width, bottom: sprite.height };
   const usedBy = project.objects.filter((o) => o.sprite === sprite.id).map((o) => o.name);
