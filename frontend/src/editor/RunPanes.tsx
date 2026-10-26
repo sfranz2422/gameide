@@ -7,7 +7,7 @@ import type { MappedError } from "../python/codegen";
 import type { GameState, WorkerStats } from "../python/protocol";
 import { activeEditor } from "./code/CodeEditor";
 import { signature } from "./code/pythonHelp";
-import type { GameHost } from "./gameHost";
+import type { GameHost, Inspected } from "./gameHost";
 import { Icon } from "./ui/icons";
 
 export type ConsoleLine = { kind: "out" | "err" | "warn" | "info"; text: string } | { kind: "error"; error: MappedError };
@@ -29,6 +29,23 @@ export function GamePane({
 }) {
   const box = useRef<HTMLDivElement>(null);
   const [debug, setDebug] = useState(false);
+  const [frozen, setFrozen] = useState(false);
+  /** The instance the inspector is watching (by its slot), and what it last saw. */
+  const [watching, setWatching] = useState<number | null>(null);
+  const [seen, setSeen] = useState<Inspected | null>(null);
+  // While watching, look again a few times a second: it is a running game.
+  useEffect(() => {
+    if (!debug || watching === null || !host) return;
+    const t = setInterval(() => void host.inspect({ slot: watching }).then((v) => v && setSeen(v)), 300);
+    return () => clearInterval(t);
+  }, [debug, watching, host]);
+  const running0 = state === "running" || state === "loading";
+  useEffect(() => {
+    // A new run, or the end of one: nothing frozen, nothing watched.
+    setFrozen(false);
+    setWatching(null);
+    setSeen(null);
+  }, [running0]);
   useEffect(() => {
     if (host) host.container = box.current;
   }, [host]);
@@ -58,6 +75,24 @@ export function GamePane({
           />
           {Icon.bug()} Debug
         </label>
+        {debug && running && (
+          <>
+            <button
+              className={`btn small${frozen ? " on" : ""}`}
+              onClick={() => {
+                host?.freeze(!frozen);
+                setFrozen(!frozen);
+              }}
+              title="Stop the game where it is (it's still drawn); press again to go on"
+              data-testid="debug-freeze"
+            >
+              {frozen ? "▶ Go on" : "❚❚ Freeze"}
+            </button>
+            <button className="btn small" disabled={!frozen} onClick={() => host?.stepOnce()} title="One step of the frozen game" data-testid="debug-step">
+              Step
+            </button>
+          </>
+        )}
         <span className="stats" data-testid="stats">
           {state === "loading" && (ready ? "Starting…" : "Loading Python…")}
           {state === "running" && stats && (
@@ -69,8 +104,19 @@ export function GamePane({
           {state === "stopped" && !ready && "Loading Python…"}
         </span>
       </header>
-      <div className="game-box" ref={box}>
+      <div
+        className="game-box"
+        ref={box}
+        onPointerDown={(e) => {
+          if (!debug || !host || (e.target as HTMLElement).tagName !== "CANVAS") return;
+          void host.inspect({ clientX: e.clientX, clientY: e.clientY }).then((v) => {
+            setSeen(v);
+            setWatching(v?.slot ?? null);
+          });
+        }}
+      >
         {state === "stopped" && <p className="hint">Press Play. Click the game to give it the keyboard.</p>}
+        {debug && running && <Inspector seen={seen} close={() => (setWatching(null), setSeen(null))} />}
       </div>
     </section>
   );
@@ -166,5 +212,52 @@ export function DocsPane() {
         </section>
       )}
     </div>
+  );
+}
+
+/**
+ * The debugger's inspector: click an instance in the game (with Debug on)
+ * to see its built-in properties and its own variables, kept up to date,
+ * and global_vars — the "print everything" a student would otherwise add.
+ */
+function Inspector({ seen, close }: { seen: Inspected | null; close: () => void }) {
+  const rows = (o: Record<string, string> | undefined) =>
+    Object.entries(o ?? {}).map(([k, v]) => (
+      <tr key={k}>
+        <th>{k}</th>
+        <td>{v}</td>
+      </tr>
+    ));
+  return (
+    <aside className="inspector" data-testid="inspector" onPointerDown={(e) => e.stopPropagation()}>
+      {seen?.object ? (
+        <>
+          <header>
+            <b data-testid="inspector-object">{seen.object}</b>
+            <button className="icon-btn" onClick={close} aria-label="Stop watching" title="Stop watching">
+              ×
+            </button>
+          </header>
+          <h4>Its variables</h4>
+          <table data-testid="inspector-vars">
+            <tbody>{Object.keys(seen.vars ?? {}).length ? rows(seen.vars) : <tr><td className="muted">none of its own</td></tr>}</tbody>
+          </table>
+          <h4>Built in</h4>
+          <table>
+            <tbody>{rows(seen.props)}</tbody>
+          </table>
+        </>
+      ) : (
+        <p className="muted small">Click an instance in the game to look inside it.</p>
+      )}
+      {seen && Object.keys(seen.globals).length > 0 && (
+        <>
+          <h4>global_vars</h4>
+          <table data-testid="inspector-globals">
+            <tbody>{rows(seen.globals)}</tbody>
+          </table>
+        </>
+      )}
+    </aside>
   );
 }

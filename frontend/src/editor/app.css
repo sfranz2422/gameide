@@ -3491,3 +3491,47 @@ a.btn {
   flex-wrap: wrap;
   gap: 6px;
 }
+
+/* ---------------------------------------------------------------- the debugger's inspector (RunPanes.tsx) */
+.inspector {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 6;
+  width: min(260px, 45%);
+  max-height: calc(100% - 16px);
+  overflow: auto;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--panel) 92%, transparent);
+  border: 1px solid var(--border);
+  font-size: 12.5px;
+}
+.inspector header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.inspector h4 {
+  margin: 8px 0 2px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--muted);
+}
+.inspector table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--mono);
+}
+.inspector th {
+  text-align: left;
+  font-weight: 400;
+  color: var(--muted);
+  padding-right: 8px;
+  white-space: nowrap;
+  vertical-align: top;
+}
+.inspector td {
+  word-break: break-all;
+}

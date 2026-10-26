@@ -19,6 +19,7 @@ import type { PyodideInterface } from "pyodide";
 import type { PyBuffer, PyProxy } from "pyodide/ffi";
 import { Engine, type FrameCommands, type PythonGameError, type SharedViews } from "../engine/engine";
 import type { GameDefinition, SoundOrder } from "../engine/game";
+import type { TouchSpec } from "../engine/engine";
 import { layoutForPython } from "../engine/layout";
 import runtimeSource from "./runtime.py?raw";
 
@@ -55,6 +56,8 @@ export interface GameCallbacks {
   sounds?: (orders: SoundOrder[]) => void;
   /** The game's whole save data, after it changed. */
   save?: (data: Record<string, unknown>) => void;
+  /** touch_controls(): what to show on the screen, or null to hide it. */
+  touch?: (spec: TouchSpec | null) => void;
 }
 
 /** Timings of the last step, for the FPS readout. */
@@ -236,6 +239,7 @@ export class PythonGame {
     for (const w of cmds?.warnings ?? []) this.callbacks.warning?.(w);
     if (cmds?.sounds) this.callbacks.sounds?.(cmds.sounds);
     if (cmds?.save) this.callbacks.save?.(cmds.save);
+    if (cmds && cmds.touch !== undefined) this.callbacks.touch?.(cmds.touch);
     return this.engine.endStep(cmds);
   }
 
@@ -275,6 +279,26 @@ export class PythonGame {
   }
 
   /** Reads a module-level value from the runtime, for tests and the debug overlay. */
+  /**
+   * The debugger's inspector: the instance at a point of the game window (or
+   * the slot already being watched), as runtime.py's _inspect makes it.
+   * "Which instance" is the engine's: anything whose mask covers the point.
+   */
+  inspect(at: { x: number; y: number } | { slot: number }): string {
+    let slot = -1;
+    if ("slot" in at) slot = at.slot;
+    else {
+      const c = this.engine.camera;
+      slot = this.engine.collision_point(at.x / c.zoom + c.x, at.y / c.zoom + c.y, -1);
+    }
+    const fn = this.module._inspect as PyProxy & ((s: number) => string);
+    try {
+      return fn(slot);
+    } finally {
+      fn.destroy();
+    }
+  }
+
   evalPython(code: string): unknown {
     const ns = this.module._ns as PyProxy;
     const r = this.py.runPython(code, { globals: ns });

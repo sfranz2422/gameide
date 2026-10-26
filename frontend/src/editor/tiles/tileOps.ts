@@ -10,6 +10,8 @@
  */
 export type TileMap = Record<string, number>;
 
+import { TILE_FLIP_X, TILE_FLIP_Y, TILE_MASK, TILE_TURN } from "../../engine/game";
+
 export interface Stamp {
   columns: number;
   rows: number;
@@ -17,6 +19,60 @@ export interface Stamp {
 }
 
 export const single = (tile: number): Stamp => ({ columns: 1, rows: 1, tiles: [tile] });
+
+export type TileOp = "flipX" | "flipY" | "turn";
+
+/**
+ * A brush flipped across, flipped down, or turned a quarter clockwise: the
+ * block of tiles moves as a whole, and each tile's own bits (game.ts
+ * TILE_FLIP_X…) change with it. The renderer draws a tile scaled first and
+ * turned second, so a flip of a turned tile is the other flip, and two
+ * turns are both flips — kept that way here, so what the brush shows is
+ * what the game draws.
+ */
+export function transformStamp(s: Stamp, op: TileOp): Stamp {
+  const at = (x: number, y: number) => s.tiles[y * s.columns + x]!;
+  const each = (n: number, change: (bits: number) => number) => (n < 0 ? n : (n & TILE_MASK) | change(n & ~TILE_MASK));
+  const turned = (bits: number) => (bits & TILE_TURN) !== 0;
+  if (op === "turn") {
+    const columns = s.rows, rows = s.columns, tiles: number[] = [];
+    for (let y = 0; y < rows; y++)
+      for (let x = 0; x < columns; x++)
+        tiles.push(each(at(y, s.rows - 1 - x), (b) => (turned(b) ? (b & ~TILE_TURN) ^ TILE_FLIP_X ^ TILE_FLIP_Y : b | TILE_TURN)));
+    return { columns, rows, tiles };
+  }
+  const tiles: number[] = [];
+  for (let y = 0; y < s.rows; y++)
+    for (let x = 0; x < s.columns; x++) {
+      const n = op === "flipX" ? at(s.columns - 1 - x, y) : at(x, s.rows - 1 - y);
+      const own = op === "flipX" ? TILE_FLIP_X : TILE_FLIP_Y, other = op === "flipX" ? TILE_FLIP_Y : TILE_FLIP_X;
+      tiles.push(each(n, (b) => b ^ (turned(b) ? other : own)));
+    }
+  return { columns: s.columns, rows: s.rows, tiles };
+}
+
+/** Draws a painted cell's tile, flipped and turned as its bits say (as the renderer does: scaled, then turned). */
+export function drawTileValue(
+  ctx: CanvasRenderingContext2D,
+  img: CanvasImageSource,
+  src: { x: number; y: number; w: number; h: number },
+  value: number,
+  dx: number,
+  dy: number,
+  dw: number,
+  dh: number,
+) {
+  if (!(value & ~TILE_MASK)) {
+    ctx.drawImage(img, src.x, src.y, src.w, src.h, dx, dy, dw, dh);
+    return;
+  }
+  ctx.save();
+  ctx.translate(dx + dw / 2, dy + dh / 2);
+  if (value & TILE_TURN) ctx.rotate(Math.PI / 2);
+  ctx.scale(value & TILE_FLIP_X ? -1 : 1, value & TILE_FLIP_Y ? -1 : 1);
+  ctx.drawImage(img, src.x, src.y, src.w, src.h, -dw / 2, -dh / 2, dw, dh);
+  ctx.restore();
+}
 
 const key = (c: number, r: number) => `${c},${r}`;
 

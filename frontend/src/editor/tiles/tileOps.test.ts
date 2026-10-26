@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { autotileErase, autotilePaint, erase, fillRect, floodFill, paint, pick, rectCells, single, stampFromPalette, type AutotileSet } from "./tileOps";
+import { transformStamp } from "./tileOps";
+import { TILE_FLIP_X, TILE_FLIP_Y, TILE_TURN } from "../../engine/game";
 
 const B = { columns: 10, rows: 5 };
 
@@ -79,5 +81,31 @@ describe("autotiling", () => {
   it("an unfinished set borrows its fully joined tile for missing pieces", () => {
     const half: AutotileSet = { id: "h", name: "half", tiles: [...new Array(15).fill(-1), 42] };
     expect(autotilePaint({}, [[0, 0]], half, B)).toEqual({ "0,0": 42 });
+  });
+});
+
+describe("flipping and turning a brush", () => {
+  const X = TILE_FLIP_X, Y = TILE_FLIP_Y, T = TILE_TURN;
+  it("flips a block across or down as a whole, and each tile with it", () => {
+    const s = { columns: 2, rows: 1, tiles: [3, 4] };
+    expect(transformStamp(s, "flipX")).toEqual({ columns: 2, rows: 1, tiles: [4 | X, 3 | X] });
+    expect(transformStamp(s, "flipY")).toEqual({ columns: 2, rows: 1, tiles: [3 | Y, 4 | Y] });
+    expect(transformStamp(transformStamp(s, "flipX"), "flipX")).toEqual(s); // twice is back
+  });
+
+  it("turns a block a quarter clockwise: its rows become columns", () => {
+    const s = { columns: 2, rows: 1, tiles: [3, 4] }; // [3][4] turned clockwise stands up: 3 on top
+    expect(transformStamp(s, "turn")).toEqual({ columns: 1, rows: 2, tiles: [3 | T, 4 | T] });
+    const tall = { columns: 1, rows: 2, tiles: [3, 4] }; // 3 over 4, turned: 4 on the left
+    expect(transformStamp(tall, "turn")).toEqual({ columns: 2, rows: 1, tiles: [4 | T, 3 | T] });
+  });
+
+  it("keeps a tile's look consistent with how the game draws it: scaled, then turned", () => {
+    const one = single(5);
+    const twice = transformStamp(transformStamp(one, "turn"), "turn");
+    expect(twice.tiles).toEqual([5 | X | Y]); // half a turn is both flips
+    expect(transformStamp(transformStamp(twice, "turn"), "turn").tiles).toEqual([5]); // a whole turn is nothing
+    expect(transformStamp(transformStamp(one, "turn"), "flipX").tiles).toEqual([5 | T | Y]); // a turned tile flipped across flips down
+    expect(transformStamp(single(-1), "turn").tiles).toEqual([-1]); // empty stays empty
   });
 });

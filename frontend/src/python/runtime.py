@@ -57,7 +57,7 @@ __all__ = [
     "place_meeting", "place_free", "instance_place", "collision_point", "tile_at", "tile_set",
     "collision_line", "path_find",
     # input
-    "keyboard_check", "keyboard_check_pressed", "keyboard_check_released",
+    "keyboard_check", "keyboard_check_pressed", "keyboard_check_released", "touch_controls",
     "mouse_check", "mouse_check_pressed", "mouse_check_released", "mouse_x", "mouse_y",
     "gamepad_check", "gamepad_check_pressed", "gamepad_check_released", "gamepad_axis", "gamepad_connected",
     # movement
@@ -704,6 +704,28 @@ def keyboard_check_pressed(key):
 
 def keyboard_check_released(key):
     return _keys[2 * _KEY_COUNT + _key_code(key)] == 1
+
+
+_touch = False      # what touch_controls() last asked for, until it is sent: a dict, None to hide, or False for nothing new
+
+
+def touch_controls(show=True, buttons=("space", "x"), always=False):
+    """
+    On-screen controls for a touchscreen: arrows on the left (the arrow keys)
+    and a button for each key in `buttons` on the right. Pressing one is
+    holding that key, so the game's keyboard_check code works unchanged.
+    Shown only on a touchscreen, unless always=True. show=False hides them.
+    """
+    global _touch
+    if not show:
+        _touch = None
+        return
+    keys = [buttons] if isinstance(buttons, str) else list(buttons)
+    if len(keys) > 4:
+        raise ValueError("touch_controls: up to 4 buttons fit on the screen.")
+    for k in keys:
+        _key_code(k)
+    _touch = {"buttons": [str(k).lower() for k in keys], "always": bool(always)}
 
 
 def mouse_check(button="left"):
@@ -1839,8 +1861,11 @@ def _end_of_frame():
 
 def _commands():
     """What JavaScript must do after this frame, as JSON — or None for nothing."""
-    global _draw, _gui, _debug_changed, _room_changed, _save_changed, _tiles_back
+    global _draw, _gui, _debug_changed, _room_changed, _save_changed, _tiles_back, _touch
     out = {}
+    if _touch is not False:
+        out["touch"] = _touch
+        _touch = False
     if _tiles_back is not None:
         out["tiles"] = _tiles_back
         _tiles_back = None
@@ -1905,6 +1930,25 @@ def _frame():
         _cur = None
         _in_draw = False
         return _error_json(e)
+
+
+def _inspect(slot):
+    """
+    The debugger's look at a running game (Debug, then click an instance):
+    one instance's built-in properties and its own variables, and
+    global_vars, as JSON with every value as repr. Long values are cut short.
+    """
+    def show(v):
+        r = repr(v)
+        return r if len(r) <= 80 else r[:77] + "..."
+    out = {"globals": {k: show(v) for k, v in sorted(vars(global_vars).items()) if not k.startswith("_")}}
+    o = _objs[slot] if 0 <= slot < len(_objs) else None
+    if o is not None and o._alive:
+        props = {name: show(getattr(o, name)) for name in _BUILTIN_PROPS if name not in ("alarm", "object_name")}
+        props["alarm"] = show([_st[o._b + _L.F.ALARM0 + i] for i in range(_L.ALARM_COUNT)])
+        out.update(object=_types[o._t].name, slot=slot, props=props,
+                   vars={k: show(v) for k, v in o.__dict__.items() if not k.startswith("_")})
+    return json.dumps(out)
 
 
 def _start():

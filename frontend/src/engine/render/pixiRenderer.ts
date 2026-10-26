@@ -17,7 +17,7 @@
 import { Application, ColorMatrixFilter, Container, FillGradient, Filter, Graphics, Rectangle, Sprite, Text, Texture, TilingSprite } from "pixi.js";
 import { flashFilter, LightLayer, outlineFilter, ParticleLayer, screenFilter, setFlash, setOutline } from "./feel";
 import type { DrawCommand, Engine } from "../engine";
-import type { BackgroundDef, GameDefinition, SpriteDef, TilesetDef } from "../game";
+import { TILE_FLIP_X, TILE_FLIP_Y, TILE_TURN, tileNumber, type BackgroundDef, type GameDefinition, type SpriteDef, type TilesetDef } from "../game";
 import { BLEND_MODES, F, G, HANDLES, STRIDE } from "../layout";
 import { boxOf, type Box } from "../sprites";
 
@@ -270,7 +270,10 @@ export class PixiRenderer {
       x: s.width ? s.originX / s.width : 0,
       y: s.height ? s.originY / s.height : 0,
     }));
-    for (const t of def.tilesets ?? []) this.tileTextures.set(t.name, cutTiles(t));
+    for (const t of def.tilesets ?? []) {
+      this.tileTextures.set(t.name, cutTiles(t));
+      this.tileAnimations.set(t.name, new Map((t.animations ?? []).filter((a) => a.tiles.length).map((a) => [a.tiles[0]!, a])));
+    }
     this.worldDraw = new DrawLayer(this.world, this.frames, this.anchors, fonts);
     this.guiDraw = new DrawLayer(this.gui, this.frames, this.anchors, fonts);
     this.particles = new ParticleLayer(this.world);
@@ -354,25 +357,52 @@ export class PixiRenderer {
     return cy * 100000 + cx;
   }
 
-  /** Makes (or refreshes) one tile's sprite in its chunk. */
+  /** Makes (or refreshes) one tile's sprite in its chunk: flipped or turned as its cell says, and animated if its tile is. */
   private drawTile(chunk: Chunk, t: Engine["tiles"][number], cell: number) {
-    const tile = t.cells[cell]!;
-    const tex = tile >= 0 ? this.tileTextures.get(t.tileset.name)?.[tile] : undefined;
+    const raw = t.cells[cell]!;
+    const tile = tileNumber(raw);
+    const textures = this.tileTextures.get(t.tileset.name);
+    const tex = tile >= 0 ? textures?.[tile] : undefined;
     let sp = chunk.sprites.get(cell);
+    this.animated.delete(sp as Sprite);
     if (!tex) {
       // Cleared (tile_set None): free the sprite rather than keep it hidden.
       sp?.destroy();
       chunk.sprites.delete(cell);
       return;
     }
+    const tw = t.tileset.tileWidth, th = t.tileset.tileHeight;
     if (!sp) {
       sp = new Sprite(tex);
-      sp.position.set((cell % t.def.columns) * t.tileset.tileWidth, Math.floor(cell / t.def.columns) * t.tileset.tileHeight);
+      // Anchored in the middle of its cell, so flipping and turning happen in place.
+      sp.anchor.set(0.5);
+      sp.position.set((cell % t.def.columns) * tw + tw / 2, Math.floor(cell / t.def.columns) * th + th / 2);
       chunk.container.addChild(sp);
       chunk.sprites.set(cell, sp);
     }
     sp.texture = tex;
+    sp.scale.set(raw & TILE_FLIP_X ? -1 : 1, raw & TILE_FLIP_Y ? -1 : 1);
+    sp.rotation = raw & TILE_TURN ? Math.PI / 2 : 0;
     sp.visible = true;
+    const anim = this.tileAnimations.get(t.tileset.name)?.get(tile);
+    if (anim && textures) this.animated.set(sp, { frames: anim.tiles.map((n) => textures[n]).filter((x): x is Texture => !!x), fps: anim.fps });
+  }
+
+  /** Animated tiles on screen, and their frames (TilesetDef.animations). */
+  private animated = new Map<Sprite, { frames: Texture[]; fps: number }>();
+  /** Per tileset, each animation by the tile that starts it. */
+  private tileAnimations = new Map<string, Map<number, { tiles: number[]; fps: number }>>();
+
+  /** Every animated tile to its frame for now: they all keep time together, as a sea's waves should. */
+  private animateTiles() {
+    const now = performance.now() / 1000;
+    for (const [sp, a] of this.animated) {
+      if (sp.destroyed) {
+        this.animated.delete(sp);
+        continue;
+      }
+      if (a.frames.length) sp.texture = a.frames[Math.floor(now * a.fps) % a.frames.length]!;
+    }
   }
 
   private buildChunk(view: TileView, t: Engine["tiles"][number], cx: number, cy: number): Chunk {
@@ -468,6 +498,7 @@ export class PixiRenderer {
     this.world.scale.set(cam.zoom);
     this.world.position.set(-vx * cam.zoom, -vy * cam.zoom);
     this.placeBackdrops(vx, vy, g[G.FRAME]!);
+    this.animateTiles();
     // Tiles tile_set() changed since the last frame. A chunk not built yet
     // will read the cell when it is; only built ones need telling.
     for (const [layer, cell] of this.engine.tileChanges) {

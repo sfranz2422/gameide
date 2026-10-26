@@ -361,3 +361,50 @@ test("a tile changed while playing changes on screen", async ({ page }) => {
   await py(page, "tile_set(5 * 32, 12 * 32, None, 'Ground')"); // a grass tile in view
   await expect.poll(async () => Number(await page.getByTestId("tiles-drawn").textContent())).toBe(before - 1);
 });
+
+test("a brush flipped upside down paints a flipped tile, and an animated tile cycles its frames", async ({ page }) => {
+  await fromTemplate(page, "empty");
+  // Tile 0 green; tile 1 dark blue with a red corner at its top-left — so a flip shows.
+  const picture: Paint = { width: 64, height: 32, rects: [[0, 0, 32, 32, "#4caf50"], [32, 0, 32, 32, "#123456"], [32, 0, 8, 8, "#ff0000"]] };
+  await page.getByTestId("add-tilesets").click();
+  await nameBox(page).press("Enter");
+  const chooser = page.waitForEvent("filechooser");
+  await page.getByTestId("tileset-image").click();
+  await (await chooser).setFiles({ name: "tiles.png", mimeType: "image/png", buffer: await png(page, picture) });
+  await expect(page.getByTestId("tileset-count")).toHaveText("2 × 1 = 2 tiles, 0 solid");
+  // Tile 1 animates: 1, 0, 1, 0…
+  await page.getByTestId("new-animation").click();
+  await page.getByTestId("tileset-canvas").click({ position: { x: 150, y: 10 } }); // tile 1
+  await page.getByTestId("tileset-canvas").click({ position: { x: 10, y: 10 } }); // tile 0
+  await page.getByTestId("animation-0-frames").click(); // Done
+  await expect(page.getByTestId("animation-0")).toContainText("Tiles 1, 0");
+
+  await addTileLayer(page);
+  const pal = (await page.getByTestId("tile-palette").boundingBox())!;
+  await page.getByTestId("tile-palette").click({ position: { x: pal.width * 0.75, y: 4 } }); // tile 1
+  await page.getByTestId("stamp-flip-y").click();
+  await expect(page.getByTestId("stamp-size")).toHaveText("Brush: 1 × 1 (tile 1), flipped or turned");
+  const at = await screenAt(page, 16, 16);
+  await page.mouse.click(at.x, at.y);
+  await playAndWait(page);
+  expect(await py(page, "tile_at(1, 1)")).toBe(1); // tile_at says what the tile is, not how it's drawn
+
+  const sample = () =>
+    page.evaluate(async () => {
+      const bmp = await createImageBitmap(await (window as any).__gameide.host.snapshot());
+      const c = new OffscreenCanvas(bmp.width, bmp.height).getContext("2d")!;
+      c.drawImage(bmp, 0, 0);
+      return [[...c.getImageData(4, 4, 1, 1).data.slice(0, 3)], [...c.getImageData(4, 28, 1, 1).data.slice(0, 3)]];
+    });
+  const red = (p: number[]) => p[0]! > 200 && p[1]! < 60 && p[2]! < 60;
+  const green = (p: number[]) => p[1]! > 140 && p[0]! < 120;
+  const seen = { redBottom: false, green: false, redTop: false };
+  for (let i = 0; i < 14; i++) {
+    const [top, bottom] = await sample();
+    if (red(bottom!)) seen.redBottom = true; // tile 1, upside down: the red corner at the bottom
+    if (green(bottom!)) seen.green = true; // tile 0's frame
+    if (red(top!)) seen.redTop = true; // never: that would be tile 1 the right way up
+    await page.waitForTimeout(110);
+  }
+  expect(seen).toEqual({ redBottom: true, green: true, redTop: false });
+});

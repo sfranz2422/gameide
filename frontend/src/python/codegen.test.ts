@@ -152,13 +152,13 @@ describe("rooms in the built game", () => {
 describe("tiles in the built game", () => {
   it("a tile layer becomes a dense grid; tiles past the room's edge are left out, not lost", () => {
     const p = project();
-    p.tilesets.push({ id: "ts", name: "terrain", image: "img", imageWidth: 64, imageHeight: 32, tileWidth: 32, tileHeight: 32, offsetX: 0, offsetY: 0, spacingX: 0, spacingY: 0, solid: [0, 2], oneWay: [1], autotiles: [] });
+    p.tilesets.push({ id: "ts", name: "terrain", image: "img", imageWidth: 64, imageHeight: 32, tileWidth: 32, tileHeight: 32, offsetX: 0, offsetY: 0, spacingX: 0, spacingY: 0, solid: [0, 2], oneWay: [1], animations: [{ tiles: [0, 1], fps: 3 }], autotiles: [] });
     const room = p.rooms[0]!;
     Object.assign(room, { width: 96, height: 40 }); // 3 × 2 tiles (the last row only partly in the room)
     room.layers.push({ id: "L", name: "Ground", kind: "tiles", depth: 5, visible: false, locked: false, tileset: "ts", tiles: { "0,0": 1, "2,1": 3, "7,0": 2 } });
     room.layers.push({ id: "M", name: "Empty", kind: "tiles", depth: 5, visible: true, locked: false, tileset: null, tiles: { "0,0": 1 } });
     const def = buildGame(p, new Map([["img", new Blob(["x"])]])).def;
-    expect(def.tilesets).toEqual([expect.objectContaining({ name: "terrain", columns: 2, count: 2, solid: [0, 2], oneWay: [1] })]);
+    expect(def.tilesets).toEqual([expect.objectContaining({ name: "terrain", columns: 2, count: 2, solid: [0, 2], oneWay: [1], animations: [{ tiles: [0, 1], fps: 3 }] })]);
     expect(def.rooms[0]!.tileLayers).toEqual([
       { name: "Ground", depth: 5, visible: false, tileset: "terrain", columns: 3, rows: 2, cells: [1, -1, -1, -1, -1, 3] },
     ]);

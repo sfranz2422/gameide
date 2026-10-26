@@ -95,3 +95,59 @@ test("game feel is drawn: flash, outline, tint, particles, lighting, a screen ef
   expect(near(box!, [16, 20, 31], 30)).toBe(true);
   if (SHOTS) await page.screenshot({ path: `${SHOTS}/feel-dialogue.png` });
 });
+
+test("touch controls hold the arrow keys, so a keyboard game plays by touch", async ({ page }) => {
+  await fromTemplate(page, "coins");
+  await treeItem(page, "Player").click();
+  await page.getByTestId("event-Create").click();
+  await setCode(page, "self.move_speed = 4\ntouch_controls(always=True)\n");
+  await page.getByTestId("play").click();
+  await expect(page.getByTestId("fps")).toBeVisible({ timeout: 60_000 });
+  const right = page.getByTestId("touch-right");
+  await expect(right).toBeVisible();
+  await expect(page.getByTestId("touch-space")).toBeVisible();
+  const x0 = (await page.evaluate(() => (window as any).__gameide.host.evalPython("instances('Player')[0].x"))) as number;
+  await right.dispatchEvent("pointerdown", { pointerId: 7, button: 0 });
+  await expect.poll(() => page.evaluate(() => (window as any).__gameide.host.evalPython("instances('Player')[0].x")), { timeout: 10_000 }).toBeGreaterThan(x0 + 8);
+  await right.dispatchEvent("pointerup", { pointerId: 7, button: 0 });
+  await page.waitForTimeout(300);
+  const x1 = await page.evaluate(() => (window as any).__gameide.host.evalPython("instances('Player')[0].x"));
+  await page.waitForTimeout(300);
+  expect(await page.evaluate(() => (window as any).__gameide.host.evalPython("instances('Player')[0].x"))).toBe(x1); // let go, it stops
+  await page.evaluate(() => (window as any).__gameide.host.evalPython("touch_controls(False)"));
+  await expect(page.getByTestId("touch-controls")).toHaveCount(0);
+});
+
+test("the debugger: click an instance to see inside it; freeze the game and step it", async ({ page }) => {
+  await fromTemplate(page, "coins");
+  await treeItem(page, "Player").click();
+  await page.getByTestId("event-Create").click();
+  await setCode(page, "self.move_speed = 4\nself.hp = 3\n");
+  await page.getByTestId("play").click();
+  await expect(page.getByTestId("fps")).toBeVisible({ timeout: 60_000 });
+  await page.getByLabel("Debug").check();
+  const py = (code: string) => page.evaluate((c) => (window as any).__gameide.host.evalPython(c), code);
+  // Where the Player is on the page: its room point, scaled like the canvas.
+  const [px, py_] = (await py("[instances('Player')[0].x + 12, instances('Player')[0].y + 12]")) as [number, number];
+  const canvas = page.locator(".game-box canvas");
+  const box = (await canvas.boundingBox())!;
+  await page.mouse.click(box.x + (px * box.width) / 640, box.y + (py_ * box.height) / 480);
+  await expect(page.getByTestId("inspector-object")).toHaveText("Player");
+  await expect(page.getByTestId("inspector-vars")).toContainText("hp");
+  await expect(page.getByTestId("inspector-vars")).toContainText("3");
+  await py("instances('Player')[0].hp = 7");
+  await expect(page.getByTestId("inspector-vars")).toContainText("7"); // kept up to date
+
+  // Frozen, holding right moves nothing; each Step moves it once.
+  await page.getByTestId("debug-freeze").click();
+  await canvas.focus();
+  await page.keyboard.down("ArrowRight");
+  const x0 = await py("instances('Player')[0].x");
+  await page.waitForTimeout(400);
+  expect(await py("instances('Player')[0].x")).toBe(x0);
+  await page.getByTestId("debug-step").click();
+  await expect.poll(() => py("instances('Player')[0].x")).toBe((x0 as number) + 4);
+  await page.keyboard.up("ArrowRight");
+  await page.getByTestId("debug-freeze").click(); // go on
+  await expect(page.getByTestId("debug-step")).toBeDisabled();
+});

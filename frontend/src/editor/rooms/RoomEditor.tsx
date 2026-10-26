@@ -28,9 +28,12 @@ import {
   rectCells,
   single,
   stampFromPalette,
+  drawTileValue,
+  transformStamp,
   type AutotileSet,
   type Stamp,
 } from "../tiles/tileOps";
+import { TILE_MASK } from "../../engine/game";
 import { tileRect } from "../tiles/TilesetEditor";
 import { CodeEditor } from "../code/CodeEditor";
 import { emptySheet } from "../../eventsheets/sheet";
@@ -285,10 +288,7 @@ export function RoomEditor({ roomId, focus }: { roomId: string; focus: { instanc
           const c0 = Math.max(0, Math.floor(-view.panX / view.zoom / tw)), r0 = Math.max(0, Math.floor(-view.panY / view.zoom / th));
           const c1 = Math.ceil((el.clientWidth - view.panX) / view.zoom / tw), r1 = Math.ceil((el.clientHeight - view.panY) / view.zoom / th);
           const onScreen = (c1 - c0 + 1) * (r1 - r0 + 1);
-          const draw = (c: number, r: number, tile: number) => {
-            const src = tileRect(ts, tile, columns);
-            ctx.drawImage(img, src.x, src.y, src.w, src.h, c * tw, r * th, tw, th);
-          };
+          const draw = (c: number, r: number, tile: number) => drawTileValue(ctx, img, tileRect(ts, tile & TILE_MASK, columns), tile, c * tw, r * th, tw, th);
           const painted = Object.keys(l.tiles).length;
           if (painted <= onScreen) {
             // Fewer painted tiles than cells on screen: go through the tiles.
@@ -364,8 +364,8 @@ export function RoomEditor({ roomId, focus }: { roomId: string; focus: { instanc
           const { columns } = tilesetGrid(tileSet);
           for (let y = 0; y < stamp.rows; y++)
             for (let x = 0; x < stamp.columns; x++) {
-              const src = tileRect(tileSet, stamp.tiles[y * stamp.columns + x]!, columns);
-              ctx.drawImage(tsImg, src.x, src.y, src.w, src.h, (c + x) * tileSize.w, (r + y) * tileSize.h, tileSize.w, tileSize.h);
+              const value = stamp.tiles[y * stamp.columns + x]!;
+              drawTileValue(ctx, tsImg, tileRect(tileSet, value & TILE_MASK, columns), value, (c + x) * tileSize.w, (r + y) * tileSize.h, tileSize.w, tileSize.h);
             }
           ctx.globalAlpha = 1;
         }
@@ -1035,7 +1035,7 @@ function TilePalette({
     const ctx = c.getContext("2d")!;
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(img, 0, 0, c.width, c.height);
-    const chosen = new Set(autoSetId ? [] : stamp.tiles);
+    const chosen = new Set(autoSetId ? [] : stamp.tiles.map((n) => n & TILE_MASK));
     for (let n = 0; n < grid.columns * grid.rows; n++) {
       const r = tileRect(ts, n, grid.columns);
       ctx.strokeStyle = chosen.has(n) ? "#4f8cff" : "rgba(255,255,255,0.15)";
@@ -1080,8 +1080,23 @@ function TilePalette({
       <p className="muted small" data-testid="stamp-size">
         {autoSetId
           ? `Brush: ${ts.autotiles.find((a) => a.id === autoSetId)?.name ?? "?"} (autotile)`
-          : `Brush: ${stamp.columns} × ${stamp.rows} ${stamp.columns * stamp.rows === 1 ? `(tile ${stamp.tiles[0]})` : "tiles"}`}
+          : `Brush: ${stamp.columns} × ${stamp.rows} ${stamp.columns * stamp.rows === 1 ? `(tile ${stamp.tiles[0]! & TILE_MASK})` : "tiles"}${
+              stamp.tiles.some((n) => n >= 0 && n & ~TILE_MASK) ? ", flipped or turned" : ""
+            }`}
       </p>
+      {!autoSetId && (
+        <div className="row" aria-label="Flip or turn the brush">
+          <button className="btn small" onClick={() => setStamp(transformStamp(stamp, "flipX"))} title="Flip across (a mirror image)" data-testid="stamp-flip-x">
+            ⇋ Flip
+          </button>
+          <button className="btn small" onClick={() => setStamp(transformStamp(stamp, "flipY"))} title="Flip upside down" data-testid="stamp-flip-y">
+            ⇵ Flip
+          </button>
+          <button className="btn small" onClick={() => setStamp(transformStamp(stamp, "turn"))} title="Turn a quarter clockwise" data-testid="stamp-turn">
+            ↻ Turn
+          </button>
+        </div>
+      )}
       {ts.autotiles.length > 0 && (
         <div className="autotile-brushes" data-tutorial="autotile-brushes">
           <p className="muted small">Autotile: paint, and the edges and corners pick themselves.</p>

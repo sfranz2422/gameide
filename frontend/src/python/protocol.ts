@@ -10,7 +10,7 @@
  * state array never has to be copied to the page. All that crosses per frame
  * is input going in; stats and output come out a few times a second.
  */
-import type { PythonGameError } from "../engine/engine";
+import type { PythonGameError, TouchSpec } from "../engine/engine";
 import type { GameDefinition, SoundOrder } from "../engine/game";
 import type { PadState } from "../engine/input";
 
@@ -30,7 +30,11 @@ export type ToWorker =
   | { type: "input"; events: InputMessage[] }
   | { type: "debug"; on: boolean }
   | { type: "eval"; id: number; code: string }
-  | { type: "snapshot"; id: number };
+  | { type: "snapshot"; id: number }
+  /** The debugger: stop the game's steps (still drawn), take one step, look inside an instance. */
+  | { type: "freeze"; on: boolean }
+  | { type: "step" }
+  | { type: "inspect"; id: number; at: { x: number; y: number } | { slot: number } };
 
 export interface WorkerStats {
   fps: number;
@@ -55,4 +59,5 @@ export type FromWorker =
   | { type: "fatal"; message: string }
   | { type: "sounds"; orders: SoundOrder[] }
   | { type: "snapshot"; id: number; png: Blob | null }
-  | { type: "save"; data: Record<string, unknown> };
+  | { type: "save"; data: Record<string, unknown> }
+  | { type: "touch"; spec: TouchSpec | null };

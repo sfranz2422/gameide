@@ -20,7 +20,7 @@
  * page is visible, and starts counting afresh when it becomes visible again.
  * Without that, switching tabs for a minute would "rescue" a healthy game.
  */
-import type { PythonGameError } from "../engine/engine";
+import type { PythonGameError, TouchSpec } from "../engine/engine";
 import type { GameDefinition } from "../engine/game";
 import { attachInput, KEY_CODE, readPads, type InputSink } from "../engine/input";
 import { SoundPlayer } from "./sound";
@@ -49,6 +49,15 @@ export function readSave(gameId: string): Record<string, unknown> {
   } catch {
     return {}; // storage blocked (a private window) or not JSON: start fresh
   }
+}
+
+/** The debugger's view of an instance (runtime.py _inspect); every value is its repr. */
+export interface Inspected {
+  globals: Record<string, string>;
+  object?: string;
+  slot?: number;
+  props?: Record<string, string>;
+  vars?: Record<string, string>;
 }
 
 export class GameHost {
@@ -195,6 +204,9 @@ export class GameHost {
       case "snapshot":
         this.evals.get(m.id)?.(m.png);
         this.evals.delete(m.id);
+        break;
+      case "touch":
+        this.showTouch(m.spec);
         break;
       case "save":
         if (this.saveId)
@@ -354,6 +366,74 @@ export class GameHost {
     this.detachInput = null;
     this.canvas?.remove();
     this.canvas = null;
+    this.showTouch(null);
+  }
+
+  private touch: HTMLElement | null = null;
+
+  /**
+   * touch_controls(): arrows bottom-left and the game's buttons bottom-right,
+   * over the game, each holding its key while a finger is on it — so a game
+   * written for the keyboard plays on a Chromebook's touchscreen or a phone
+   * unchanged. Several fingers at once work (each button has its own
+   * pointer). Only on a touchscreen, unless the game said always.
+   */
+  showTouch(spec: TouchSpec | null) {
+    this.touch?.remove();
+    this.touch = null;
+    const box = this.box;
+    if (!spec || !box) return;
+    const touchscreen = matchMedia("(pointer: coarse)").matches || navigator.maxTouchPoints > 0;
+    if (!touchscreen && !spec.always) return;
+    if (getComputedStyle(box).position === "static") box.style.position = "relative";
+    const layer = document.createElement("div");
+    layer.className = "touch-controls";
+    layer.dataset.testid = "touch-controls";
+    Object.assign(layer.style, { position: "absolute", inset: "0", pointerEvents: "none", zIndex: "5", touchAction: "none", userSelect: "none" });
+    const button = (key: string, label: string, style: Partial<CSSStyleDeclaration>) => {
+      const b = document.createElement("div");
+      b.textContent = label;
+      b.dataset.testid = `touch-${key}`;
+      Object.assign(b.style, {
+        position: "absolute", width: "58px", height: "58px", display: "grid", placeItems: "center", borderRadius: "50%",
+        background: "rgba(255,255,255,0.18)", border: "2px solid rgba(255,255,255,0.45)", color: "#fff",
+        font: "600 15px system-ui, sans-serif", pointerEvents: "auto", touchAction: "none", ...style,
+      });
+      const code = KEY_CODE.get(key);
+      let held = false;
+      const up = () => {
+        if (!held) return;
+        held = false;
+        b.style.background = "rgba(255,255,255,0.18)";
+        if (code !== undefined) this.input?.keyUp(code);
+      };
+      b.addEventListener("pointerdown", (e) => {
+        e.preventDefault();
+        // So a finger sliding off still lets go here. It can refuse (a pointer it doesn't know): the press still counts.
+        try {
+          b.setPointerCapture(e.pointerId);
+        } catch {
+          /* pressed all the same */
+        }
+        held = true;
+        b.style.background = "rgba(255,255,255,0.45)";
+        if (code !== undefined) this.input?.keyDown(code);
+      });
+      for (const ev of ["pointerup", "pointercancel", "lostpointercapture"]) b.addEventListener(ev, up);
+      layer.appendChild(b);
+    };
+    // Arrows: a plus shape, bottom-left.
+    button("up", "▲", { left: "78px", bottom: "136px" });
+    button("left", "◀", { left: "16px", bottom: "74px" });
+    button("right", "▶", { left: "140px", bottom: "74px" });
+    button("down", "▼", { left: "78px", bottom: "12px" });
+    // The game's buttons, bottom-right, the first nearest the thumb.
+    spec.buttons.forEach((key, i) => {
+      const label = key === "space" ? "␣" : key.length === 1 ? key.toUpperCase() : key[0]!.toUpperCase() + key.slice(1);
+      button(key, label, { right: `${16 + (i % 2) * 70}px`, bottom: `${30 + Math.floor(i / 2) * 70 + (i % 2) * 34}px` });
+    });
+    box.appendChild(layer);
+    this.touch = layer;
   }
 
   setDebug(on: boolean) {
@@ -368,6 +448,37 @@ export class GameHost {
     return new Promise((resolve) => {
       this.evals.set(id, (v) => resolve((v as Blob | null) ?? null));
       this.send({ type: "snapshot", id });
+    });
+  }
+
+  // ---------------------------------------------------------------- the debugger
+
+  /** Stops the game's steps (it is still drawn), or lets it run again. */
+  freeze(on: boolean) {
+    this.send({ type: "freeze", on });
+  }
+
+  /** One step of a frozen game. */
+  stepOnce() {
+    this.send({ type: "step" });
+  }
+
+  /**
+   * What is inside the instance at a point of the page (a click on the
+   * game), or in one already being watched: runtime.py's _inspect, parsed.
+   */
+  inspect(at: { clientX: number; clientY: number } | { slot: number }): Promise<Inspected | null> {
+    if (this.state !== "running") return Promise.resolve(null);
+    let where: { x: number; y: number } | { slot: number };
+    if ("slot" in at) where = at;
+    else {
+      if (!this.canvas) return Promise.resolve(null);
+      where = this.toRoom(at as PointerEvent);
+    }
+    const id = this.nextEval++;
+    return new Promise((resolve) => {
+      this.evals.set(id, (v) => resolve(typeof v === "string" ? (JSON.parse(v) as Inspected) : null));
+      this.send({ type: "inspect", id, at: where });
     });
   }
 

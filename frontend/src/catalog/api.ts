@@ -119,6 +119,8 @@ export const API: ApiEntry[] = [
   fn("Input", "keyboard_check", [p("key", "key")], "True or False", "Is this key held down?"),
   fn("Input", "keyboard_check_pressed", [p("key", "key")], "True or False", "Was this key pressed this step?"),
   fn("Input", "keyboard_check_released", [p("key", "key")], "True or False", "Was this key let go this step?"),
+  fn("Input", "touch_controls", [p("show", "boolean", "True"), p("buttons", "any", "('space', 'x')"), p("always", "boolean", "False")], "nothing",
+    'On-screen controls for a touchscreen: arrows (the arrow keys) and a button for each key in buttons, up to 4. Pressing one holds that key, so keyboard_check code just works. Shown only on a touchscreen unless always=True; touch_controls(False) hides them.'),
   fn("Input", "mouse_check", [p("button", "button", '"left"')], "True or False", "Is this mouse button held down?"),
   fn("Input", "mouse_check_pressed", [p("button", "button", '"left"')], "True or False",
     "Was this mouse button pressed this step?"),

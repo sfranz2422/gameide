@@ -28,7 +28,7 @@ import { InputState } from "./input";
 import { Effects, type FxOrder, type Light } from "./effects";
 import { SpatialHash } from "./spatialHash";
 import { boxOf, containsPoint, maskOverlapsBox, masksOverlap, overlaps, spriteInfo, type Box, type SpriteInfo } from "./sprites";
-import type { TileLayerDef, TilesetDef } from "./game";
+import { tileNumber, type TileLayerDef, type TilesetDef } from "./game";
 
 /**
  * A tile layer as it is now — tile_set() changes it — rebuilt from the room's
@@ -99,6 +99,14 @@ export interface FrameCommands {
   lights?: Light[];
   /** A persistent room's tiles as it was left (tiles_get), put back after the room change. */
   tiles?: number[][];
+  /** touch_controls(): show these (the page draws them), or null to hide them. Absent: no change. */
+  touch?: TouchSpec | null;
+}
+
+/** On-screen controls (touch_controls): arrows, and a button per key. */
+export interface TouchSpec {
+  buttons: string[];
+  always: boolean;
 }
 
 /**
@@ -324,7 +332,7 @@ export class Engine {
       const r0 = Math.max(0, Math.floor(scratch.top / th)), r1 = Math.min(def.rows - 1, Math.ceil(scratch.bottom / th) - 1);
       for (let r = r0; r <= r1; r++) {
         for (let c = c0; c <= c1; c++) {
-          const tile = cells[r * def.columns + c]!;
+          const tile = tileNumber(cells[r * def.columns + c]!);
           if (tile < 0 || !(solid[tile] || oneWay[tile])) continue;
           if (oneWay[tile]) {
             // A platform: only from above, onto its top, and not while dropping through.
@@ -401,7 +409,7 @@ export class Engine {
       if (!t) continue;
       const c = Math.floor(x / t.tileset.tileWidth), r = Math.floor(y / t.tileset.tileHeight);
       if (c < 0 || r < 0 || c >= t.def.columns || r >= t.def.rows) continue;
-      const tile = t.cells[r * t.def.columns + c]!;
+      const tile = tileNumber(t.cells[r * t.def.columns + c]!);
       if (tile >= 0) return tile;
     }
     return -1;
@@ -547,7 +555,7 @@ export class Engine {
           if (k >= best) break;
           const c = Math.floor((x1 + (x2 - x1) * k) / tileset.tileWidth), r = Math.floor((y1 + (y2 - y1) * k) / tileset.tileHeight);
           if (c < 0 || r < 0 || c >= def.columns || r >= def.rows) continue;
-          const tile = cells[r * def.columns + c]!;
+          const tile = tileNumber(cells[r * def.columns + c]!);
           if (tile >= 0 && solid[tile]) {
             best = k;
             found = tileCode(L);
@@ -581,7 +589,7 @@ export class Engine {
     };
     for (const { def, tileset, cells, solid } of this.tiles) {
       for (let i = 0; i < cells.length; i++) {
-        const tile = cells[i]!;
+        const tile = tileNumber(cells[i]!);
         if (tile < 0 || !solid[tile]) continue;
         const tc = i % def.columns, tr = Math.floor(i / def.columns);
         mark(tc * tileset.tileWidth + 0.01, tr * tileset.tileHeight + 0.01, (tc + 1) * tileset.tileWidth - 0.01, (tr + 1) * tileset.tileHeight - 0.01);

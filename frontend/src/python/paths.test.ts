@@ -134,3 +134,25 @@ describe("path_find", () => {
     expect(() => py(game, "path_find(0, 0, 10, 10, 1)")).toThrow(/2 or more/);
   });
 });
+
+describe("flipped and turned tiles", () => {
+  it("collide and answer tile_at as the tile they are, whatever way up they're drawn", async () => {
+    const flags = (1 << 28) | (1 << 30); // flipped across and turned (game.ts TILE_FLIP_X, TILE_TURN)
+    const cells = new Array(N * N).fill(-1);
+    for (let c = 0; c < N; c++) cells[9 * N + c] = 1 | flags; // the solid floor, every tile flipped and turned
+    cells[5 * N + 3] = 2 | (1 << 29); // a one-way platform, flipped down
+    const { game } = await load({
+      tilesets: TILES,
+      code: { P: FALLER },
+      instances: [{ object: "P", x: 32, y: 100 }],
+      rooms: [{ name: "R", width: N * 16, height: N * 16, instances: [{ object: "P", x: 32, y: 100 }],
+        tileLayers: [{ name: "Ground", depth: 0, visible: true, tileset: "t", columns: N, rows: N, cells }] }],
+    });
+    py(game, "instances('P')[0].vy = 4");
+    run(game, 20);
+    expect(py(game, "instances('P')[0].y")).toBe(128); // stood on the flipped floor
+    expect(py(game, "(tile_at(8, 150), tile_at(56, 88), tile_at(8, 8))")).toEqual([1, 2, undefined]);
+    expect(py(game, "collision_line(0, 150, 150, 150)")).toBe("Ground");
+    expect((py(game, "path_find(8, 8, 150, 8)") as unknown as unknown[]).length).toBeGreaterThan(0); // empty cells (-1) aren't walls
+  });
+});

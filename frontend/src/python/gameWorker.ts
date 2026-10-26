@@ -22,6 +22,9 @@ let game: PythonGame | null = null;
 let renderer: PixiRenderer | null = null;
 let loop: GameLoop | null = null;
 let debug = false;
+/** The debugger's Freeze: no steps (the picture still drawn), except the ones Step asks for. */
+let frozen = false;
+let stepsWanted = 0;
 let run = 0;
 
 // Output is collected and sent a few times a second, not line by line: a
@@ -123,6 +126,7 @@ async function play(msg: Extract<ToWorker, { type: "play" }>) {
     warning: (t) => emit(t, "warn"),
     sounds: (orders) => post({ type: "sounds", orders }),
     save: (data) => post({ type: "save", data }),
+    touch: (spec) => post({ type: "touch", spec }),
   });
   if (mine !== run) return g.dispose();
   game = g;
@@ -138,6 +142,10 @@ async function play(msg: Extract<ToWorker, { type: "play" }>) {
   r.onRoomSize = (width, height) => post({ type: "room", width, height });
   loop = new GameLoop(
     () => {
+      if (frozen) {
+        if (stepsWanted <= 0) return true;
+        stepsWanted--;
+      }
       const err = g.step();
       if (err) {
         flush();
@@ -216,6 +224,20 @@ self.onmessage = async (ev: MessageEvent<ToWorker>) => {
         post({ type: "snapshot", id: msg.id, png });
         break;
       }
+      case "freeze":
+        frozen = msg.on;
+        stepsWanted = 0;
+        break;
+      case "step":
+        stepsWanted++;
+        break;
+      case "inspect":
+        try {
+          post({ type: "eval", id: msg.id, value: game ? game.inspect(msg.at) : null });
+        } catch (e) {
+          post({ type: "eval", id: msg.id, error: String(e) });
+        }
+        break;
       case "eval": {
         try {
           post({ type: "eval", id: msg.id, value: game ? game.evalPython(msg.code) : undefined });

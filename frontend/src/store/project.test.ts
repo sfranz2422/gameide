@@ -135,6 +135,23 @@ describe("changing a tileset's grid", () => {
     expect(p.tilesets[0]!.autotiles[0]!.tiles.slice(0, 2)).toEqual([3, -1]); // autotile slots move too
   });
 
+  it("keeps a painted tile's flips and turn, and moves animation frames, losing ones with nowhere to go", async () => {
+    const { remapTileset, newTileset } = await import("./project");
+    const p = blankProject("t");
+    const FLIP = 1 << 28, TURN = 1 << 30;
+    const before = { ...newTileset("terrain"), id: "ts", image: "a", imageWidth: 32, imageHeight: 32, tileWidth: 16, tileHeight: 16, solid: [],
+      animations: [{ tiles: [2, 3], fps: 4 }, { tiles: [1], fps: 2 }] };
+    p.tilesets.push(structuredClone(before));
+    p.rooms[0]!.layers.push({ id: "L", name: "Ground", kind: "tiles", depth: 0, visible: true, locked: false, tileset: "ts", tiles: { "0,0": 2 | FLIP | TURN } });
+    p.tilesets[0]!.imageWidth = 48; // column 0, row 1 is now tile 3
+    remapTileset(p, "ts", before);
+    expect(p.rooms[0]!.layers.find((l) => l.id === "L")).toMatchObject({ tiles: { "0,0": 3 | FLIP | TURN } });
+    expect(p.tilesets[0]!.animations).toEqual([{ tiles: [3, 4], fps: 4 }, { tiles: [1], fps: 2 }]);
+    p.tilesets[0]!.imageWidth = 16; // one column: tile 1 (column 1) has nowhere to go
+    remapTileset(p, "ts", { ...structuredClone(p.tilesets[0]!), imageWidth: 48 });
+    expect(p.tilesets[0]!.animations).toEqual([{ tiles: [1], fps: 4 }]); // frame 4 (column 1) is gone, and with tile 1 the second animation
+  });
+
   it("removes, and counts, tiles the new grid doesn't have", async () => {
     const { remapTileset, newTileset } = await import("./project");
     const p = blankProject("t");

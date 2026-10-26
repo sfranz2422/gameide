@@ -186,6 +186,7 @@ export function buildGame(project: Project, images: Map<string, Blob>): BuiltGam
           count: columns * rows,
           solid: t.solid,
           oneWay: t.oneWay ?? [],
+          ...(t.animations?.length ? { animations: t.animations } : {}),
         };
       }),
     rooms: project.rooms.map((r) => buildRoom(project, r, hex)),

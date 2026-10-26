@@ -62,6 +62,8 @@ export function TilesetEditor({ tilesetId }: { tilesetId: string }) {
   const [editing, setEditing] = useState<{ set: string; slot: number } | null>(null);
   /** What a click on a tile marks: a wall, or a one-way platform (jumped up through, stood on). */
   const [marking, setMarking] = useState<"solid" | "oneway">("solid");
+  /** The animation being given its frames: clicks on tiles add them, in order. */
+  const [animating, setAnimating] = useState<number | null>(null);
   const grid = tileset ? tilesetGrid(tileset) : { columns: 0, rows: 0 };
   const zoom = tileset && tileset.imageWidth ? Math.max(1, Math.min(4, Math.floor(560 / tileset.imageWidth))) : 1;
 
@@ -75,12 +77,19 @@ export function TilesetEditor({ tilesetId }: { tilesetId: string }) {
     ctx.drawImage(img, 0, 0, c.width, c.height);
     const solid = new Set(tileset.solid);
     const oneWay = new Set(tileset.oneWay ?? []);
+    const frameOf = new Set((tileset.animations ?? []).flatMap((a) => a.tiles));
     ctx.font = "10px system-ui";
     for (let n = 0; n < grid.columns * grid.rows; n++) {
       const r = tileRect(tileset, n, grid.columns);
       if (solid.has(n)) {
         ctx.fillStyle = "rgba(255,90,90,0.35)";
         ctx.fillRect(r.x * zoom, r.y * zoom, r.w * zoom, r.h * zoom);
+      }
+      if (frameOf.has(n)) {
+        ctx.strokeStyle = "#ffd166";
+        ctx.lineWidth = 2;
+        ctx.strokeRect(r.x * zoom + 2, r.y * zoom + 2, r.w * zoom - 4, r.h * zoom - 4);
+        ctx.lineWidth = 1;
       }
       if (oneWay.has(n)) {
         // A platform: tinted blue, with a bar along the top it is stood on.
@@ -150,6 +159,13 @@ export function TilesetEditor({ tilesetId }: { tilesetId: string }) {
     for (let n = 0; n < grid.columns * grid.rows; n++) {
       const r = tileRect(tileset, n, grid.columns);
       if (x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h) {
+        if (animating !== null) {
+          set((t) => {
+            const a = t.animations?.[animating];
+            if (a) a.tiles.push(n);
+          });
+          return;
+        }
         if (editing) {
           // Filling an autotile set: this tile goes in the chosen slot, and
           // the next slot is chosen, so 16 clicks fill a set.
@@ -223,6 +239,55 @@ export function TilesetEditor({ tilesetId }: { tilesetId: string }) {
           </p>
         </fieldset>
         <AutotileSets tileset={tileset} img={img} columns={grid.columns} editing={editing} setEditing={setEditing} change={set} />
+        <fieldset>
+          <legend>Animated tiles</legend>
+          <p className="muted small">
+            {animating !== null
+              ? "Click tiles in the picture to add them as frames, in order. Press Done when it has them all."
+              : "Water, torches, flags: paint the first frame in a room and the game shows each frame in turn."}
+          </p>
+          {(tileset.animations ?? []).map((a, i) => (
+            <div key={i} className="row" data-testid={`animation-${i}`}>
+              <span className="small">
+                Tiles {a.tiles.join(", ") || "(none yet)"}
+              </span>
+              <label className="num">
+                fps
+                <input
+                  type="number"
+                  min={1}
+                  max={60}
+                  value={a.fps}
+                  onChange={(e) => set((t) => void (t.animations![i]!.fps = Math.max(1, Math.min(60, Number(e.target.value) || 1))))}
+                  aria-label="Frames a second"
+                />
+              </label>
+              <button className="btn small" onClick={() => setAnimating(animating === i ? null : i)} data-testid={`animation-${i}-frames`}>
+                {animating === i ? "Done" : "Frames…"}
+              </button>
+              <button
+                className="btn small"
+                onClick={() => {
+                  setAnimating(null);
+                  set((t) => void (t.animations = (t.animations ?? []).filter((_, j) => j !== i)));
+                }}
+                aria-label="Delete this animation"
+              >
+                ×
+              </button>
+            </div>
+          ))}
+          <button
+            className="btn small"
+            onClick={() => {
+              setAnimating((tileset.animations ?? []).length);
+              set((t) => void (t.animations = [...(t.animations ?? []), { tiles: [], fps: 6 }]));
+            }}
+            data-testid="new-animation"
+          >
+            + New animation
+          </button>
+        </fieldset>
         <fieldset>
           <legend>Solid tiles</legend>
           <div className="seg" role="radiogroup" aria-label="What a click marks">

@@ -89,12 +89,31 @@ export interface TilesetDef {
   /** Tile numbers that collide. */
   solid: number[];
   /**
+   * Animated tiles: painting `tiles[0]` shows each of `tiles` in turn, at
+   * `fps` frames a second (water, torches). Collisions and tile_at go by
+   * `tiles[0]`.
+   */
+  animations?: { tiles: number[]; fps: number }[];
+  /**
    * Tile numbers that are one-way platforms: solid only to something coming
    * down onto them from above. Jumped up through, walked along, and dropped
    * through while an instance's drop_through is counting down.
    */
   oneWay?: number[];
 }
+
+/**
+ * A painted cell can carry how its tile is drawn, in bits above the tile
+ * number: flipped across, flipped down, turned a quarter clockwise. Only
+ * the picture changes; collisions and tile_at go by the tile number alone
+ * (tileNumber). An empty cell is -1 — check that BEFORE masking, since
+ * -1 masked is a large, real-looking tile number.
+ */
+export const TILE_FLIP_X = 1 << 28;
+export const TILE_FLIP_Y = 1 << 29;
+export const TILE_TURN = 1 << 30;
+export const TILE_MASK = TILE_FLIP_X - 1;
+export const tileNumber = (cell: number) => (cell < 0 ? -1 : cell & TILE_MASK);
 
 /**
  * A room's painted tiles on one layer: `cells[row * columns + column]` is a

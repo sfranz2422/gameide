@@ -18,6 +18,7 @@
 import { renameInBlocks, type BlocksState } from "../blocks/blockState";
 import { renameInSheet, type Sheet } from "../eventsheets/sheet";
 import { KEY_NAMES, MOUSE_BUTTONS, type KeyName } from "../engine/layout";
+import { TILE_MASK } from "../engine/game";
 
 /** Bump when the format changes, and teach `migrate` the old shape. */
 export const SCHEMA_VERSION = 8; // 2: room layers, grid, camera, instance overrides. 3: tilesets and tile layers. 4: autotile sets. 5: blocks in events. 6: blocks in scripts and creation code. 7: event sheets. 8: sounds and fonts
@@ -132,6 +133,8 @@ export interface TilesetResource {
   solid: number[];
   /** Tile numbers that are one-way platforms (game.ts TilesetDef.oneWay). Absent in older projects: none. */
   oneWay?: number[];
+  /** Animated tiles (game.ts TilesetDef.animations). Absent: none. */
+  animations?: { tiles: number[]; fps: number }[];
   /**
    * Autotile sets: 16 tiles each, one per way a cell joins its neighbours
    * (editor/tiles/tileOps.ts), so painting "grass" picks edges and corners
@@ -436,9 +439,10 @@ export function remapTileset(project: Project, tilesetId: string, before: Tilese
       if (l.kind !== "tiles" || l.tileset !== tilesetId) continue;
       const out: Record<string, number> = {};
       for (const [k, t] of Object.entries(l.tiles)) {
-        const m = move(t);
+        // The flip and turn bits (game.ts TILE_FLIP_X…) ride above the number: keep them.
+        const m = move(t & TILE_MASK);
         if (m === null) lost++;
-        else out[k] = m;
+        else out[k] = m | (t & ~TILE_MASK);
       }
       l.tiles = out;
     }
@@ -452,6 +456,10 @@ export function remapTileset(project: Project, tilesetId: string, before: Tilese
       return m === null ? [] : [m];
     });
   for (const set of after.autotiles) set.tiles = set.tiles.map((n) => (n < 0 ? n : move(n) ?? -1));
+  if (after.animations)
+    after.animations = after.animations
+      .map((a) => ({ ...a, tiles: a.tiles.flatMap((n) => (move(n) === null ? [] : [move(n)!])) }))
+      .filter((a) => a.tiles.length > 0);
   return lost;
 }
 
