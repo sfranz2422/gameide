@@ -21,9 +21,26 @@ const onCanvas = (page: Page, text: string | RegExp) => mainCanvas(page).locator
 /** The hat: the workspace's first block, whatever it says ("def on_step(self):", "creation code: …"). */
 const hat = (page: Page) => mainCanvas(page).locator(":scope > .blocklyDraggable").first();
 
+/**
+ * Where a block is, once it has stopped moving. A palette is still being
+ * laid out just after its category opens, and a dropped block may still be
+ * settling: a position read too early made a drag grab empty space, now and
+ * then, under the load of the whole suite.
+ */
+async function settled(block: ReturnType<typeof fromPalette>) {
+  let last = (await block.boundingBox())!;
+  for (let i = 0; i < 20; i++) {
+    await block.page().waitForTimeout(50);
+    const now = (await block.boundingBox())!;
+    if (now.x === last.x && now.y === last.y && now.height === last.height) return now;
+    last = now;
+  }
+  return last;
+}
+
 /** Drags a block by its top-left corner so that corner lands at (x, y). */
 async function dragTo(page: Page, block: ReturnType<typeof fromPalette>, x: number, y: number) {
-  const b = (await block.boundingBox())!;
+  const b = await settled(block);
   await page.mouse.move(b.x + 6, b.y + 6);
   await page.mouse.down();
   await page.mouse.move(b.x + 30, b.y + 10, { steps: 4 });
@@ -246,7 +263,7 @@ test("a script made with blocks defines a function, and an event's blocks call i
   await dragTo(page, fromPalette(page, "def"), ws.x + ws.width * 0.45, ws.y + 40);
   await expect(pythonPane(page)).toHaveText("def my_function():    pass");
   // Its body: one block, inside the def's C.
-  const def = (await onCanvas(page, "def").boundingBox())!;
+  const def = await settled(onCanvas(page, "def"));
   await category(page, "Variables");
   await dragTo(page, fromPalette(page, /change\s*global/), def.x + 14, def.y + def.height * 0.5);
   await expect(pythonPane(page)).toHaveText("def my_function():    global_vars.score += 1");
