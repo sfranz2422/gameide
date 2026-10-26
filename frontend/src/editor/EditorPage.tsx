@@ -19,7 +19,8 @@ import { SpriteEditor } from "./sprites/SpriteEditor";
 import { SpriteImport, type ImportResult } from "./sprites/SpriteImport";
 import { decodeImage, type Decoded } from "../store/imageTools";
 import { refitMask, spriteFromFrames } from "../store/spriteOps";
-import { newId } from "../store/project";
+import { newId, newTileset } from "../store/project";
+import { LibraryBrowser } from "../library/LibraryBrowser";
 import { ResourceTree, type TabRef } from "./ResourceTree";
 import { ConsolePane, DocsPane, GamePane, type ConsoleLine } from "./RunPanes";
 import { Icon } from "./ui/icons";
@@ -73,6 +74,7 @@ export function EditorPage({ store, id }: { store: ProjectStore; id: string }) {
   const [scriptFocus, setScriptFocus] = useState<{ id: string; line: number; nonce: number } | null>(null);
   const [roomFocus, setRoomFocus] = useState<{ roomId: string; instanceId: string; line: number; nonce: number } | null>(null);
   const [picking, setPicking] = useState(false);
+  const [library, setLibrary] = useState(false);
   const [importing, setImporting] = useState<{ source: Decoded; fileName: string; appendTo?: string } | null>(null);
   const [dropping, setDropping] = useState(false);
 
@@ -503,8 +505,39 @@ export function EditorPage({ store, id }: { store: ProjectStore; id: string }) {
             onClose={() => setImporting(null)}
           />
         )}
+        {library && (
+          <LibraryBrowser
+            onClose={() => setLibrary(false)}
+            onSprite={async (lib) => {
+              // As an imported strip would be: spriteFromFrames gives it a free name, its box and its speed.
+              const { sprite, assets: made } = await spriteFromFrames(
+                { name: lib.name, width: lib.width, height: lib.height, frames: lib.frames, fps: 8, origin: "center" },
+                (projectRef.current?.sprites ?? []).map((s) => s.name),
+              );
+              await addAssets(made);
+              mutate((d) => void d.sprites.push(sprite));
+              setLibrary(false);
+              open({ kind: "sprites", id: sprite.id });
+            }}
+            onTileset={async (lib) => {
+              const bmp = await createImageBitmap(lib.image);
+              const id = newId();
+              await addAssets(new Map([[id, lib.image]]));
+              let name = lib.name;
+              for (let i = 2; (projectRef.current?.tilesets ?? []).some((t) => t.name.toLowerCase() === name.toLowerCase()); i++) name = `${lib.name}${i}`;
+              const ts = { ...newTileset(name), image: id, imageWidth: bmp.width, imageHeight: bmp.height, tileWidth: lib.tileWidth, tileHeight: lib.tileHeight };
+              mutate((d) => void d.tilesets.push(ts));
+              setLibrary(false);
+              open({ kind: "tilesets", id: ts.id });
+            }}
+          />
+        )}
         {picking && (
           <SpritePicker
+            onLibrary={() => {
+              setPicking(false);
+              setLibrary(true);
+            }}
             onImport={() => chooseFile()}
             onClose={() => setPicking(false)}
             onPick={async (key) => {

@@ -3535,3 +3535,51 @@ a.btn {
 .inspector td {
   word-break: break-all;
 }
+
+/* ---------------------------------------------------------------- the free art library (library/LibraryBrowser.tsx) */
+.modal.library {
+  width: min(680px, 94vw);
+  max-height: 90vh;
+  overflow: auto;
+}
+.library-packs {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 10px;
+}
+.library-pack {
+  display: grid;
+  gap: 4px;
+  padding: 8px;
+  text-align: left;
+  border-radius: 10px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  color: var(--text);
+  cursor: pointer;
+}
+.library-pack:hover {
+  border-color: var(--accent);
+}
+.library-pack img {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: 6px;
+  image-rendering: pixelated;
+}
+.library-sheet {
+  margin: 12px 0;
+  display: grid;
+  gap: 6px;
+}
+.library-canvas {
+  overflow: auto;
+  max-height: 340px;
+  border-radius: 6px;
+}
+.library-canvas canvas {
+  display: block;
+  cursor: pointer;
+  image-rendering: pixelated;
+}

@@ -13,7 +13,17 @@ import { readSave, saveKey } from "./gameHost";
 import { blockNamesFor, BlocksEditor, confirmToPython, isBlocks, ModeTabs, projectNames, toBlocks, toPython } from "./codeMode";
 import { useProjectApi } from "./useProject";
 
-export function SpritePicker({ onPick, onImport, onClose }: { onPick: (key: string) => void; onImport: () => void; onClose: () => void }) {
+export function SpritePicker({
+  onPick,
+  onImport,
+  onLibrary,
+  onClose,
+}: {
+  onPick: (key: string) => void;
+  onImport: () => void;
+  onLibrary: () => void;
+  onClose: () => void;
+}) {
   const [thumbs, setThumbs] = useState<Record<string, string>>({});
   useEffect(() => {
     const out: Record<string, string> = {};
@@ -33,6 +43,10 @@ export function SpritePicker({ onPick, onImport, onClose }: { onPick: (key: stri
         <button className="import-own" onClick={onImport} data-testid="import-picture">
           <b>Import your own picture…</b>
           <span className="muted small">PNG, JPG or GIF — one picture, a sprite sheet, or an animated GIF. You can also drop a picture anywhere in the editor, or paste one.</span>
+        </button>
+        <button className="import-own" onClick={onLibrary} data-testid="open-library">
+          <b>Free art library…</b>
+          <span className="muted small">Characters, tiles and ships by Kenney, free for any game (public domain). Sprites, or whole tilesets.</span>
         </button>
         <p className="muted small">Or start with one of these:</p>
         <div className="sprite-grid">

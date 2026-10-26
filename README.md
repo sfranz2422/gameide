@@ -46,3 +46,8 @@ inside exported games, keep their own licences: Pyodide (MPL 2.0), Blockly
 (Apache 2.0), PixiJS, CodeMirror and fflate (MIT), Electron in the Steam kit
 (MIT), and the Source Sans 3 and Ubuntu fonts (SIL Open Font License and the
 Ubuntu Font Licence).
+
+The free art library (`frontend/public/library/kenney/`) is Kenney's Pixel
+Platformer, Tiny Dungeon, Tiny Town and Pixel Shmup packs (kenney.nl),
+under Creative Commons Zero: public domain, usable in any game, credit
+optional. Each pack's own `License.txt` is beside its pictures.

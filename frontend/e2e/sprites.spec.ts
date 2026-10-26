@@ -3,7 +3,7 @@
  * — and the masks then decide collisions in a running game.
  */
 import { expect, test, type Page } from "@playwright/test";
-import { fromTemplate, placeInRoom, playAndWait, py, treeItem, watchErrors } from "./helpers";
+import { fromTemplate, placeInRoom, playAndWait, py, SHOTS, treeItem, watchErrors } from "./helpers";
 
 /** Rectangles to paint, then the picture as a PNG: [x, y, w, h, colour]. */
 type Paint = { width: number; height: number; rects: [number, number, number, number, string][]; clear?: [number, number, number, number][] };
@@ -144,4 +144,28 @@ r = instances("Ring")[0]
 (collision_point(r.x + 20, r.y + 20, "Ring") is None, collision_point(r.x + 1, r.y + 20, "Ring") is r)`);
   expect(hits).toEqual([true, true]);
   expect(errors.filter((e) => !e.includes("502"))).toEqual([]);
+});
+
+test("the free art library: cells of a sheet become a sprite's frames, and a whole sheet a tileset", async ({ page }) => {
+  await fromTemplate(page, "empty");
+  await page.getByTestId("add-sprites").click();
+  await page.getByTestId("open-library").click();
+  await page.getByTestId("library-pixel-platformer").click();
+  const sheet = page.getByTestId("sheet-canvas-Characters");
+  await expect(sheet).toBeVisible();
+  const box = (await sheet.boundingBox())!;
+  const cell = box.width / 9; // 9 characters across
+  await sheet.click({ position: { x: cell / 2, y: cell / 2 } }); // the first
+  await sheet.click({ position: { x: cell * 3.5, y: cell / 2 }, modifiers: ["Shift"] }); // and on to the fourth, as a run
+  await expect(page.getByTestId("sheet-sprite-Characters")).toHaveText("Add as a sprite (4 frames)");
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/library.png` });
+  await page.getByTestId("sheet-sprite-Characters").click();
+  await expect(treeItem(page, "pixel-platformer-characters-0")).toBeVisible();
+  await expect(page.getByTestId("sprite-frames").getByRole("button", { name: /^Frame \d$/ })).toHaveCount(4);
+
+  await page.getByTestId("add-sprites").click();
+  await page.getByTestId("open-library").click();
+  await page.getByTestId("library-tiny-dungeon").click();
+  await page.getByTestId("sheet-tileset-Tiles and characters").click();
+  await expect(page.getByTestId("tileset-count")).toHaveText("12 × 11 = 132 tiles, 0 solid");
 });

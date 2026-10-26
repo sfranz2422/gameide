@@ -1,6 +1,6 @@
 # Progress
 
-## Phase 12 — What GameMaker and GDevelop have that GameIDE didn't (in progress, 2026-10-26)
+## Phase 12 — What GameMaker and GDevelop have that GameIDE didn't ✅ (2026-10-26, waiting for review)
 Asked for after Thornwood's level 1 needed workarounds for most of these.
 ### 12a — Drawing and small maths ✅
 - **`draw_sprite_ext(sprite, frame, x, y, xscale, yscale, angle, color, alpha)`**: scaled, flipped, turned, tinted and faded, as GameMaker's. Its alpha multiplies with `draw_set_alpha`'s.
@@ -29,6 +29,11 @@ Asked for after Thornwood's level 1 needed workarounds for most of these.
 - **Flipped and turned tiles**: the tile palette's **⇋ Flip**, **⇵ Flip** and **↻ Turn** change the brush (a block of tiles turns as a whole). A painted cell keeps them in bits above its tile number (`game.ts` `TILE_FLIP_X`…); only the picture changes — collisions, `tile_at` and paths go by the tile. Flips and turns compose as the renderer draws them (scaled, then turned), so the brush shows what the game draws.
 - **Animated tiles**: the tileset's **Animated tiles** (+ New animation, click its frames, fps). Paint the first frame; the game shows each in turn, all in step. Kept with the tiles when a tileset's picture is replaced.
 - Tests: `e2e/feel.editor.spec.ts` (touch moves the coins Player and stops when let go; the debugger shows the Player's variables updating, and freezing/stepping moves it exactly once); `e2e/tiles.spec.ts` reads a tile painted upside down and its animation cycling; unit tests for brush transforms, flagged tiles colliding, remapping flags and frames. 17 sabotage cases, all caught.
+
+### 12e — A free art library ✅
+- **Add a sprite → Free art library…**: Kenney's **Pixel Platformer**, **Tiny Dungeon**, **Tiny Town** and **Pixel Shmup** (kenney.nl), all CC0 — public domain, free for any game, published or sold, credit optional. 100 KB in all, in `frontend/public/library/kenney/`, each pack with its own `License.txt`.
+- Choose a pack, then click cells of a sheet — in the order they should play, shift-click for a run — and **Add as a sprite** (its box fitted, 8 frames a second); or **Add the sheet as a tileset**, cut at its own tile size. Either opens at once.
+- Tests: `src/library/library.test.ts` (every listed picture there, a whole number of cells, every licence CC0); `e2e/sprites.spec.ts` makes a 4-frame sprite from a run and a 132-tile tileset. 3 sabotage cases, all caught (one showed the run test was too short to tell a run from two clicks).
 
 ## Phase 9½ — Game feel ✅ (2026-10-26, waiting for review)
 
