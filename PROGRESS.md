@@ -21,6 +21,14 @@ As agreed: a build kit (one command on a computer with Node), achievements later
 
 ### Tests
 
+```
+cd frontend
+npm test                      # Vitest: 191
+npm run e2e                   # Playwright: 62 editor tests + 11 account tests (4 opt-in, skipped)
+../backend/.venv/bin/python ../backend/tests/test_server.py   # 123 server checks
+python3 scripts/sabotage.py   # 310 deliberate bugs
+```
+
 - `e2e/steam.editor.spec.ts`: the kit's contents (the game, `main.js`, the pinned versions, the README), on every run.
 - With `RUN_STEAM_KIT=1`, the same file installs the kit's Electron and **plays the exported game in the real desktop app**: it starts with no click, is cross-origin isolated, and is titled with the game's name. With `RUN_STEAM_BUILD=1` as well, it also runs `npm run steam` and checks the folders. Run both for this phase: the kit built Windows, Linux and a universal Mac app, and the **packaged** Mac app played the game.
 
