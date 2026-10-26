@@ -27,6 +27,15 @@ import { ThemeToggle } from "./ui/ThemeToggle";
 import { AccountMenu, ExportButton, HistoryButton, SaveStatusView } from "./AccountBits";
 import { AssignmentButtons, ViewBar } from "./AssignmentBits";
 import type { ViewStore } from "../store/viewStore";
+import { claimRun } from "../xp/runXp";
+import { useSession } from "./session";
+
+/**
+ * How long a game must run without an error to count as a game that ran,
+ * for XP (xp/runXp.ts): long enough that one crashing in its first frames
+ * doesn't, short enough that a student testing a jump does.
+ */
+const RUN_COUNTS_MS = 5000;
 import { Splitter, usePaneSize } from "./ui/Splitter";
 import { ProjectContext, useProjectState, type ProjectApi } from "./useProject";
 
@@ -69,6 +78,14 @@ export function EditorPage({ store, id }: { store: ProjectStore; id: string }) {
   const [ready, setReady] = useState(false);
   const [host, setHost] = useState<GameHost | null>(null);
   const sources = useRef<Record<string, ObjectSource>>({});
+  const { me } = useSession();
+  // A game that has run RUN_COUNTS_MS without an error is claimed for XP.
+  // An error, a stop or another Play before then cancels it.
+  const runClaim = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cancelClaim = useCallback(() => {
+    if (runClaim.current) clearTimeout(runClaim.current);
+    runClaim.current = null;
+  }, []);
   const projectRef = useRef(project);
   projectRef.current = project;
 
@@ -83,6 +100,7 @@ export function EditorPage({ store, id }: { store: ProjectStore; id: string }) {
       state: setGameState,
       output: (ls) => addLines(ls),
       error: (e) => {
+        cancelClaim();
         const p = projectRef.current;
         const mapped = p ? mapError(p, sources.current, e) : { where: null, message: e.message, traceback: e.traceback, target: null, hang: !!e.hang };
         addLines([{ kind: "error", error: mapped }]);
@@ -94,7 +112,7 @@ export function EditorPage({ store, id }: { store: ProjectStore; id: string }) {
     setHost(h);
     (window as unknown as Record<string, unknown>).__gameide = { host: h };
     return () => h.dispose();
-  }, [addLines]);
+  }, [addLines, cancelClaim]);
 
   const open = useCallback((t: TabRef) => {
     setTabs((ts) => (ts.some((x) => x.id === t.id) ? ts : [...ts, t]));
@@ -127,9 +145,20 @@ export function EditorPage({ store, id }: { store: ProjectStore; id: string }) {
     setBottom("console");
     // The project's id names where its save data (save_set) lives in this browser.
     void host.play(built.def, p.id);
-  }, [host, assets, addLines]);
+    cancelClaim();
+    // Only a student's own game earns: not a teacher's, not one open read only.
+    if (store.kind === "cloud" && me.user && !me.user.teacher)
+      runClaim.current = setTimeout(() => {
+        runClaim.current = null;
+        void claimRun(p);
+      }, RUN_COUNTS_MS);
+  }, [host, assets, addLines, store, me, cancelClaim]);
 
-  const stop = useCallback(() => host?.stop(), [host]);
+  const stop = useCallback(() => {
+    cancelClaim();
+    host?.stop();
+  }, [host, cancelClaim]);
+  useEffect(() => cancelClaim, [cancelClaim]);
 
   useEffect(() => {
     const key = (e: KeyboardEvent) => {

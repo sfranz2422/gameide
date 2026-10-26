@@ -40,6 +40,7 @@ GS = "../backend/gamestore.py"
 PUB, PA, PD = "../backend/publishing.py", "src/player/PlayerApp.tsx", "src/editor/PublishDialog.tsx"
 CM, BS = "src/editor/codeMode.tsx", "src/blocks/blockState.ts"
 CL, UPJ, EP = "../backend/classes.py", "src/editor/useProject.ts", "src/editor/EditorPage.tsx"
+RW, XPP, RX = "../backend/rewards.py", "src/xp/XpPages.tsx", "src/xp/runXp.ts"
 CASES = [
  ("layout drift", RT, '"x": boxy(F.X)', '"x": boxy(F.Y)', "every built-in property"),
  ("no polar sync", RT, "            _st[b + i] = v\n            set_polar(b)", "            _st[b + i] = v", "two views of one motion"),
@@ -404,6 +405,32 @@ CASES = [
  ("view shows a backup", UPJ, "        const backup = store.kind === \"view\" ? null : readBackup(id);", "        const backup = readBackup(id);", "a class:", E2E),
  ("badge not mirrored", "src/store/gameBadge.ts", "    const right = left.slice(0, BADGE_SIZE - half).reverse();", "    const right = left.slice(0, BADGE_SIZE - half);", "mirrored left to right"),
  ("badge changes each visit", "src/store/gameBadge.ts", "  const rnd = random(hash(id));", "  const rnd = random(Math.floor(Math.random() * 1e9));", "same every time"),
+ # Phase 10b: XP
+ ("run pays at once", RW, "        if busy < xp.RUN_EVERY_SECONDS:", "        if False:", "a run pays nothing before enough working time", PY),
+ ("run twice in the time", RW, "        if runs.filter(accounts.XpAward.created_at > cutoff).first() is not None:", "        if False:", "not twice inside the time", PY),
+ ("same code pays", RW, "        if last is not None and last.detail == code:", "        if False:", "nor for the same code again", PY),
+ ("teachers earn", RW, "    return user is not None and not _is_teacher(user)", "    return user is not None", "a teacher's run pays nothing", PY),
+ ("no working time", APP, '            session["busy"] = session.get("busy", 0) + min(t - last, BUSY_STEP_SECONDS)', '            session["busy"] = session.get("busy", 0)', "working time is counted", PY),
+ ("penalty below zero", RW, "            moved = xp.penalty_for(amount, have.get(s.id, 0))", "            moved = amount", "never takes XP below 0", PY),
+ ("XP to anyone", RW, "        if u is not None and u.id == sid:", "        if u is not None:", "someone not in the class", PY),
+ ("hidden on the board", RW, "            if u is not None and not u.board_hidden:", "            if u is not None:", "who hides is off the board", PY),
+ ("board for all", RW, "        if course is None or not (teaching or any(c.id == class_id for c in my_classes(db, user))):", "        if course is None:", "closed to anyone outside the class", PY),
+ ("quest short of full", RW, "    return sub is not None and sub.score is not None and sub.score >= a.out_of", "    return sub is not None and sub.score is not None and sub.score >= a.out_of - 1", "short of full marks pays no quest", PY),
+ ("score pays no quest", CL, "        paid = rewards.full_marks_xp(db, a, sid)", "        paid = 0", "full marks pays the quest reward", PY),
+ ("reward pays no one", RW, "            paid = sum(1 for sid in students if full_marks_xp(db, a, sid))", "            paid = 0", "those who already have full marks", PY),
+ ("any avatar", RW, "        avatar, why = xp.clean_avatar(wanted, xp.level_of(xp.total(db, user.id)))", "        avatar, why = xp.clean_avatar(wanted, 99)", "above the student's level is refused", PY),
+ ("waiting photo public", RW, '        if photo.status != "approved":\n            viewer', '        if False:\n            viewer', "seen by nobody else", PY),
+ ("photo before approval", RW, '            approved = _photo(db, user, "approved")\n            if approved is None:\n                return err("Your photo', '            approved = _photo(db, user, "pending")\n            if approved is None:\n                return err("Your photo', "isn't their avatar yet", PY),
+ ("ask past tokens", RW, "        if free < item.cost:", "        if free < 0:", "without a token is refused", PY),
+ ("any teacher decides", RW, '        row = db.query(accounts.ShopRequest).filter_by(id=request_id, teacher_id=user.id, status="pending").first()', '        row = db.query(accounts.ShopRequest).filter_by(id=request_id, status="pending").first()', "another teacher can't approve it", PY),
+ ("approve spends nothing", RW, '.update({"tokens_used": accounts.User.tokens_used + row.cost}, synchronize_session=False))', '.update({"tokens_used": accounts.User.tokens_used + 0}, synchronize_session=False))', "approving spends the token", PY),
+ ("off shelf offered", RW, "        q = q.filter_by(active=1)", "        q = q", "taken off the shelf isn't offered", PY),
+ ("undo keeps XP", RW, '.delete(\n            synchronize_session=False)\n        row.undone = 1', '.count()\n        row.undone = 1', "Undo takes its XP back", PY),
+ ("news shows runs", RW, '                  if a.source.split(":", 1)[0] != "run"]', "                  if True]", "runs don't", PY),
+ ("toasts see nothing", XPP, "      const after = mark && mark.user === me.user!.id ? `?after=${mark.after}` : \"\";", '      const after = mark && mark.user === me.user!.id ? "" : "";', "XP: given by the teacher", E2E),
+ ("run claimed at once", EP, "      }, RUN_COUNTS_MS);", "      }, RUN_COUNTS_MS / 50);", "claimed for XP", E2E),
+ ("stop keeps the claim", EP, "    cancelClaim();\n    host?.stop();", "    host?.stop();", "claimed for XP", E2E),
+ ("hash ignores scripts", RX, "  for (const s of p.scripts) parts.push(`s:${s.id}:${s.code}`);\n", "", "changes when the game's code changes"),
  ("turn in does nothing", "src/editor/AssignmentBits.tsx", "            await api(`/api/projects/${encodeURIComponent(projectId)}/turn-in`, { json: {} });", "            void 0;", "a class:", E2E),
  ("no read-only bar", EP, '          {store.kind === "view" ? (', "          {store.kind !== store.kind ? (", "a class:", E2E),
 ]

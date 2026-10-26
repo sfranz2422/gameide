@@ -350,6 +350,33 @@ student), `Comment`.
   (`_google_post/_get/_api`) replaced in the tests. The connection is per
   app; GameIDE's `/classroom/callback` must be on the OAuth client's list.
 
+## XP
+
+`backend/rewards.py` (a blueprint), `src/xp/`. **PyIDE's XP joined, not
+copied**: one total per person across all four editors.
+
+- **`backend/xp.py` is the fourth byte-identical copy** of PyIDE's, like
+  accounts.py. Change it in PyIDE first and copy it to WebIDE, FlaskIDE and
+  here. The rows are shared tables (`xp_awards`, `shop_items`,
+  `shop_requests`, `student_photos`, `class_events`); every award GameIDE
+  makes has `app = "gameide"`.
+- **The unique `(user_id, source)` is what stops paying twice.** `xp.award`
+  commits on its own; call it after what it pays for is committed. Sources
+  here: `run:<minute>`, `bonus:<assignment>`, `grant:<random>`,
+  `event:<event>:<user>` (Undo deletes exactly those — the only deletion).
+- **The server can't see a game run.** EditorPage claims one 5 s after Play
+  with no error (`RUN_COUNTS_MS`; an error, Stop or Play cancels it),
+  sending a hash of the code (`xp/runXp.ts`, never the code). The server
+  pays only after `RUN_EVERY_SECONDS` of working time (`session["busy"]`,
+  counted in `_sign_out_idle_student`, never for a GET to /api/) and for
+  changed code, so a faked claim earns what a real one would.
+- Only students earn. Nothing here touches a grade; tokens are spent only
+  by one conditional UPDATE (approve, Use a token).
+- Avatars are PyIDE's pictures in `public/avatars/` (a server check fails
+  on a picture without its id or an id without its picture) or an approved
+  photo; `xp/avatar.tsx` is GameIDE's version of PyIDE's avatar.js.
+  Leaderboards show `xp.board_name` only, never an email.
+
 ## Saving, signed in
 
 `store/cloudStore.ts`: every save goes to a per-user IndexedDB cache first

@@ -52,6 +52,7 @@ from sqlalchemy import func
 
 import accounts
 import gamestore
+import rewards
 from accounts import now
 from gamestore import AssignmentGame, AssignmentWork, ClassSettings, Comment, GameAsset, GameProject, GameVersion
 
@@ -334,6 +335,7 @@ def get_class(class_id):
                     continue
                 g = games.get(a.id)
                 out.append({**row, "kind": "assignment", "title": a.title, "slug": a.slug, "outOf": a.out_of,
+                            "xpBonus": a.xp_bonus or 0,
                             "dueAt": _iso(g.due_at if g else None), "archived": bool(a.archived),
                             "started": started.get(a.id, 0), "turnedIn": turned.get(a.id, 0), "posted": a.id in posted})
             students = db.query(accounts.Enrollment).filter_by(class_id=course.id).order_by(accounts.Enrollment.name).all()
@@ -355,6 +357,7 @@ def get_class(class_id):
         projects = {p.id: p for p in db.query(GameProject).filter(GameProject.id.in_([w.project_id for w in work.values()] or [-1])).all()}
         subs = {s.assignment_id: s for s in db.query(accounts.Submission).filter(
             accounts.Submission.assignment_id.in_(ids or [-1]), accounts.Submission.student_id == user.id).all()}
+        done = rewards.quests_done(db, user)
         unread = dict(db.query(Comment.project_id, func.count(Comment.id)).filter(
             Comment.project_id.in_(list(projects) or [-1]), Comment.author_id != user.id, Comment.seen == 0)
             .group_by(Comment.project_id).all())
@@ -371,6 +374,7 @@ def get_class(class_id):
             p = projects.get(w.project_id) if w else None
             out.append({"id": i.id, "kind": "assignment", "title": a.title, "slug": a.slug, "description": i.description,
                         "outOf": a.out_of, "dueAt": _iso(g.due_at if g else None),
+                        "xpBonus": a.xp_bonus or 0, "questDone": a.id in done,
                         "project": p.slug if p and p.deleted_at is None else None,
                         "turnedIn": _iso(s.submitted_at) if s and s.times_submitted > 0 else None,
                         "score": s.score if s else None, "unread": unread.get(p.id, 0) if p else 0})
@@ -711,6 +715,7 @@ def assignment_results(slug):
         starter = db.query(GameProject).filter_by(id=g.starter_id).first() if g else None
         post = db.query(accounts.ClassroomPost).filter_by(assignment_id=a.id).first()
         return jsonify(slug=a.slug, title=a.title, outOf=a.out_of, dueAt=_iso(g.due_at if g else None),
+                       xpBonus=a.xp_bonus or 0,
                        archived=bool(a.archived), hidden=bool(item and item.hidden),
                        classId=course.id if course else None, className=course.name if course else "",
                        courseId=course.course_id if course else "",
@@ -939,7 +944,10 @@ def give_score(slug):
             db.add(s)
         s.score = score
         db.commit()
-        return jsonify(ok=True, synced=s.score is not None and s.score == s.score_synced)
+        # Full marks pays the quest reward, once — after the score is
+        # committed, so nothing in paying it can lose the score.
+        paid = rewards.full_marks_xp(db, a, sid)
+        return jsonify(ok=True, synced=s.score is not None and s.score == s.score_synced, questPaid=paid)
     finally:
         db.close()
 

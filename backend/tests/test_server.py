@@ -601,6 +601,166 @@ check("deleting a class archives its assignments and keeps the students' games",
       teacher.delete(f"/api/classes/{CR}").status_code == 200 and teacher.get(f"/api/assignments/{C}").get_json()["archived"]
       and dana.post(f"/api/assignments/{C}/start").status_code == 200)
 
+# ---------------------------------------------------------------- XP (rewards.py)
+import xp  # noqa: E402
+
+XC = teacher.post("/api/classes", json={"name": "XP class"}).get_json()["id"]
+teacher.post(f"/api/classes/{XC}/students", json={"emails": "xa@example.com xb@example.com xc@example.com"})
+xa, xb, xc = client("xa@example.com"), client("xb@example.com"), client("xc@example.com")
+ids = {}
+for name, c in (("xa", xa), ("xb", xb), ("xc", xc)):
+    ids[name] = c.get("/api/me").get_json()["user"]["id"]
+card = xa.get("/api/me/xp").get_json()
+check("a student's XP card starts at level 1 with nothing", card.get("xp") == 0 and card.get("level") == 1 and card.get("earns") is True, card)
+check("…with the avatars to pick from", len(card.get("avatars", [])) == len(xp.AVATARS))
+check("a teacher doesn't earn XP", teacher.get("/api/me/xp").get_json().get("earns") is False)
+
+# A game that ran: paid only after working long enough, and only for changed code.
+news0 = xa.get("/api/me/xp/news").get_json()
+r = xa.post("/api/xp/run", json={"code": "abc123"}).get_json()
+check("a run pays nothing before enough working time", r.get("awarded") == 0 and r.get("minutes", 0) > 0, r)
+with xa.session_transaction() as sess:
+    sess["busy"] = xp.RUN_EVERY_SECONDS
+r = xa.post("/api/xp/run", json={"code": "abc123"}).get_json()
+check("…and RUN_XP once the student has worked long enough", r.get("awarded") == xp.RUN_XP, r)
+# The paid run's source is moved to another minute, so it is the time check
+# that refuses the next claim, not the two colliding on the same minute.
+db = server.SessionLocal()
+db.query(accounts.XpAward).filter(accounts.XpAward.user_id == ids["xa"]).update({"source": "run:1"}, synchronize_session=False)
+db.commit()
+db.close()
+with xa.session_transaction() as sess:
+    sess["busy"] = xp.RUN_EVERY_SECONDS
+check("…not twice inside the time, however long the session says", xa.post("/api/xp/run", json={"code": "zzz999"}).get_json().get("awarded") == 0)
+db = server.SessionLocal()
+db.query(accounts.XpAward).filter(accounts.XpAward.user_id == ids["xa"]).update(
+    {"created_at": accounts.now() - __import__("datetime").timedelta(hours=1)}, synchronize_session=False)
+db.commit()
+db.close()
+with xa.session_transaction() as sess:
+    sess["busy"] = xp.RUN_EVERY_SECONDS
+check("…nor for the same code again", xa.post("/api/xp/run", json={"code": "abc123"}).get_json().get("same") is True)
+with teacher.session_transaction() as sess:
+    sess["busy"] = xp.RUN_EVERY_SECONDS
+check("a teacher's run pays nothing", teacher.post("/api/xp/run", json={"code": "t1"}).get_json().get("awarded") == 0)
+with xa.session_transaction() as sess:
+    sess["busy"] = 0
+    sess["act"] = int(time.time()) - 200
+xa.post("/api/alive")
+with xa.session_transaction() as sess:
+    busy = sess.get("busy", 0)
+check("working time is counted as the student works", 190 <= busy <= 400, busy)
+
+# The teacher's XP, with a reason.
+r = teacher.post(f"/api/classes/{XC}/xp", json={"students": [ids["xa"], ids["xb"]], "xp": 30, "reason": "Helped debug"})
+check("a teacher gives XP to students in their class", r.status_code == 200 and xa.get("/api/me/xp").get_json()["xp"] == 30 + xp.RUN_XP)
+news = xa.get(f"/api/me/xp/news?after={news0['latest']}").get_json()
+check("…which pops up for the student, with the reason (and runs don't)", [a["reason"] for a in news["awards"]] == ["Helped debug"], news)
+check("another teacher can't give XP in this class", other_teacher.post(f"/api/classes/{XC}/xp", json={"student": ids["xa"], "xp": 5}).status_code == 403)
+check("…nor can it go to someone not in the class", teacher.post(f"/api/classes/{XC}/xp", json={"student": ids["xa"] + 1000, "xp": 5}).status_code == 404)
+check("a student can't give XP", xa.post(f"/api/classes/{XC}/xp", json={"student": ids["xa"], "xp": 500}).status_code == 403)
+r = teacher.post(f"/api/classes/{XC}/xp", json={"students": [ids["xb"], ids["xc"]], "xp": -50, "reason": "Late"}).get_json()
+check("a penalty never takes XP below 0, and names who it skipped", xb.get("/api/me/xp").get_json()["xp"] == 0 and len(r.get("skipped", [])) == 1, r)
+
+# XP from another editor counts: one total per person.
+db = server.SessionLocal()
+db.add(accounts.XpAward(user_id=ids["xc"], app="pyide", source="quiz:1:x", xp=70, reason="Question in PyIDE"))
+db.commit()
+db.close()
+b = xa.get(f"/api/classes/{XC}/board").get_json()
+check("the class's board ranks everyone by their whole XP, PyIDE's included",
+      [(r["name"], r["xp"]) for r in b["board"]] == [("Xc", 70), ("Xa", 30 + xp.RUN_XP), ("Xb", 0)], b.get("board"))
+check("…by first name and initial, never an email", "@" not in json.dumps(b))
+check("…closed to anyone outside the class", alice.get(f"/api/classes/{XC}/board").status_code == 403)
+xc.post("/api/me/board", json={"hidden": True})
+check("a student who hides is off the board", "Xc" not in [r["name"] for r in xa.get(f"/api/classes/{XC}/board").get_json()["board"]])
+check("…and still earns", xc.get("/api/me/xp").get_json()["xp"] == 70)
+check("a teacher with several classes has an all-classes board", isinstance(xa.get(f"/api/classes/{XC}/board").get_json()["all"], list))
+
+# Quests: full marks on an assignment with a reward.
+put(teacher, "q1", project("q1", "Quest game"), 0)
+Q = teacher.post(f"/api/classes/{XC}/assignments", json={"title": "Boss level", "project": "q1", "outOf": 10}).get_json()["slug"]
+check("only its teacher sets a quest reward", other_teacher.post(f"/api/assignments/{Q}/xp-bonus", json={"xp": 50}).status_code == 403)
+teacher.post(f"/api/assignments/{Q}/xp-bonus", json={"xp": 50})
+xa.post(f"/api/assignments/{Q}/start")
+before = xa.get("/api/me/xp").get_json()["xp"]
+teacher.post(f"/api/assignments/{Q}/score", json={"student": ids["xa"], "score": 9})
+check("a score short of full marks pays no quest", xa.get("/api/me/xp").get_json()["xp"] == before)
+teacher.post(f"/api/assignments/{Q}/score", json={"student": ids["xa"], "score": 10})
+check("full marks pays the quest reward", xa.get("/api/me/xp").get_json()["xp"] == before + 50)
+teacher.post(f"/api/assignments/{Q}/score", json={"student": ids["xa"], "score": 10})
+check("…once", xa.get("/api/me/xp").get_json()["xp"] == before + 50)
+qi = [i for i in xa.get(f"/api/classes/{XC}").get_json()["items"] if i.get("slug") == Q][0]
+check("the class page marks the quest done", qi.get("xpBonus") == 50 and qi.get("questDone") is True, qi)
+xb.post(f"/api/assignments/{Q}/start")
+teacher.post(f"/api/assignments/{Q}/xp-bonus", json={"xp": 0})
+teacher.post(f"/api/assignments/{Q}/score", json={"student": ids["xb"], "score": 10})
+r = teacher.post(f"/api/assignments/{Q}/xp-bonus", json={"xp": 40}).get_json()
+check("setting a reward pays those who already have full marks", r.get("paid") == 1 and xb.get("/api/me/xp").get_json()["xp"] == 40, r)
+check("an open quest is listed for a student who hasn't done it", [q["title"] for q in xc.get("/api/me/xp").get_json()["quests"]] == ["Boss level"])
+
+# Avatars.
+check("an avatar above the student's level is refused", xb.post("/api/me/avatar", json={"avatar": "wizard"}).status_code == 400)
+check("…and one that doesn't exist", xb.post("/api/me/avatar", json={"avatar": "nope"}).status_code == 400)
+check("one unlocked is saved", xb.post("/api/me/avatar", json={"avatar": "robot"}).get_json().get("avatar") == "robot"
+      and [r["avatar"] for r in xa.get(f"/api/classes/{XC}/board").get_json()["board"] if r["name"] == "Xb"] == ["robot"])
+pending = xb.post("/api/me/photo", data=PNG, content_type="image/png").get_json().get("pending", "")
+check("a student's photo waits for approval", pending.startswith("photo:"))
+pslug = pending.split(":", 1)[-1]
+check("…seen by nobody else", xa.get(f"/photo/{pslug}").status_code == 404 and anon.get(f"/photo/{pslug}").status_code == 404)
+check("…but their teacher", teacher.get(f"/photo/{pslug}").status_code == 200)
+check("…and isn't their avatar yet", xb.post("/api/me/avatar", json={"avatar": "photo"}).status_code == 400)
+check("a picture that isn't one is refused", xb.post("/api/me/photo", data=b"<svg/>", content_type="image/svg+xml").status_code == 400)
+photos = teacher.get(f"/api/classes/{XC}/xp").get_json()["photos"]
+check("another teacher can't approve it", other_teacher.post(f"/api/classes/{XC}/photo/{photos[0]['id']}/approve").status_code == 403)
+teacher.post(f"/api/classes/{XC}/photo/{photos[0]['id']}/approve")
+check("approved, it's their avatar, and anyone can see it", xb.get("/api/me/xp").get_json()["avatar"] == pending
+      and anon.get(f"/photo/{pslug}").status_code == 200)
+
+# The token shop.
+shopc = xa.get("/api/me/xp").get_json()["shops"]
+check("a student sees their teacher's shop, stocked from the starter list", shopc and len(shopc[0]["items"]) == len(xp.SHOP_STARTER), shopc)
+cheap = [i for i in shopc[0]["items"] if i["cost"] == 1][0]
+check("asking without a token is refused", xa.post("/api/shop/request", json={"item": cheap["id"]}).status_code == 409)
+teacher.post(f"/api/classes/{XC}/xp", json={"student": ids["xa"], "xp": 1000, "reason": "Token time"})
+r = xa.post("/api/shop/request", json={"item": cheap["id"]})
+RQ = (r.get_json() or {}).get("request", {}).get("id")
+check("with one, the request is taken and its token held", r.status_code == 200 and r.get_json()["free"] == 0)
+check("…so a second can't be asked for", xa.post("/api/shop/request", json={"item": cheap["id"]}).status_code == 409)
+check("another teacher can't approve it", other_teacher.post(f"/api/shop/request/{RQ}/approve").status_code == 404)
+check("…nor can the student", xa.post(f"/api/shop/request/{RQ}/approve").status_code == 403)
+check("its teacher sees it on the class's XP page", [q["id"] for q in teacher.get(f"/api/classes/{XC}/xp").get_json()["requests"]] == [RQ])
+teacher.post(f"/api/shop/request/{RQ}/approve")
+card = xa.get("/api/me/xp").get_json()
+check("approving spends the token", card["tokens"] == 0 and card["free"] == 0, card.get("tokens"))
+check("using a token needs one", teacher.post(f"/api/classes/{XC}/tokens", json={"student": ids["xa"]}).status_code == 409)
+item = teacher.post("/api/shop/item", json={"name": "Choose the music", "cost": 2})
+check("a teacher stocks their shop", item.status_code == 201 and "Choose the music" in [i["name"] for i in teacher.get("/api/shop").get_json()["items"]])
+check("…a student can't", xa.post("/api/shop/item", json={"name": "Free A", "cost": 1}).status_code == 403)
+teacher.post(f"/api/shop/item/{item.get_json()['id']}", json={"active": False})
+check("an item taken off the shelf isn't offered", "Choose the music" not in [i["name"] for i in xa.get("/api/me/xp").get_json()["shops"][0]["items"]])
+
+# Random events.
+r = teacher.post(f"/api/classes/{XC}/event").get_json()
+ev = r.get("event", {})
+check("a random event is drawn and applied", ev.get("title") in [e["title"] for e in xp.EVENTS] and isinstance(ev.get("hits"), list), r)
+db = server.SessionLocal()
+moved = db.query(accounts.XpAward).filter(accounts.XpAward.source.like("event:%d:%%" % ev.get("id", -1))).count()
+db.close()
+check("…its XP is rows the event names", moved == len(ev.get("hits", [])))
+check("the class's page shows it", (xa.get(f"/api/classes/{XC}/board").get_json().get("event") or {}).get("id") == ev.get("id"))
+check("only the class's teacher draws one", other_teacher.post(f"/api/classes/{XC}/event").status_code == 403)
+teacher.post(f"/api/classes/{XC}/event/{ev.get('id')}/undo")
+db = server.SessionLocal()
+moved = db.query(accounts.XpAward).filter(accounts.XpAward.source.like("event:%d:%%" % ev.get("id", -1))).count()
+db.close()
+check("Undo takes its XP back, and it leaves the class's page", moved == 0 and xa.get(f"/api/classes/{XC}/board").get_json().get("event") is None)
+pics = {f.stem for f in (BACKEND.parent / "frontend" / "public" / "avatars").glob("*.webp")}
+check("every avatar has its picture, and every picture is an avatar", pics == set(xp.AVATAR_IDS), pics ^ set(xp.AVATAR_IDS))
+log = xa.get("/api/me/xp/all").get_json()["awards"]
+check("a student's every award is listed, with why and where", {"Helped debug", "Ran a game", "Token time"} <= {a["reason"] for a in log}
+      and {a["app"] for a in log} == {"gameide"})
+
 # ---------------------------------------------------------------- the built editor's files
 # The blocks editor's media come from our own origin (vite.config.ts copies
 # them into dist/blockly-media); without this route the trash can and drag

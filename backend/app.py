@@ -27,6 +27,7 @@ from werkzeug.exceptions import BadRequest
 
 import accounts
 import classes
+import rewards
 import gamestore
 import publishing
 from gamestore import GameAsset, GameProject, GameVersion
@@ -300,6 +301,11 @@ def dev_login():
 # itself signed in forever; a save or the page's beat (POSTs) is.
 
 STUDENT_IDLE_SECONDS = 2 * 60 * 60
+#: Working time, toward a run's XP (rewards.xp_run), counts each gap between
+#: bits of activity for at most this — a little over the page's 5-minute
+#: beat — so a student who went to lunch comes back with one step's worth,
+#: not the hour they were away. As in PyIDE.
+BUSY_STEP_SECONDS = 6 * 60
 
 
 def _counts_as_activity() -> bool:
@@ -323,6 +329,8 @@ def _sign_out_idle_student():
             return redirect(url_for("login", next=request.full_path.rstrip("?")))
         return
     if last is None or (_counts_as_activity() and t - last >= 60):
+        if last is not None:
+            session["busy"] = session.get("busy", 0) + min(t - last, BUSY_STEP_SECONDS)
         session["act"] = t
 
 
@@ -764,6 +772,14 @@ def home_pictures(name):
     return r
 
 
+@app.get("/avatars/<path:name>")
+def avatar_pictures(name):
+    """The avatars a student picks from (xp.AVATARS; public/avatars/, the same pictures as PyIDE's)."""
+    r = send_from_directory(DIST / "avatars", name)
+    r.headers["Cache-Control"] = "public, max-age=86400"
+    return r
+
+
 @app.get("/icons/<path:name>")
 def icons(name):
     r = send_from_directory(DIST / "icons", name)
@@ -794,6 +810,8 @@ def blockly_media(name):
 publishing.init(app, _db, current_user)
 # Classes, assignments, turning in, comments and Google Classroom (classes.py).
 classes.init(app, _db, current_user, _scheme, _problem)
+# XP, levels, leaderboards, avatars, the token shop and random events (rewards.py).
+rewards.init(app, _db, current_user)
 
 
 if __name__ == "__main__":

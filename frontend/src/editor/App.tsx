@@ -17,6 +17,7 @@ import { HomePage } from "./HomePage";
 import { ExplorePage, GalleryPage, ModerationPage } from "./ExplorePages";
 import { AssignmentPage, ClassesPage, ClassPage, StartAssignment } from "./ClassPages";
 import { ViewStore } from "../store/viewStore";
+import { ClassXpPage, ShopPage, XpLogPage, XpToasts } from "../xp/XpPages";
 import { useIdleSignOut } from "./idle";
 import { ProjectsPage } from "./ProjectsPage";
 import { SessionContext, type SessionInfo } from "./session";
@@ -53,6 +54,7 @@ export function App() {
   const m = hash.match(/^#\/p\/([\w-]+)/);
   const gallery = hash.match(/^#\/gallery\/(\d+)/);
   const klass = hash.match(/^#\/class\/(\d+)/);
+  const classXp = hash.match(/^#\/class\/(\d+)\/xp/);
   const results = hash.match(/^#\/assignment\/([\w-]+)/);
   const start = hash.match(/^#\/a\/([\w-]+)/);
   return (
@@ -63,6 +65,12 @@ export function App() {
         <EditorPage key={hash} store={viewStore} id={view[1]!} />
       ) : start ? (
         <StartAssignment key={start[1]} slug={start[1]!} />
+      ) : classXp ? (
+        <ClassXpPage key={classXp[1]} classId={Number(classXp[1])} />
+      ) : hash.startsWith("#/xp") ? (
+        <XpLogPage />
+      ) : hash.startsWith("#/shop") ? (
+        <ShopPage />
       ) : klass ? (
         <ClassPage key={klass[1]} classId={Number(klass[1])} />
       ) : results ? (
@@ -80,6 +88,7 @@ export function App() {
       ) : (
         <HomePage />
       )}
+      <XpToasts />
     </SessionContext.Provider>
   );
 }

@@ -15,6 +15,7 @@ import type { ProjectSummary } from "../store/store";
 import { CommentsDialog, whenText } from "./AssignmentBits";
 import { useSession } from "./session";
 import { SiteNav } from "./SiteNav";
+import { ClassBoard, XpCard } from "../xp/XpPages";
 import { Icon } from "./ui/icons";
 
 interface ClassroomState {
@@ -120,6 +121,7 @@ export function ClassesPage() {
     <Page title="Classes">
       {(loadProblem || problem) && <p className="banner error">{loadProblem || problem}</p>}
       {!data && !loadProblem && <p className="muted">Loading…</p>}
+      {data && !data.teacher && <XpCard />}
       {data && (
         <>
           {data.teacher && (
@@ -182,6 +184,9 @@ export function ClassesPage() {
                   {Icon.plus()} Make the class
                 </button>
               </form>
+              <p className="muted small">
+                <a href="#/shop">Token shop</a>: what your students' XP tokens buy, the same shelf in every editor.
+              </p>
               {data.classroom?.configured && (
                 <p className="muted small classroom-line">
                   {data.classroom.connected ? (
@@ -240,7 +245,9 @@ interface Item {
   started?: number;
   turnedIn?: number | string | null;
   posted?: boolean;
+  xpBonus?: number;
   // a student's
+  questDone?: boolean;
   project?: string | null;
   score?: number | null;
   unread?: number;
@@ -310,6 +317,11 @@ function StudentClass({ data }: { data: ClassData }) {
                   {i.unread} new comment{i.unread === 1 ? "" : "s"}
                 </span>
               ) : null}
+              {i.xpBonus ? (
+                <span className={`pill quest${i.questDone ? " done" : ""}`} data-testid="quest">
+                  {i.questDone ? "✓ Quest done" : `Quest: +${i.xpBonus} XP for full marks`}
+                </span>
+              ) : null}
               {i.score != null && (
                 <span className="pill" data-testid="my-score">
                   {i.score}
@@ -324,6 +336,7 @@ function StudentClass({ data }: { data: ClassData }) {
         )}
         {!data.items.length && <p className="muted">Nothing here yet.</p>}
       </div>
+      <ClassBoard classId={data.id} />
     </Page>
   );
 }
@@ -365,6 +378,9 @@ function TeacherClass({ data, reload }: { data: ClassData; reload: () => void })
           >
             New group
           </button>
+          <a className="btn blue" href={`#/class/${data.id}/xp`} data-testid="class-xp">
+            XP and tokens
+          </a>
         </>
       }
     >
@@ -412,6 +428,7 @@ function TeacherClass({ data, reload }: { data: ClassData; reload: () => void })
                     {i.hidden ? "Hidden from students · " : ""}
                     {i.dueAt ? `Due ${whenText(i.dueAt)} · ` : ""}
                     {i.started} started · {i.turnedIn} turned in{i.posted ? " · in Classroom" : ""}
+                    {i.xpBonus ? ` · quest: +${i.xpBonus} XP` : ""}
                   </span>
                 </div>
                 <button
@@ -544,6 +561,8 @@ function TeacherClass({ data, reload }: { data: ClassData; reload: () => void })
           </tbody>
         </table>
       </section>
+
+      <ClassBoard classId={data.id} />
 
       <section className="class-section">
         <h2>Publishing</h2>
@@ -700,6 +719,7 @@ interface ResultRow {
 interface Results {
   slug: string;
   title: string;
+  xpBonus: number;
   outOf: number | null;
   dueAt: string | null;
   archived: boolean;
@@ -768,6 +788,25 @@ export function AssignmentPage({ slug }: { slug: string }) {
         <label>
           Due{" "}
           <input type="datetime-local" defaultValue={toLocal(data.dueAt)} key={`d${data.dueAt}`} onBlur={(e) => toLocal(data.dueAt) !== e.target.value && void set({ dueAt: toUtc(e.target.value) })} />
+        </label>
+        <label title="XP paid once to each student who gets full marks. 0 is no quest.">
+          Quest reward{" "}
+          <input
+            type="number"
+            min={0}
+            defaultValue={data.xpBonus || ""}
+            key={`x${data.xpBonus}`}
+            placeholder="0"
+            onBlur={(e) =>
+              Number(e.target.value || 0) !== data.xpBonus &&
+              void act(async () => {
+                const r = await api<{ paid: number }>(`/api/assignments/${slug}/xp-bonus`, { json: { xp: e.target.value || 0 } });
+                if (r.paid) setNote(`Paid the quest reward to ${r.paid} student${r.paid === 1 ? "" : "s"} who already had full marks.`);
+              })
+            }
+            data-testid="quest-reward"
+          />{" "}
+          XP
         </label>
         {data.starter && (
           <a className="btn small" href={`#/p/${data.starter}`}>

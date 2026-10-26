@@ -1,6 +1,74 @@
 # Progress
 
-## Phase 10 — Classrooms ✅ (2026-10-26, waiting for review)
+## Phase 10b — XP ✅ (2026-10-26, waiting for review)
+
+Agreed: XP now, then a Phase 11 that brings the notes tab, questions and tests along with the tutorials.
+
+**One total per person, across all four editors.** GameIDE joins PyIDE's XP rather than copying it.
+- The rules are `xp.py`, now byte-identical in four repos. Its header says so in all four, and PyIDE's CLAUDE.md does too.
+- The rows are the shared tables: `xp_awards`, `shop_items`, `shop_requests`, `student_photos` and `class_events`.
+- XP earned in GameIDE counts on a PyIDE leaderboard, and the other way round. Your token shop is the same shelf in every editor.
+
+### Done
+
+- **What earns XP in GameIDE:**
+  - A **game that ran** for 5 seconds without an error earns `RUN_XP`, at most once per half hour of working time, and only when its code changed. This is PyIDE's rule:
+    - Working time is now counted in GameIDE's idle check, as in PyIDE.
+    - The page sends a hash of the code, never the code.
+  - **Quests:** a "Quest reward" on an assignment pays once on full marks (a score reaching its points). Setting it pays everyone who already has full marks.
+  - The **teacher's XP**: give or take with a reason, from the class's new **XP and tokens** page. You tick students, pick one of the programming-themed reasons or type your own. XP never goes below 0.
+  - **Random events:** shown big for the projector and on the class's page for a day. Undo takes them back.
+- **Students:**
+  - An XP card at the top of Classes: avatar, level and title, progress bar, badges, tokens to spend, leaderboards (top five plus their own row) and open quests.
+  - Their teacher's **token shop** with Ask buttons, and their requests.
+  - "Hide me from the leaderboards".
+  - **#/xp** lists every award, from every editor, with why.
+  - XP from elsewhere **pops up** on any page, the editor included, and so does a run that paid.
+  - **Avatars**: PyIDE's pictures, unlocked by level, or **their own photo once a teacher approves it**.
+- **Teachers:**
+  - The **XP and tokens** page per class: roster with XP, level and tokens, Use a token, requests to approve or decline, photos to approve or reject, and the event history with Undo.
+  - **Token shop** (`#/shop`): your shelf, editable, with items taken off it rather than deleted.
+  - Each class's page has its **leaderboard** (and an all-classes one once you have two classes) and marks quests.
+- Leaderboards show first name and last initial, never an email.
+
+### Tests
+
+```
+cd frontend
+npm test                      # Vitest: 196
+npm run e2e                   # Playwright: 62 editor tests + 15 account tests (4 opt-in, skipped)
+../backend/.venv/bin/python ../backend/tests/test_server.py   # 277 server checks
+python3 scripts/sabotage.py   # 364 deliberate bugs
+```
+
+- **57 new server checks**, covering:
+  - run XP (not before the working time, not twice inside it, not for the same code, never for a teacher, working time counted as the student works)
+  - the teacher's XP (reason shown, only their own class, never below 0)
+  - one total with PyIDE's XP included
+  - leaderboards (names only, hidden students off, closed to outsiders)
+  - quests (short of full marks pays nothing, full marks once, setting the reward pays early finishers)
+  - avatars (level locks)
+  - photos (no one sees one until approved)
+  - the shop (no asking past your tokens, only the class's teacher approves, approving spends, off-shelf items hidden)
+  - events and Undo
+  - every avatar's picture present.
+- **`e2e/xp.spec.ts`**:
+  - The teacher gives XP and it pops up for the student. The student picks an avatar, which shows on the leaderboard, asks for a shop item, and the teacher approves it. A random event shows big and on the class's page.
+  - A game that runs is claimed for XP (the server's answer is stubbed: it pays only after half an hour of work). A game stopped at once isn't claimed.
+- 25 new sabotage cases, each caught. Four found weak checks that passed for the wrong reason; all four were fixed:
+  - a second run was refused because two awards shared a minute, not by the time check
+  - the "runs aren't news" check never had a run in range
+  - two editor sabotages didn't compile.
+
+### Known issues and gaps
+
+- PyIDE's **editor themes** for sale in the shop aren't offered here: they change PyIDE's editor only.
+- XP for questions and tests arrives with Phase 11, as agreed.
+- The badges are PyIDE's, including programming titles like "List Wrangler" (they're shared, so one set for all four).
+
+---
+
+## Phase 10 — Classrooms ✅ (2026-10-26, reviewed)
 
 Built the way PyIDE's classes are, on the tables PyIDE made and shares (`classes`, `enrollments`, `class_items`, `assignments`, `submissions`, `classroom_links`, `classroom_posts`), every row carrying `app = "gameide"`. So there are no join codes: a class's students come from its Google Classroom roster, or are typed in by email.
 
@@ -767,7 +835,9 @@ of its own after Phase 9.
 | 11 Tutorials | tutorial panel, checks, library | |
 | 12 Retro mode (new, agreed 2026-10-26) | — | **export to .gb, then .nes** (SNES left out): a restricted Python subset translated to C (GBDK-2020 / cc65), editor limits (4 shades, 8×8 tiles, 160×144), chiptune sound, tested in a browser emulator |
 
-## Next: Phase 11 — Tutorials
+## Next: Phase 11 — Tutorials, with the notes tab, questions and tests
+
+Agreed 2026-10-26: a **Notes** tab beside Console and Docs (the editor's layout unchanged) showing an assignment's markdown and slides, questions in PyIDE's format, and game-shaped tests ("Player has a Step event", "uses keyboard_check", "after setup there are 15 Coins") with Check my work and Check all — built with the tutorials, which need the same panel and step checks.
 
 (Phase 9's parts are below; the old plan for all of Phase 9 follows them.)
 
