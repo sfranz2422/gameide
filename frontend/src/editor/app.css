@@ -3165,3 +3165,203 @@ a.btn {
   color: var(--muted);
   border-bottom: 1px solid var(--border);
 }
+
+/* ---------------------------------------------------------------- notes (notes/NotesPane.tsx) */
+.notes-holder {
+  min-height: 0;
+  overflow: auto;
+}
+.notes-holder[hidden] {
+  display: none;
+}
+.notes-pane {
+  padding: 10px 14px 20px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.notes-slides-bar {
+  position: sticky;
+  top: -10px;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+  background: var(--panel);
+}
+.notes-md h1 {
+  font-size: 22px;
+}
+.notes-md h2 {
+  font-size: 18px;
+}
+.notes-md h3 {
+  font-size: 16px;
+}
+.notes-md img {
+  max-width: 100%;
+}
+.notes-md table {
+  border-collapse: collapse;
+}
+.notes-md td,
+.notes-md th {
+  border: 1px solid var(--border);
+  padding: 3px 8px;
+}
+.notes-md pre {
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--code-bg);
+  overflow-x: auto;
+}
+/* Code in notes is for reading and typing, not copying (the teacher's
+   decision): a speed bump, not a lock. */
+.notes-md pre,
+.notes-md code {
+  font-family: var(--mono, "Ubuntu Mono", monospace);
+  user-select: none;
+  -webkit-user-select: none;
+}
+.notes-md.inline,
+.notes-md.inline p {
+  display: inline;
+  margin: 0;
+}
+.quiz-card,
+.tests-card {
+  margin: 12px 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+}
+.quiz-card.done {
+  opacity: 0.92;
+}
+.quiz-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+.quiz-choices,
+.quiz-items {
+  display: grid;
+  gap: 6px;
+  margin: 8px 0;
+}
+.quiz-items label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.quiz-text {
+  width: 100%;
+  box-sizing: border-box;
+  margin: 6px 0;
+}
+.quiz-long {
+  width: 100%;
+  box-sizing: border-box;
+  margin: 6px 0;
+  font: inherit;
+}
+.quiz-card input,
+.quiz-card select,
+.quiz-card textarea {
+  font: inherit;
+  padding: 4px 8px;
+  background: var(--code-bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.quiz-result {
+  margin: 6px 0;
+  font-weight: 600;
+}
+.quiz-result.right {
+  color: var(--go-hover);
+}
+.quiz-result.wrong {
+  color: #f08080;
+}
+.quiz-result.part {
+  color: hsl(45, 80%, 60%);
+}
+.tests-list {
+  list-style: none;
+  margin: 8px 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+.tests-list li {
+  display: flex;
+  gap: 8px;
+}
+.tests-mark {
+  width: 16px;
+  flex: 0 0 auto;
+  text-align: center;
+}
+.tests-list li.pass .tests-mark {
+  color: var(--go-hover);
+}
+.tests-list li.fail .tests-mark {
+  color: #f08080;
+}
+.tests-why {
+  display: block;
+  color: var(--muted);
+  font-size: 13px;
+}
+.notes-editor-cols {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+}
+.notes-editor textarea {
+  width: 100%;
+  box-sizing: border-box;
+  font-family: var(--mono, "Ubuntu Mono", monospace);
+  font-size: 14px;
+}
+.notes-preview {
+  max-height: 460px;
+  overflow: auto;
+  padding: 4px 12px;
+  border-radius: 10px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+}
+.check-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.check-all-game {
+  position: fixed;
+  left: -10000px;
+  top: 0;
+  width: 640px;
+  height: 480px;
+  overflow: hidden;
+}
+.long-answer {
+  margin: 6px 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--panel-2);
+}
+@media (max-width: 860px) {
+  .notes-editor-cols {
+    grid-template-columns: 1fr;
+  }
+}
+.help-example {
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--code-bg);
+  overflow-x: auto;
+}

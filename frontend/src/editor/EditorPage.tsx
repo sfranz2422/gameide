@@ -25,7 +25,9 @@ import { ConsolePane, DocsPane, GamePane, type ConsoleLine } from "./RunPanes";
 import { Icon } from "./ui/icons";
 import { ThemeToggle } from "./ui/ThemeToggle";
 import { AccountMenu, ExportButton, HistoryButton, SaveStatusView } from "./AccountBits";
-import { AssignmentButtons, ViewBar } from "./AssignmentBits";
+import { AssignmentButtons, useAssignment, ViewBar } from "./AssignmentBits";
+import { NotesPane } from "../notes/NotesPane";
+import { hostRunner } from "../checks/hostRunner";
 import type { ViewStore } from "../store/viewStore";
 import { claimRun } from "../xp/runXp";
 import { useSession } from "./session";
@@ -72,8 +74,13 @@ export function EditorPage({ store, id }: { store: ProjectStore; id: string }) {
   const [dropping, setDropping] = useState(false);
 
   const [lines, setLines] = useState<ConsoleLine[]>([]);
-  const [bottom, setBottom] = useState<"console" | "docs">("console");
+  const [bottom, setBottom] = useState<"console" | "docs" | "notes">("console");
   const [gameState, setGameState] = useState<GameState>("stopped");
+  // For checks (notes' Check my work): the game's state and errors as they
+  // happen, which the runner reads while it waits. And while checks run, an
+  // error stays out of the way on the Console instead of hiding the results.
+  const gameStateRef = useRef<GameState>("stopped");
+  const checkErrors = useRef<string[]>([]);
   const [stats, setStats] = useState<WorkerStats | null>(null);
   const [ready, setReady] = useState(false);
   const [host, setHost] = useState<GameHost | null>(null);
@@ -97,14 +104,18 @@ export function EditorPage({ store, id }: { store: ProjectStore; id: string }) {
 
   useEffect(() => {
     const h = new GameHost({
-      state: setGameState,
+      state: (s) => {
+        gameStateRef.current = s;
+        setGameState(s);
+      },
       output: (ls) => addLines(ls),
       error: (e) => {
         cancelClaim();
         const p = projectRef.current;
         const mapped = p ? mapError(p, sources.current, e) : { where: null, message: e.message, traceback: e.traceback, target: null, hang: !!e.hang };
         addLines([{ kind: "error", error: mapped }]);
-        setBottom("console");
+        checkErrors.current.push(`${mapped.where ? `${mapped.where}: ` : ""}${mapped.message}`);
+        setBottom((b) => (b === "notes" ? b : "console"));
       },
       stats: setStats,
       ready: setReady,
@@ -142,7 +153,9 @@ export function EditorPage({ store, id }: { store: ProjectStore; id: string }) {
     const built = buildGame(p, assets);
     sources.current = built.sources;
     addLines([{ kind: "info", text: `▶ ${p.name}` }]);
-    setBottom("console");
+    // The notes stay open while their reader plays: a tutorial step and the
+    // game are meant to be looked at together.
+    setBottom((b) => (b === "notes" ? b : "console"));
     // The project's id names where its save data (save_set) lives in this browser.
     void host.play(built.def, p.id);
     cancelClaim();
@@ -310,6 +323,22 @@ export function EditorPage({ store, id }: { store: ProjectStore; id: string }) {
     setSaveNote(null);
   }, [saveNote, setSaveNote, addLines]);
 
+  // An assignment's game: its notes (a Notes tab, open first) and, for the
+  // student, Turn in. The checks in the notes play this editor's own game.
+  const { a: assignment, reload: reloadAssignment } = useAssignment(store, id);
+  const notes = assignment?.notes?.trim() ? assignment.notes : "";
+  const openedNotes = useRef(false);
+  useEffect(() => {
+    if (notes && !openedNotes.current) {
+      openedNotes.current = true;
+      setBottom("notes");
+    }
+  }, [notes]);
+  const runner = useMemo(
+    () => (host ? hostRunner(host, () => buildGame(projectRef.current!, assets).def, { state: () => gameStateRef.current, errors: checkErrors.current }, play) : null),
+    [host, assets, play],
+  );
+
   if (loadError)
     return (
       <div className="center-message">
@@ -348,7 +377,7 @@ export function EditorPage({ store, id }: { store: ProjectStore; id: string }) {
             <ViewBar projectId={id} versionId={(store as ViewStore).versionId} name={project.name} />
           ) : (
             <>
-              <AssignmentButtons store={store} projectId={id} modified={project.modified} />
+              <AssignmentButtons store={store} projectId={id} modified={project.modified} a={assignment} reload={reloadAssignment} />
               <HistoryButton />
               <PublishButton host={host} />
             </>
@@ -409,11 +438,22 @@ export function EditorPage({ store, id }: { store: ProjectStore; id: string }) {
                 <button role="tab" aria-selected={bottom === "console"} className={bottom === "console" ? "on" : ""} onClick={() => setBottom("console")}>
                   {Icon.console()} Console
                 </button>
+                {notes && (
+                  <button role="tab" aria-selected={bottom === "notes"} className={bottom === "notes" ? "on" : ""} onClick={() => setBottom("notes")} data-tutorial="notes-tab" data-testid="notes-tab">
+                    {Icon.notes()} Notes
+                  </button>
+                )}
                 <button role="tab" aria-selected={bottom === "docs"} className={bottom === "docs" ? "on" : ""} onClick={() => setBottom("docs")} data-tutorial="docs-tab">
                   {Icon.docs()} Docs
                 </button>
               </div>
-              {bottom === "console" ? <ConsolePane lines={lines} clear={() => setLines([])} jump={jump} /> : <DocsPane />}
+              {bottom === "console" ? <ConsolePane lines={lines} clear={() => setLines([])} jump={jump} /> : bottom === "docs" ? <DocsPane /> : null}
+              {/* Kept mounted while hidden: answers being typed and check results stay. */}
+              {notes && assignment && (
+                <div className="notes-holder" hidden={bottom !== "notes"}>
+                  <NotesPane notes={notes} assignment={assignment.slug} project={project} runner={runner} practice={!!assignment.teacher || store.kind !== "cloud"} />
+                </div>
+              )}
             </section>
           </aside>
         </div>

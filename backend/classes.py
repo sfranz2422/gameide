@@ -52,6 +52,9 @@ from sqlalchemy import func
 
 import accounts
 import gamestore
+import grades
+import notes
+import quiz
 import rewards
 from accounts import now
 from gamestore import AssignmentGame, AssignmentWork, ClassSettings, Comment, GameAsset, GameProject, GameVersion
@@ -357,6 +360,7 @@ def get_class(class_id):
         projects = {p.id: p for p in db.query(GameProject).filter(GameProject.id.in_([w.project_id for w in work.values()] or [-1])).all()}
         subs = {s.assignment_id: s for s in db.query(accounts.Submission).filter(
             accounts.Submission.assignment_id.in_(ids or [-1]), accounts.Submission.student_id == user.id).all()}
+        totals = {aid: grades.student_total(db, assignments[aid], user.id) for aid in subs if aid in assignments}
         done = rewards.quests_done(db, user)
         unread = dict(db.query(Comment.project_id, func.count(Comment.id)).filter(
             Comment.project_id.in_(list(projects) or [-1]), Comment.author_id != user.id, Comment.seen == 0)
@@ -377,7 +381,7 @@ def get_class(class_id):
                         "xpBonus": a.xp_bonus or 0, "questDone": a.id in done,
                         "project": p.slug if p and p.deleted_at is None else None,
                         "turnedIn": _iso(s.submitted_at) if s and s.times_submitted > 0 else None,
-                        "score": s.score if s else None, "unread": unread.get(p.id, 0) if p else 0})
+                        "score": totals.get(a.id), "unread": unread.get(p.id, 0) if p else 0})
         teacher = db.query(accounts.User).filter_by(id=course.teacher_id).first()
         return jsonify(id=course.id, name=course.name, teaching=False, items=out,
                        teacher=teacher.display_name() if teacher else "")
@@ -680,6 +684,30 @@ def assignment_results(slug):
         by_email = {u.email.lower(): u for u in users}
         by_id = {u.id: u for u in users}
         work_by_owner = {w.owner_id: w for w in works}
+        # The notes' part of each grade: questions answered, tests checked.
+        quiz_got = grades.quiz_earned(db, a.id)
+        earned = grades.earned(db, a.id)
+        results = {}
+        for t in db.query(accounts.TestResult).filter_by(assignment_id=a.id):
+            results[(t.student_id, t.kind)] = t
+        keys = {k.qid: k for k in db.query(accounts.QuizQuestion).filter_by(assignment_id=a.id)}
+        longs = {}
+        for ans in db.query(accounts.QuizAnswer).filter_by(assignment_id=a.id):
+            k = keys.get(ans.qid)
+            if k is not None and k.kind == "long":
+                # Cleaned again as it is shown: it is drawn as markup (quiz.clean_html).
+                longs.setdefault(ans.student_id, []).append({"question": ans.qid, "prompt": k.prompt, "points": k.points,
+                                                             "response": quiz.clean_html(ans.response), "score": ans.score})
+
+        def test_out(sid, kind, s):
+            t = results.get((sid, kind))
+            if t is None:
+                return None
+            # A teacher's check older than the last turn-in is of work since replaced.
+            stale = kind == "verified" and s is not None and s.times_submitted > 0 and _naive(t.checked_at) < _naive(s.submitted_at)
+            return {"earned": t.earned, "possible": t.possible, "at": _iso(t.checked_at), "stale": stale,
+                    "details": json.loads(t.details or "[]")}
+
         counts = {}
         for c in db.query(Comment).filter(Comment.project_id.in_(list(projects) or [-1])).all():
             n = counts.setdefault(c.project_id, [0, 0])
@@ -693,12 +721,16 @@ def assignment_results(slug):
             s = subs.get(u.id) if u else None
             version = int(s.snippet_slug[1:]) if s and s.snippet_slug.startswith("v") and s.snippet_slug[1:].isdigit() else None
             n = counts.get(p.id, [0, 0]) if p else [0, 0]
-            return {"student": u.id if u else None, "name": _student_label(u, name) or email.split("@")[0], "email": email,
+            total = grades.total(s.score if s else None, earned.get(u.id)) if u else None
+            return {"quiz": quiz_got.get(u.id) if u else None, "total": total,
+                    "testsSelf": test_out(u.id, "self", s) if u else None,
+                    "testsVerified": test_out(u.id, "verified", s) if u else None,
+                    "longs": longs.get(u.id, []) if u else [],"student": u.id if u else None, "name": _student_label(u, name) or email.split("@")[0], "email": email,
                     "onRoster": on_roster, "project": p.slug if p else None, "deleted": bool(p and p.deleted_at),
                     "updated": _iso(p.updated_at) if p else None,
                     "turnedIn": _iso(s.submitted_at) if s and s.times_submitted > 0 else None,
                     "times": s.times_submitted if s else 0, "version": version,
-                    "score": s.score if s else None, "synced": s is not None and s.score is not None and s.score == s.score_synced,
+                    "score": s.score if s else None, "synced": s is not None and total is not None and total == s.score_synced,
                     "comments": n[0], "unread": n[1]}
 
         rows, seen = [], set()
@@ -715,7 +747,8 @@ def assignment_results(slug):
         starter = db.query(GameProject).filter_by(id=g.starter_id).first() if g else None
         post = db.query(accounts.ClassroomPost).filter_by(assignment_id=a.id).first()
         return jsonify(slug=a.slug, title=a.title, outOf=a.out_of, dueAt=_iso(g.due_at if g else None),
-                       xpBonus=a.xp_bonus or 0,
+                       xpBonus=a.xp_bonus or 0, notes=grades.notes_of(a), possible=grades.possible(a),
+                       questions=len(grades.quiz_possible(a)), tests=grades.tests_of(a),
                        archived=bool(a.archived), hidden=bool(item and item.hidden),
                        classId=course.id if course else None, className=course.name if course else "",
                        courseId=course.course_id if course else "",
@@ -874,12 +907,23 @@ def project_assignment(slug):
             return err("There is no game here.", 404)
         a, _ = _work_for(db, user, p)
         if a is None:
+            # The teacher, looking at a student's work or editing the starter:
+            # the notes whole, key and all, and nothing to turn in.
+            work = db.query(AssignmentWork).filter_by(project_id=p.id).first()
+            starter = db.query(AssignmentGame).filter_by(starter_id=p.id).first()
+            aid = work.assignment_id if work else starter.assignment_id if starter else None
+            t = db.query(accounts.Assignment).filter_by(id=aid).first() if aid else None
+            if t is not None and t.teacher_id == user.id:
+                return jsonify(assignment={"slug": t.slug, "title": t.title, "teacher": True, "notes": grades.notes_of(t)})
             return jsonify(assignment=None)
         s = db.query(accounts.Submission).filter_by(assignment_id=a.id, student_id=user.id).first()
         g = _game_of(db, a)
         unread = db.query(func.count(Comment.id)).filter(Comment.project_id == p.id, Comment.author_id != user.id,
                                                          Comment.seen == 0).scalar()
+        # THE ONE EXIT for an assignment's notes to a student: redacted
+        # (notes.py says why; test_server.py's leak checks open it).
         return jsonify(assignment={"slug": a.slug, "title": a.title, "dueAt": _iso(g.due_at if g else None),
+                                   "notes": notes.student_notes(a),
                                    "turnedIn": _iso(s.submitted_at) if s and s.times_submitted > 0 else None,
                                    "changedSince": bool(s and s.times_submitted > 0 and _naive(p.updated_at) > _naive(s.submitted_at)),
                                    "unread": int(unread)})
@@ -934,20 +978,25 @@ def give_score(slug):
             if score < 0 or (a.out_of and score > a.out_of * 2):
                 return err("That score is out of range.", 400)
         s = db.query(accounts.Submission).filter_by(assignment_id=a.id, student_id=sid).first()
-        if s is None:
+        if s is None or not s.snippet_slug:
+            # Never turned in (perhaps only answered questions): freeze the
+            # game now, so the score always points at what it was for.
             work = db.query(AssignmentWork).filter_by(assignment_id=a.id, owner_id=sid).first()
             if work is None:
                 return err("That student hasn't started this assignment.", 400)
             p = db.query(GameProject).filter_by(id=work.project_id).first()
             v = _freeze(db, p, "graded", "Scored by your teacher")
-            s = accounts.Submission(assignment_id=a.id, student_id=sid, snippet_slug=f"v{v.id}", times_submitted=0)
-            db.add(s)
+            if s is None:
+                s = accounts.Submission(assignment_id=a.id, student_id=sid, snippet_slug=f"v{v.id}", times_submitted=0)
+                db.add(s)
+            s.snippet_slug = f"v{v.id}"
         s.score = score
         db.commit()
         # Full marks pays the quest reward, once — after the score is
         # committed, so nothing in paying it can lose the score.
         paid = rewards.full_marks_xp(db, a, sid)
-        return jsonify(ok=True, synced=s.score is not None and s.score == s.score_synced, questPaid=paid)
+        total = grades.student_total(db, a, sid)
+        return jsonify(ok=True, total=total, synced=total is not None and total == s.score_synced, questPaid=paid)
     finally:
         db.close()
 
@@ -1481,17 +1530,23 @@ def classroom_sync(slug):
                 ids[email] = by_user.get(st.get("userId"))
         rows = (db.query(accounts.Submission, accounts.User)
                 .join(accounts.User, accounts.Submission.student_id == accounts.User.id)
-                .filter(accounts.Submission.assignment_id == a.id, accounts.Submission.score.isnot(None)).all())
+                .filter(accounts.Submission.assignment_id == a.id).all())
+        # The grade is the score plus the notes' points (grades.total): a
+        # student with no score yet but questions answered still has one.
+        earned = grades.earned(db, a.id)
         sent, unmatched, failed = 0, [], []
         for sub, student in rows:
+            grade = grades.total(sub.score, earned.get(student.id))
+            if grade is None:
+                continue
             cid = ids.get(student.email.lower())
             if not cid:
                 unmatched.append(student.display_name())
                 continue
             status, data = _google_api("PATCH", "%s/courseWork/%s/studentSubmissions/%s" % (base, post.work_id, cid),
-                                       access, body={"draftGrade": sub.score}, params={"updateMask": "draftGrade"})
+                                       access, body={"draftGrade": grade}, params={"updateMask": "draftGrade"})
             if status == 200:
-                sub.score_synced = sub.score
+                sub.score_synced = grade
                 sent += 1
             else:
                 failed.append("%s (%s)" % (student.display_name(), _google_message(data, "refused")))

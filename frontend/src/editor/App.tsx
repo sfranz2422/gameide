@@ -18,6 +18,7 @@ import { ExplorePage, GalleryPage, ModerationPage } from "./ExplorePages";
 import { AssignmentPage, ClassesPage, ClassPage, StartAssignment } from "./ClassPages";
 import { ViewStore } from "../store/viewStore";
 import { ClassXpPage, ShopPage, XpLogPage, XpToasts } from "../xp/XpPages";
+import { HelpPage } from "../notes/HelpPage";
 import { useIdleSignOut } from "./idle";
 import { ProjectsPage } from "./ProjectsPage";
 import { SessionContext, type SessionInfo } from "./session";
@@ -67,6 +68,8 @@ export function App() {
         <StartAssignment key={start[1]} slug={start[1]!} />
       ) : classXp ? (
         <ClassXpPage key={classXp[1]} classId={Number(classXp[1])} />
+      ) : hash.startsWith("#/help") ? (
+        <HelpPage />
       ) : hash.startsWith("#/xp") ? (
         <XpLogPage />
       ) : hash.startsWith("#/shop") ? (

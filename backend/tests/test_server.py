@@ -761,6 +761,145 @@ log = xa.get("/api/me/xp/all").get_json()["awards"]
 check("a student's every award is listed, with why and where", {"Helped debug", "Ran a game", "Token time"} <= {a["reason"] for a in log}
       and {a["app"] for a in log} == {"gameide"})
 
+# ---------------------------------------------------------------- notes, questions, tests (notes.py)
+import quiz as quizmod  # noqa: E402
+import checks as checksmod  # noqa: E402
+
+cases = json.loads((BACKEND.parent / "frontend" / "src" / "notes" / "parse-cases.json").read_text())
+check("questions are read here as the editor reads them (the shared cases)", all(
+    {k: quizmod.parse(c["body"])[k2] for k, k2 in (("id", "given_id"), ("kind", "kind"), ("prompt", "prompt"), ("choices", "choices"),
+     ("correct", "correct"), ("answers", "answers"), ("options", "options"), ("points", "points"))} == c["expect"] for c in cases["quiz"]))
+check("…and tests too", all(checksmod.parse(c["body"]) == c["expect"] for c in cases["tests"]))
+
+NOTES = """# Coins
+
+---
+
+```quiz
+Which says a key is held?
+- [ ] keyboard_check_pressed
+- [x] keyboard_check
+points: 2
+```
+
+```quiz
+What is a picture with frames called?
+answer: SECRETSPRITE
+```
+
+```quiz
+type: blank
+Move right with [[xblankkey]] and down with [[yblankkey]].
+```
+
+```quiz
+type: long
+Describe your game.
+points: 4
+```
+
+```tests
+object Player exists
+Player has event step (2 points)
+uses keyboard_check
+```
+"""
+put(teacher, "nq1", project("nq1", "Notes game"), 0)
+N = teacher.post(f"/api/classes/{XC}/assignments", json={"title": "Coins with notes", "project": "nq1"}).get_json()["slug"]
+check("only the assignment's teacher writes its notes", other_teacher.post(f"/api/assignments/{N}/notes", json={"notes": NOTES}).status_code == 403
+      and xa.post(f"/api/assignments/{N}/notes", json={"notes": NOTES}).status_code == 403)
+r = teacher.post(f"/api/assignments/{N}/notes", json={"notes": NOTES}).get_json()
+check("notes are saved, and say what they're worth", r.get("possible") == 2 + 1 + 1 + 4 + 1 + 2 + 1, r)
+check("the teacher's page has them whole", "SECRETSPRITE" in teacher.get(f"/api/assignments/{N}").get_json()["notes"])
+
+# The leak checks: every way a student reaches an assignment's notes.
+NP = xa.post(f"/api/assignments/{N}/start").get_json()["project"]
+seen = xa.get(f"/api/projects/{NP}/assignment").get_json()["assignment"]["notes"]
+check("a student's editor gets the notes", "Which says a key is held?" in seen and "object Player exists" in seen)
+check("…without the right choice marked", "[x]" not in seen and "- [ ] keyboard_check\n" in seen)
+check("…without the short answer", "SECRETSPRITE" not in seen and "answer:" not in seen)
+check("…without the blanks' answers", "xblankkey" not in seen and "yblankkey" not in seen and "[[]]" in seen)
+check("…with an id on each question, to answer it by", seen.count("id: ") == 4)
+for path in (f"/api/classes/{XC}", f"/api/projects/{NP}", f"/api/assignments/{N}/tests/work", f"/api/quiz/{N}/mine", "/api/me/xp"):
+    body = xa.get(path).get_data(as_text=True)
+    check(f"no answers reach a student through {path.split('/')[2]}…{path.split('/')[-1]}", "SECRETSPRITE" not in body and "xblankkey" not in body)
+qs = {q["prompt"].split("\n")[0][:20]: q for q in quizmod.keys(NOTES)}
+choice_q = [q for q in quizmod.keys(NOTES) if q["kind"] == "choice"][0]
+text_q = [q for q in quizmod.keys(NOTES) if q["kind"] == "text"][0]
+blank_q = [q for q in quizmod.keys(NOTES) if q["kind"] == "blank"][0]
+long_q = [q for q in quizmod.keys(NOTES) if q["kind"] == "long"][0]
+
+# Answering: one try, marked at once.
+before = xa.get("/api/me/xp").get_json()["xp"]
+r = xa.post("/api/quiz/answer", json={"assignment": N, "question": choice_q["qid"], "response": "keyboard_check_pressed"}).get_json()
+check("a wrong choice is marked wrong, without saying the right one", r.get("correct") is False and r.get("earned") == 0 and "keyboard_check\"" not in json.dumps(r), r)
+r = xa.post("/api/quiz/answer", json={"assignment": N, "question": choice_q["qid"], "response": "keyboard_check"}).get_json()
+check("…and there's no second try", r.get("correct") is False and r.get("already") is True, r)
+r = xa.post("/api/quiz/answer", json={"assignment": N, "question": text_q["qid"], "response": "  secretsprite. "}).get_json()
+check("a short answer forgives case, spacing and a full stop", r.get("correct") is True and r.get("earned") == 1, r)
+check("…and pays XP for its points", xa.get("/api/me/xp").get_json()["xp"] == before + xp.XP_PER_POINT, xa.get("/api/me/xp").get_json()["xp"] - before)
+r = xa.post("/api/quiz/answer", json={"assignment": N, "question": blank_q["qid"], "response": json.dumps(["xblankkey", "nope"])}).get_json()
+check("blanks give part marks", r.get("earned") == 0.5 and r.get("correct") is False, r)
+r = xa.post("/api/quiz/answer", json={"assignment": N, "question": long_q["qid"], "response": "<p>My game <script>alert(1)</script><b onclick='x'>rocks</b></p>"}).get_json()
+check("a long response is kept, its markup cleaned", r.get("kind") == "long" and "<script" not in r.get("response", "") and "onclick" not in r.get("response", "")
+      and "<b>rocks</b>" in r.get("response", ""), r)
+db = server.SessionLocal()
+stored = db.query(accounts.QuizAnswer).filter_by(student_id=ids["xa"], qid=long_q["qid"]).first()
+db.close()
+check("…cleaned as it's stored, not only as it's shown", stored is not None and "<script" not in stored.response and "onclick" not in stored.response)
+xp_now = xa.get("/api/me/xp").get_json()["xp"]
+check("answering every question pays its bonus", xp_now >= before + xp.XP_PER_POINT + xp.ALL_ANSWERED_XP, xp_now - before)
+mine = xa.get(f"/api/quiz/{N}/mine").get_json()["answers"]
+check("a student's answers come back, locked", set(mine) == {choice_q["qid"], text_q["qid"], blank_q["qid"], long_q["qid"]})
+r = teacher.post("/api/quiz/answer", json={"assignment": N, "question": choice_q["qid"], "response": "keyboard_check"}).get_json()
+check("the teacher trying a question is practice, kept nowhere", r.get("practice") is True and r.get("correct") is True)
+res = {x["email"]: x for x in teacher.get(f"/api/assignments/{N}").get_json()["rows"]}["xa@example.com"]
+check("the results show the questions' points and the total", res["quiz"] == 1.5 and res["total"] == 1.5, (res["quiz"], res["total"]))
+check("…and the long response, cleaned, to mark", res["longs"] and "<script" not in res["longs"][0]["response"])
+check("another teacher can't mark it", other_teacher.post("/api/quiz/grade", json={"assignment": N, "student": ids["xa"], "question": long_q["qid"], "score": 4}).status_code == 403)
+r = teacher.post("/api/quiz/grade", json={"assignment": N, "student": ids["xa"], "question": long_q["qid"], "score": 3}).get_json()
+check("its teacher marks it, and it counts", r.get("total") == 4.5, r)
+
+# Tests: the student's own check is feedback; the teacher's counts.
+fake = [{"label": "object Player exists", "ok": True, "points": 99}, {"label": "Player has event step", "ok": False, "points": 2},
+        {"label": "uses keyboard_check", "ok": True}, {"label": "made up (50 points)", "ok": True, "points": 50}]
+before = xa.get("/api/me/xp").get_json()["xp"]
+r = xa.post("/api/tests/self", json={"assignment": N, "results": fake}).get_json()
+check("a student's check keeps only the notes' tests, at the notes' points", r.get("earned") == 2 and r.get("possible") == 4, r)
+check("…pays a little XP for each real one passing", r.get("xp") == 2 * xp.SELF_TEST_XP, r)
+check("…once each", xa.post("/api/tests/self", json={"assignment": N, "results": fake}).get_json().get("xp") == 0)
+check("…and counts toward no grade", {x["email"]: x for x in teacher.get(f"/api/assignments/{N}").get_json()["rows"]}["xa@example.com"]["total"] == 4.5)
+check("a student can't send the teacher's check", xa.post(f"/api/assignments/{N}/tests/verify", json={"student": ids["xa"], "results": fake}).status_code == 403)
+check("Check all has nothing to check before anything is frozen", teacher.get(f"/api/assignments/{N}/tests/work").get_json()["work"] == [])
+xa.post(f"/api/projects/{NP}/turn-in")
+work = teacher.get(f"/api/assignments/{N}/tests/work").get_json()
+check("Check all gets each turned-in version, and the tests", [w["project"] for w in work["work"]] == [NP] and len(work["tests"]) == 3, work)
+r = teacher.post(f"/api/assignments/{N}/tests/verify", json={"student": ids["xa"], "results": fake}).get_json()
+check("the teacher's check counts toward the grade", r.get("earned") == 2 and r.get("total") == 6.5, r)
+check("…and pays XP for each test's points, once", r.get("xp") == 2 * xp.XP_PER_POINT
+      and teacher.post(f"/api/assignments/{N}/tests/verify", json={"student": ids["xa"], "results": fake}).get_json().get("xp") == 0)
+check("only for someone who turned something in", teacher.post(f"/api/assignments/{N}/tests/verify", json={"student": ids["xc"], "results": fake}).status_code == 404)
+db = server.SessionLocal()
+db.query(accounts.TestResult).filter_by(student_id=ids["xa"], kind="verified").update(
+    {"checked_at": accounts.now() - __import__("datetime").timedelta(hours=1)}, synchronize_session=False)
+db.commit()
+db.close()
+xa.post(f"/api/projects/{NP}/turn-in")
+res = {x["email"]: x for x in teacher.get(f"/api/assignments/{N}").get_json()["rows"]}["xa@example.com"]
+check("a check older than the last turn-in is marked stale", res["testsVerified"]["stale"] is True and res["testsSelf"]["earned"] == 2)
+check("the student's class page shows the total", [i for i in xa.get(f"/api/classes/{XC}").get_json()["items"] if i.get("slug") == N][0]["score"] == 6.5)
+
+# Full marks from the notes alone (no points set): the quest pays when everything is earned.
+put(teacher, "nq2", project("nq2", "Quiz only"), 0)
+N2 = teacher.post(f"/api/classes/{XC}/assignments", json={"title": "Just a question", "project": "nq2"}).get_json()["slug"]
+teacher.post(f"/api/assignments/{N2}/notes", json={"notes": "```quiz\nOne?\nanswer: one\n```"})
+teacher.post(f"/api/assignments/{N2}/xp-bonus", json={"xp": 25})
+qid2 = quizmod.keys("```quiz\nOne?\nanswer: one\n```")[0]["qid"]
+before = xb.get("/api/me/xp").get_json()["xp"]
+xb.post(f"/api/assignments/{N2}/start")
+r = xb.post("/api/quiz/answer", json={"assignment": N2, "question": qid2, "response": "one"}).get_json()
+check("with no points set, earning everything in the notes is full marks, and pays the quest", r.get("xp", 0) >= 25 + xp.XP_PER_POINT, r)
+
 # ---------------------------------------------------------------- the built editor's files
 # The blocks editor's media come from our own origin (vite.config.ts copies
 # them into dist/blockly-media); without this route the trash can and drag

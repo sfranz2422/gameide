@@ -24,6 +24,7 @@ export const Icon = {
   close: () => svg(<path d="M4 4l8 8M12 4l-8 8" />),
   more: () => svg(<><circle cx="3.5" cy="8" r=".9" fill="currentColor" /><circle cx="8" cy="8" r=".9" fill="currentColor" /><circle cx="12.5" cy="8" r=".9" fill="currentColor" /></>),
   chevron: (open: boolean) => svg(<path d={open ? "M4 6l4 4 4-4" : "M6 4l4 4-4 4"} />),
+  notes: () => svg(<><path d="M4 2.5h8v11H4z" /><path d="M6 5.5h4M6 8h4M6 10.5h2.5" /></>),
   docs: () => svg(<><path d="M3 2.5h7l3 3v8H3z" /><path d="M10 2.5v3h3M5.5 8.5h5M5.5 11h5" /></>),
   console: () => svg(<><rect x="1.5" y="2.5" width="13" height="11" rx="1.5" /><path d="M4.5 6.5l2 1.5-2 1.5M8 10h3.5" /></>),
   bug: () => svg(<><rect x="5" y="5" width="6" height="8" rx="3" /><path d="M8 5V3.5M5 8H2.5M13.5 8H11M5 11l-2 1.5M11 11l2 1.5M5.5 5.5L4 4M10.5 5.5L12 4" /></>),

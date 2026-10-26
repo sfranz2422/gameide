@@ -350,6 +350,31 @@ student), `Comment`.
   (`_google_post/_get/_api`) replaced in the tests. The connection is per
   app; GameIDE's `/classroom/callback` must be on the OAuth client's list.
 
+## Notes, questions and tests
+
+`backend/notes.py` (routes), `grades.py` (what a grade is), `quiz.py` (PyIDE's,
+copied unchanged), `checks.py`; `src/notes/`, `src/checks/`. An assignment's
+notes are `notes.md` in `Assignment.files`, shown in the editor's Notes tab.
+
+- **The key is taken out at every exit.** The one exit to a student is
+  `classes.project_assignment` (`notes.student_notes`). A new route that
+  hands notes to a student must redact too and needs a leak check in
+  test_server.py — a missed exit leaks the answers with no visible sign.
+- **Two readers, one format**: `quiz.ts`/`quiz.py` and `checks.ts`/`checks.py`
+  must read a block the same; `src/notes/parse-cases.json` is checked by
+  both. Change one, change both, and add a case.
+- **Checks run in a browser, never on the server.** Project checks read the
+  project; game checks play it through a `GameRunner` (`checks/hostRunner.ts`):
+  the editor's own game pane for Check my work, a hidden GameHost for the
+  teacher's Check all. `GameHost.press` holds keys for them.
+- **Only the teacher's Check all counts** (kind "verified"); a student's own
+  check (kind "self") is feedback and pays SELF_TEST_XP once per real test.
+  Points are summed from the notes' own lines, never what a page sends.
+- **Every grade goes through `grades.total`**: score + questions + checked
+  tests — results, the student's class page, quests and Classroom's Sync.
+- Code in notes is `user-select: none` (the teacher's decision: no copying
+  tutorial code). Don't add a Copy button.
+
 ## XP
 
 `backend/rewards.py` (a blueprint), `src/xp/`. **PyIDE's XP joined, not

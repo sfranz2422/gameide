@@ -10,7 +10,7 @@
  *   CommentsDialog     the comments on one game, used by both and by the
  *                      assignment's results page.
  */
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api } from "../store/api";
 import type { CloudStore } from "../store/cloudStore";
 import type { ProjectStore } from "../store/store";
@@ -92,28 +92,46 @@ export function CommentsDialog({ projectId, title, onClose }: { projectId: strin
   );
 }
 
-interface Standing {
+export interface Standing {
   slug: string;
   title: string;
-  dueAt: string | null;
-  turnedIn: string | null;
-  changedSince: boolean;
-  unread: number;
+  /** The assignment's notes: redacted for a student (backend/notes.py), whole for its teacher. */
+  notes: string;
+  /** The teacher looking (a student's game read only, or the starter): nothing to turn in. */
+  teacher?: boolean;
+  dueAt?: string | null;
+  turnedIn?: string | null;
+  changedSince?: boolean;
+  unread?: number;
+}
+
+/**
+ * Whether the open game is an assignment's — a student's own work, or a
+ * student's game or the starter open to its teacher — and how it stands.
+ * Signed-out and browser-only games have none.
+ */
+export function useAssignment(store: ProjectStore, projectId: string) {
+  const [a, setA] = useState<Standing | null>(null);
+  const load = useCallback(() => {
+    if (store.kind === "local") return;
+    void api<{ assignment: Standing | null }>(`/api/projects/${encodeURIComponent(projectId)}/assignment`).then(
+      (r) => setA(r.assignment),
+      () => undefined,
+    );
+  }, [store, projectId]);
+  useEffect(load, [load]);
+  return { a, reload: load };
 }
 
 /** A student's assignment game: Comments and Turn in. Nothing at all on any other game. */
-export function AssignmentButtons({ store, projectId, modified }: { store: ProjectStore; projectId: string; modified: string }) {
-  const [a, setA] = useState<Standing | null>(null);
+export function AssignmentButtons({ store, projectId, modified, a, reload: load }: { store: ProjectStore; projectId: string; modified: string; a: Standing | null; reload: () => void }) {
   const [talking, setTalking] = useState(false);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
-  const load = () => void api<{ assignment: Standing | null }>(`/api/projects/${encodeURIComponent(projectId)}/assignment`).then((r) => setA(r.assignment), () => undefined);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => (store.kind === "cloud" ? load() : undefined), [store, projectId]);
   // Turned in, then changed: say so, so the student knows to turn in again.
   const [turnedAt, setTurnedAt] = useState<string | null>(null);
   useEffect(() => setTurnedAt(null), [projectId]);
-  if (!a) return null;
+  if (!a || a.teacher || store.kind !== "cloud") return null;
   const changed = turnedAt ? modified > turnedAt : a.changedSince;
   const done = (turnedAt || a.turnedIn) && !changed;
   return (

@@ -1,0 +1,183 @@
+{
+ "quiz": [
+  {
+   "body": "What does len(\"hello\") return?\n- [ ] \"hello\"\n- [x] 5\n- [ ] 4\npoints: 2",
+   "expect": {
+    "id": "",
+    "kind": "choice",
+    "prompt": "What does len(\"hello\") return?",
+    "choices": [
+     "\"hello\"",
+     "5",
+     "4"
+    ],
+    "correct": [
+     "5"
+    ],
+    "answers": [],
+    "options": [],
+    "points": 2.0
+   }
+  },
+  {
+   "body": "Which keyword repeats code while a condition stays true?\nanswer: while\nanswer: While loop",
+   "expect": {
+    "id": "",
+    "kind": "text",
+    "prompt": "Which keyword repeats code while a condition stays true?",
+    "choices": [],
+    "correct": [],
+    "answers": [
+     "while",
+     "While loop"
+    ],
+    "options": [],
+    "points": 1.0
+   }
+  },
+  {
+   "body": "Explain why a loop needs its condition to change.\ntype: long\npoints: 5",
+   "expect": {
+    "id": "",
+    "kind": "long",
+    "prompt": "Explain why a loop needs its condition to change.",
+    "choices": [],
+    "correct": [],
+    "answers": [],
+    "options": [],
+    "points": 5.0
+   }
+  },
+  {
+   "body": "type: blank\nA [[while]] loop repeats as long as its condition is [[True|true]].",
+   "expect": {
+    "id": "",
+    "kind": "blank",
+    "prompt": "A [[while]] loop repeats as long as its condition is [[True|true]].",
+    "choices": [],
+    "correct": [],
+    "answers": [
+     [
+      "while"
+     ],
+     [
+      "True",
+      "true"
+     ]
+    ],
+    "options": [],
+    "points": 1.0
+   }
+  },
+  {
+   "body": "type: match\nMatch each keyword to what it does.\n- for -> repeats once for each item\n- while -> repeats while a condition holds\noption: stops the program",
+   "expect": {
+    "id": "",
+    "kind": "match",
+    "prompt": "Match each keyword to what it does.",
+    "choices": [
+     "for",
+     "while"
+    ],
+    "correct": [
+     "repeats once for each item",
+     "repeats while a condition holds"
+    ],
+    "answers": [],
+    "options": [
+     "repeats once for each item",
+     "repeats while a condition holds",
+     "stops the program"
+    ],
+    "points": 1.0
+   }
+  },
+  {
+   "body": "id: 0123456789ab\npoints: 1\nWhich moves right?\n~~~\nself.x += 1\n- [x] not a choice\n~~~\n- [ ] self.x += 1\n- [ ] self.y += 1",
+   "expect": {
+    "id": "0123456789ab",
+    "kind": "choice",
+    "prompt": "Which moves right?\n~~~\nself.x += 1\n- [x] not a choice\n~~~",
+    "choices": [
+     "self.x += 1",
+     "self.y += 1"
+    ],
+    "correct": [],
+    "answers": [],
+    "options": [],
+    "points": 1.0
+   }
+  },
+  {
+   "body": "id: 0123456789ab\npoints: 3\ntype: match\nPair them.\nmatch: a\nmatch: b\noption: x\noption: y",
+   "expect": {
+    "id": "0123456789ab",
+    "kind": "match",
+    "prompt": "Pair them.",
+    "choices": [
+     "a",
+     "b"
+    ],
+    "correct": [],
+    "answers": [],
+    "options": [
+     "x",
+     "y"
+    ],
+    "points": 3.0
+   }
+  },
+  {
+   "body": "id: 0123456789ab\npoints: 2\ntype: blank\nFill [[]] and [[]].",
+   "expect": {
+    "id": "0123456789ab",
+    "kind": "blank",
+    "prompt": "Fill [[]] and [[]].",
+    "choices": [],
+    "correct": [],
+    "answers": [
+     [],
+     []
+    ],
+    "options": [],
+    "points": 2.0
+   }
+  }
+ ],
+ "tests": [
+  {
+   "body": "object Player exists\nPlayer has event step (2 points)\n# a comment\n\n  after 1 second holding right,   Player.x increased  \nroom Level1 has 3 Coin (1.5 point)",
+   "expect": [
+    {
+     "label": "object Player exists",
+     "points": 1.0
+    },
+    {
+     "label": "Player has event step",
+     "points": 2.0
+    },
+    {
+     "label": "after 1 second holding right, Player.x increased",
+     "points": 1.0
+    },
+    {
+     "label": "room Level1 has 3 Coin",
+     "points": 1.5
+    }
+   ]
+  },
+  {
+   "body": "uses keyboard_check\nnot a real check (3 points)",
+   "expect": [
+    {
+     "label": "uses keyboard_check",
+     "points": 1.0
+    },
+    {
+     "label": "not a real check",
+     "points": 3.0
+    }
+   ]
+  }
+ ]
+}

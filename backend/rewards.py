@@ -38,6 +38,7 @@ from sqlalchemy import func
 
 import accounts
 import gamestore
+import grades
 import xp
 from accounts import now
 
@@ -220,13 +221,9 @@ def class_board(class_id):
 # ---------------------------------------------------------------- quests (full marks)
 
 def _has_full_marks(db, a, student_id):
-    """Full marks: a score reaching the assignment's points. An assignment
-    without points has no full marks to get — until Phase 11's questions and
-    tests give it points of their own."""
-    if not a.out_of:
-        return False
-    sub = db.query(accounts.Submission).filter_by(assignment_id=a.id, student_id=student_id).first()
-    return sub is not None and sub.score is not None and sub.score >= a.out_of
+    """Full marks: the grade (score, questions and checked tests) reaching
+    the points — grades.py has the rule, shared with every total."""
+    return grades.has_full_marks(db, a, student_id)
 
 
 def full_marks_xp(db, a, student_id):

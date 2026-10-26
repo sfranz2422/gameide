@@ -22,7 +22,7 @@
  */
 import type { PythonGameError } from "../engine/engine";
 import type { GameDefinition } from "../engine/game";
-import { attachInput, readPads, type InputSink } from "../engine/input";
+import { attachInput, KEY_CODE, readPads, type InputSink } from "../engine/input";
 import { SoundPlayer } from "./sound";
 import type { FromWorker, GameState, InputMessage, ToWorker, WorkerStats } from "../python/protocol";
 
@@ -282,8 +282,9 @@ export class GameHost {
     // Blobs in the definition are posted as references, not copied.
     this.send({ type: "play", def, canvas: offscreen, debug: this.debug }, [offscreen]);
 
+    this.input = this.sink();
     this.detachInput = attachInput(
-      this.sink(),
+      this.input,
       canvas,
       () => document.activeElement === canvas,
       (e) => this.toRoom(e),
@@ -293,6 +294,20 @@ export class GameHost {
   }
 
   private box: HTMLElement | null = null;
+  /** Where key presses go while a game plays: the keyboard's, and press()'s. */
+  private input: InputSink | null = null;
+
+  /**
+   * Holds a key down or lets it go, as if on the keyboard — for checks
+   * (checks/checks.ts: "after 1 second holding right, …"), which hold keys
+   * the student isn't pressing. `key` is a name from KEY_NAMES.
+   */
+  press(key: string, down: boolean) {
+    const code = KEY_CODE.get(key);
+    if (code === undefined || !this.input) return;
+    if (down) this.input.keyDown(code);
+    else this.input.keyUp(code);
+  }
 
   /** Where the game's canvas goes. Set by the game pane. */
   get container(): HTMLElement | null {

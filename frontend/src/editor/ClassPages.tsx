@@ -16,6 +16,9 @@ import { CommentsDialog, whenText } from "./AssignmentBits";
 import { useSession } from "./session";
 import { SiteNav } from "./SiteNav";
 import { ClassBoard, XpCard } from "../xp/XpPages";
+import { CheckAll, NotesEditor } from "../notes/TeacherNotes";
+import { Fragment } from "react";
+import DOMPurify from "dompurify";
 import { Icon } from "./ui/icons";
 
 interface ClassroomState {
@@ -714,12 +717,32 @@ interface ResultRow {
   synced: boolean;
   comments: number;
   unread: number;
+  /** Points from the notes' questions, null when they answered none. */
+  quiz: number | null;
+  /** The grade: score plus questions plus checked tests (backend/grades.py). */
+  total: number | null;
+  testsSelf: TestRun | null;
+  testsVerified: TestRun | null;
+  longs: { question: string; prompt: string; points: number; response: string; score: number | null }[];
+}
+
+interface TestRun {
+  earned: number;
+  possible: number;
+  at: string;
+  /** Checked before their last turn-in: of work since replaced. */
+  stale: boolean;
+  details: { label: string; ok: boolean; detail: string; points: number }[];
 }
 
 interface Results {
   slug: string;
   title: string;
   xpBonus: number;
+  notes: string;
+  possible: number;
+  questions: number;
+  tests: { label: string; points: number }[];
   outOf: number | null;
   dueAt: string | null;
   archived: boolean;
@@ -759,6 +782,8 @@ export function AssignmentPage({ slug }: { slug: string }) {
     );
   const set = (change: Record<string, unknown>) => act(() => api(`/api/assignments/${slug}`, { json: change }));
   const started = data.rows.filter((r) => r.project).length;
+  // The notes give points of their own: show what each student has from them, and the total.
+  const extra = data.questions > 0 || data.tests.length > 0;
   const turned = data.rows.filter((r) => r.turnedIn).length;
   return (
     <Page title={data.title} head={data.classId ? <a href={`#/class/${data.classId}`}>{data.className}</a> : null}>
@@ -883,20 +908,29 @@ export function AssignmentPage({ slug }: { slug: string }) {
         </section>
       )}
 
+      {data.tests.length > 0 && (
+        <p>
+          <CheckAll slug={slug} onDone={load} />
+        </p>
+      )}
       <table className="mod-table results-table">
         <thead>
           <tr>
             <th>Student</th>
             <th>Their game</th>
             <th>Turned in</th>
-            <th>Score</th>
+            <th>{extra ? "Your score" : "Score"}</th>
+            {data.questions > 0 && <th>Questions</th>}
+            {data.tests.length > 0 && <th title="From your Check all; their own check in grey">Tests</th>}
+            {extra && <th>Total</th>}
             <th>Comments</th>
             <th />
           </tr>
         </thead>
         <tbody>
           {data.rows.map((r) => (
-            <tr key={r.email} data-testid="result-row">
+            <Fragment key={r.email}>
+            <tr data-testid="result-row">
               <td>
                 {r.name}
                 {!r.onRoster && <span className="muted small"> (not on the roster)</span>}
@@ -942,11 +976,37 @@ export function AssignmentPage({ slug }: { slug: string }) {
                       }}
                       data-testid="score"
                     />
-                    {data.outOf ? <span className="muted"> / {data.outOf}</span> : null}
-                    {data.posted && r.score != null && <span className="muted small">{r.synced ? " ✓ in Classroom" : " not sent"}</span>}
+                    {!extra && data.outOf ? <span className="muted"> / {data.outOf}</span> : null}
+                    {!extra && data.posted && r.score != null && <span className="muted small">{r.synced ? " ✓ in Classroom" : " not sent"}</span>}
                   </span>
                 ) : null}
               </td>
+              {data.questions > 0 && <td data-testid="row-quiz">{r.quiz ?? <span className="muted">—</span>}</td>}
+              {data.tests.length > 0 && (
+                <td data-testid="row-tests">
+                  {r.testsVerified ? (
+                    <span title={r.testsVerified.details.filter((d) => !d.ok).map((d) => `✗ ${d.label}: ${d.detail}`).join("\n") || "All passing"}>
+                      {r.testsVerified.earned} / {r.testsVerified.possible}
+                      {r.testsVerified.stale && <span title="Checked before they turned it in again: press Check all"> ⟳</span>}
+                    </span>
+                  ) : (
+                    <span className="muted">—</span>
+                  )}
+                  {r.testsSelf && (
+                    <span className="muted small" title="Their own Check my work: feedback, not counted">
+                      {" "}
+                      (their check {r.testsSelf.earned}/{r.testsSelf.possible})
+                    </span>
+                  )}
+                </td>
+              )}
+              {extra && (
+                <td data-testid="row-total">
+                  {r.total ?? <span className="muted">—</span>}
+                  {data.outOf && r.total != null ? <span className="muted"> / {data.outOf}</span> : null}
+                  {data.posted && r.total != null && <span className="muted small">{r.synced ? " ✓ in Classroom" : " not sent"}</span>}
+                </td>
+              )}
               <td>
                 {r.project && (
                   <button className="btn small" onClick={() => setTalking(r)} data-testid="comments">
@@ -974,9 +1034,41 @@ export function AssignmentPage({ slug }: { slug: string }) {
                 )}
               </td>
             </tr>
+            {r.longs.length > 0 && (
+              <tr className="long-row">
+                <td />
+                <td colSpan={7}>
+                  {r.longs.map((l) => (
+                    <div key={l.question} className="long-answer" data-testid="long-answer">
+                      <div className="muted small">{l.prompt}</div>
+                      {/* Cleaned on the server when saved and when sent (quiz.clean_html); again here, as it is drawn as markup. */}
+                      <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(l.response, { ALLOWED_TAGS: ["p", "div", "br", "b", "strong", "i", "em", "u", "ul", "ol", "li"], ALLOWED_ATTR: [] }) }} />
+                      <label className="small">
+                        Mark{" "}
+                        <input
+                          type="number"
+                          step="0.5"
+                          min={0}
+                          defaultValue={l.score ?? ""}
+                          key={`${l.question}${l.score}`}
+                          onBlur={(e) =>
+                            (e.target.value === "" ? null : Number(e.target.value)) !== l.score &&
+                            void act(() => api("/api/quiz/grade", { json: { assignment: slug, student: r.student, question: l.question, score: e.target.value } }))
+                          }
+                          data-testid="long-mark"
+                        />{" "}
+                        / {l.points}
+                      </label>
+                    </div>
+                  ))}
+                </td>
+              </tr>
+            )}
+            </Fragment>
           ))}
         </tbody>
       </table>
+      <NotesEditor slug={slug} notes={data.notes} onSaved={load} />
       {talking?.project && (
         <CommentsDialog
           projectId={talking.project}

@@ -1,6 +1,72 @@
 # Progress
 
-## Phase 10b — XP ✅ (2026-10-26, waiting for review)
+## Phase 11a — Notes, questions and tests ✅ (2026-10-26, waiting for review)
+
+Phase 11 is split like Phase 9: **11a** builds the Notes tab, questions and the check language; **11b** builds tutorials on them (library, strict steps, spotlights, authoring, assigning, the four starters). Agreed: the Notes tab is the tutorial panel, steps are strict, a tutorial is an assignment, and **tutorial code can't be copied**.
+
+### Done
+
+- **The Notes tab**, beside Console and Docs, on an assignment's game. The editor's layout is unchanged; the tab appears only when there are notes, and the editor opens on it.
+  - Markdown, cut into slides at `---` lines (← 3 / 7 →, remembered per assignment).
+  - Sanitised with DOMPurify: no forms, no inline style, links open in a new tab.
+  - Pressing Play keeps the notes open, since a step and the game are meant to be read together. An error during a check goes to the Console without hiding the results.
+  - **Code in notes can't be selected**: typing it is the exercise. It's a speed bump, not a lock, like PyIDE's live pane.
+- **Questions**: PyIDE's ` ```quiz ` formats exactly (choice, short answer, blanks, match, long). `quiz.py` is copied unchanged from PyIDE, and the questions use PyIDE's tables.
+  - One try, marked at once, part marks for blanks and matches.
+  - **The answers never leave the server**: the student's editor gets the notes redacted. That's the one exit, and a leak check opens it, along with every other route a student has.
+  - Long responses are cleaned when stored and when shown, and you mark them on the assignment's page.
+  - XP as in PyIDE: points × 10 per question, plus a bonus for answering them all.
+- **Tests**: a ` ```tests ` block in the notes, in GameIDE's **check language**:
+  - Existence: `object Player exists`, `Player has sprite`, `Player has event step`.
+  - Code: `Player.step uses keyboard_check` (or `avoids`), `room Level1 has 3 Coin`.
+  - Running the game: `game runs 2 seconds without errors`, `after 1 second holding right, Player.x increased`, `after 2 seconds, <any Python>`.
+  - Points per line, as in PyIDE.
+  - **Check my work** plays the student's game in their own game pane, holding keys as the check says, and marks each line ✓ or ✗ with why. It's feedback, and pays a little XP once per test.
+  - **Check all** on the assignment's page runs every turned-in version in a game hidden in your browser. That's the result that counts, at 10 XP a point. A check older than the student's last turn-in shows ⟳.
+- **Grades** are your score plus the questions plus the checked tests (`backend/grades.py`, PyIDE's rule). The total is on the results page, on the student's class page, for quests, and sent by Classroom's Sync. With no points set, earning everything in the notes is full marks.
+- **The assignment's page** has a notes editor with the students' view beside it, flags any check it can't read, and offers "Start from an example". It also has Questions, Tests and Total columns, and the long answers to mark.
+- **`#/help/checks`** lists every question format and check. Its examples are tested to be ones GameIDE reads.
+
+### Tests
+
+```
+cd frontend
+npm test                      # Vitest: 208
+npm run e2e                   # Playwright: 62 editor tests + 16 account tests (4 opt-in, skipped)
+../backend/.venv/bin/python ../backend/tests/test_server.py   # 319 server checks
+python3 scripts/sabotage.py   # 388 deliberate bugs
+```
+
+- **Questions and tests are read the same in Python and TypeScript.** `src/notes/parse-cases.json` is read by both Vitest and the server checks.
+- **42 new server checks**, covering:
+  - the leak checks
+  - one try, marking, part marks, cleaning (also as stored), practice for the teacher, XP and the all-answered bonus
+  - marking a long answer
+  - a student's check keeps only the notes' tests at the notes' points, pays once, and counts for nothing
+  - the teacher's check counts and pays once, only for turned-in work, and goes stale after a re-turn-in
+  - totals on every page, and notes-only full marks.
+- **12 new unit tests**: slides, notes split into pieces, every kind of check against a project, game checks against a fake game, and the help page's examples.
+- **`e2e/notes.spec.ts`**:
+  1. The teacher writes notes.
+  2. The student opens on the Notes tab, can't select its code, answers the question, and presses Check my work, which plays the coins game holding keys: 5 ✓ and 1 ✗ with its reason.
+  3. The student turns it in, and the teacher's Check all puts 6 / 7 and the total on the page.
+
+  While writing it, the engine was right and the test wrong: holding left *does* move the player 4 pixels to the wall.
+- 24 new sabotage cases, each caught. Three found weak checks:
+  - a long answer cleaned only on the way out
+  - a "prefix" case the test never had
+  - one sabotage that didn't compile.
+
+### Known issues and gaps
+
+- **PyIDE, WebIDE and FlaskIDE load DOMPurify 3.2.4** from the CDN, which has published XSS advisories (fixed in 3.4.17, which GameIDE uses). Worth updating there; I haven't touched them.
+- A check plays the game for 10 seconds at most, and holds keys rather than clicking.
+- Long responses are a plain box (paragraphs kept), without PyIDE's small formatting toolbar.
+- Slide themes (`theme: chalkboard`) aren't in GameIDE's notes yet.
+
+---
+
+## Phase 10b — XP ✅ (2026-10-26, reviewed)
 
 Agreed: XP now, then a Phase 11 that brings the notes tab, questions and tests along with the tutorials.
 

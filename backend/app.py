@@ -27,6 +27,7 @@ from werkzeug.exceptions import BadRequest
 
 import accounts
 import classes
+import notes
 import rewards
 import gamestore
 import publishing
@@ -812,6 +813,8 @@ publishing.init(app, _db, current_user)
 classes.init(app, _db, current_user, _scheme, _problem)
 # XP, levels, leaderboards, avatars, the token shop and random events (rewards.py).
 rewards.init(app, _db, current_user)
+# An assignment's notes, its questions and its tests (notes.py).
+notes.init(app, _db, current_user)
 
 
 if __name__ == "__main__":
