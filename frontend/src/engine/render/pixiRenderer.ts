@@ -14,7 +14,7 @@
  * same. A slot handed to a new instance (GEN changed) gets its sprite reset,
  * so a bullet never briefly appears with the last bullet's frame.
  */
-import { Application, ColorMatrixFilter, Container, Filter, Graphics, Rectangle, Sprite, Text, Texture, TilingSprite } from "pixi.js";
+import { Application, ColorMatrixFilter, Container, FillGradient, Filter, Graphics, Rectangle, Sprite, Text, Texture, TilingSprite } from "pixi.js";
 import { flashFilter, LightLayer, outlineFilter, ParticleLayer, screenFilter, setFlash, setOutline } from "./feel";
 import type { DrawCommand, Engine } from "../engine";
 import type { BackgroundDef, GameDefinition, SpriteDef, TilesetDef } from "../game";
@@ -56,6 +56,12 @@ async function loadFrames(def: SpriteDef): Promise<Texture[]> {
  * pooled and reused by position in the list, because making a Text's
  * texture is the expensive part and a HUD says the same thing most frames.
  */
+/** A shape filled, or drawn round its edge (outline), in a colour. */
+function paint(g: Graphics, color: number, outline: number, alpha: number) {
+  if (outline) g.stroke({ color, width: 1, alignment: 0.5, alpha });
+  else g.fill({ color, alpha });
+}
+
 class DrawLayer {
   private graphicsByDepth = new Map<number, Graphics>();
   private texts: Text[] = [];
@@ -94,8 +100,37 @@ class DrawLayer {
           else gfx.fill({ color, alpha });
           break;
         }
+        case "line": {
+          const [, depth, x1, y1, x2, y2, color, width, alpha] = cmd;
+          this.graphicsAt(depth).moveTo(x1, y1).lineTo(x2, y2).stroke({ color, width, alpha, cap: "round" });
+          break;
+        }
+        case "circle": {
+          const [, depth, x, y, r, color, outline, alpha] = cmd;
+          paint(this.graphicsAt(depth).circle(x, y, r), color, outline, alpha);
+          break;
+        }
+        case "ellipse": {
+          const [, depth, x1, y1, x2, y2, color, outline, alpha] = cmd;
+          paint(this.graphicsAt(depth).ellipse((x1 + x2) / 2, (y1 + y2) / 2, Math.abs(x2 - x1) / 2, Math.abs(y2 - y1) / 2), color, outline, alpha);
+          break;
+        }
+        case "tri": {
+          const [, depth, x1, y1, x2, y2, x3, y3, color, outline, alpha] = cmd;
+          paint(this.graphicsAt(depth).poly([x1, y1, x2, y2, x3, y3]), color, outline, alpha);
+          break;
+        }
+        case "grad": {
+          const [, depth, x1, y1, x2, y2, c1, c2, vertical, alpha] = cmd;
+          const left = Math.min(x1, x2), top = Math.min(y1, y2), w = Math.abs(x2 - x1), h = Math.abs(y2 - y1);
+          // In the rectangle's own space (0–1 across it), so it shades over this rectangle, not the room.
+          const fill = new FillGradient({ type: "linear", start: { x: 0, y: 0 }, end: vertical ? { x: 0, y: 1 } : { x: 1, y: 0 }, textureSpace: "local",
+            colorStops: [{ offset: 0, color: c1 }, { offset: 1, color: c2 }] });
+          this.graphicsAt(depth).rect(left, top, w, h).fill({ fill, alpha });
+          break;
+        }
         case "text": {
-          const [, depth, x, y, text, color, font = -1, size = 16, alpha = 1] = cmd;
+          const [, depth, x, y, text, color, font = -1, size = 16, alpha = 1, halign = "left", valign = "top"] = cmd;
           let t = this.texts[ti];
           if (!t) {
             t = new Text({ text: "", style: { fill: 0xffffff, fontFamily: "monospace", fontSize: 16 } });
@@ -114,13 +149,14 @@ class DrawLayer {
           if (t.text !== text) t.text = text;
           if (t.style.fill !== color) t.style.fill = color;
           t.position.set(x, y);
+          t.anchor.set(halign === "center" ? 0.5 : halign === "right" ? 1 : 0, valign === "middle" ? 0.5 : valign === "bottom" ? 1 : 0);
           t.zIndex = -depth;
           t.alpha = alpha;
           t.visible = true;
           break;
         }
         case "sprite": {
-          const [, depth, sprite, frame, x, y, alpha = 1] = cmd;
+          const [, depth, sprite, frame, x, y, alpha = 1, xscale = 1, yscale = 1, angle = 0, tint = 0xffffff] = cmd;
           const frames = this.frames[sprite];
           if (!frames) break;
           let sp = this.sprites[si];
@@ -134,6 +170,9 @@ class DrawLayer {
           const a = this.anchors[sprite]!;
           sp.anchor.set(a.x, a.y);
           sp.position.set(x, y);
+          sp.scale.set(xscale, yscale);
+          sp.rotation = -angle * DEG; // GameMaker's angles go anticlockwise; Pixi's clockwise
+          sp.tint = tint;
           sp.zIndex = -depth;
           sp.alpha = alpha;
           sp.visible = true;

@@ -82,9 +82,18 @@ export interface FrameCommands {
  * event made it), so the renderer can put it in the right layer.
  */
 export type DrawCommand =
-  | ["text", number, number, number, string, number, number, number, number?] // depth, x, y, text, color, font (-1 built-in), size, alpha
+  | ["text", number, number, number, string, number, number, number, number?, Halign?, Valign?] // depth, x, y, text, color, font (-1 built-in), size, alpha, halign, valign
   | ["rect", number, number, number, number, number, number, number, number?] // depth, x1, y1, x2, y2, color, outline, alpha
-  | ["sprite", number, number, number, number, number, number?]; // depth, sprite, frame, x, y, alpha
+  // depth, sprite, frame, x, y, alpha — and from draw_sprite_ext: xscale, yscale, angle (degrees, anticlockwise), tint
+  | ["sprite", number, number, number, number, number, number?, number?, number?, number?, number?]
+  | ["line", number, number, number, number, number, number, number, number] // depth, x1, y1, x2, y2, color, width, alpha
+  | ["circle", number, number, number, number, number, number, number] // depth, x, y, r, color, outline, alpha
+  | ["ellipse", number, number, number, number, number, number, number, number] // depth, x1, y1, x2, y2, color, outline, alpha
+  | ["tri", number, number, number, number, number, number, number, number, number, number] // depth, 3 points, color, outline, alpha
+  | ["grad", number, number, number, number, number, number, number, number, number]; // depth, x1, y1, x2, y2, color1, color2, vertical, alpha
+
+export type Halign = "left" | "center" | "right";
+export type Valign = "top" | "middle" | "bottom";
 
 /** A Python exception, already traced back to the student's code. */
 export interface PythonGameError {

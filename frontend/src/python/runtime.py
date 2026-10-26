@@ -63,6 +63,10 @@ __all__ = [
     "move_towards", "point_direction", "point_distance", "move_and_collide",
     # drawing
     "draw_self", "draw_sprite", "draw_text", "draw_rect", "draw_set_color", "draw_set_font",
+    "draw_sprite_ext", "draw_line", "draw_circle", "draw_ellipse", "draw_triangle", "draw_rect_gradient",
+    "draw_set_halign", "draw_set_valign", "string_width", "string_height",
+    # small maths
+    "clamp", "lerp", "approach", "sign", "choose",
     # rooms and the game
     "room_goto", "room_restart", "game_restart", "global_vars", "room_width", "room_height",
     # the camera
@@ -712,7 +716,101 @@ def draw_sprite(sprite, frame, x, y):
 
 def draw_text(x, y, text):
     if _check_draw("draw_text"):
-        _draw_list.append(["text", _draw_depth, x, y, str(text), _color, _font, _font_size, _alpha])
+        _draw_list.append(["text", _draw_depth, x, y, str(text), _color, _font, _font_size, _alpha, _halign, _valign])
+
+
+def draw_sprite_ext(sprite, frame, x, y, xscale=1, yscale=1, angle=0, color="white", alpha=1):
+    """A frame of a sprite, scaled, turned (degrees, anticlockwise), tinted and faded."""
+    if _check_draw("draw_sprite_ext"):
+        _draw_list.append(["sprite", _draw_depth, _sprite_of(sprite), frame, x, y,
+                           _alpha * max(0.0, min(1.0, _num(alpha, "draw_sprite_ext", "alpha"))),
+                           _num(xscale, "draw_sprite_ext", "xscale"), _num(yscale, "draw_sprite_ext", "yscale"),
+                           _num(angle, "draw_sprite_ext", "angle"), _parse_color(color, "draw_sprite_ext")])
+
+
+def draw_line(x1, y1, x2, y2, width=1):
+    if _check_draw("draw_line"):
+        _draw_list.append(["line", _draw_depth, x1, y1, x2, y2, _color, max(0.0, _num(width, "draw_line", "width")), _alpha])
+
+
+def draw_circle(x, y, r, outline=False):
+    if _check_draw("draw_circle"):
+        _draw_list.append(["circle", _draw_depth, x, y, abs(_num(r, "draw_circle", "r")), _color, 1 if outline else 0, _alpha])
+
+
+def draw_ellipse(x1, y1, x2, y2, outline=False):
+    if _check_draw("draw_ellipse"):
+        _draw_list.append(["ellipse", _draw_depth, x1, y1, x2, y2, _color, 1 if outline else 0, _alpha])
+
+
+def draw_triangle(x1, y1, x2, y2, x3, y3, outline=False):
+    if _check_draw("draw_triangle"):
+        _draw_list.append(["tri", _draw_depth, x1, y1, x2, y2, x3, y3, _color, 1 if outline else 0, _alpha])
+
+
+def draw_rect_gradient(x1, y1, x2, y2, color1, color2, vertical=True):
+    """A rectangle shading from color1 to color2: top to bottom, or left to right with vertical=False."""
+    if _check_draw("draw_rect_gradient"):
+        _draw_list.append(["grad", _draw_depth, x1, y1, x2, y2, _parse_color(color1, "draw_rect_gradient"),
+                           _parse_color(color2, "draw_rect_gradient"), 1 if vertical else 0, _alpha])
+
+
+_halign = "left"
+_valign = "top"
+
+
+def draw_set_halign(align):
+    """Where draw_text's x is: "left" (the default), "center" or "right" of the text."""
+    global _halign
+    _halign = _named(align, ("left", "center", "right"), "draw_set_halign", "a way to line text up")
+
+
+def draw_set_valign(align):
+    """Where draw_text's y is: "top" (the default), "middle" or "bottom" of the text."""
+    global _valign
+    _valign = _named(align, ("top", "middle", "bottom"), "draw_set_valign", "a way to line text up")
+
+
+def string_width(text):
+    """How wide draw_text would draw this, in pixels, in the font set now."""
+    return _js.text_size(str(text), _font, _font_size, 0)
+
+
+def string_height(text):
+    """How tall draw_text would draw this, in pixels, in the font set now (more lines, taller)."""
+    return _js.text_size(str(text), _font, _font_size, 1)
+
+
+# ---------------------------------------------------------------- small maths
+
+def clamp(value, low, high):
+    """value, kept between low and high."""
+    return max(low, min(high, value))
+
+
+def lerp(a, b, t):
+    """The point t of the way from a to b: lerp(0, 100, 0.25) is 25."""
+    return a + (b - a) * t
+
+
+def approach(value, target, step):
+    """value moved towards target by at most step, never past it: smooth speeding up and slowing down."""
+    step = abs(step)
+    return min(value + step, target) if value < target else max(value - step, target)
+
+
+def sign(value):
+    """1 for a positive number, -1 for a negative one, 0 for 0."""
+    return (value > 0) - (value < 0)
+
+
+def choose(options):
+    """One of a list, picked at random: choose(["red", "green", "blue"])."""
+    import random
+    options = list(options)
+    if not options:
+        raise ValueError("choose needs a list with something in it.")
+    return random.choice(options)
 
 
 _font = -1        # index into the game's fonts, or -1 for the built-in one
@@ -1562,7 +1660,7 @@ def _input_events():
 
 def _draw_events():
     """Draw, into the room, then Draw GUI, onto the screen over everything."""
-    global _in_draw, _draw_depth, _cur, _color, _draw_list, _alpha
+    global _in_draw, _draw_depth, _cur, _color, _draw_list, _alpha, _halign, _valign
     for name, target in (("on_draw", _draw), ("on_draw_gui", _gui)):
         lst = _lists[name]
         if not lst:
@@ -1571,6 +1669,7 @@ def _draw_events():
         _draw_list = target
         _color = 0xFFFFFF
         _alpha = 1.0
+        _halign, _valign = "left", "top"
         try:
             for i in range(len(lst)):
                 o = lst[i]

@@ -77,6 +77,24 @@ _fresh_module
 `;
 
 /** A running game: one Engine plus its Python side. */
+let measurer: OffscreenCanvasRenderingContext2D | null | undefined;
+
+/**
+ * How big draw_text would draw `text`: [width, height] in pixels, in the font
+ * the renderer would use (pixiRenderer's DrawLayer: a game font as
+ * "gameide-font-<n>", else monospace). Measured on a canvas where there is
+ * one; the headless tests have none, and get monospace's usual 0.6 em a
+ * character, so a game's code still runs there.
+ */
+export function measureText(text: string, font: number, size: number): [number, number] {
+  const lines = text.split("\n");
+  const height = lines.length * size * 1.25;
+  if (measurer === undefined) measurer = typeof OffscreenCanvas !== "undefined" ? new OffscreenCanvas(1, 1).getContext("2d") : null;
+  if (!measurer) return [Math.max(...lines.map((l) => l.length)) * size * 0.6, height];
+  measurer.font = `${size}px ${font >= 0 ? `gameide-font-${font}, monospace` : "monospace"}`;
+  return [Math.max(...lines.map((l) => measurer!.measureText(l).width)), height];
+}
+
 /**
  * The game as Python is given it: without the pictures, pixel masks, tile
  * grids, and sound and font files, which Python never needs (and a pixel
@@ -157,6 +175,7 @@ export class PythonGame {
       hit_pause: (steps: number) => e().hit_pause(steps),
       tile_at: (x: number, y: number, layer: number) => e().tile_at(x, y, layer),
       tile_set: (x: number, y: number, tile: number, layer: number) => e().tile_set(x, y, tile, layer),
+      text_size: (text: string, font: number, size: number, which: number) => measureText(text, font, size)[which]!,
     };
     py.registerJsModule("_engine", api);
     const fresh = py.runPython(FRESH_MODULE) as PyProxy & ((src: string) => PyProxy);

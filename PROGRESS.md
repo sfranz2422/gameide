@@ -1,5 +1,15 @@
 # Progress
 
+## Phase 12 — What GameMaker and GDevelop have that GameIDE didn't (in progress, 2026-10-26)
+Asked for after Thornwood's level 1 needed workarounds for most of these.
+### 12a — Drawing and small maths ✅
+- **`draw_sprite_ext(sprite, frame, x, y, xscale, yscale, angle, color, alpha)`**: scaled, flipped, turned, tinted and faded, as GameMaker's. Its alpha multiplies with `draw_set_alpha`'s.
+- **Shapes**: `draw_line` (with a width), `draw_circle`, `draw_ellipse` and `draw_triangle` (filled, or outline=True), and `draw_rect_gradient` (top to bottom, or left to right).
+- **Text**: `draw_set_halign` ("left", "center", "right") and `draw_set_valign` ("top", "middle", "bottom"), reset at the start of each Draw event like the colour. `string_width` and `string_height` measure text in the font set now: on a canvas in the game, and as monospace's 0.6 em a character in the headless tests.
+- **Small maths**, in the Motion docs: `clamp`, `lerp`, `approach`, `sign` and `choose(list)`.
+- Each one is in the catalog, so it has docs, autocomplete, a block and an event-sheet entry.
+- Tests: `src/python/drawing.test.ts` (6, real Pyodide); `e2e/drawing.editor.spec.ts` reads the game's own pixels for every shape, the scaled and tinted sprite, the gradient and centred text. 12 sabotage cases, all caught. Two existing tests compared whole text commands and now allow for the two alignment fields.
+
 ## Phase 9½ — Game feel ✅ (2026-10-26, waiting for review)
 
 The phase planned in October "so student games can look and feel like GameMaker's showcase", built before the showcase platformer that will use it. Everything is in a new **Effects** category of the catalog, so it's in the docs, the blocks palette, event sheets and autocomplete.
