@@ -3467,3 +3467,23 @@ a.btn {
   font-family: var(--mono, "Ubuntu Mono", monospace);
   font-size: 14px;
 }
+
+/* Every CodeMirror box's own cursor (the event sheets' expression boxes have
+   no theme of their own): the text colour, not CodeMirror's near-black,
+   which vanished on the dark theme. !important because CodeMirror injects
+   its own cursor style after this sheet, and it won without it — silently. */
+.cm-editor .cm-cursorLayer .cm-cursor,
+.cm-editor .cm-dropCursor {
+  border-left-color: var(--code-text, var(--text)) !important;
+  border-left-width: 2px !important;
+}
+.add-event-close {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+}
+.help-targets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}

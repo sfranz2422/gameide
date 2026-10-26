@@ -23,6 +23,8 @@ import { allTests, runTests, type GameRunner, type TestResult } from "../checks/
 import type { Project } from "../store/project";
 import { announceXp } from "../xp/runXp";
 import { BLANK, parseQuiz, pieces, slides, type Question } from "./quiz";
+import { Spotlight } from "../tutorials/TutorialPane";
+import { takeHighlight } from "../tutorials/tutorial";
 
 const SANITIZE = {
   USE_PROFILES: { html: true },
@@ -90,7 +92,12 @@ export function NotesPane({ notes, assignment, project, runner, practice }: Note
   }, [assignment, practice]);
   const answered = useCallback((qid: string, r: Reply) => setMine((m) => ({ ...m, [qid]: r })), []);
 
-  const shown = deck.length ? deck[Math.min(at, deck.length - 1)]! : notes;
+  // A slide's `highlight:` line spotlights part of the editor while the slide
+  // is open, as a tutorial step's does; the line itself isn't shown.
+  const { md: shown, highlight } = takeHighlight(deck.length ? deck[Math.min(at, deck.length - 1)]! : notes);
+  const [spot, setSpot] = useState(true);
+  useEffect(() => setSpot(true), [at, highlight]);
+  const hideSpot = useCallback(() => setSpot(false), []);
   return (
     <div className="notes-pane" data-testid="notes-pane">
       {deck.length > 0 && (
@@ -106,6 +113,7 @@ export function NotesPane({ notes, assignment, project, runner, practice }: Note
           </button>
         </div>
       )}
+      {highlight && spot && <Spotlight target={highlight} onDone={hideSpot} />}
       <div className="notes-body">
         {pieces(shown).map((p, i) =>
           p.type === "md" ? (

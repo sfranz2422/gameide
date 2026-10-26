@@ -237,3 +237,35 @@ test("the pages carry GameIDE's mark: a favicon, and the logo in the top bar", a
   await expect(page.getByTestId("site-logo").locator(".logo-mark rect").first()).toBeVisible();
   await expect(page.getByTestId("site-logo")).toHaveText("GameIDE");
 });
+
+test("the code editor's cursor shows on the dark theme", async ({ page }) => {
+  await fromTemplate(page, "coins");
+  await treeItem(page, "Player").click();
+  await page.getByTestId("event-Step").click();
+  await page.getByTestId("event-code").locator(".cm-content").click();
+  const cursor = page.getByTestId("event-code").locator(".cm-cursor").first();
+  await expect(cursor).toBeAttached();
+  const color = await cursor.evaluate((el) => getComputedStyle(el).borderLeftColor);
+  const [r, g, b] = color.match(/\d+/g)!.map(Number);
+  // Light, against the editor's near-black background.
+  expect(r! + g! + b!).toBeGreaterThan(400);
+});
+
+test("the Add event menu closes without picking anything: ×, Escape, or a click away", async ({ page }) => {
+  await fromTemplate(page, "coins");
+  await treeItem(page, "Player").click();
+  const menu = page.getByRole("dialog", { name: "Add event" });
+  await page.getByTestId("add-event").click();
+  await page.getByTestId("add-event-close").click();
+  await expect(menu).toHaveCount(0);
+  await page.getByTestId("add-event").click();
+  await page.keyboard.press("Escape");
+  await expect(menu).toHaveCount(0);
+  await page.getByTestId("add-event").click();
+  await page.getByTestId("event-code").click();
+  await expect(menu).toHaveCount(0);
+  // And picking an event still works.
+  await page.getByTestId("add-event").click();
+  await page.getByTestId("pick-draw").click();
+  await expect(page.getByTestId("event-Draw")).toBeVisible();
+});

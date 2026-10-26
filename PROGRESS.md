@@ -50,6 +50,17 @@ python3 scripts/sabotage.py   # 430 deliberate bugs
 - A unit test: checks wait for game time on a slow computer.
 - 23 new sabotage cases, each caught.
 
+### After review: fixes from trying it
+
+- **Deleting an assignment was a 500 on Render.** Rows pointing at it (its game, its questions' keys…) weren't all deleted first, and Postgres refuses that. The tests' SQLite never noticed, because SQLite ignores foreign keys unless asked. Now:
+  - every table that refers to an assignment is cleared first, and the same for **deleting a class** (its random events and visits would have failed the same way)
+  - **the tests' database enforces foreign keys**, as Postgres does, with a server check that it does.
+- **The code cursor was invisible on the dark theme.** CodeMirror draws its own cursor, near-black unless told otherwise; the event-sheet boxes had the same problem. A test now checks it's light, and was watched to fail. My first fix used the wrong class name and changed nothing; the test caught that.
+- **The Add event menu had no way out** but picking an event: it now closes with ×, Escape, or a click away.
+- **Spotlights in an assignment's notes**: a `highlight: <name>` line on a slide rings that part of the editor while the slide is open, as in tutorials. The notes editor warns about a name it can't point at, and `#/help/checks#spotlights` lists the names. Found on the way: a `highlight:` line inside a code block was taken out too (in tutorials as well); it's code, so it's now left alone.
+- The assignment's page has a **✎ Notes** button that goes to its notes editor.
+- Tests now: Vitest 237, Playwright 81 (+4), server 348, sabotage 436.
+
 ### Known issues and gaps
 
 - Lights and glows draw in the room; a light on a moving camera follows it, but lights aren't blocked by walls (no shadows).

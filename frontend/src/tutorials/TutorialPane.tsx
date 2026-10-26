@@ -147,7 +147,7 @@ export function TutorialPane({ md, progress, onProgress, project, runner, earns 
 }
 
 /** A ring round `[data-tutorial=target]`, following it as the page moves; gone at the first click. */
-function Spotlight({ target, onDone }: { target: string; onDone: () => void }) {
+export function Spotlight({ target, onDone }: { target: string; onDone: () => void }) {
   const [box, setBox] = useState<DOMRect | null>(null);
   useEffect(() => {
     let frame = 0;

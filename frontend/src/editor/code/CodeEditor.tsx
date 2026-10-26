@@ -46,6 +46,7 @@ const theme = EditorView.theme({
   "&": { height: "100%", fontSize: "14px", backgroundColor: "var(--code-bg)", color: "var(--code-text)" },
   ".cm-scroller": { fontFamily: "var(--mono)", lineHeight: "1.55" },
   ".cm-content": { caretColor: "var(--accent)" },
+  // (CodeMirror's own cursor, which is what shows, is coloured in app.css for every CodeMirror box.)
   ".cm-gutters": { backgroundColor: "var(--code-gutter)", color: "var(--muted)", border: "none" },
   ".cm-activeLine": { backgroundColor: "var(--code-active)" },
   ".cm-activeLineGutter": { backgroundColor: "var(--code-active)" },

@@ -7,7 +7,7 @@
  * An event is written in Python or with blocks (its `mode`), and the tabs
  * say which, by the same rules as scripts and creation code (codeMode.tsx).
  */
-import { Suspense, useMemo, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { emptyBlocks, hasBlocks } from "../blocks/blockState";
 import { emptySheet, hasRows } from "../eventsheets/sheet";
 import { KEY_NAMES } from "../engine/layout";
@@ -323,6 +323,24 @@ function AddEventMenu({ project, obj, onPick, onClose }: { project: Project; obj
   const [collide, setCollide] = useState(project.objects[0]?.id ?? "");
   const [alarm, setAlarm] = useState(0);
   const [mouse, setMouse] = useState("left pressed false");
+  // Ways out besides picking an event: ×, Escape from anywhere, or a click
+  // outside. Opened by mistake, the menu had none (Escape only worked once
+  // something inside it had focus), and it covered the button that opened it.
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    const away = (e: PointerEvent) => {
+      const t = e.target as Element | null;
+      // The Add event button toggles the menu itself; leave that click to it.
+      if (box.current && t && !box.current.contains(t) && !t.closest("[data-testid=add-event]")) onClose();
+    };
+    window.addEventListener("keydown", key);
+    window.addEventListener("pointerdown", away);
+    return () => {
+      window.removeEventListener("keydown", key);
+      window.removeEventListener("pointerdown", away);
+    };
+  }, [onClose]);
 
   const simple = (label: string, type: EventKey["type"] & string, hint: string) => {
     const k = { type } as EventKey;
@@ -334,7 +352,10 @@ function AddEventMenu({ project, obj, onPick, onClose }: { project: Project; obj
   };
 
   return (
-    <div className="add-event-menu" role="dialog" aria-label="Add event" onKeyDown={(e) => e.key === "Escape" && onClose()}>
+    <div className="add-event-menu" role="dialog" aria-label="Add event" ref={box}>
+      <button className="icon-btn add-event-close" onClick={onClose} aria-label="Close" title="Close (Esc)" data-testid="add-event-close">
+        {Icon.close()}
+      </button>
       <div className="menu-group">
         <h4>Basics</h4>
         {simple("Create", "create", "Runs once, when an instance appears")}

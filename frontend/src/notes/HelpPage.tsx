@@ -5,6 +5,7 @@
  * every one, so a check listed here is one GameIDE knows.
  */
 import { SiteNav } from "../editor/SiteNav";
+import { TARGETS } from "../tutorials/tutorial";
 
 export const CHECK_EXAMPLES: [string, string][] = [
   ["object Player exists", "Also sprite, room, sound, font, script and tileset."],
@@ -79,6 +80,19 @@ export function HelpPage() {
           checks that play the game play it in their game pane — and you press <b>Check all</b> on the assignment's page, which checks what each student turned in
           and is the result that counts. Add <code>(2 points)</code> at the end of a line to make it worth more than 1.
         </p>
+        <h2 id="spotlights">Spotlights</h2>
+        <p>
+          A line <code>highlight: add-event</code> on a slide (or a tutorial's step) puts a pulsing ring round that part of the editor while the slide is open.
+          It never blocks a click, and goes at the first one. It points at what's on screen: if the part isn't open (a tab not chosen), there's no ring, so say
+          where it is too. The names, with <code>*</code> standing for a resource's or a folder's name (<code>add-sprites</code>,{" "}
+          <code>resource-player</code>, <code>object-sprite</code>):
+        </p>
+        <p className="help-targets" data-testid="help-targets">
+          {TARGETS.map((t) => (
+            <code key={t}>{t}</code>
+          ))}
+        </p>
+        <h2>Every check</h2>
         <table className="mod-table">
           <tbody>
             {CHECK_EXAMPLES.map(([line, what]) => (

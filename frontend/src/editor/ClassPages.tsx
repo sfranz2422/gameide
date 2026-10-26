@@ -842,6 +842,14 @@ export function AssignmentPage({ slug }: { slug: string }) {
         )}
         <button
           className="btn small"
+          onClick={() => document.querySelector("[data-testid=notes-editor]")?.scrollIntoView({ behavior: "smooth" })}
+          title="The notes students read in their editor's Notes tab: instructions, slides, questions, tests and spotlights"
+          data-testid="go-to-notes"
+        >
+          ✎ Notes
+        </button>
+        <button
+          className="btn small"
           onClick={() => {
             void navigator.clipboard?.writeText(`${location.origin}/a/${data.slug}`);
             setNote(`Copied the link: ${location.origin}/a/${data.slug}`);

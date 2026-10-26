@@ -491,7 +491,8 @@ B = r.get_json().get("slug")
 check("an assignment is copied to another class, with a link of its own", r.status_code == 201 and B != A)
 check("…with none of the students' work", teacher.get(f"/api/assignments/{B}").get_json()["rows"][0]["project"] is None)
 check("…only to the teacher's own classes", teacher.post(f"/api/assignments/{A}/copy", json={"class": PYCLASS}).status_code == 400)
-check("an assignment nobody turned in is deleted", teacher.delete(f"/api/assignments/{B}").status_code == 200
+teacher.post(f"/api/assignments/{B}/notes", json={"notes": "```quiz\nOne?\nanswer: one\n```\n```tests\nuses for\n```"})
+check("an assignment nobody turned in is deleted, notes and all", teacher.delete(f"/api/assignments/{B}").status_code == 200
       and teacher.get(f"/api/assignments/{B}").status_code == 404)
 teacher.post(f"/api/assignments/{A}", json={"archived": True})
 check("an archived assignment is off the students' page", [i for i in dana.get(f"/api/classes/{GD}").get_json()["items"] if i["kind"] == "assignment"] == [])
@@ -948,6 +949,26 @@ game["data"]["tutorial"] = {"key": "a:" + TA, "step": 2, "steps": 3, "title": "B
 put(xc, TP, game["data"], game["version"])
 check("My Games knows a game's tutorial and how far it's got", ({g["id"]: g for g in xc.get("/api/projects").get_json()["projects"]}[TP].get("tutorial") or {}).get("step") == 2)
 check("…and so do the teacher's results", {x["email"]: x for x in teacher.get(f"/api/assignments/{TA}").get_json()["rows"]}["xc@example.com"]["tutorial"] == {"step": 2, "steps": 3})
+
+# The tests' database refuses what Postgres would: a row pointing at nothing.
+db = server.SessionLocal()
+try:
+    db.add(accounts.ClassItem(class_id=987654, title="orphan"))
+    db.commit()
+    refused = False
+except Exception:
+    db.rollback()
+    refused = True
+db.close()
+check("the tests' database enforces foreign keys, as Render's Postgres does", refused)
+
+# Deleting a class that has had a random event (rows that point at it).
+DC = teacher.post("/api/classes", json={"name": "Short-lived"}).get_json()["id"]
+teacher.post(f"/api/classes/{DC}/students", json={"emails": "xa@example.com"})
+teacher.post(f"/api/classes/{DC}/event")
+xp_before_delete = xa.get("/api/me/xp").get_json()["xp"]
+check("a class that has had a random event can be deleted", teacher.delete(f"/api/classes/{DC}").status_code == 200)
+check("…and the XP its event gave stays with the students", xa.get("/api/me/xp").get_json()["xp"] == xp_before_delete)
 
 # ---------------------------------------------------------------- the built editor's files
 # The blocks editor's media come from our own origin (vite.config.ts copies

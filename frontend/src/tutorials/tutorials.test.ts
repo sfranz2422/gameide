@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { TUTORIAL_STARTERS } from "../store/templates";
-import { isTutorial, parseTutorial, splitHeader, TARGETS, tutorialProblems } from "./tutorial";
+import { isTutorial, parseTutorial, splitHeader, takeHighlight, TARGETS, tutorialProblems, unknownHighlights } from "./tutorial";
 import cases from "../notes/parse-cases.json";
 
 const DIR = join(__dirname, "../../public/tutorials");
@@ -24,6 +24,13 @@ describe("tutorials", () => {
       const t = parseTutorial(c.body);
       expect({ steps: t.steps.length, tutorial: isTutorial(c.body), title: c.expect.tutorial ? t.meta.title : c.expect.title }).toEqual(c.expect);
     }
+  });
+  it("a highlight line in ordinary notes is taken out and named; code is left alone", () => {
+    expect(takeHighlight("Press Play.\nhighlight: play\n```python\nhighlight: not_this\n```")).toEqual({
+      md: "Press Play.\n```python\nhighlight: not_this\n```",
+      highlight: "play",
+    });
+    expect(unknownHighlights("# A\nhighlight: play\n---\n# B\nhighlight: nowhere")).toEqual(["nowhere"]);
   });
   it("say what's wrong with one: unreadable checks, spotlights on nothing", () => {
     const t = parseTutorial("---\ntitle: T\n---\n# A\nhighlight: nowhere\n```check\nmake it good\n```");

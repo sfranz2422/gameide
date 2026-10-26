@@ -18,6 +18,7 @@ import { hostRunner, type HostWatch } from "../checks/hostRunner";
 import type { GameState } from "../python/protocol";
 import { pieces, parseQuiz, slides } from "./quiz";
 import { renderMarkdown } from "./NotesPane";
+import { takeHighlight, unknownHighlights } from "../tutorials/tutorial";
 
 const EXAMPLE = `# Collect the coins
 
@@ -56,7 +57,8 @@ export function NotesEditor({ slug, notes, onSaved }: { slug: string; notes: str
     setSaved(notes);
   }, [notes]);
   const deck = useMemo(() => slides(text), [text]);
-  const parts = useMemo(() => pieces(text), [text]);
+  const parts = useMemo(() => pieces(takeHighlight(text).md), [text]);
+  const badSpots = useMemo(() => unknownHighlights(text), [text]);
   const questions = parts.filter((p) => p.type === "quiz").length;
   const unknown = useMemo(() => allTests(text).filter((t) => readCheck(t.label).kind === "unknown"), [text]);
   const save = async () => {
@@ -77,7 +79,8 @@ export function NotesEditor({ slug, notes, onSaved }: { slug: string; notes: str
       <h2>Notes</h2>
       <p className="muted small">
         What students see in their editor's Notes tab. Markdown; a line of <code>---</code> starts a new slide. A <code>```quiz</code> block is a question (one try,
-        marked at once); a <code>```tests</code> block is checks their game must pass. The answers never leave the server.
+        marked at once); a <code>```tests</code> block is checks their game must pass; a line <code>highlight: add-event</code> spotlights that part of the
+        editor while the slide is open (<a href="#/help/checks">the names</a>). The answers never leave the server.
       </p>
       <div className="notes-editor-cols">
         <div>
@@ -100,6 +103,11 @@ export function NotesEditor({ slug, notes, onSaved }: { slug: string; notes: str
             <p className="banner warn small">
               GameIDE can't read {unknown.length === 1 ? "this check" : "these checks"}: {unknown.map((t) => `"${t.label}"`).join(", ")}. See{" "}
               <a href="#/help/checks">the checks it knows</a>.
+            </p>
+          )}
+          {badSpots.length > 0 && (
+            <p className="banner warn small" data-testid="notes-bad-highlight">
+              There's nothing called {badSpots.map((h) => `"${h}"`).join(", ")} to spotlight. See <a href="#/help/checks">the names</a>.
             </p>
           )}
           {problem && <p className="error-text">{problem}</p>}

@@ -428,11 +428,12 @@ def delete_class(class_id):
         ids = [i.assignment_id for i in items if i.assignment_id]
         db.query(accounts.Assignment).filter(accounts.Assignment.id.in_(ids or [-1])).update(
             {"archived": 1}, synchronize_session=False)
-        for i in items:
-            db.delete(i)
-        db.query(accounts.Enrollment).filter_by(class_id=course.id).delete()
-        db.query(ClassSettings).filter_by(class_id=course.id).delete()
-        db.delete(course)
+        # Everything pointing at the class goes first (Postgres refuses otherwise:
+        # see delete_assignment). Its random events go; the XP they gave stays
+        # with the students — those are their own rows.
+        for table in (accounts.ClassItem, accounts.Enrollment, accounts.ClassEvent, accounts.Visit, ClassSettings):
+            db.query(table).filter_by(class_id=course.id).delete(synchronize_session=False)
+        db.query(accounts.Course).filter_by(id=course.id).delete(synchronize_session=False)
         db.commit()
         return jsonify(ok=True)
     finally:
@@ -815,15 +816,20 @@ def delete_assignment(slug):
         if db.query(accounts.Submission).filter_by(assignment_id=a.id).first() is not None:
             return err("Students have turned this in, so it can't be deleted. Archive it instead.", 409)
         g = _game_of(db, a)
-        db.query(AssignmentWork).filter_by(assignment_id=a.id).delete()
-        db.query(accounts.ClassItem).filter_by(assignment_id=a.id).delete()
-        db.query(accounts.ClassroomPost).filter_by(assignment_id=a.id).delete()
         if g:
             starter = db.query(GameProject).filter_by(id=g.starter_id).first()
-            db.delete(g)
             if starter:
                 starter.deleted_at = now()
-        db.delete(a)
+        # Every row that points at the assignment goes first, each by its own
+        # DELETE: Postgres refuses to delete an assignment anything still
+        # refers to, and SQLAlchemy can't order deletes between tables it has
+        # no relationship for. Missing one was a 500 on Render (and passed
+        # here until the tests' SQLite was made to enforce foreign keys too).
+        # Students' games are AssignmentWork's projects: theirs, kept.
+        for table in (AssignmentWork, AssignmentGame, accounts.ClassItem, accounts.ClassroomPost, accounts.QuizAnswer,
+                      accounts.QuizQuestion, accounts.TestResult, accounts.Draft, accounts.LiveSession):
+            db.query(table).filter_by(assignment_id=a.id).delete(synchronize_session=False)
+        db.query(accounts.Assignment).filter_by(id=a.id).delete(synchronize_session=False)
         db.commit()
         return jsonify(ok=True)
     finally:

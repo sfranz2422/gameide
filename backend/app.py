@@ -62,6 +62,17 @@ engine = create_engine(
     **({} if _url.startswith("sqlite") else {"pool_size": 3, "max_overflow": 2}),
 )
 SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)
+
+if _url.startswith("sqlite"):
+    # SQLite ignores foreign keys unless asked; Postgres (Render) never does.
+    # Without this, a delete that leaves rows pointing at what it deleted
+    # passed every test here and was a 500 on the real site — deleting an
+    # assignment was exactly that. So the tests' database refuses it too.
+    from sqlalchemy import event
+
+    @event.listens_for(engine, "connect")
+    def _foreign_keys_on(conn, _record):
+        conn.execute("PRAGMA foreign_keys=ON")
 gamestore.create_all(engine)
 
 # ---------------------------------------------------------------- the app

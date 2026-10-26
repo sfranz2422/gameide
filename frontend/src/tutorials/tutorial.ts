@@ -88,28 +88,56 @@ export function splitHeader(md: string): { meta: TutorialMeta; body: string } {
   };
 }
 
+/**
+ * A step's (or a notes slide's) `highlight:` line taken out: the markdown
+ * without it, and the first target named. Lines inside code are left alone.
+ */
+export function takeHighlight(md: string): { md: string; highlight: string | null } {
+  let highlight: string | null = null;
+  const kept = pieces(md, ["check", "tests"])
+    .map((p) => {
+      if (p.type === "quiz") return "```quiz\n" + p.body + "\n```";
+      if (p.type === "tests") return "```" + p.kind + "\n" + p.body + "\n```";
+      // Inside a code block, a line is code — `highlight: x` there is an example, kept.
+      let fence: string | null = null;
+      return p.text
+        .split("\n")
+        .filter((ln) => {
+          const f = /^ {0,3}(`{3,}|~{3,})/.exec(ln);
+          if (f) {
+            if (fence === null) fence = f[1]!;
+            else if (f[1]![0] === fence[0] && f[1]!.length >= fence.length) fence = null;
+            return true;
+          }
+          if (fence !== null) return true;
+          const h = HIGHLIGHT.exec(ln.trim());
+          if (h && !highlight) highlight = h[1]!;
+          return !h;
+        })
+        .join("\n");
+    })
+    .join("\n");
+  return { md: kept, highlight };
+}
+
+/** Spotlight names in notes GameIDE can't point at (the notes editor warns). */
+export function unknownHighlights(md: string): string[] {
+  const out: string[] = [];
+  for (const slide of slides(md).length ? slides(md) : [md]) {
+    const h = takeHighlight(slide).highlight;
+    if (h && !TARGETS.some((tg) => (tg.endsWith("*") ? h.startsWith(tg.slice(0, -1)) : tg === h))) out.push(h);
+  }
+  return out;
+}
+
 export function parseTutorial(md: string): Tutorial {
   const { meta, body } = splitHeader(md);
   const cut = slides(body);
   const raw = cut.length ? cut : body.trim() ? [body.trim()] : [];
   const steps = raw.map((s) => {
-    let highlight: string | null = null;
-    // A highlight line outside code, like a question's lines: taken out of what is shown.
-    const kept = pieces(s, ["check"])
-      .map((p) => {
-        if (p.type !== "md") return p.type === "quiz" ? "```quiz\n" + p.body + "\n```" : "```check\n" + p.body + "\n```";
-        return p.text
-          .split("\n")
-          .filter((ln) => {
-            const h = HIGHLIGHT.exec(ln.trim());
-            if (h && !highlight) highlight = h[1]!;
-            return !h;
-          })
-          .join("\n");
-      })
-      .join("\n");
+    const { md, highlight } = takeHighlight(s);
     const title = /^#{1,3}\s+(.+)$/m.exec(s)?.[1]?.trim() ?? "";
-    return { md: kept, checks: allTests(s, "check"), highlight, title };
+    return { md, checks: allTests(s, "check"), highlight, title };
   });
   return { meta, steps };
 }

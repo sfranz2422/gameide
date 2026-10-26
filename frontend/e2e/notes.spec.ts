@@ -20,6 +20,8 @@ const NOTES = `# Collect the coins
 
 Move with the arrow keys. In Player's Step event:
 
+highlight: play
+
 \`\`\`python
 move_and_collide(dx, dy, "Wall")
 \`\`\`
@@ -76,6 +78,9 @@ test("notes: slides, a question, Check my work in the game pane, and the teacher
   await nia.waitForURL(/#\/p\//);
   await expect(nia.getByTestId("notes-pane")).toBeVisible();
   await expect(nia.getByTestId("slide-count")).toHaveText("1 / 3");
+  // The slide's spotlight, on Play — and the line itself isn't shown.
+  await expect(nia.getByTestId("spotlight")).toHaveAttribute("data-target", "play");
+  await expect(nia.getByTestId("notes-pane")).not.toContainText("highlight:");
   // Code in the notes is for typing, not copying.
   expect(await nia.getByTestId("notes-pane").locator("pre").first().evaluate((el) => getComputedStyle(el).userSelect)).toBe("none");
   await expect(nia.getByTestId("notes-pane")).not.toContainText("[x]");

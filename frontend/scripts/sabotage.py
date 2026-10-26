@@ -480,6 +480,13 @@ CASES = [
  ("tutorial checks not graded", GR, '    for t in checks.tests(notes_of(a)) + checks.tests(notes_of(a), "check"):', "    for t in checks.tests(notes_of(a)):", "its checks are what Check all checks", PY),
  ("games forget their tutorial", APP, '"tutorial": gamestore.tutorial_of(p.data)}', '"tutorial": None}', "My Games knows a game's tutorial", PY),
  ("tutorials not served", APP, '    r = send_from_directory(DIST / "tutorials", name)', '    r = send_from_directory(DIST / "tutorial", name)', "the built-in tutorials are served", PY),
+ ("delete leaves answer keys", CL, "accounts.ClassroomPost, accounts.QuizAnswer,\n                      accounts.QuizQuestion, accounts.TestResult,", "accounts.ClassroomPost, accounts.QuizAnswer,\n                      accounts.TestResult,", "notes and all", PY),
+ ("class delete leaves events", CL, "(accounts.ClassItem, accounts.Enrollment, accounts.ClassEvent, accounts.Visit, ClassSettings)", "(accounts.ClassItem, accounts.Enrollment, accounts.Visit, ClassSettings)", "had a random event can be deleted", PY),
+ ("SQLite ignores foreign keys", APP, '        conn.execute("PRAGMA foreign_keys=ON")', '        conn.execute("PRAGMA foreign_keys=OFF")', "enforces foreign keys", PY),
+ ("dark cursor", "src/editor/app.css", "  border-left-color: var(--code-text, var(--text)) !important;\n  border-left-width: 2px !important;\n}", "  border-left-width: 2px !important;\n}", "cursor shows on the dark theme", E2E),
+ ("menu won't close", "src/editor/ObjectEditor.tsx", "    window.addEventListener(\"keydown\", key);\n    window.addEventListener(\"pointerdown\", away);", "    void key;\n    void away;", "Add event menu closes", E2E),
+ ("notes spotlight ignored", "src/notes/NotesPane.tsx", "      {highlight && spot && <Spotlight", "      {highlight && !spot && <Spotlight", "notes: slides", E2E),
+ ("highlight in code taken", TUP, "          if (fence !== null) return true;\n", "", "code is left alone"),
  # Phase 9½: game feel
  ("particles stand still", FX, "      this.x[p] = this.x[p]! + this.vx[p]!;\n      this.y[p] = this.y[p]! + this.vy[p]!;", "      this.x[p] = this.x[p]!;\n      this.y[p] = this.y[p]!;", "a burst makes its particles"),
  ("particles live forever", FX, "      if (--this.life[p]! <= 0) {", "      if (--this.life[p]! < -1e9) {", "a burst makes its particles"),
