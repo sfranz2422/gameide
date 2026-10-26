@@ -6,7 +6,8 @@
  */
 import type * as Blockly from "blockly/core";
 import { API, type Category } from "../catalog/api";
-import { blocksFor, COLOURS, functionBlock, shadowFor, statementBlock, variableBlock } from "./catalogBlocks";
+import type { BlocksKind } from "./blockState";
+import { blockNames, blocksFor, COLOURS, functionBlock, shadowFor, statementBlock, variableBlock } from "./catalogBlocks";
 
 type Item = Record<string, unknown>;
 const num = (n: number) => ({ shadow: { type: "math_number", fields: { NUM: n } } });
@@ -35,11 +36,43 @@ const prop = (type: "gm_prop_set" | "gm_prop_change" | "gm_prop_get", name: stri
 });
 const label = (text: string) => ({ kind: "label", text });
 
-export function toolbox(): Blockly.utils.toolbox.ToolboxDefinition {
-  const category = (name: string, colour: string, contents: Item[]) => ({ kind: "category", name, colour, contents });
+/**
+ * Blocks that need `self` — this instance's properties, "my" variables,
+ * alarms, `other`. A script's functions have no instance of their own, so
+ * its palette leaves these out, and an input that would start as `self`
+ * starts empty instead (the function's caller passes the instance).
+ */
+const NEEDS_SELF = new Set(["gm_prop_get", "gm_prop_set", "gm_prop_change", "gm_self", "gm_other", "gm_alarm_set", "gm_my_get", "gm_my_set", "gm_my_change"]);
+
+function withoutSelf(items: Item[]): Item[] {
+  const strip = (node: unknown): unknown => {
+    if (Array.isArray(node)) return node.map(strip);
+    if (!node || typeof node !== "object") return node;
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(node)) {
+      const t = (v as { type?: string } | null)?.type;
+      if (k === "shadow" && t && NEEDS_SELF.has(t)) continue;
+      out[k] = strip(v);
+    }
+    return out;
+  };
+  return items.filter((i) => !NEEDS_SELF.has(i["type"] as string)).map((i) => strip(i) as Item);
+}
+
+export function toolbox(kind: BlocksKind = "event"): Blockly.utils.toolbox.ToolboxDefinition {
+  const category = (name: string, colour: string, contents: Item[]) => ({
+    kind: "category",
+    name,
+    colour,
+    contents: kind === "script" ? withoutSelf(contents) : contents,
+  });
+  const functions = { kind: "category", name: "Functions", colour: COLOURS.Functions, custom: "GAMEIDE_FUNCTIONS" };
   return {
     kind: "categoryToolbox",
     contents: [
+      // A script is functions: making one comes first. (Blockly's own
+      // category: define, return, and calls to this script's functions.)
+      ...(kind === "script" ? [{ kind: "category", name: "Make a function", colour: COLOURS.Functions, custom: "PROCEDURE" }] : []),
       category("Motion", COLOURS.Motion, [
         prop("gm_prop_change", "x", 4),
         prop("gm_prop_change", "y", 4),
@@ -113,14 +146,33 @@ export function toolbox(): Blockly.utils.toolbox.ToolboxDefinition {
       category("Rooms", COLOURS.Rooms, catalogItems("Rooms")),
       category("Camera", COLOURS.Camera, catalogItems("Camera")),
       category("Debug", COLOURS.Debug, [{ kind: "block", type: "text_print", inputs: { TEXT: shadow("text", { TEXT: "Hello" }) } }, ...catalogItems("Debug")]),
+      functions,
     ],
   };
 }
 
+/**
+ * The Functions category: a call block for each function the project's
+ * scripts define (in a script's own palette, the other scripts' — its own
+ * are under Make a function). Filled when opened, so a function written a
+ * moment ago in another tab is there.
+ */
+export function functionsFlyout(): Item[] {
+  const fns = blockNames().functions;
+  if (!fns.length) return [label("No functions yet. Make one in a script — typed, or with blocks.")];
+  return fns.flatMap((f) => {
+    const block = { fields: { FN: f.name }, extraState: { params: f.params }, inputs: Object.fromEntries(f.params.map((_, i) => [`ARG${i}`, num(0)])) };
+    return [
+      { kind: "block", type: "gm_call_do", ...block },
+      { kind: "block", type: "gm_call_get", ...block },
+    ];
+  });
+}
+
 /** The Variables category: "my" and global variables, then local ones (Blockly's). */
-export function variablesFlyout(ws: Blockly.Workspace): Item[] {
+export function variablesFlyout(ws: Blockly.Workspace, kind: BlocksKind = "event"): Item[] {
   const locals = ws.getVariableMap().getAllVariables().map((v) => v.getName());
-  return [
+  const items: Item[] = [
     { kind: "block", type: "gm_my_set", inputs: { TO: num(3) } },
     { kind: "block", type: "gm_my_change", inputs: { BY: num(-1) } },
     { kind: "block", type: "gm_my_get" },
@@ -135,8 +187,10 @@ export function variablesFlyout(ws: Blockly.Workspace): Item[] {
       { kind: "block", type: "variables_get", fields: { VAR: { name } } },
     ]),
   ];
+  return kind === "script" ? withoutSelf(items) : items;
 }
 
 /** Every block type the palette can offer, for the tests. */
+export const CALL_BLOCKS = ["gm_call_do", "gm_call_get"];
 export const VARIABLE_BLOCKS = ["gm_my_set", "gm_my_change", "gm_my_get", "gm_global_set", "gm_global_change", "gm_global_get", "variables_set", "gm_local_change", "variables_get"];
 export { functionBlock, statementBlock };

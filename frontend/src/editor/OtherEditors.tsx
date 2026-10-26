@@ -4,11 +4,12 @@
  * picker. Sprite import and slicing (Phase 4) and the drag-and-drop room
  * editor (Phase 5) replace parts of these.
  */
-import { useEffect, useState } from "react";
-import { find } from "../store/project";
+import { Suspense, useEffect, useRef, useState } from "react";
+import { emptyBlocks } from "../blocks/blockState";
+import { find, type ScriptResource } from "../store/project";
 import { STARTER_SPRITES } from "../store/starterArt";
 import { CodeEditor } from "./code/CodeEditor";
-import { projectNames } from "./ObjectEditor";
+import { blockNamesFor, BlocksEditor, confirmToPython, isBlocks, ModeTabs, projectNames, toBlocks, toPython } from "./codeMode";
 import { useProjectApi } from "./useProject";
 
 export function SpritePicker({ onPick, onImport, onClose }: { onPick: (key: string) => void; onImport: () => void; onClose: () => void }) {
@@ -53,19 +54,53 @@ export function SpritePicker({ onPick, onImport, onClose }: { onPick: (key: stri
 
 export function ScriptEditor({ scriptId, focus }: { scriptId: string; focus: { line: number; nonce: number } | null }) {
   const { project, mutate } = useProjectApi();
+  const projectRef = useRef(project);
+  projectRef.current = project;
   const script = find(project, "scripts", scriptId);
   if (!script) return <div className="empty-pane">This script was deleted.</div>;
+  // Code, typed or blocks: out of the project's undo, like typing (history.ts).
+  const edit = (recipe: (s: ScriptResource) => void) => mutate((p) => recipe(find(p, "scripts", scriptId)!), { history: "skip" });
   return (
     <div className="script-editor">
-      <div className="signature">Functions and values here can be used by every object. Scripts run in order, before any object.</div>
-      <CodeEditor
-        docKey={script.id}
-        value={script.code}
-        onChange={(code) => mutate((p) => void (find(p, "scripts", scriptId)!.code = code), { history: "skip" })}
-        names={() => projectNames(project)}
-        errorLine={focus}
-        testId="script-code"
+      <ModeTabs
+        holder={script}
+        testPrefix="script"
+        onBlocks={() => edit((s) => toBlocks(s, "script"))}
+        onPython={() => confirmToPython(script, `the script ${script.name}`) && edit(toPython)}
       />
+      {isBlocks(script) ? (
+        <Suspense fallback={<div className="empty-pane">Loading blocks…</div>}>
+          <BlocksEditor
+            key={script.id}
+            eventId={script.id}
+            kind="script"
+            signature=""
+            state={script.blocks ?? emptyBlocks("script")}
+            code={script.code}
+            onChange={(blocks, code) =>
+              edit((s) => {
+                s.blocks = blocks;
+                s.code = code;
+              })
+            }
+            names={() => blockNamesFor(projectRef.current, scriptId)}
+            onConvert={() => confirmToPython(script, `the script ${script.name}`) && edit(toPython)}
+            errorLine={focus}
+          />
+        </Suspense>
+      ) : (
+        <>
+          <div className="signature">Functions and values here can be used by every object. Scripts run in order, before any object.</div>
+          <CodeEditor
+            docKey={script.id}
+            value={script.code}
+            onChange={(code) => edit((s) => void (s.code = code))}
+            names={() => projectNames(project)}
+            errorLine={focus}
+            testId="script-code"
+          />
+        </>
+      )}
     </div>
   );
 }

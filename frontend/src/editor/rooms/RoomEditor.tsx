@@ -13,7 +13,8 @@
  * A drag only previews while it happens and is saved once, on release — a
  * save per pointer move would rewrite the project sixty times a second.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { emptyBlocks } from "../../blocks/blockState";
 import { find, newId, newInstance, tilesetGrid, type Project, type RoomInstance, type RoomLayer, type RoomResource } from "../../store/project";
 import {
   autotileErase,
@@ -32,7 +33,7 @@ import {
 } from "../tiles/tileOps";
 import { tileRect } from "../tiles/TilesetEditor";
 import { CodeEditor } from "../code/CodeEditor";
-import { projectNames } from "../ObjectEditor";
+import { blockNamesFor, BlocksEditor, confirmToPython, isBlocks, ModeTabs, projectNames, toBlocks, toPython } from "../codeMode";
 import { Icon } from "../ui/icons";
 import { useProjectApi } from "../useProject";
 import { cameraPreview, copy, corners, drawOrder, hitTest, inBox, occupied, paste, shapeOf, snap, visibleLayers, type Clip } from "./roomOps";
@@ -812,7 +813,7 @@ function RoomPanel({
   setLayerId: (id: string) => void;
   focus: { instanceId: string; line: number; nonce: number } | null;
 }) {
-  const { project, mutate } = useProjectApi();
+  const { project } = useProjectApi();
   const num = (label: string, value: number, change: (v: number) => void, testid?: string, min?: number) => (
     <label className="num">
       {label}
@@ -959,30 +960,7 @@ function RoomPanel({
                   ))}
               </select>
             </label>
-            {one && (
-              <div className="creation-code">
-                <div className="signature">
-                  Creation code — runs for this one instance, after its Create event. <code>self</code> is this instance.
-                </div>
-                <CodeEditor
-                  docKey={`inst:${one.id}`}
-                  value={one.code}
-                  // Code has its own undo, in its editor (history.ts).
-                  onChange={(code) =>
-                    mutate(
-                      (p) => {
-                        const inst = find(p, "rooms", room.id)?.instances.find((i) => i.id === one.id);
-                        if (inst) inst.code = code;
-                      },
-                      { history: "skip" },
-                    )
-                  }
-                  names={() => projectNames(project)}
-                  errorLine={focus && focus.instanceId === one.id ? { line: focus.line, nonce: focus.nonce } : null}
-                  testId="creation-code"
-                />
-              </div>
-            )}
+            {one && <CreationCode roomId={room.id} inst={one} focus={focus && focus.instanceId === one.id ? focus : null} />}
             <div className="row">
               <button
                 className="btn small"
@@ -1292,6 +1270,103 @@ function LayersPanel({
           {Icon.plus()} Background layer
         </button>
       </div>
+    </div>
+  );
+}
+
+/**
+ * One instance's creation code: Python, or blocks (codeMode.tsx's rules).
+ * Blocks don't fit in this side panel, so they open in a large dialog; the
+ * panel shows the Python they make.
+ */
+function CreationCode({ roomId, inst, focus }: { roomId: string; inst: RoomInstance; focus: { line: number; nonce: number } | null }) {
+  const { project, mutate } = useProjectApi();
+  const projectRef = useRef(project);
+  projectRef.current = project;
+  const [open, setOpen] = useState(false);
+  const objectName = find(project, "objects", inst.object)?.name ?? "this instance";
+  // Code has its own undo, in its editor (history.ts).
+  const edit = (recipe: (i: RoomInstance) => void) =>
+    mutate(
+      (p) => {
+        const i = find(p, "rooms", roomId)?.instances.find((x) => x.id === inst.id);
+        if (i) recipe(i);
+      },
+      { history: "skip" },
+    );
+  const convert = () => confirmToPython(inst, "this creation code") && (edit(toPython), setOpen(false));
+  // An error in blocks creation code: open them, with the block selected.
+  useEffect(() => {
+    if (focus && isBlocks(inst)) setOpen(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focus?.nonce]);
+
+  return (
+    <div className="creation-code">
+      <div className="signature">
+        Creation code — runs for this one instance, after its Create event. <code>self</code> is this instance.
+      </div>
+      <ModeTabs
+        holder={inst}
+        testPrefix="creation"
+        onBlocks={() => {
+          edit((i) => toBlocks(i, "creation"));
+          setOpen(true);
+        }}
+        onPython={convert}
+      />
+      {isBlocks(inst) ? (
+        <>
+          <CodeEditor docKey={`inst-blocks:${inst.id}`} value={inst.code} readOnly testId="creation-code-python" errorLine={focus} />
+          <div className="row">
+            <button className="btn small" onClick={() => setOpen(true)} data-testid="edit-creation-blocks">
+              Edit blocks
+            </button>
+          </div>
+        </>
+      ) : (
+        <CodeEditor
+          docKey={`inst:${inst.id}`}
+          value={inst.code}
+          onChange={(code) => edit((i) => void (i.code = code))}
+          names={() => projectNames(project)}
+          errorLine={focus}
+          testId="creation-code"
+        />
+      )}
+      {open && isBlocks(inst) && (
+        <div className="blocks-dialog" role="dialog" aria-label={`Creation code for ${objectName}`} onKeyDown={(e) => e.key === "Escape" && setOpen(false)}>
+          <div className="blocks-dialog-head">
+            <span>
+              Creation code for <b>{objectName}</b> at ({inst.x}, {inst.y})
+            </span>
+            <button className="btn small" onClick={() => setOpen(false)} data-testid="close-creation-blocks">
+              Done
+            </button>
+          </div>
+          <div className="blocks-dialog-body">
+            <Suspense fallback={<div className="empty-pane">Loading blocks…</div>}>
+              <BlocksEditor
+                key={inst.id}
+                eventId={`inst:${inst.id}`}
+                kind="creation"
+                signature={`creation code: self is this ${objectName}`}
+                state={inst.blocks ?? emptyBlocks("creation")}
+                code={inst.code}
+                onChange={(blocks, code) =>
+                  edit((i) => {
+                    i.blocks = blocks;
+                    i.code = code;
+                  })
+                }
+                names={() => blockNamesFor(projectRef.current)}
+                onConvert={convert}
+                errorLine={focus}
+              />
+            </Suspense>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

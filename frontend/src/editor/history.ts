@@ -16,7 +16,11 @@
  * that, undoing a sprite change would quietly throw away ten minutes of
  * typing done since.
  */
-import type { ObjectEvent, Project } from "../store/project";
+import type { BlocksState } from "../blocks/blockState";
+import type { Project } from "../store/project";
+
+/** Anything with code in it: an event, a script, a room instance's creation code. Ids are unique across all. */
+type CodeHolder = { id: string; code: string; mode?: "python" | "blocks"; blocks?: BlocksState };
 
 export const GROUP_MS = 1000;
 export const MAX_STEPS = 200;
@@ -36,25 +40,24 @@ export interface RecordOptions {
 /** `snapshot`, with all code as it is in `current` wherever the same thing still exists. */
 export function keepCode(snapshot: Project, current: Project): Project {
   const out = structuredClone(snapshot);
-  // An event's blocks are its code too, and so is whether it is blocks at
-  // all: undoing a sprite change must not turn blocks back into Python, or
-  // Python (after Convert) back into blocks.
-  const events = new Map<string, ObjectEvent>();
-  for (const o of current.objects) for (const e of o.events) events.set(e.id, e);
-  for (const o of out.objects)
-    for (const e of o.events) {
-      const now = events.get(e.id);
-      if (!now) continue;
-      e.code = now.code;
-      e.mode = now.mode;
-      if (now.blocks) e.blocks = structuredClone(now.blocks);
-      else delete e.blocks;
-    }
-  const scripts = new Map(current.scripts.map((s) => [s.id, s.code]));
-  for (const s of out.scripts) if (scripts.has(s.id)) s.code = scripts.get(s.id)!;
-  const creation = new Map<string, string>();
-  for (const r of current.rooms) for (const i of r.instances) creation.set(i.id, i.code);
-  for (const r of out.rooms) for (const i of r.instances) if (creation.has(i.id)) i.code = creation.get(i.id)!;
+  // Events, scripts and creation code. Their blocks are code too, and so
+  // is whether they are blocks at all: undoing a sprite change must not
+  // turn blocks back into Python, or Python (after Convert) back into blocks.
+  const holders = (p: Project): CodeHolder[] => [
+    ...p.objects.flatMap((o) => o.events),
+    ...p.scripts,
+    ...p.rooms.flatMap((r) => r.instances),
+  ];
+  const now = new Map(holders(current).map((h) => [h.id, h]));
+  for (const h of holders(out)) {
+    const n = now.get(h.id);
+    if (!n) continue;
+    h.code = n.code;
+    if (n.mode) h.mode = n.mode;
+    else delete h.mode;
+    if (n.blocks) h.blocks = structuredClone(n.blocks);
+    else delete h.blocks;
+  }
   return out;
 }
 

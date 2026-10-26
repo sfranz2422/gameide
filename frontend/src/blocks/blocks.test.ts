@@ -5,13 +5,18 @@
  * Python in Pyodide, never by eye.
  */
 import * as Blockly from "blockly/core";
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { API } from "../catalog/api";
 import { load, py, run } from "../python/testkit";
-import { emptyBlocks, hasBlocks, renameInBlocks, type BlocksState } from "./blockState";
-import { blocksFor } from "./catalogBlocks";
-import { blocksToPython } from "./python";
-import { toolbox, VARIABLE_BLOCKS, variablesFlyout } from "./toolbox";
+import { emptyBlocks, hasBlocks, hasPython, renameInBlocks, scriptFunctions, type BlocksKind, type BlocksState } from "./blockState";
+import { blocksFor, refreshCalls, setBlockNames, type BlockNames } from "./catalogBlocks";
+import { blocksToPython, workspaceToPython } from "./python";
+import { CALL_BLOCKS, functionsFlyout, toolbox, VARIABLE_BLOCKS, variablesFlyout } from "./toolbox";
+
+const NO_NAMES: BlockNames = { objects: [], sprites: [], rooms: [], layers: [], functions: [] };
+// Two script functions, so the Functions category has call blocks to offer.
+beforeAll(() => setBlockNames(() => ({ ...NO_NAMES, functions: [{ name: "spawn", params: ["n"] }, { name: "double", params: ["n"] }] })));
+afterAll(() => setBlockNames(() => NO_NAMES));
 
 type B = Record<string, unknown>;
 /** An event: these blocks, one after another, under the hat. */
@@ -21,16 +26,20 @@ function event(...stack: B[]): BlocksState {
   return { blocks: { languageVersion: 0, blocks: [{ type: "gm_event", id: "hat", x: 0, y: 0, ...(next ? { inputs: { BODY: { block: next } } } : {}) }] } };
 }
 const n = (v: number) => ({ shadow: { type: "math_number", fields: { NUM: v } } });
-const code = (s: BlocksState) => blocksToPython(s).code;
+const code = (s: BlocksState, kind: BlocksKind = "event") => blocksToPython(s, kind).code;
+/** A script: these functions. */
+const script = (...defs: B[]) => ({ blocks: { languageVersion: 0, blocks: defs } }) as BlocksState;
 
 type Category = { kind: string; name: string; contents?: B[]; custom?: string };
 const categories = (toolbox() as unknown as { contents: Category[] }).contents;
-function paletteBlocks(): { category: string; block: B }[] {
+function paletteBlocks(kind: BlocksKind = "event"): { category: string; block: B }[] {
   const ws = new Blockly.Workspace();
   ws.getVariableMap().createVariable("i");
   const out: { category: string; block: B }[] = [];
-  for (const c of categories) {
-    const contents = c.custom ? variablesFlyout(ws) : (c.contents ?? []);
+  for (const c of (toolbox(kind) as unknown as { contents: Category[] }).contents) {
+    // Blockly's own "Make a function" category is checked by the script tests below.
+    if (c.custom === "PROCEDURE") continue;
+    const contents = c.custom === "GAMEIDE_VARIABLES" ? variablesFlyout(ws, kind) : c.custom === "GAMEIDE_FUNCTIONS" ? functionsFlyout() : (c.contents ?? []);
     for (const b of contents) if (b["kind"] === "block") out.push({ category: c.name, block: b });
   }
   ws.dispose();
@@ -47,7 +56,7 @@ describe("the palette", () => {
         if (!palette.some((p) => p.block["type"] === type && p.category === want)) missing.push(`${type} in ${want}`);
       }
     expect(missing).toEqual([]);
-    for (const t of VARIABLE_BLOCKS) expect(palette.some((p) => p.block["type"] === t)).toBe(true);
+    for (const t of [...VARIABLE_BLOCKS, ...CALL_BLOCKS]) expect(palette.some((p) => p.block["type"] === t)).toBe(true);
   });
 
   it("has the spec's categories, Scratch-coloured", () => {
@@ -56,18 +65,25 @@ describe("the palette", () => {
   });
 
   it("every block, as it comes out of the palette, writes Python that compiles and calls with the catalog's parameters", async () => {
-    // Each block in an event of its own: a statement as it is, a value
-    // printed, so even a lone value makes a whole line.
-    const bodies = paletteBlocks().map(({ block }) => {
-      const { kind: _k, ...b } = block;
-      const s = Blockly.Blocks[b["type"] as string];
-      expect(s, `${String(b["type"])} is defined`).toBeTruthy();
-      const ws = new Blockly.Workspace();
-      const one = Blockly.serialization.blocks.append(b as never, ws);
-      const isValue = !!one.outputConnection;
-      ws.dispose();
-      return { type: b["type"] as string, code: code(isValue ? event({ type: "text_print", inputs: { TEXT: { block: b } } }) : event(b)) };
-    });
+    // Each block on its own — in an event, and in a script's function: a
+    // statement as it is, a value printed, so even a lone value makes a
+    // whole line.
+    const bodies = (["event", "script"] as const).flatMap((kind) =>
+      paletteBlocks(kind).map(({ block }) => {
+        const { kind: _k, ...b } = block;
+        const s = Blockly.Blocks[b["type"] as string];
+        expect(s, `${String(b["type"])} is defined`).toBeTruthy();
+        const ws = new Blockly.Workspace();
+        const one = Blockly.serialization.blocks.append(b as never, ws);
+        const isValue = !!one.outputConnection;
+        ws.dispose();
+        const stmt = isValue ? { type: "text_print", inputs: { TEXT: { block: b } } } : b;
+        const c = kind === "event" ? code(event(stmt)) : code(script({ type: "procedures_defnoreturn", fields: { NAME: "f" }, inputs: { STACK: { block: stmt } } }), "script");
+        return { type: `${kind} ${String(b["type"])}`, kind, code: c };
+      }),
+    );
+    // A script's function has no `self` (or `other`) to use.
+    expect(bodies.filter((b) => b.kind === "script" && /\b(self|other)\b/.test(b.code)).map((b) => b.code)).toEqual([]);
     expect(bodies.length).toBeGreaterThan(60);
     if (process.env["SHOW"]) for (const b of bodies) console.log(`${b.type.padEnd(28)} ${b.code.replace(/\n/g, " ⏎ ")}`);
     const { game } = await load({ code: {} });
@@ -79,7 +95,10 @@ import ast, json
 problems = []
 arity = json.loads(${JSON.stringify(JSON.stringify(arity))})
 for item in json.loads(${JSON.stringify(JSON.stringify(bodies))}):
-    src = "def on_step(self):\\n" + "".join("    " + l + "\\n" for l in (item["code"] or "pass").split("\\n"))
+    if item["kind"] == "event":
+        src = "def on_step(self):\\n" + "".join("    " + l + "\\n" for l in (item["code"] or "pass").split("\\n"))
+    else:
+        src = item["code"]
     try:
         tree = ast.parse(compile(src, item["type"], "exec", ast.PyCF_ONLY_AST))
     except SyntaxError as e:
@@ -182,6 +201,99 @@ describe("the Python blocks write", () => {
     expect(code(emptyBlocks())).toBe("");
     expect(hasBlocks(emptyBlocks())).toBe(false);
     expect(hasBlocks(event({ type: "gm_do_room_restart" }))).toBe(true);
+  });
+});
+
+describe("scripts", () => {
+  const param = (id: string) => ({ type: "variables_get", fields: { VAR: { id } } });
+  const double = {
+    type: "procedures_defreturn",
+    fields: { NAME: "double" },
+    extraState: { params: [{ name: "n", id: "n1" }] },
+    inputs: { RETURN: { block: { type: "math_arithmetic", fields: { OP: "MULTIPLY" }, inputs: { A: { block: param("n1") }, B: n(2) } } } },
+  };
+  const roll = {
+    type: "procedures_defreturn",
+    fields: { NAME: "roll" },
+    inputs: {
+      STACK: { block: { type: "variables_set", fields: { VAR: { id: "r1" } }, inputs: { VALUE: { block: { type: "math_random_int", inputs: { FROM: n(1), TO: n(6) } } } } } },
+      RETURN: { block: param("r1") },
+    },
+  };
+  const withVars = (s: BlocksState) => ({ ...s, variables: [{ name: "n", id: "n1" }, { name: "r", id: "r1" }] });
+
+  it("are functions, PEP 8 apart, with imports first and no `global` lines", () => {
+    expect(code(withVars(script(double, roll)), "script")).toBe(
+      ["import random", "", "", "def double(n):", "    return n * 2", "", "", "def roll():", "    r = random.randint(1, 6)", "    return r"].join("\n"),
+    );
+  });
+
+  it("leave out anything that isn't a function", () => {
+    const s = withVars(script(double, { type: "gm_global_set", x: 300, y: 300, fields: { NAME: "x" }, inputs: { TO: n(1) } }));
+    expect(code(s, "script")).toBe("def double(n):\n    return n * 2");
+  });
+
+  it("are called from an event by name, one slot per parameter", () => {
+    const call = (type: string, args: B[]) => ({ type, fields: { FN: "spawn" }, extraState: { params: args.map((_, i) => `p${i}`) }, inputs: Object.fromEntries(args.map((a, i) => [`ARG${i}`, { block: a }])) });
+    expect(code(event(call("gm_call_do", [{ type: "math_number", fields: { NUM: 3 } }])))).toBe("spawn(3)");
+    expect(code(event({ type: "gm_my_set", fields: { NAME: "hp" }, inputs: { TO: { block: call("gm_call_get", [n(1).shadow, n(2).shadow]) } } }))).toBe("self.hp = spawn(1, 2)");
+  });
+
+  it("a call block takes the function's parameters as they are now, keeping what was plugged in", () => {
+    // Saved when spawn had one parameter, n; it has since gained `kind`.
+    const s = event({ type: "gm_call_do", fields: { FN: "spawn" }, extraState: { params: ["n"] }, inputs: { ARG0: { block: { type: "math_number", fields: { NUM: 5 } } } } });
+    setBlockNames(() => ({ ...NO_NAMES, functions: [{ name: "spawn", params: ["n", "kind"] }] }));
+    const ws = new Blockly.Workspace();
+    try {
+      // Loading keeps the saved shape, whatever the function is now…
+      Blockly.serialization.workspaces.load(s as Record<string, unknown>, ws);
+      expect(workspaceToPython(ws).code).toBe("spawn(5)");
+      // …and refreshing takes today's.
+      refreshCalls(ws);
+      expect(workspaceToPython(ws).code).toBe("spawn(5, None)");
+      // A parameter taken away: the block still loads (it once failed to).
+      setBlockNames(() => ({ ...NO_NAMES, functions: [{ name: "spawn", params: [] }] }));
+      refreshCalls(ws);
+      expect(workspaceToPython(ws).code).toBe("spawn()");
+      const twoArgs = event({ type: "gm_call_do", fields: { FN: "spawn" }, extraState: { params: ["a", "b"] }, inputs: { ARG1: n(2) } });
+      expect(code(twoArgs)).toBe("spawn(None, 2)");
+    } finally {
+      ws.dispose();
+      setBlockNames(() => ({ ...NO_NAMES, functions: [{ name: "spawn", params: ["n"] }, { name: "double", params: ["n"] }] }));
+    }
+  });
+
+  it("their functions are found in any script's code, typed or made with blocks", () => {
+    expect(
+      scriptFunctions([
+        { code: "def spawn(n, kind=\"Coin\"):\n    pass\n\n    def inner(x):\n        pass\n" },
+        { code: "import random\n\n\ndef roll():\n    return 1\ndef many(a, *rest, b=1):\n    pass" },
+      ]),
+    ).toEqual([
+      { name: "spawn", params: ["n", "kind"] },
+      { name: "roll", params: [] },
+      { name: "many", params: ["a"] },
+    ]);
+  });
+
+  it("only code with no Python in it yet can become blocks", () => {
+    expect(hasPython("# Functions here can be used by every object.\n\n")).toBe(false);
+    expect(hasPython("x = 1  # one")).toBe(true);
+  });
+
+  it("run, called from an event made with blocks", async () => {
+    const lib = code(withVars(script(double)), "script");
+    const step = code(event({ type: "gm_prop_change", fields: { PROP: "x" }, inputs: { BY: { block: { type: "gm_call_get", fields: { FN: "double" }, extraState: { params: ["n"] }, inputs: { ARG0: n(3) } } } } }));
+    expect(step).toBe("self.x += double(3)");
+    const { game, error } = await load({
+      scripts: { helpers: lib },
+      code: { Mover: `class Mover(GameObject):\n    def on_step(self):\n${indent(step)}\n` },
+      instances: [{ object: "Mover", x: 0, y: 0 }],
+    });
+    expect(error).toBeNull();
+    run(game, 2);
+    expect(py(game, "instances('Mover')[0].x")).toBe(12);
+    game.dispose();
   });
 });
 

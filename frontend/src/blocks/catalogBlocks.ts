@@ -22,7 +22,7 @@ import * as En from "blockly/msg/en";
 import { Order, type PythonGenerator } from "blockly/python";
 import { API, PROPERTIES, type ApiFunction, type ApiVariable, type Category, type Param } from "../catalog/api";
 import { KEY_NAMES, MOUSE_BUTTONS } from "../engine/layout";
-import { NAME_FIELD_BLOCKS } from "./blockState";
+import { NAME_FIELD_BLOCKS, type ScriptFunction } from "./blockState";
 
 /** The project's names, for the object/sprite/room/layer dropdowns. Set by the editor; empty when headless. */
 export interface BlockNames {
@@ -30,18 +30,21 @@ export interface BlockNames {
   sprites: string[];
   rooms: string[];
   layers: string[];
+  /** Functions the project's scripts define, for the call blocks. */
+  functions: ScriptFunction[];
 }
-let currentNames: () => BlockNames = () => ({ objects: [], sprites: [], rooms: [], layers: [] });
+let currentNames: () => BlockNames = () => ({ objects: [], sprites: [], rooms: [], layers: [], functions: [] });
 export function setBlockNames(get: () => BlockNames) {
   currentNames = get;
 }
+export const blockNames = () => currentNames();
 
 /**
  * Category colours, after Scratch's: blue motion, orange variables, gold
  * control, green operators. Students who used Scratch or MakeCode find
  * things where their eye expects them.
  */
-export const COLOURS: Record<Category | "Variables" | "Logic" | "Loops" | "Math" | "Text" | "Events", string> = {
+export const COLOURS: Record<Category | "Variables" | "Logic" | "Loops" | "Math" | "Text" | "Events" | "Functions", string> = {
   Motion: "#4C97FF",
   Instances: "#D65CD6",
   Collision: "#0FBD8C",
@@ -54,8 +57,9 @@ export const COLOURS: Record<Category | "Variables" | "Logic" | "Loops" | "Math"
   Logic: "#FFAB19",
   Loops: "#E09A0B",
   Math: "#59C059",
-  Text: "#FF6680",
+  Text: "#3FB6B2",
   Events: "#FFBF00",
+  Functions: "#FF6680", // Scratch's My Blocks
 };
 
 // blockly/core comes with no words: the standard blocks' labels are looked
@@ -71,6 +75,18 @@ Blockly.Msg["LOGIC_OPERATION_AND"] = "and";
 Blockly.Msg["LOGIC_OPERATION_OR"] = "or";
 Blockly.Msg["LOGIC_NEGATE_TITLE"] = "not %1";
 Blockly.Msg["TEXT_PRINT_TITLE"] = "print %1";
+// Functions, as Python says it: "def jump(height)", not "to jump with: height".
+Blockly.Msg["PROCEDURES_DEFNORETURN_TITLE"] = "def";
+Blockly.Msg["PROCEDURES_DEFRETURN_TITLE"] = "def";
+Blockly.Msg["PROCEDURES_DEFNORETURN_PROCEDURE"] = "my_function";
+Blockly.Msg["PROCEDURES_DEFRETURN_PROCEDURE"] = "my_function";
+Blockly.Msg["PROCEDURES_BEFORE_PARAMS"] = "with";
+Blockly.Msg["PROCEDURES_CALL_BEFORE_PARAMS"] = "with";
+Blockly.Msg["PROCEDURES_DEFNORETURN_DO"] = "";
+// Blockly gives a new function the comment "Describe this function...",
+// which would turn up in the Python as a comment nobody wrote.
+Blockly.Msg["PROCEDURES_DEFNORETURN_COMMENT"] = "";
+Blockly.Msg["PROCEDURES_DEFRETURN_COMMENT"] = "";
 
 /** Dropdown value for "nothing chosen" (None). A leading space: no name can start with one. */
 export const NONE = " none";
@@ -88,7 +104,7 @@ class NameDropdown extends Blockly.FieldDropdown {
   }
 }
 
-function nameField(kind: keyof BlockNames, none: string | null, alsoLayers = false) {
+function nameField(kind: "objects" | "sprites" | "rooms" | "layers", none: string | null, alsoLayers = false) {
   return new NameDropdown(function (this: Blockly.FieldDropdown) {
     const n = currentNames();
     const options: [string, string][] = n[kind].map((x) => [x, x]);
@@ -132,7 +148,9 @@ const arg = (b: Blockly.Block, g: Gen, input: string, order: number = Order.NONE
 define(
   "gm_event",
   function () {
-    this.appendDummyInput().appendField("def", "DEF").appendField("on_event(self):", "SIG");
+    // The editor puts the real words here: "def on_step(self):", or what
+    // creation code is. Labels aren't saved, so they can never go stale.
+    this.appendDummyInput().appendField("def on_event(self):", "SIG");
     this.appendStatementInput("BODY");
     this.setColour(COLOURS.Events);
     this.setDeletable(false);
@@ -455,6 +473,85 @@ generators["text_join"] = (b, g) => {
   const inner = parts.map((p) => (p.text !== undefined ? g.quote_(p.text).slice(1, -1).replace(/[{}]/g, (c) => c + c) : `{${p.code}}`)).join("");
   return [`f"${inner}"`, Order.ATOMIC];
 };
+
+// ---------------------------------------------------------------- calling a script's functions
+
+/**
+ * "call speed_up with 3": any function a script defines, typed or made with
+ * blocks. The block has one slot per parameter, remembered in the saved
+ * blocks (extraState), so it loads with its slots even before the project's
+ * functions are known — or after the function is gone, when the game says
+ * so by name.
+ *
+ * It takes the function's parameters as they are now through refreshCalls,
+ * which the editor runs after loading and when another function is picked —
+ * never while loading: Blockly loads a block's shape, then its fields, then
+ * what is plugged in, and reshaping as the name loaded made a call to a
+ * function that had lost a parameter fail to load at all.
+ */
+type CallBlock = Blockly.Block & { params: string[]; setParams(params: string[]): void };
+
+function defineCall(type: string, statement: boolean) {
+  Blockly.Blocks[type] = {
+    init(this: CallBlock) {
+      this.params = [];
+      const field = new NameDropdown(function (this: Blockly.FieldDropdown) {
+        const options: [string, string][] = currentNames().functions.map((f) => [f.name, f.name]);
+        const value = this.getValue();
+        if (value && !options.some((o) => o[1] === value)) options.push([value, value]);
+        if (!options.length) options.push(["(no functions yet)", ""]);
+        return options;
+      });
+      this.appendDummyInput("HEAD").appendField("call").appendField(field as unknown as Blockly.Field<string | undefined>, "FN");
+      this.setInputsInline(true);
+      if (statement) {
+        this.setPreviousStatement(true, null);
+        this.setNextStatement(true, null);
+      } else this.setOutput(true, null);
+      this.setColour(COLOURS.Functions);
+      this.setTooltip("Runs a function one of your scripts defines.");
+    },
+    setParams(this: CallBlock, params: string[]) {
+      // Keep what was plugged into a slot whose name is still there.
+      const kept = new Map<string, Blockly.Connection>();
+      this.params.forEach((name, i) => {
+        const target = this.getInput(`ARG${i}`)?.connection?.targetConnection;
+        if (target && params.includes(name)) kept.set(name, target);
+      });
+      for (let i = 0; this.getInput(`ARG${i}`); i++) this.removeInput(`ARG${i}`);
+      this.params = [...params];
+      params.forEach((name, i) => {
+        const input = this.appendValueInput(`ARG${i}`).appendField(name);
+        const old = kept.get(name);
+        if (old) input.connection!.connect(old);
+      });
+    },
+    saveExtraState(this: CallBlock) {
+      return { params: this.params };
+    },
+    loadExtraState(this: CallBlock, state: { params?: string[] }) {
+      this.setParams(state.params ?? []);
+    },
+  };
+  generators[type] = (b, g) => {
+    const block = b as CallBlock;
+    const name = String(b.getFieldValue("FN") || "missing_function");
+    const call = `${name}(${block.params.map((_, i) => arg(b, g, `ARG${i}`)).join(", ")})`;
+    return statement ? `${call}\n` : [call, Order.FUNCTION_CALL];
+  };
+}
+defineCall("gm_call_do", true);
+defineCall("gm_call_get", false);
+
+/** Gives call blocks (all, or the listed ones) their function's parameters as the scripts have them now. */
+export function refreshCalls(ws: Blockly.Workspace, blocks?: Blockly.Block[]) {
+  const all = blocks ?? [...ws.getBlocksByType("gm_call_do", false), ...ws.getBlocksByType("gm_call_get", false)];
+  for (const b of all as CallBlock[]) {
+    if (!b.setParams) continue;
+    const f = currentNames().functions.find((x) => x.name === b.getFieldValue("FN"));
+    if (f && f.params.join() !== b.params.join()) b.setParams(f.params);
+  }
+}
 
 /** Installs every block's Python on a generator. */
 export function installGenerators(g: Gen) {

@@ -19,7 +19,7 @@ import { renameInBlocks, type BlocksState } from "../blocks/blockState";
 import { KEY_NAMES, MOUSE_BUTTONS, type KeyName } from "../engine/layout";
 
 /** Bump when the format changes, and teach `migrate` the old shape. */
-export const SCHEMA_VERSION = 5; // 2: room layers, grid, camera, instance overrides. 3: tilesets and tile layers. 4: autotile sets. 5: code blocks
+export const SCHEMA_VERSION = 6; // 2: room layers, grid, camera, instance overrides. 3: tilesets and tile layers. 4: autotile sets. 5: blocks in events. 6: blocks in scripts and creation code
 
 export interface Project {
   format: "gameide-project";
@@ -234,12 +234,19 @@ export interface RoomInstance {
   angle: number;
   /** Creation code: Python run for this one instance, after its Create event. */
   code: string;
+  /** Absent means "python". As for an event: blocks write their Python into `code`. */
+  mode?: "python" | "blocks";
+  blocks?: BlocksState;
 }
 
 export interface ScriptResource {
   id: string;
   name: string;
+  /** Python run before any object: its functions are for every object to call. */
   code: string;
+  /** Absent means "python". Blocks scripts hold function definitions, and write them into `code`. */
+  mode?: "python" | "blocks";
+  blocks?: BlocksState;
 }
 
 export type ResourceKind = "sprites" | "tilesets" | "objects" | "rooms" | "scripts";
@@ -503,6 +510,11 @@ export function quotedUses(project: Project, name: string): { where: string; cou
     const n = (s.code.match(re) ?? []).length;
     if (n) out.push({ where: `script ${s.name}`, count: n });
   }
+  for (const r of project.rooms)
+    for (const i of r.instances) {
+      const n = (i.code.match(re) ?? []).length;
+      if (n) out.push({ where: `${r.name} → ${find(project, "objects", i.object)?.name ?? "an instance"}'s creation code`, count: n });
+    }
   return out;
 }
 
@@ -514,7 +526,15 @@ export function replaceQuoted(project: Project, from: string, to: string) {
       e.code = sub(e.code);
       if (e.blocks) renameInBlocks(e.blocks, from, to);
     }
-  for (const s of project.scripts) s.code = sub(s.code);
+  for (const s of project.scripts) {
+    s.code = sub(s.code);
+    if (s.blocks) renameInBlocks(s.blocks, from, to);
+  }
+  for (const r of project.rooms)
+    for (const i of r.instances) {
+      i.code = sub(i.code);
+      if (i.blocks) renameInBlocks(i.blocks, from, to);
+    }
 }
 
 // ---------------------------------------------------------------- events in words
@@ -587,7 +607,9 @@ export function migrate(data: unknown): Project {
   if (p.schemaVersion < 2) upgradeTo2(p as Project);
   if (p.schemaVersion < 3) upgradeTo3(p as Project);
   if (p.schemaVersion < 4) upgradeTo4(p as Project);
-  if (p.schemaVersion < 5) p.schemaVersion = 5; // 4 → 5: events may be blocks; every older one is Python, as it says
+  // 4 → 5: events may be blocks; 5 → 6: scripts and creation code too.
+  // Everything older is Python, as it says (a missing mode means Python).
+  if (p.schemaVersion < 6) p.schemaVersion = 6;
   return p as Project;
 }
 

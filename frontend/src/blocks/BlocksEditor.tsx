@@ -1,6 +1,7 @@
 /**
- * The Blocks tab: a Blockly workspace for one event, with the Python it
- * makes beside it, read-only, updated as blocks move.
+ * The Blocks tab: a Blockly workspace for one event, creation code or
+ * script, with the Python it makes beside it, read-only, updated as blocks
+ * move.
  *
  * Loaded only when a Blocks tab opens (ObjectEditor imports it lazily), so
  * a student who only types Python never downloads Blockly.
@@ -12,14 +13,16 @@
 import * as Blockly from "blockly/core";
 import { useEffect, useRef, useState } from "react";
 import { CodeEditor } from "../editor/code/CodeEditor";
-import type { BlocksState } from "./blockState";
-import { COLOURS, setBlockNames, type BlockNames } from "./catalogBlocks";
+import type { BlocksKind, BlocksState } from "./blockState";
+import { COLOURS, refreshCalls, setBlockNames, type BlockNames } from "./catalogBlocks";
 import { hatOf, workspaceToPython } from "./python";
-import { toolbox, variablesFlyout } from "./toolbox";
+import { functionsFlyout, toolbox, variablesFlyout } from "./toolbox";
 
 export interface BlocksEditorProps {
+  /** Names the workspace (an event's, instance's or script's id): its Python pane keeps its own state. */
   eventId: string;
-  /** `def on_step(self):` — shown on the hat. */
+  kind: BlocksKind;
+  /** `def on_step(self):` — shown on the hat. Not used for a script, which has none. */
   signature: string;
   state: BlocksState;
   code: string;
@@ -50,6 +53,7 @@ const THEME = Blockly.Theme.defineTheme("gameide", {
     text_blocks: style(COLOURS.Text),
     variable_blocks: style(COLOURS.Variables),
     variable_dynamic_blocks: style(COLOURS.Variables),
+    procedure_blocks: style(COLOURS.Functions),
   },
   fontStyle: { family: "system-ui, -apple-system, \"Segoe UI\", sans-serif", size: 11, weight: "600" },
   startHats: false,
@@ -67,7 +71,7 @@ export default function BlocksEditor(props: BlocksEditorProps) {
 
   useEffect(() => {
     const workspace = Blockly.inject(div.current!, {
-      toolbox: toolbox(),
+      toolbox: toolbox(props.kind),
       renderer: "zelos", // Scratch's shapes
       theme: THEME,
       media: "/blockly-media/", // served by us, not Google's site (school filters)
@@ -77,22 +81,23 @@ export default function BlocksEditor(props: BlocksEditorProps) {
       grid: { spacing: 24, length: 2, colour: "#7d8aa3", snap: false }, // drawn faint by app.css
     });
     ws.current = workspace;
-    workspace.registerToolboxCategoryCallback("GAMEIDE_VARIABLES", (w) => variablesFlyout(w) as unknown as Blockly.utils.toolbox.FlyoutDefinition);
+    workspace.registerToolboxCategoryCallback("GAMEIDE_VARIABLES", (w) => variablesFlyout(w, props.kind) as unknown as Blockly.utils.toolbox.FlyoutDefinition);
+    workspace.registerToolboxCategoryCallback("GAMEIDE_FUNCTIONS", () => functionsFlyout() as unknown as Blockly.utils.toolbox.FlyoutDefinition);
     workspace.registerButtonCallback("CREATE_VARIABLE", (b) => Blockly.Variables.createVariableButtonHandler(b.getTargetWorkspace()));
 
     Blockly.serialization.workspaces.load(props.state as Record<string, unknown>, workspace);
     let hat = hatOf(workspace);
-    if (!hat) {
+    if (!hat && props.kind !== "script") {
       // A saved event always has its hat; this is only for one that somehow lost it.
       hat = workspace.newBlock("gm_event") as Blockly.BlockSvg;
       (hat as Blockly.BlockSvg).initSvg();
       (hat as Blockly.BlockSvg).render();
       hat.moveBy(24, 24);
     }
-    hat.setFieldValue(props.signature.replace(/^def /, ""), "SIG");
+    hat?.setFieldValue(props.signature, "SIG");
 
     const save = () => {
-      const py = workspaceToPython(workspace);
+      const py = workspaceToPython(workspace, latest.current.kind);
       setLines(py.lines);
       const state = Blockly.serialization.workspaces.save(workspace) as BlocksState;
       // Only when something changed: saving on every click would mark the
@@ -108,12 +113,23 @@ export default function BlocksEditor(props: BlocksEditorProps) {
     workspace.addChangeListener(Blockly.Events.disableOrphans);
     workspace.addChangeListener((e) => {
       if (e.isUiEvent || workspace.isDragging()) return;
+      // Another function picked in a call block: its slots follow.
+      if (e.type === Blockly.Events.BLOCK_CHANGE && (e as Blockly.Events.BlockChange).name === "FN") {
+        const b = workspace.getBlockById((e as Blockly.Events.BlockChange).blockId ?? "");
+        if (b) refreshCalls(workspace, [b]);
+      }
       save();
     });
-    // Python saved by an older version of the blocks is brought up to date.
-    const py = workspaceToPython(workspace);
+    // Calls follow their functions' parameters as they are now, and Python
+    // saved by an older version of the blocks is brought up to date.
+    refreshCalls(workspace);
+    const py = workspaceToPython(workspace, latest.current.kind);
+    const state = Blockly.serialization.workspaces.save(workspace) as BlocksState;
     setLines(py.lines);
-    if (py.code !== props.code) latest.current.onChange(props.state, py.code);
+    if (py.code !== props.code || JSON.stringify(state) !== saved.current) {
+      saved.current = JSON.stringify(state);
+      latest.current.onChange(state, py.code);
+    }
 
     const resize = new ResizeObserver(() => Blockly.svgResize(workspace));
     resize.observe(div.current!);
@@ -137,11 +153,11 @@ export default function BlocksEditor(props: BlocksEditorProps) {
     Blockly.Events.disable();
     try {
       Blockly.serialization.workspaces.load(props.state as Record<string, unknown>, w);
-      hatOf(w)?.setFieldValue(latest.current.signature.replace(/^def /, ""), "SIG");
+      hatOf(w)?.setFieldValue(latest.current.signature, "SIG");
     } finally {
       Blockly.Events.enable();
     }
-    setLines(workspaceToPython(w).lines);
+    setLines(workspaceToPython(w, latest.current.kind).lines);
   }, [props.state]);
 
   // An error: select the block that made that line, and bring it into view.

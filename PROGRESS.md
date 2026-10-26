@@ -2,6 +2,32 @@
 
 ## Phase 7 — Code blocks ✅ (2026-10-26, waiting for review)
 
+### After review: blocks everywhere code lives
+
+You were happy with the known gaps except one: only object events had blocks. Now:
+
+- **Scripts can be blocks.** A blocks script is functions: **Make a function** gives Blockly's `def` block, with parameters and `return`. The Python beside it is ordinary, PEP 8 spaced:
+
+  ```python
+  import random
+
+
+  def roll():
+      r = random.randint(1, 6)
+      return r
+  ```
+
+  There's no `self` in a script, so blocks that need one are left out of its palette, and inputs that start as `self` elsewhere start empty.
+- **A Functions category in every palette** has a call block for each function your scripts define, whether typed in Python or made with blocks. There's one slot per parameter. If a function gains or loses a parameter, its call blocks follow when next opened and keep what was plugged into slots that still exist.
+- **Creation code can be blocks.** The room editor's side panel is too narrow to build in, so blocks open in a large dialog, and the panel shows the Python they make.
+- The rules are the same in all three places: no Python yet (nothing, or only comments) switches freely; blocks convert to Python once, after a warning; Python never becomes blocks.
+
+**Found along the way:**
+- **Renaming an object never reached creation code**, typed or not. It does now, and the rename prompt counts uses there too.
+- **A call to a function that had lost a parameter stopped its blocks loading at all.** The call was reshaped while it was still loading. Now it loads as saved and is updated afterwards.
+
+The project format is now **version 6**: scripts and creation code can be blocks. Older projects load unchanged.
+
 ### Done
 
 - **A Blocks tab for every event.** Drag blocks under the event's hat (`def on_step(self):`). The Python they make shows beside them, read-only, and changes as they do. On a narrow window it shows under them instead.
@@ -37,19 +63,18 @@ The project format is now **version 5**: an event can be `mode: "blocks"`, with 
 
 ```
 cd frontend
-npm test                      # Vitest: 148
-npm run e2e                   # Playwright: 40 editor tests + 7 account tests
+npm test                      # Vitest: 157
+npm run e2e                   # Playwright: 42 editor tests + 7 account tests
 ../backend/.venv/bin/python ../backend/tests/test_server.py   # 53 server checks
-python3 scripts/sabotage.py   # 198 deliberate bugs
+python3 scripts/sabotage.py   # 214 deliberate bugs
 ```
 
 New this phase:
 - `src/blocks/blocks.test.ts`: every catalog entry's block, every palette block's Python checked in real Pyodide, the exact text of typical programs, blocks running in a game, renaming.
-- `e2e/blocks.spec.ts`: building an event by dragging blocks and playing it; the Python/Blocks rules and Convert; an error selecting its block; Ctrl+Z in and out of the blocks; renaming with the blocks open.
+- `e2e/blocks.spec.ts`: building an event by dragging blocks and playing it; the Python/Blocks rules and Convert; an error selecting its block; Ctrl+Z in and out of the blocks; renaming with the blocks open; a blocks script's function called from an event's blocks; creation code built in its dialog.
 
 ### Known issues and gaps
 
-- **Only object events have blocks.** Scripts and instance creation code stay Python, which suits what they're used for.
 - A function block shows its Python name and parameter names (`place_meeting x ( ) y ( ) obj ( )`) rather than a Scratch-style sentence. That's on purpose, so the block matches the Python beside it. Blockly's compare block shows `=` where the Python has `==`.
 - After a rename, a palette category still shows the old name until it is opened again. Blocks placed after that, and the code, use the new one.
 - No starter tutorial uses blocks yet. "Blocks to Python" is one of the four tutorials in Phase 11.

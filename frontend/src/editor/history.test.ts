@@ -73,4 +73,19 @@ describe("undo history", () => {
     expect(back.objects[0]!.sprite).toBeNull();
     expect(back.objects[0]!.events).toEqual(now.objects[0]!.events);
   });
+
+  it("…in scripts and creation code too", () => {
+    const before = blankProject("t");
+    before.scripts.push({ id: "s", name: "helpers", code: "" });
+    before.rooms[0]!.instances.push({ id: "i", object: "o", layer: "l", x: 0, y: 0, scaleX: 1, scaleY: 1, angle: 0, code: "self.x = 1", mode: "blocks", blocks: {} });
+    const now = structuredClone(before);
+    now.name = "renamed"; // the change being undone
+    Object.assign(now.scripts[0]!, { mode: "blocks", code: "def f():\n    pass", blocks: { variables: [] } });
+    Object.assign(now.rooms[0]!.instances[0]!, { mode: "python", code: "converted" });
+    delete now.rooms[0]!.instances[0]!.blocks;
+    const back = keepCode(before, now);
+    expect(back.name).toBe("t");
+    expect(back.scripts).toEqual(now.scripts);
+    expect(back.rooms[0]!.instances).toEqual(now.rooms[0]!.instances);
+  });
 });

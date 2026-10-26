@@ -62,6 +62,20 @@ describe("renaming references in code", () => {
     replaceQuoted(p, "Coin", "Gem");
     expect(p.objects[1]!.events[0]!.blocks).toEqual({ blocks: { languageVersion: 0, blocks: [{ type: "gm_object", fields: { NAME: "Gem" } }] } });
   });
+
+  it("…and in scripts and instances' creation code, typed or blocks", () => {
+    const p = withObjects("Coin", "Player");
+    const picker = () => ({ blocks: { languageVersion: 0, blocks: [{ type: "gm_object", fields: { NAME: "Coin" } }] } });
+    p.scripts.push({ id: "s", name: "helpers", code: 'def count():\n    return instance_number("Coin")', mode: "blocks", blocks: picker() });
+    p.rooms[0]!.instances.push({ id: "i1", object: "Player", layer: "l", x: 0, y: 0, scaleX: 1, scaleY: 1, angle: 0, code: 'instance_create(0, 0, "Coin")' });
+    p.rooms[0]!.instances.push({ id: "i2", object: "Player", layer: "l", x: 0, y: 0, scaleX: 1, scaleY: 1, angle: 0, code: "", mode: "blocks", blocks: picker() });
+    expect(quotedUses(p, "Coin").map((u) => u.where)).toEqual(["script helpers", "Room1 → Player's creation code"]);
+    replaceQuoted(p, "Coin", "Gem");
+    expect(p.scripts[0]!.code).toContain('"Gem"');
+    expect(JSON.stringify(p.scripts[0]!.blocks)).toContain('"Gem"');
+    expect(p.rooms[0]!.instances[0]!.code).toBe('instance_create(0, 0, "Gem")');
+    expect(JSON.stringify(p.rooms[0]!.instances[1]!.blocks)).toContain('"Gem"');
+  });
 });
 
 describe("loading an older project", () => {
@@ -74,7 +88,7 @@ describe("loading an older project", () => {
     };
     const p = migrate(old);
     const room = p.rooms[0]!;
-    expect(p.schemaVersion).toBe(5);
+    expect(p.schemaVersion).toBe(6);
     expect(p.tilesets).toEqual([]); // 2 → 3 added tilesets
     expect(room.camera).toEqual({ enabled: false, width: 800, height: 600, follow: null, smoothing: 1 });
     expect([room.gridWidth, room.snap]).toEqual([32, true]);

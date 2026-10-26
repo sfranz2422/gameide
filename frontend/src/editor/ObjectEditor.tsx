@@ -5,12 +5,9 @@
  * the whole generated class, read-only, so students see the real Python.
  *
  * An event is written in Python or with blocks (its `mode`), and the tabs
- * say which. An empty event can be switched either way freely. One with
- * blocks can be converted to Python, once, after a warning; Python never
- * goes back to blocks — that would mean reading arbitrary code as blocks,
- * and a student's typing would come back changed.
+ * say which, by the same rules as scripts and creation code (codeMode.tsx).
  */
-import { lazy, Suspense, useMemo, useRef, useState } from "react";
+import { Suspense, useMemo, useRef, useState } from "react";
 import { emptyBlocks, hasBlocks } from "../blocks/blockState";
 import { KEY_NAMES } from "../engine/layout";
 import { generateObject, methodSignature } from "../python/codegen";
@@ -27,12 +24,9 @@ import {
   type Project,
 } from "../store/project";
 import { CodeEditor } from "./code/CodeEditor";
-import type { ProjectNames } from "./code/pythonHelp";
+import { blockNamesFor, BlocksEditor, canUseBlocks, confirmToPython, projectNames, toBlocks as makeBlocks, toPython as makePython } from "./codeMode";
 import { Icon } from "./ui/icons";
 import { useProjectApi } from "./useProject";
-
-// Blockly is about 700 KB: fetched the first time a Blocks tab opens.
-const BlocksEditor = lazy(() => import("../blocks/BlocksEditor"));
 
 export interface EventFocus {
   eventId: string;
@@ -40,14 +34,7 @@ export interface EventFocus {
   nonce: number;
 }
 
-export function projectNames(p: Project): ProjectNames {
-  return {
-    objects: p.objects.map((o) => o.name),
-    sprites: p.sprites.map((s) => s.name),
-    rooms: p.rooms.map((r) => r.name),
-    layers: [...new Set(p.rooms.flatMap((r) => r.layers.filter((l) => l.kind === "tiles").map((l) => l.name)))],
-  };
-}
+export { projectNames };
 
 export function ObjectEditor({
   objectId,
@@ -102,27 +89,11 @@ export function ObjectEditor({
     );
   const toBlocks = (ev: ObjectEvent) => {
     setShowClass(false);
-    if (ev.mode === "blocks") return;
-    if (ev.code.trim()) return; // the tab is disabled: Python never becomes blocks
-    setEvent(ev.id, (e) => {
-      e.mode = "blocks";
-      e.blocks = emptyBlocks();
-    });
+    setEvent(ev.id, (e) => makeBlocks(e, "event"));
   };
   const toPython = (ev: ObjectEvent) => {
     setShowClass(false);
-    if (ev.mode === "python") return;
-    if (
-      hasBlocks(ev.blocks) &&
-      !confirm(
-        `Turn the ${eventLabel(project, ev.key)} event into Python?\n\nYou'll edit the Python from now on. It can't be turned back into blocks.`,
-      )
-    )
-      return;
-    setEvent(ev.id, (e) => {
-      e.mode = "python";
-      delete e.blocks;
-    });
+    if (confirmToPython(ev, `the ${eventLabel(project, ev.key)} event`)) setEvent(ev.id, makePython);
   };
   const isBlocks = current?.mode === "blocks";
 
@@ -217,12 +188,12 @@ export function ObjectEditor({
               role="tab"
               aria-selected={!showClass && isBlocks}
               className={!showClass && isBlocks ? "on" : ""}
-              disabled={!current || (!isBlocks && !!current.code.trim())}
+              disabled={!current || !canUseBlocks(current)}
               onClick={() => current && toBlocks(current)}
               data-testid="tab-blocks"
               data-tutorial="tab-blocks"
               title={
-                current && !isBlocks && current.code.trim()
+                current && !canUseBlocks(current)
                   ? "This event is written in Python. Python can't be turned into blocks — add a new event to use blocks."
                   : "Build this event with code blocks"
               }
@@ -254,6 +225,7 @@ export function ObjectEditor({
               <BlocksEditor
                 key={current.id}
                 eventId={current.id}
+                kind="event"
                 signature={methodSignature(project, current.key)}
                 state={current.blocks ?? emptyBlocks()}
                 code={current.code}
@@ -263,7 +235,7 @@ export function ObjectEditor({
                     e.code = code;
                   })
                 }
-                names={() => ({ layers: [], ...projectNames(projectRef.current) })}
+                names={() => blockNamesFor(projectRef.current)}
                 onConvert={() => toPython(current)}
                 errorLine={focus && focus.eventId === current.id ? { line: focus.line, nonce: focus.nonce } : null}
               />

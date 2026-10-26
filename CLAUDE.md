@@ -110,10 +110,20 @@ testing.
 
 ## Code blocks
 
-- `src/blocks/`. An event with `mode: "blocks"` keeps Blockly's JSON in
-  `blocks` and **writes its Python into `code` on every change**, so the
+- `src/blocks/`. Events, scripts and creation code can be blocks
+  (`mode: "blocks"`, kind event/script/creation). Each keeps Blockly's JSON
+  in `blocks` and **writes its Python into `code` on every change**, so the
   game, error mapping, export and tutorial checks only ever read `code`.
-  Python never turns into blocks; blocks → Python is one way (Convert).
+  The switching rules live once, in `editor/codeMode.tsx`: no Python yet
+  (comments don't count) switches freely, blocks → Python is one way
+  (Convert), Python never becomes blocks.
+- A blocks script is function definitions only (Blockly's procedures);
+  `python.ts` drops the `global` lines Blockly adds. Its palette leaves out
+  blocks that need `self`. Calls (`gm_call_*`) list every script's
+  functions, read from their *code* (`scriptFunctions`), so typed and
+  blocks scripts alike; a call's slots are saved in extraState and fitted
+  to the function by `refreshCalls` after loading — never while loading,
+  which made a call to a function that lost a parameter fail to load.
 - Blocks are made from the catalog (`catalogBlocks.ts`: one per function,
   plus a statement version when `alsoStatement`), so a catalog entry needs
   no block work. Hand-made ones: properties, my/global variables, self,

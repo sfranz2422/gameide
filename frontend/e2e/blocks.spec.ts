@@ -4,7 +4,7 @@
  * convert to Python.
  */
 import { expect, test, type Page } from "@playwright/test";
-import { nameBox, placeInRoom, playAndWait, py, SHOTS, treeItem, watchErrors } from "./helpers";
+import { nameBox, placeInRoom, playAndWait, py, screenAt, SHOTS, treeItem, watchErrors } from "./helpers";
 
 async function newObjectWithEvent(page: Page, name: string, event = "pick-step") {
   await page.getByTestId("add-objects").click();
@@ -16,8 +16,10 @@ async function newObjectWithEvent(page: Page, name: string, event = "pick-step")
 }
 
 const category = (page: Page, name: string) => page.getByTestId("blocks-workspace").getByRole("treeitem", { name, exact: true }).click();
-const fromPalette = (page: Page, text: string) => page.locator(".blocklyFlyout .blocklyDraggable").filter({ hasText: text }).first();
-const onCanvas = (page: Page, text: string) => page.locator(".blocklyBlockCanvas .blocklyDraggable").filter({ hasText: text }).first();
+const fromPalette = (page: Page, text: string | RegExp) => page.locator(".blocklyFlyout .blocklyDraggable").filter({ hasText: text }).first();
+const onCanvas = (page: Page, text: string | RegExp) => mainCanvas(page).locator(".blocklyDraggable").filter({ hasText: text }).first();
+/** The hat: the workspace's first block, whatever it says ("def on_step(self):", "creation code: …"). */
+const hat = (page: Page) => mainCanvas(page).locator(":scope > .blocklyDraggable").first();
 
 /** Drags a block by its top-left corner so that corner lands at (x, y). */
 async function dragTo(page: Page, block: ReturnType<typeof fromPalette>, x: number, y: number) {
@@ -31,8 +33,8 @@ async function dragTo(page: Page, block: ReturnType<typeof fromPalette>, x: numb
 
 /** Where a block must go to hang under the hat: inside its C, below the def line. */
 async function underHat(page: Page) {
-  const hat = (await onCanvas(page, "def").boundingBox())!;
-  return { x: hat.x + 14, y: hat.y + hat.height * 0.48 };
+  const box = (await hat(page).boundingBox())!;
+  return { x: box.x + 14, y: box.y + box.height * 0.48 };
 }
 
 /** The workspace's blocks (the palette has a canvas of its own). */
@@ -47,7 +49,7 @@ async function openBlocks(page: Page) {
 /** Drags a palette block (found by its text) under the hat, or under the last block there. */
 async function addUnderHat(page: Page, cat: string, text: string | RegExp, nth = 0) {
   await category(page, cat);
-  const stack = page.locator(".blocklyBlockCanvas > .blocklyDraggable").filter({ hasText: "def" }).first();
+  const stack = hat(page);
   const before = (await stack.boundingBox())!;
   const at = await underHat(page);
   // Under the last block already there: the hat's C grows by each block.
@@ -213,5 +215,75 @@ test("renaming an object renames it in the blocks' pickers too", async ({ page }
   // The next change keeps the new name rather than writing the old one back.
   await addUnderHat(page, "Motion", "change");
   await expect(pythonPane(page)).toHaveText('instance_create(0, 0, "Gem")self.x += 4');
+  expect(errors).toEqual([]);
+});
+
+test("a script made with blocks defines a function, and an event's blocks call it", async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.goto("/");
+  await page.getByTestId("template-empty").click();
+  await page.waitForURL(/#\/p\//);
+  await page.getByTestId("add-scripts").click();
+  await nameBox(page).fill("helpers");
+  await nameBox(page).press("Enter");
+  // A new script has only a comment in it, so it can still become blocks.
+  await page.getByTestId("script-tab-blocks").click();
+  await expect(page.getByTestId("blocks-workspace").locator(".blocklyMainBackground")).toBeVisible({ timeout: 20_000 });
+  await category(page, "Make a function");
+  const ws = (await page.getByTestId("blocks-workspace").boundingBox())!;
+  await dragTo(page, fromPalette(page, "def"), ws.x + ws.width * 0.45, ws.y + 40);
+  await expect(pythonPane(page)).toHaveText("def my_function():    pass");
+  // Its body: one block, inside the def's C.
+  const def = (await onCanvas(page, "def").boundingBox())!;
+  await category(page, "Variables");
+  await dragTo(page, fromPalette(page, /change\s*global/), def.x + 14, def.y + def.height * 0.5);
+  await expect(pythonPane(page)).toHaveText("def my_function():    global_vars.score += 1");
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/script-blocks.png` });
+
+  await newObjectWithEvent(page, "Counter", "pick-create");
+  await page.getByTestId("event-code").locator(".cm-content").click();
+  await page.keyboard.insertText("global_vars.score = 0");
+  await page.getByTestId("add-event").click();
+  await page.getByTestId("pick-step").click();
+  await openBlocks(page);
+  await addUnderHat(page, "Functions", /call\s*my_function/);
+  await expect(pythonPane(page)).toHaveText("my_function()");
+
+  await placeInRoom(page, "Room1 start", "Counter", 100, 100);
+  await playAndWait(page);
+  await page.waitForTimeout(300);
+  expect((await py(page, "global_vars.score")) as number).toBeGreaterThan(10);
+  expect(errors).toEqual([]);
+});
+
+test("creation code can be blocks too, built in a dialog", async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.goto("/");
+  await page.getByTestId("template-empty").click();
+  await page.waitForURL(/#\/p\//);
+  await page.getByTestId("add-sprites").click();
+  await page.getByTestId("starter-coin").click();
+  await expect(treeItem(page, "coin")).toBeVisible(); // its tab opens when it's made; wait, or it takes over from Gem's
+  await page.getByTestId("add-objects").click();
+  await nameBox(page).fill("Gem");
+  await nameBox(page).press("Enter");
+  await page.getByTestId("object-sprite").selectOption({ label: "coin" });
+  await placeInRoom(page, "Room1 start", "Gem", 128, 96);
+  const at = await screenAt(page, 128, 96);
+  await page.mouse.click(at.x, at.y);
+
+  await page.getByTestId("creation-tab-blocks").click();
+  await expect(page.getByRole("dialog", { name: "Creation code for Gem" })).toBeVisible();
+  await expect(page.getByTestId("blocks-workspace").locator(".blocklyMainBackground")).toBeVisible({ timeout: 20_000 });
+  await expect(onCanvas(page, "creation code")).toBeVisible();
+  await addUnderHat(page, "Variables", /set\s*my/);
+  await expect(pythonPane(page)).toHaveText("self.lives = 3");
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/creation-blocks.png` });
+  await page.getByTestId("close-creation-blocks").click();
+  // The panel shows the Python the blocks made.
+  await expect(page.getByTestId("creation-code-python")).toContainText("self.lives = 3");
+
+  await playAndWait(page);
+  expect(await py(page, "instances('Gem')[0].lives")).toBe(3);
   expect(errors).toEqual([]);
 });

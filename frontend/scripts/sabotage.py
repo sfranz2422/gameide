@@ -34,6 +34,7 @@ SP, TO = "src/engine/sprites.ts", "src/editor/tiles/tileOps.ts"
 HI = "src/editor/history.ts"
 CB, PB, TB = "src/blocks/catalogBlocks.ts", "src/blocks/python.ts", "src/blocks/toolbox.ts"
 BE, OE = "src/blocks/BlocksEditor.tsx", "src/editor/ObjectEditor.tsx"
+CM, BS = "src/editor/codeMode.tsx", "src/blocks/blockState.ts"
 CASES = [
  ("layout drift", RT, '"x": boxy(F.X)', '"x": boxy(F.Y)', "every built-in property"),
  ("no polar sync", RT, "            _st[b + i] = v\n            set_polar(b)", "            _st[b + i] = v", "two views of one motion"),
@@ -175,7 +176,7 @@ CASES = [
  ("paint stacks", RE, "        if (!occupied(room, placeObject, at.x, at.y)) place(placeObject, at);\n      }", "        place(placeObject, at);\n      }", "without stacking copies", E2E),
  ("move not saved", RE, "        for (const i of r.instances) if (selected.has(i.id)) (i.x += dx), (i.y += dy);", "        for (const i of r.instances) if (selected.has(i.id) && dx > 1e9) (i.x += dx), (i.y += dy);", "move with the keys", E2E),
  ("enemies in the air", "src/store/templates.ts", '  "    ====                                ",\n  " P               E      *    E          ",', '  "    ====         E           E          ",\n  " P                      *               ",', "enemies walk their floor", E2E),
- ("creation code not saved", RE, "                        if (inst) inst.code = code;", "                        if (inst) inst.code = code.slice(0, 0);", "creation code runs for that one", E2E),
+ ("creation code not saved", RE, "          onChange={(code) => edit((i) => void (i.code = code))}", "          onChange={(code) => edit((i) => void (i.code = code.slice(0, 0)))}", "creation code runs for that one", E2E),
  ("scaling not whole", "src/editor/gameHost.ts", "    const scale = this.pixelScaling && fit >= 1 ? Math.floor(fit) : fit;", "    const scale = this.pixelScaling && fit >= 1e9 ? Math.floor(fit) : fit;", "scales by whole numbers", E2E),
  # Phase 6: tiles
  ("scenery collides", EN, "          if (tile < 0 || !solid[tile]) continue;", "          if (tile < 0) continue;", "scenery doesn't"),
@@ -200,7 +201,7 @@ CASES = [
  ("undo per tile", RE, "{ label, ...(stroke.current ? { group: stroke.current } : {}) }", "{ label, ...(stroke.current ? { group: stroke.current + Math.random() } : {}) }", "painting a level", E2E),
  ("palette single only", RE, "            if (n !== null) setStamp(stampFromPalette(anchor, n, grid.columns));", "            if (n !== null) setStamp(stampFromPalette(n, n, grid.columns));", "painting a level", E2E),
  # Phase 6 gaps: undo, remap, chunks, autotiling
- ("undo changes code", HI, "  const out = structuredClone(snapshot);\n  const events", "  const out = structuredClone(snapshot);\n  if (out) return out;\n  const events", "never changes code"),
+ ("undo changes code", HI, "  const out = structuredClone(snapshot);\n", "  const out = structuredClone(snapshot);\n  if (out) return out;\n", "never changes code"),
  ("undo groups forever", HI, "    const same = group !== null && this.group === group && (opts.group !== undefined || now - this.at < GROUP_MS);", "    const same = group !== null && this.group === group;", "close together are one"),
  ("groups time out", HI, "    const same = group !== null && this.group === group && (opts.group !== undefined || now - this.at < GROUP_MS);", "    const same = group !== null && this.group === group && now - this.at < GROUP_MS;", "one step however long"),
  ("redo kept", HI, "    this.future = [];\n    this.group = group;", "    this.group = group;", "clears redo"),
@@ -230,7 +231,7 @@ CASES = [
  ("two-space indent", PB, "    this.INDENT = \"    \";", "    this.INDENT = \"  \";", "what a person would type"),
  ("single quotes", PB, "  override quote_(s: string): string {", "  quoteUnused(s: string): string {", "what a person would type"),
  ("x = None lines", PB, "      .filter(([k]) => k !== \"variables\")", "      .filter(([k]) => k !== \"variables_\")", "no `x = None` lines"),
- ("unused import", PB, "      return !m || body.includes(`${m[1]}.`);", "      return !m || body.length >= 0;", "imports only what it uses"),
+ ("unused import", PB, "      return isImport(d) && (!m || rest.includes(`${m[1]}.`));", "      return isImport(d) && (!m || rest.length >= 0);", "imports only what it uses"),
  ("no f-strings", CB, "generators[\"text_join\"] = (b, g) => {", "generators[\"text_join_unused\"] = (b, g) => {", "joins text into an f-string"),
  ("braces not doubled", CB, ".replace(/[{}]/g, (c) => c + c)", ".replace(/[{}]/g, (c) => c)", "joins text into an f-string"),
  ("loose blocks run", PB, "  const body = first ? (gen.blockToCode(first) as string) : \"\";", "  const body = ws.getTopBlocks(true).filter((b) => b !== hat).map((b) => gen.blockToCode(b) as string).join(\"\") + (first ? (gen.blockToCode(first) as string) : \"\");", "aren't under the hat"),
@@ -239,18 +240,35 @@ CASES = [
  ("error selects nothing", BE, "    Blockly.getFocusManager().focusNode(block);\n", "", "selects the block that made it", E2E),
  ("rename skips blocks", PJ, "      if (e.blocks) renameInBlocks(e.blocks, from, to);", "      if (e.blocks && from === to) renameInBlocks(e.blocks, from, to);", "renames in blocks too"),
  ("open blocks not reloaded", BE, "    if (!w || json === saved.current) return;", "    if (!w || json !== \"\") return;", "renames it in the blocks' pickers", E2E),
- ("undo reverts blocks mode", HI, "      e.mode = now.mode;\n", "", "never changes blocks either"),
- ("undo restores converted blocks", HI, "      else delete e.blocks;", "      else e.blocks = e.blocks;", "never changes blocks either"),
+ ("undo reverts blocks mode", HI, "    if (n.mode) h.mode = n.mode;\n    else delete h.mode;\n", "", "never changes blocks either"),
+ ("undo restores converted blocks", HI, "    else delete h.blocks;", "    else h.blocks = h.blocks;", "never changes blocks either"),
  ("unlabelled merged", HI, "    const group = opts.group ?? (opts.label !== undefined ? `auto:${opts.label}` : null);", "    const group = opts.group ?? `auto:${opts.label ?? \"\"}`;", "never merged"),
  ("object changes share a label", OE, '  const set = (recipe: (o: ObjectResource) => void, label: string) => mutate((p) => recipe(find(p, "objects", objectId)!), { label });', '  const set = (recipe: (o: ObjectResource) => void, label: string) => mutate((p) => recipe(find(p, "objects", objectId)!), { label: label.slice(0, 0) });', "elsewhere it undoes the project", E2E),
- ("Python becomes blocks", OE, "              disabled={!current || (!isBlocks && !!current.code.trim())}", "              disabled={!current}", "Python never becomes blocks", E2E,
-  ("    if (ev.code.trim()) return; // the tab is disabled: Python never becomes blocks\n", "")),
- ("converted without asking", OE, "      hasBlocks(ev.blocks) &&\n      !confirm(", "      false &&\n      !confirm(", "Python never becomes blocks", E2E),
+ ("Python becomes blocks", CM, "export const canUseBlocks = (h: CodeHolder) => isBlocks(h) || !hasPython(h.code);", "export const canUseBlocks = (h: CodeHolder) => isBlocks(h) || !hasPython(h.code) || true;", "Python never becomes blocks", E2E,
+  ("  if (isBlocks(h) || hasPython(h.code)) return;", "  if (isBlocks(h) || (hasPython(h.code) && false)) return;")),
+ ("converted without asking", CM, "  return !hasBlocks(h.blocks) || confirm(", "  return hasBlocks(h.blocks) || !hasBlocks(h.blocks) || confirm(", "Python never becomes blocks", E2E),
  ("Ctrl+Z in blocks undoes the project", "src/editor/EditorPage.tsx", '!!t.closest(".cm-editor, .blocks-editor, .blocklyWidgetDiv, .blocklyDropDownDiv")', '!!t.closest(".cm-editor")', "in the blocks undoes blocks", E2E),  # -g is a regex: no "+" in it
  ("blocks not saved", BE, "        latest.current.onChange(state, py.code);", "        void state;", "the game runs it", E2E),
  ("media not built", "vite.config.ts", "      for (const f of readdirSync(blocklyMediaDir)) copyFileSync", "      for (const f of readdirSync(blocklyMediaDir).slice(0, 0)) copyFileSync", "the game runs it", E2E),
  ("media not served", APP, '    r = send_from_directory(DIST / "blockly-media", name)', '    r = send_from_directory(DIST / "blockly-medium", name)', "Blockly's media", PY),
- ("still version 4", PJ, "  if (p.schemaVersion < 5) p.schemaVersion = 5;", "", "version 1 rooms"),
+ ("still version 4", PJ, "  if (p.schemaVersion < 6) p.schemaVersion = 6;", "", "version 1 rooms"),
+ # Blocks in scripts and creation code
+ ("script globals kept", PB, '    return gen.finish("").replace(/^ +global [\\w, ]+\\n/gm, "")', '    return gen.finish("").replace(/^ +globalx [\\w, ]+\\n/gm, "")', "no `global` lines"),
+ ("functions crowded", PB, '      .join("\\n\\n\\n");', '      .join("\\n");', "PEP 8 apart"),
+ ("script runs loose blocks", PB, '    return gen.finish("").replace(', '    return gen.finish(ws.getTopBlocks(true).filter((b) => !FUNCTION_DEFS.includes(b.type)).map((b) => gen.blockToCode(b) as string).join("")).replace(', "anything that isn't a function"),
+ ("call slots ignored", CB, "    const call = `${name}(${block.params.map((_, i) => arg(b, g, `ARG${i}`)).join(\", \")})`;", "    const call = `${name}(${block.params.slice(1).map((_, i) => arg(b, g, `ARG${i}`)).join(\", \")})`;", "one slot per parameter"),
+ ("calls never refreshed", CB, "    if (f && f.params.join() !== b.params.join()) b.setParams(f.params);", "    if (f && b.params.length < 0) b.setParams(f.params);", "parameters as they are now"),
+ ("plugged blocks dropped", CB, "        if (old) input.connection!.connect(old);", "        if (old && params.length < 0) input.connection!.connect(old);", "parameters as they are now"),
+ ("functions not found", BS, "s.code.matchAll(/^def\\s+", "s.code.matchAll(/^define\\s+", "found in any script's code"),
+ ("self in scripts", TB, '    contents: kind === "script" ? withoutSelf(contents) : contents,', "    contents,", "calls with the catalog's parameters"),
+ ("no Functions category", TB, "      functions,\n    ],", "    ],", "every catalog entry's blocks"),
+ ("comments count as Python", BS, '  return code.split("\\n").some((l) => l.trim() !== "" && !l.trim().startsWith("#"));', '  return code.split("\\n").some((l) => l.trim() !== "");', "no Python in it yet"),
+ ("scripts can't be blocks", "src/editor/OtherEditors.tsx", '        onBlocks={() => edit((s) => toBlocks(s, "script"))}', "        onBlocks={() => edit((s) => void (s.code.length < 0 && toBlocks(s, \"script\")))}", "script made with blocks", E2E),
+ ("creation dialog never opens", RE, '          edit((i) => toBlocks(i, "creation"));\n          setOpen(true);', '          edit((i) => toBlocks(i, "creation"));', "built in a dialog", E2E),
+ ("creation blocks not saved", RE, "                    i.code = code;\n", "                    void code;\n", "built in a dialog", E2E),
+ ("undo reverts scripts and creation code", HI, "    ...p.scripts,\n    ...p.rooms.flatMap((r) => r.instances),\n", "", "in scripts and creation code too"),
+ ("rename skips creation code", PJ, "      i.code = sub(i.code);\n", "", "instances' creation code"),
+ ("function comment written", CB, 'Blockly.Msg["PROCEDURES_DEFNORETURN_COMMENT"] = "";\n', "", "script made with blocks", E2E),
 ]
 only = sys.argv[1:]
 # A name that matches no case would otherwise run nothing and still say

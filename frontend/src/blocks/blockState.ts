@@ -2,18 +2,63 @@
  * Code blocks as data — the part the rest of the editor needs without
  * loading Blockly (about 700 KB, fetched only when a Blocks tab opens).
  *
- * A blocks event keeps Blockly's own JSON in `event.blocks`, and the Python
- * it makes in `event.code`, written on every change. Everything that runs or
+ * Three kinds of code can be blocks: an object's event, an instance's
+ * creation code (both a method body under a hat), and a script (function
+ * definitions). Each keeps Blockly's own JSON in `blocks`, and the Python
+ * it makes in `code`, written on every change. Everything that runs or
  * reads code — the game, error mapping, export, tutorial checks — reads
- * `code` and never needs to know the event was made with blocks.
+ * `code` and never needs to know it was made with blocks.
  */
+
+/** What the blocks are for: a method body under a hat, or a script's functions. */
+export type BlocksKind = "event" | "creation" | "script";
 
 /** The JSON Blockly saves a workspace as. Treated as opaque except for the walks below. */
 export type BlocksState = { blocks?: { languageVersion?: number; blocks?: unknown[] }; variables?: unknown[] };
 
-/** A new event's blocks: only the hat, ready for blocks to go under it. */
-export function emptyBlocks(): BlocksState {
+/** New blocks: for a body, only the hat, ready for blocks to go under it; for a script, nothing yet. */
+export function emptyBlocks(kind: BlocksKind = "event"): BlocksState {
+  if (kind === "script") return { blocks: { languageVersion: 0, blocks: [] } };
   return { blocks: { languageVersion: 0, blocks: [{ type: "gm_event", x: 24, y: 24, deletable: false }] } };
+}
+
+/**
+ * Is there any code here besides comments? An event or script with only
+ * comments (a new script starts with one) can still become blocks; one with
+ * real Python can't, because Python never turns into blocks.
+ */
+export function hasPython(code: string): boolean {
+  return code.split("\n").some((l) => l.trim() !== "" && !l.trim().startsWith("#"));
+}
+
+/** A function a script defines, for the call blocks. */
+export interface ScriptFunction {
+  name: string;
+  params: string[];
+}
+
+/**
+ * The functions scripts define, read from their code — typed or made with
+ * blocks alike, since blocks scripts keep their Python in `code` too. Only
+ * top-level `def`s; `*args` and keyword-only parameters are left out of the
+ * call block (it gives one slot per plain parameter).
+ */
+export function scriptFunctions(scripts: { code: string }[]): ScriptFunction[] {
+  const out: ScriptFunction[] = [];
+  for (const s of scripts)
+    for (const m of s.code.matchAll(/^def\s+([A-Za-z_]\w*)\s*\(([^)]*)\)/gm)) {
+      const params: string[] = [];
+      for (const raw of m[2]!.split(",")) {
+        const p = raw.trim();
+        if (!p || p.startsWith("*")) {
+          if (p.startsWith("*")) break;
+          continue;
+        }
+        params.push(p.split(/[=:]/)[0]!.trim());
+      }
+      if (!out.some((f) => f.name === m[1])) out.push({ name: m[1]!, params });
+    }
+  return out;
 }
 
 /** Is anything attached under the hat (or lying loose)? */

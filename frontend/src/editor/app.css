@@ -688,7 +688,9 @@ button:focus-visible {
    palette, blocks and Python side by side: the palette's blocks were cut
    off and there was no room left to build. Narrow, the Python goes under
    the blocks instead — still in view as they change. */
-.event-code {
+.event-code,
+.script-editor,
+.blocks-dialog-body {
   container-type: inline-size;
 }
 @container (max-width: 760px) {
@@ -702,6 +704,33 @@ button:focus-visible {
     border-left: 0;
     border-top: 1px solid var(--border);
   }
+}
+/* Creation code's blocks: too much for the room editor's side panel. */
+.blocks-dialog {
+  position: fixed;
+  inset: 5vh 4vw;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  /* The second shadow dims the page behind it. */
+  box-shadow: 0 20px 60px #0008, 0 0 0 100vmax #0007;
+  overflow: hidden;
+}
+.blocks-dialog-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.blocks-dialog-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 /* Blockly in the page's colours, light or dark, without a theme reload. */
 .blocks-editor .blocklyMainBackground {
