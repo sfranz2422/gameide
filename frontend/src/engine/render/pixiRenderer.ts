@@ -334,7 +334,7 @@ export class PixiRenderer {
       const tex = si >= 0 ? this.frames[si]?.[0] : undefined;
       let picture: TilingSprite | Sprite | null = null;
       if (tex) {
-        picture = bg.mode === "tile" ? new TilingSprite({ texture: tex }) : new Sprite(tex);
+        picture = bg.mode === "tile" || bg.mode === "tile_x" || bg.mode === "tile_y" ? new TilingSprite({ texture: tex }) : new Sprite(tex);
         picture.zIndex = -bg.depth + 0.5; // over its own colour
         this.world.addChild(picture);
       }
@@ -392,8 +392,8 @@ export class PixiRenderer {
     for (let L = 0; L < this.tileViews.length; L++) {
       const view = this.tileViews[L]!, t = this.engine.tiles[L]!;
       const cw = CHUNK * t.tileset.tileWidth, ch = CHUNK * t.tileset.tileHeight;
-      const x0 = Math.floor(vx / cw) - 1, x1 = Math.floor((vx + cam.w) / cw) + 1;
-      const y0 = Math.floor(vy / ch) - 1, y1 = Math.floor((vy + cam.h) / ch) + 1;
+      const x0 = Math.floor(vx / cw) - 1, x1 = Math.floor((vx + cam.w / cam.zoom) / cw) + 1;
+      const y0 = Math.floor(vy / ch) - 1, y1 = Math.floor((vy + cam.h / cam.zoom) / ch) + 1;
       for (const [key, chunk] of view.chunks) {
         const cx = key % 100000, cy = Math.floor(key / 100000);
         const near = cx >= x0 && cx <= x1 && cy >= y0 && cy <= y1;
@@ -416,20 +416,35 @@ export class PixiRenderer {
   private placeBackdrops(vx: number, vy: number, step: number) {
     const cam = this.engine.camera;
     const room = this.def.rooms[this.roomShown]!;
+    // The part of the room the view shows (smaller than the window when zoomed in).
+    const vw = cam.w / cam.zoom, vh = cam.h / cam.zoom;
     for (const { def: bg, color, picture } of this.backdrops) {
       if (color) {
         color.position.set(vx, vy);
-        color.scale.set(cam.w, cam.h);
+        color.scale.set(vw, vh);
       }
       if (!picture) continue;
       // Parallax 0 sits in the room; 1 is fixed to the screen; between,
-      // it slides more slowly than the room — further away.
-      const px = vx * bg.parallax + bg.hspeed * step;
-      const py = vy * bg.parallax + bg.vspeed * step;
-      if (picture instanceof TilingSprite) {
+      // it slides more slowly than the room — further away. Across and down
+      // can differ (parallaxY): a strip of hills slides sideways and stays
+      // at the bottom of the screen, which one number for both couldn't do.
+      const px = vx * bg.parallax + bg.hspeed * step + (bg.offsetX ?? 0);
+      const py = vy * (bg.parallaxY ?? bg.parallax) + bg.vspeed * step + (bg.offsetY ?? 0);
+      if (picture instanceof TilingSprite && bg.mode === "tile_x") {
+        // Repeats across the view, once down: as tall as the picture, at py.
+        picture.position.set(vx, py);
+        picture.width = vw;
+        picture.height = picture.texture.height;
+        picture.tilePosition.set(px - vx, 0);
+      } else if (picture instanceof TilingSprite && bg.mode === "tile_y") {
+        picture.position.set(px, vy);
+        picture.width = picture.texture.width;
+        picture.height = vh;
+        picture.tilePosition.set(0, py - vy);
+      } else if (picture instanceof TilingSprite) {
         picture.position.set(vx, vy);
-        picture.width = cam.w;
-        picture.height = cam.h;
+        picture.width = vw;
+        picture.height = vh;
         picture.tilePosition.set(px - vx, py - vy);
       } else if (bg.mode === "stretch") {
         picture.position.set(px, py);
@@ -449,7 +464,9 @@ export class PixiRenderer {
     const cam = this.engine.camera;
     // Whole pixels, so pixel art doesn't shimmer as a smooth camera glides.
     const vx = Math.round(cam.x + cam.offX), vy = Math.round(cam.y + cam.offY);
-    this.world.position.set(-vx, -vy);
+    // Zoomed (camera_zoom), the room is drawn bigger; Draw GUI, on its own layer, is not.
+    this.world.scale.set(cam.zoom);
+    this.world.position.set(-vx * cam.zoom, -vy * cam.zoom);
     this.placeBackdrops(vx, vy, g[G.FRAME]!);
     // Tiles tile_set() changed since the last frame. A chunk not built yet
     // will read the cell when it is; only built ones need telling.
@@ -505,7 +522,7 @@ export class PixiRenderer {
       this.applyLook(sp, s, st[b + F.FLASH]! > 0 ? st[b + F.FLASH_COLOR]! : -1, st[b + F.OUTLINE]!, st[b + F.OUTLINE_COLOR]!);
     }
     this.particles.draw(this.engine.effects);
-    this.lights.draw(this.app.renderer, this.engine.effects, vx, vy, cam.w, cam.h);
+    this.lights.draw(this.app.renderer, this.engine.effects, vx, vy, cam.w, cam.h, cam.zoom);
     this.applyScreen(cam.w, cam.h);
 
     this.worldDraw.render(this.engine.drawList);

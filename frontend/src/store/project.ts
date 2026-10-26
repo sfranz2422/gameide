@@ -215,6 +215,8 @@ export interface RoomResource {
   layers: RoomLayer[];
   /** The view: what part of the room the game window shows. */
   camera: RoomCamera;
+  /** Remembers how it was left (game.ts RoomDef.persistent). Absent: starts afresh each visit. */
+  persistent?: boolean;
   instances: RoomInstance[];
 }
 
@@ -244,13 +246,18 @@ export type RoomLayer =
       locked: boolean;
       color: string | null; // "#rrggbb" or none
       sprite: string | null; // sprite id
-      /** "tile" repeats the picture, "stretch" fills the room with it, "once" draws it at the top-left. */
-      mode: "tile" | "stretch" | "once";
+      /** "tile" repeats the picture, "tile_x" across only, "tile_y" down only, "stretch" fills the room with it, "once" draws it at the top-left. */
+      mode: "tile" | "tile_x" | "tile_y" | "stretch" | "once";
       /** Pixels per step it scrolls by itself (a moving sky). */
       hspeed: number;
       vspeed: number;
-      /** 0 = fixed to the room, 1 = fixed to the screen; between is parallax. */
+      /** 0 = fixed to the room, 1 = fixed to the screen; between is parallax. Across, and down too unless parallaxY says otherwise. */
       parallax: number;
+      /** Parallax down; absent = the same as `parallax` (as before it existed). */
+      parallaxY?: number;
+      /** Where the picture sits, added to where parallax puts it. */
+      offsetX?: number;
+      offsetY?: number;
     };
 
 export interface RoomCamera {

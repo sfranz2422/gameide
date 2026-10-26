@@ -275,7 +275,7 @@ export class LightLayer {
     world.addChild(this.glows);
   }
 
-  draw(renderer: Renderer, fx: Effects, vx: number, vy: number, w: number, h: number) {
+  draw(renderer: Renderer, fx: Effects, vx: number, vy: number, w: number, h: number, zoom = 1) {
     const lights = fx.lights;
     // The glows: in the room, so they move with it.
     for (let i = 0; i < Math.max(lights.length, this.glow.length); i++) {
@@ -321,9 +321,9 @@ export class LightLayer {
         this.scene.addChild(s);
       }
       s.visible = true;
-      // The darkness is drawn on the screen, so lights go where the room is on it.
-      s.position.set(L[0] - vx, L[1] - vy);
-      s.width = s.height = L[2] * 2;
+      // The darkness is drawn on the screen, so lights go where the room is on it (zoomed, bigger).
+      s.position.set((L[0] - vx) * zoom, (L[1] - vy) * zoom);
+      s.width = s.height = L[2] * 2 * zoom;
       s.alpha = L[4];
     }
     renderer.render({ container: this.scene, target: this.target, clear: true });

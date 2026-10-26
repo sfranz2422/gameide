@@ -241,6 +241,9 @@ function buildRoom(project: Project, r: RoomResource, hex: (c: string) => number
       hspeed: l.hspeed,
       vspeed: l.vspeed,
       parallax: l.parallax,
+      ...(l.parallaxY !== undefined ? { parallaxY: l.parallaxY } : {}),
+      ...(l.offsetX ? { offsetX: l.offsetX } : {}),
+      ...(l.offsetY ? { offsetY: l.offsetY } : {}),
     });
   }
   // Tile layers as dense grids (what the engine reads fastest), from the
@@ -268,6 +271,7 @@ function buildRoom(project: Project, r: RoomResource, hex: (c: string) => number
     instances,
     ...(backgrounds.length ? { backgrounds } : {}),
     ...(tileLayers.length ? { tileLayers } : {}),
+    ...(r.persistent ? { persistent: true } : {}),
     ...(r.camera.enabled
       ? { camera: { width: r.camera.width, height: r.camera.height, smoothing: r.camera.smoothing, ...(follow ? { follow } : {}) } }
       : {}),

@@ -58,10 +58,11 @@ export const F = {
   OUTLINE: 44, // 0 none, 1 outline, 2 glow (outline / glow properties)
   OUTLINE_COLOR: 45,
   DROP: 46, // drop_through: steps left of falling through one-way tiles (counts down each step)
+  UNPAUSED: 47, // ignore_pause: 1 = keeps running while the game is paused (a pause menu)
 } as const;
 
 export const ALARM_COUNT = 12;
-export const STRIDE = F.DROP + 1; // 47
+export const STRIDE = F.UNPAUSED + 1; // 48
 
 /** blend_mode's names, by the number F.BLEND holds. */
 export const BLEND_MODES = ["normal", "add", "multiply", "screen"] as const;
@@ -126,8 +127,10 @@ export const G = {
   PAD_DOWN: 40, // 40–107
   PAD_PRESSED: 108, // 108–175
   PAD_RELEASED: 176, // 176–243
+  PAUSED: 244, // game_pause(): 1 while the game is paused
+  ZOOM: 245, // camera_zoom(): how far in the view is zoomed (1 = as drawn)
 } as const;
-export const G_SIZE = 244;
+export const G_SIZE = 246;
 
 /**
  * Gamepad buttons Python can name, in the order of the browser's "standard"

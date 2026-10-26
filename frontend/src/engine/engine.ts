@@ -97,6 +97,8 @@ export interface FrameCommands {
   fx?: FxOrder[];
   /** This step's lights (light()); none sent is none shining. */
   lights?: Light[];
+  /** A persistent room's tiles as it was left (tiles_get), put back after the room change. */
+  tiles?: number[][];
 }
 
 /**
@@ -154,6 +156,16 @@ export interface CameraState {
   offY: number;
   /** Just entered the room: jump to the target rather than glide from 0, 0. */
   fresh: boolean;
+  /**
+   * camera_zoom(): 2 shows half as much, twice as big. `w`/`h` stay the
+   * window's size; the part of the room seen is w / zoom by h / zoom
+   * (viewW / viewH), and that is what view_width and collisions see.
+   */
+  zoom: number;
+  zoomFrom: number;
+  zoomTo: number;
+  zoomSteps: number;
+  zoomLeft: number;
 }
 
 const scratch: Box = { left: 0, top: 0, right: 0, bottom: 0 };
@@ -189,7 +201,21 @@ export class Engine {
   camera: CameraState = {
     enabled: false, x: 0, y: 0, w: 0, h: 0, followType: -1, followSlot: -1, followGen: 0, smoothing: 1,
     shake: 0, shakeLeft: 0, shakeTotal: 0, offX: 0, offY: 0, fresh: true,
+    zoom: 1, zoomFrom: 1, zoomTo: 1, zoomSteps: 0, zoomLeft: 0,
   };
+
+  /** How much of the room the view shows, after zoom. */
+  get viewW() {
+    return this.camera.w / this.camera.zoom;
+  }
+  get viewH() {
+    return this.camera.h / this.camera.zoom;
+  }
+
+  /** Is the game paused (game_pause) and this slot not one that ignores it? */
+  private frozen(st: Float64Array, g: Float64Array, b: number): boolean {
+    return g[G.PAUSED] === 1 && !st[b + F.UNPAUSED];
+  }
   roomIndex = 0;
   /** Set when there were more events than the events array holds. */
   overflowed = false;
@@ -684,6 +710,8 @@ export class Engine {
     c.shakeLeft = 0;
     c.offX = c.offY = 0;
     c.fresh = true;
+    c.zoom = c.zoomFrom = c.zoomTo = 1;
+    c.zoomLeft = 0;
     this.updateCamera();
   }
 
@@ -709,6 +737,18 @@ export class Engine {
     this.effects.pauseLeft = Math.max(this.effects.pauseLeft, Math.min(120, Math.round(steps)));
   }
 
+  /** camera_zoom(): to `zoom` over `steps` steps (0: at once), about the middle of the view. */
+  camera_zoom(zoom: number, steps: number) {
+    const c = this.camera;
+    c.zoomFrom = c.zoom;
+    c.zoomTo = Math.max(0.1, Math.min(10, zoom));
+    c.zoomSteps = c.zoomLeft = Math.max(1, Math.round(steps));
+    if (steps <= 0) {
+      c.zoomLeft = 1;
+      c.zoomSteps = 1;
+    }
+  }
+
   camera_shake(strength: number, steps: number) {
     const c = this.camera;
     c.shake = Math.max(0, strength);
@@ -720,22 +760,34 @@ export class Engine {
     const room = this.def.rooms[this.roomIndex];
     if (!room) return;
     // Keep the view inside the room; a room smaller than the view sits at its top-left.
-    c.x = Math.max(0, Math.min(c.x, room.width - c.w));
-    c.y = Math.max(0, Math.min(c.y, room.height - c.h));
+    c.x = Math.max(0, Math.min(c.x, room.width - this.viewW));
+    c.y = Math.max(0, Math.min(c.y, room.height - this.viewH));
   }
 
   private publishView() {
     const { g } = this.fresh();
     g[G.VIEW_X] = this.camera.x;
     g[G.VIEW_Y] = this.camera.y;
-    g[G.VIEW_W] = this.camera.w;
-    g[G.VIEW_H] = this.camera.h;
+    g[G.VIEW_W] = this.viewW;
+    g[G.VIEW_H] = this.viewH;
+    g[G.ZOOM] = this.camera.zoom;
   }
 
   /** Moves the view for this step, after the game's own code has run. */
   updateCamera() {
     const { st, g } = this.fresh();
     const c = this.camera;
+    if (c.zoomLeft > 0) {
+      // Zooming about the middle of the view: what is in the middle stays there.
+      c.zoomLeft--;
+      const k = 1 - c.zoomLeft / c.zoomSteps;
+      const ease = k * k * (3 - 2 * k);
+      const midX = c.x + this.viewW / 2, midY = c.y + this.viewH / 2;
+      c.zoom = c.zoomFrom + (c.zoomTo - c.zoomFrom) * ease;
+      c.x = midX - this.viewW / 2;
+      c.y = midY - this.viewH / 2;
+      if (!c.enabled) this.clampCamera();
+    }
     if (c.enabled) {
       let target = -1;
       if (c.followSlot >= 0) {
@@ -749,7 +801,7 @@ export class Engine {
       }
       if (target >= 0) {
         const b = target * STRIDE;
-        const tx = st[b + F.X]! - c.w / 2, ty = st[b + F.Y]! - c.h / 2;
+        const tx = st[b + F.X]! - this.viewW / 2, ty = st[b + F.Y]! - this.viewH / 2;
         const k = c.fresh ? 1 : c.smoothing;
         c.x += (tx - c.x) * k;
         c.y += (ty - c.y) * k;
@@ -776,8 +828,8 @@ export class Engine {
     this.input.commit(keys, g);
     // The input knows where the pointer is on the canvas; the game wants
     // where that is in the room.
-    g[G.MOUSE_X] = g[G.MOUSE_X]! + this.camera.x;
-    g[G.MOUSE_Y] = g[G.MOUSE_Y]! + this.camera.y;
+    g[G.MOUSE_X] = g[G.MOUSE_X]! / this.camera.zoom + this.camera.x;
+    g[G.MOUSE_Y] = g[G.MOUSE_Y]! / this.camera.zoom + this.camera.y;
     g[G.FRAME] = g[G.FRAME]! + 1;
     const n = g[G.SLOTS]!;
     for (let s = 0; s < n; s++) {
@@ -786,6 +838,8 @@ export class Engine {
       st[b + F.XPREV] = st[b + F.X]!;
       st[b + F.YPREV] = st[b + F.Y]!;
       st[b + F.DRAWN] = 0;
+      // Paused: its flash and alarms wait (game_pause), unless it ignores the pause.
+      if (this.frozen(st, g, b)) continue;
       if (st[b + F.FLASH]! > 0) st[b + F.FLASH] = st[b + F.FLASH]! - 1;
       // GameMaker's alarms: a positive number counts down one per step and
       // fires on reaching zero, then rests at -1. Zero or below never fires,
@@ -809,7 +863,7 @@ export class Engine {
       for (const edge of this.input.mouseEdges) {
         this.hash.query(mx, my, mx + 1, my + 1, (c) => {
           const cb = c * STRIDE;
-          if (!st[cb + F.ALIVE] || !(this.flags[st[cb + F.TYPE]!]! & HANDLES.MOUSE)) return false;
+          if (!st[cb + F.ALIVE] || !(this.flags[st[cb + F.TYPE]!]! & HANDLES.MOUSE) || this.frozen(st, g, cb)) return false;
           if (!containsPoint(st, c, st[cb + F.X]!, st[cb + F.Y]!, this.sprites, mx, my)) return false;
           this.pushEvent(events, EV.MOUSE, c, edge.button * 2 + (edge.released ? 1 : 0));
           return false;
@@ -834,7 +888,7 @@ export class Engine {
 
     for (let s = 0; s < n; s++) {
       const b = s * STRIDE;
-      if (!st[b + F.ALIVE]) continue;
+      if (!st[b + F.ALIVE] || this.frozen(st, g, b)) continue; // paused: no moving, no animating
       let h = st[b + F.HSPEED]!;
       let v = st[b + F.VSPEED]!;
       const fr = st[b + F.FRICTION]!;
@@ -885,7 +939,7 @@ export class Engine {
     // every step it overlaps, as in GameMaker, not only on first contact.
     for (let s = 0; s < n; s++) {
       const b = s * STRIDE;
-      if (!st[b + F.ALIVE]) continue;
+      if (!st[b + F.ALIVE] || this.frozen(st, g, b)) continue; // paused: its collision events wait
       const t = st[b + F.TYPE]!;
       const fl = this.flags[t]!;
       if (fl & HANDLES.COLLISION) {
@@ -937,11 +991,34 @@ export class Engine {
     // or a burst made in a room's first step was wiped out at once.
     if (commands?.room !== undefined) this.setRoom(commands.room);
     else this.updateCamera();
+    // A remembered room (persistent) coming back: its tiles as they were left, after setRoom laid the room's own.
+    if (commands?.tiles) this.restoreTiles(commands.tiles);
     this.effects.apply(commands?.fx);
     this.effects.lights = commands?.lights ?? [];
     const c = this.camera;
-    this.effects.step({ x: c.x, y: c.y, w: c.w || this.def.rooms[this.roomIndex]!.width, h: c.h || this.def.rooms[this.roomIndex]!.height });
+    // Paused, particles hang where they are (and weather stops falling).
+    if (this.fresh().g[G.PAUSED] !== 1)
+      this.effects.step({ x: c.x, y: c.y, w: this.viewW || this.def.rooms[this.roomIndex]!.width, h: this.viewH || this.def.rooms[this.roomIndex]!.height });
     return commands?.error ?? null;
+  }
+
+  /** Every tile layer's cells now, as JSON, for a persistent room being left (Python keeps it). */
+  tiles_get(): string {
+    return JSON.stringify(this.tiles.map((t) => Array.from(t.cells)));
+  }
+
+  /** Puts a remembered room's tiles back, layer by layer, and tells the renderer every cell changed. */
+  restoreTiles(saved: number[][]) {
+    saved.forEach((cells, L) => {
+      const t = this.tiles[L];
+      if (!t || cells.length !== t.cells.length) return;
+      for (let i = 0; i < cells.length; i++) {
+        if (t.cells[i] !== cells[i]) {
+          t.cells[i] = cells[i]!;
+          this.tileChanges.push([L, i]);
+        }
+      }
+    });
   }
 
   /** Live instances, for the FPS readout and tests. */

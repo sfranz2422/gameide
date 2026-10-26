@@ -125,6 +125,13 @@ describe("rooms in the built game", () => {
     expect(r.camera).toEqual({ width: 320, height: 240, smoothing: 0.2, follow: "Hero" });
     room.camera.enabled = false;
     expect(buildGame(p, new Map()).def.rooms[0]!.camera).toBeUndefined();
+    // Parallax down, offsets and a remembered room travel too — and stay out when unset.
+    expect(r.persistent).toBeUndefined();
+    if (bg.kind === "background") Object.assign(bg, { mode: "tile_x", parallax: 0.5, parallaxY: 1, offsetX: 0, offsetY: 200 });
+    room.persistent = true;
+    const r2 = buildGame(p, new Map()).def.rooms[0]!;
+    expect(r2.backgrounds).toEqual([{ depth: 900, color: 0x112233, mode: "tile_x", hspeed: 0, vspeed: 0, parallax: 0.5, parallaxY: 1, offsetY: 200 }]);
+    expect(r2.persistent).toBe(true);
   });
 
   it("an error in an instance's creation code points at that instance and line", async () => {

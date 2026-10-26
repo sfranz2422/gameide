@@ -256,8 +256,11 @@ export function RoomEditor({ roomId, focus }: { roomId: string; focus: { instanc
           }
           const img = l.sprite ? images.get(l.sprite) : undefined;
           if (!img) return;
+          const ox = l.offsetX ?? 0, oy = l.offsetY ?? 0;
           if (l.mode === "stretch") ctx.drawImage(img, 0, 0, room.width, room.height);
-          else if (l.mode === "once") ctx.drawImage(img, 0, 0);
+          else if (l.mode === "once") ctx.drawImage(img, ox, oy);
+          else if (l.mode === "tile_x") for (let x = (ox % img.width) - img.width; x < room.width; x += img.width) ctx.drawImage(img, x, oy);
+          else if (l.mode === "tile_y") for (let y = (oy % img.height) - img.height; y < room.height; y += img.height) ctx.drawImage(img, ox, y);
           else {
             ctx.save();
             ctx.fillStyle = ctx.createPattern(img, "repeat")!;
@@ -860,6 +863,23 @@ function RoomPanel({
             </label>
           </fieldset>
           <fieldset>
+            <legend>Coming back</legend>
+            <label className="check">
+              <input
+                type="checkbox"
+                checked={!!room.persistent}
+                onChange={(e) => setRoom((r) => void (r.persistent = e.target.checked || undefined))}
+                data-testid="room-persistent"
+              />{" "}
+              Remember how it was left
+            </label>
+            <p className="muted small">
+              {room.persistent
+                ? "Leave and come back: everything is where it was — enemies beaten stay beaten, doors opened stay open. room_restart() still starts it afresh."
+                : "Each visit starts the room afresh, as it is here."}
+            </p>
+          </fieldset>
+          <fieldset>
             <legend>Grid</legend>
             {num("Width", room.gridWidth, (v) => setRoom((r) => void (r.gridWidth = Math.max(1, v))), "grid-width", 1)}
             {num("Height", room.gridHeight, (v) => setRoom((r) => void (r.gridHeight = Math.max(1, v))), "grid-height", 1)}
@@ -1220,12 +1240,22 @@ function LayersPanel({
                       </label>
                       <label className="num">
                         Fill
-                        <select value={l.mode} onChange={(e) => setLayer(l.id, (x) => x.kind === "background" && void (x.mode = e.target.value as "tile"))} aria-label="Background fill">
+                        <select value={l.mode} onChange={(e) => setLayer(l.id, (x) => x.kind === "background" && void (x.mode = e.target.value as "tile" | "tile_x" | "tile_y" | "stretch" | "once"))} aria-label="Background fill">
                           <option value="tile">Repeat</option>
+                          <option value="tile_x">Repeat across only</option>
+                          <option value="tile_y">Repeat down only</option>
                           <option value="stretch">Stretch to the room</option>
                           <option value="once">Once, at the top-left</option>
                         </select>
                       </label>
+                      <div>
+                        <label className="num">
+                          Offset x <input type="number" value={l.offsetX ?? 0} onChange={(e) => setLayer(l.id, (x) => x.kind === "background" && void (x.offsetX = Number(e.target.value) || 0))} aria-label="Offset x" data-testid="bg-offset-x" />
+                        </label>
+                        <label className="num">
+                          y <input type="number" value={l.offsetY ?? 0} onChange={(e) => setLayer(l.id, (x) => x.kind === "background" && void (x.offsetY = Number(e.target.value) || 0))} aria-label="Offset y" data-testid="bg-offset-y" />
+                        </label>
+                      </div>
                       <div>
                         <label className="num">
                           Scroll x <input type="number" value={l.hspeed} onChange={(e) => setLayer(l.id, (x) => x.kind === "background" && void (x.hspeed = Number(e.target.value) || 0))} aria-label="Scroll x" />
@@ -1238,6 +1268,22 @@ function LayersPanel({
                         Parallax
                         <input type="range" min={0} max={1} step={0.05} value={l.parallax} onChange={(e) => setLayer(l.id, (x) => x.kind === "background" && void (x.parallax = Number(e.target.value)))} aria-label="Parallax" />
                         <span className="muted small">{l.parallax === 0 ? "moves with the room" : l.parallax === 1 ? "fixed to the screen" : "far away"}</span>
+                      </label>
+                      <label className="num">
+                        Parallax down
+                        <input
+                          type="range"
+                          min={0}
+                          max={1}
+                          step={0.05}
+                          value={l.parallaxY ?? l.parallax}
+                          onChange={(e) => setLayer(l.id, (x) => x.kind === "background" && void (x.parallaxY = Number(e.target.value)))}
+                          aria-label="Parallax down"
+                          data-testid="bg-parallax-y"
+                        />
+                        <span className="muted small">
+                          {(l.parallaxY ?? l.parallax) === 1 ? "stays at one height on the screen" : l.parallaxY === undefined ? "the same as across" : "far away"}
+                        </span>
                       </label>
                     </>
                   )}

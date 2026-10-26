@@ -127,10 +127,17 @@ export interface BackgroundDef {
   depth: number;
   color?: number;
   sprite?: string;
-  mode: "tile" | "stretch" | "once";
+  /** "tile_x" repeats across only (a strip of hills), "tile_y" down only. */
+  mode: "tile" | "tile_x" | "tile_y" | "stretch" | "once";
   hspeed: number;
   vspeed: number;
+  /** Across: 0 moves with the room, 1 is fixed to the screen; between is far away. */
   parallax: number;
+  /** Down, the same; absent is the same as `parallax`. 1 keeps a strip at one height on the screen. */
+  parallaxY?: number;
+  /** Where the picture is put: added to where parallax puts it (with parallax 1, from the screen's top-left). */
+  offsetX?: number;
+  offsetY?: number;
 }
 
 export interface RoomDef {
@@ -142,6 +149,8 @@ export interface RoomDef {
   camera?: CameraDef;
   backgrounds?: BackgroundDef[];
   tileLayers?: TileLayerDef[];
+  /** Remembers how it was left: its instances (and changed tiles) are as they were when the game comes back. */
+  persistent?: boolean;
 }
 
 export interface GameDefinition {

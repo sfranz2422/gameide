@@ -70,8 +70,9 @@ __all__ = [
     "clamp", "lerp", "approach", "sign", "choose",
     # rooms and the game
     "room_goto", "room_restart", "game_restart", "global_vars", "room_width", "room_height",
+    "game_pause", "game_paused",
     # the camera
-    "camera_follow", "camera_set", "camera_shake", "view_x", "view_y", "view_width", "view_height",
+    "camera_follow", "camera_set", "camera_shake", "camera_zoom", "view_x", "view_y", "view_width", "view_height",
     # sound
     "sound_play", "sound_stop", "sound_playing", "music_play", "music_stop",
     # saving
@@ -484,6 +485,7 @@ def _install_properties():
         "image_xscale": boxy(F.XSCALE), "image_yscale": boxy(F.YSCALE),
         "image_angle": plain(F.ANGLE), "image_alpha": plain(F.ALPHA),
         "visible": flag(F.VISIBLE), "solid": flag(F.SOLID), "drop_through": plain(F.DROP),
+        "ignore_pause": flag(F.UNPAUSED),
         "depth": plain(F.DEPTH),
         "image_blend": property(blend_get, blend_set), "blend_mode": property(mode_get, mode_set),
         "outline": edge(1, "outline"), "glow": edge(2, "glow"),
@@ -1177,13 +1179,28 @@ def room_goto(room):
 
 
 def room_restart():
-    global _pending_room
+    global _pending_room, _restarting_room
     _pending_room = _room_now
+    _restarting_room = True   # a persistent room starts afresh, not as it was left
 
 
 def game_restart():
     global _pending_room
     _pending_room = "restart"
+
+
+def game_pause(paused=True):
+    """
+    Stops the game (or starts it again, with False): nothing moves, animates,
+    counts down or collides, and Step and key events run only for instances
+    with ignore_pause = True — a pause menu. Everything is still drawn.
+    """
+    _g[_L.G.PAUSED] = 1.0 if paused else 0.0
+
+
+def game_paused():
+    """Is the game paused (game_pause)?"""
+    return _g[_L.G.PAUSED] == 1
 
 
 def camera_follow(instance, smoothing=None):
@@ -1204,6 +1221,14 @@ def camera_set(x, y):
 def camera_shake(strength=4, steps=15):
     """Shakes the view by up to `strength` pixels, fading out over `steps` steps."""
     _js.camera_shake(strength, steps)
+
+
+def camera_zoom(zoom=1, steps=0):
+    """Zooms the view about its middle: 2 shows half as much, twice the size; 1 is as drawn. Over `steps` steps, or at once."""
+    zoom = _num(zoom, "camera_zoom", "zoom")
+    if zoom <= 0:
+        raise ValueError("camera_zoom: zoom is above 0 — 2 is closer, 0.5 further out, 1 as drawn.")
+    _js.camera_zoom(zoom, max(0, int(_num(steps, "camera_zoom", "steps"))))
 
 
 def _layer_number(layer):
@@ -1412,6 +1437,18 @@ def _call(o, name):
         _cur = prev
 
 
+def _call_unpaused(lst, name):
+    """_call_all for a paused game: only the instances with ignore_pause set."""
+    global _cur
+    unpaused = _L.F.UNPAUSED
+    for i in range(len(lst)):
+        o = lst[i]
+        if o._alive and _st[o._b + unpaused]:
+            _cur = o
+            getattr(o, name)()
+    _cur = None
+
+
 def _call_all(lst, name):
     """
     Runs an event on every instance in a list. Only the instances there when
@@ -1427,18 +1464,23 @@ def _call_all(lst, name):
     _cur = None
 
 
+def _new_slot():
+    """A free slot in the shared array: one given back, or a new one (growing the arrays when full)."""
+    global _next
+    if _free:
+        return _free.pop()
+    slot = _next
+    if slot >= _capacity:
+        _grow()
+    _next += 1
+    _g[_L.G.SLOTS] = _next
+    return slot
+
+
 def _create(t, x, y, placed=None):
     """A new instance. `placed` is a room instance's overrides (scale,
     angle), applied before its Create event as GameMaker does."""
-    global _next
-    if _free:
-        slot = _free.pop()
-    else:
-        slot = _next
-        if slot >= _capacity:
-            _grow()
-        _next += 1
-        _g[_L.G.SLOTS] = _next
+    slot = _new_slot()
     b = slot * STRIDE
     F = _L.F
     gen = _st[b + F.GEN] + 1
@@ -1506,6 +1548,12 @@ def _reap():
         # belongs to someone else: -1 matches no instance on the JS side.
         o._slot = -1
     _dead.clear()
+    _prune()
+
+
+def _prune():
+    """Takes instances that are no longer alive (destroyed, or parked by a persistent room) off every list."""
+    global _all
     _all = [o for o in _all if o._alive]
     for t in range(len(_by_type)):
         if any(not o._alive for o in _by_type[t]):
@@ -1527,17 +1575,84 @@ def _kill_quietly(o):
     _dead.append(o)
 
 
+# Persistent rooms (RoomDef.persistent): a room left is kept here, by its
+# index, as its instances — the same Python objects, so references between
+# them still work — with each one's built-in state, and its tile layers as
+# they were. Going back puts them in again instead of building the room
+# from the room editor's instances. room_restart() starts one afresh.
+_parked = {}
+_restarting_room = False
+_tiles_back = None   # a parked room's tiles, sent to the engine with this frame's commands
+
+
+def _park(o):
+    """
+    Takes an instance out of the game without ending it (no Destroy, no
+    Clean Up): its persistent room keeps it. While parked it is a ghost like a
+    destroyed instance — its slot belongs to someone else now — so a
+    reference kept elsewhere reads where it was, not another instance's x.
+    """
+    b = o._b
+    state = _st[b:b + STRIDE]
+    values = {name: getattr(o, name) for name in _BUILTIN_PROPS if name not in ("alarm",)}
+    o._alive = False
+    _st[b + _F_ALIVE] = 0.0
+    _mark_dirty(o._slot, b)
+    _objs[o._slot] = None
+    _free.append(o._slot)
+    o._slot = -1
+    o.__class__ = _ghost(type(o))
+    o.__dict__.update(values)
+    return state
+
+
+def _unpark(o, state):
+    """Puts a parked instance back in the game as it was: its own class, a slot, and its state."""
+    ty = _types[o._t]
+    for name in _BUILTIN_PROPS:
+        o.__dict__.pop(name, None)
+    o.__class__ = ty.cls
+    slot = _new_slot()
+    b = slot * STRIDE
+    gen = _st[b + _L.F.GEN] + 1
+    was_dirty = _st[b + _F_DIRTY]
+    _st[b:b + STRIDE] = state
+    _st[b + _L.F.GEN] = gen
+    _st[b + _F_DIRTY] = was_dirty
+    _st[b + _F_ALIVE] = 1.0
+    o._slot, o._b, o._alive = slot, b, True
+    _mark_dirty(slot, b)
+    _objs[slot] = o
+    _all.append(o)
+    _by_type[o._t].append(o)
+    for name in ty.per_frame:
+        _lists[name].append(o)
+
+
 def _goto(index, first=False):
-    """Leaves the current room (if any) and builds room `index`."""
-    global _room_now, _room_changed, room_width, room_height, _cur
+    """Leaves the current room (if any) and builds room `index` — or, for a persistent room left before, puts it back."""
+    global _room_now, _room_changed, room_width, room_height, _cur, _restarting_room, _tiles_back
     if _room_now >= 0:
         for o in list(_all):
             if o._alive:
                 _call(o, "on_room_end")
+        keep = _rooms[_room_now].get("persistent") and not _restarting_room
+        kept = []
         for o in list(_all):
             if o._alive and not _types[o._t].persistent:
-                _kill_quietly(o)
+                if keep:
+                    kept.append((o, _park(o)))
+                else:
+                    _kill_quietly(o)
+        if keep:
+            _parked[_room_now] = (kept, json.loads(_js.tiles_get()))
+        else:
+            _parked.pop(_room_now, None)
         _reap()
+        # _reap only tidies when something was destroyed: parked instances
+        # must leave the lists too, or coming back would list them twice.
+        _prune()
+    _restarting_room = False
     room = _rooms[index]
     _room_now = index
     _room_changed = True
@@ -1546,9 +1661,15 @@ def _goto(index, first=False):
     _g[_L.G.ROOM_WIDTH] = room_width
     _g[_L.G.ROOM_HEIGHT] = room_height
     _publish_globals()
+    back = _parked.pop(index, None)
+    if back is not None:
+        # A persistent room as it was left: no Create events, no creation code.
+        for o, state in back[0]:
+            _unpark(o, state)
+        _tiles_back = back[1]
     # GameMaker's order: each instance's Create then its creation code, then
     # Game Start (first room only), then Room Start.
-    for i, inst in enumerate(room["instances"]):
+    for i, inst in enumerate(room["instances"] if back is None else []):
         o = _create(_type_of(inst["object"]), inst["x"], inst["y"], inst)
         code = _creation_fns.get((index, i))
         if code is not None and o._alive:
@@ -1576,6 +1697,8 @@ def _restart_game():
     for o in list(_all):
         _kill_quietly(o)
     _reap()
+    _parked.clear()   # every room afresh
+    _g[_L.G.PAUSED] = 0.0
     global_vars.__dict__.clear()
     # The game's feel starts over too: no tweens, lines, fades or effects left from the last go.
     _tweens.clear()
@@ -1649,14 +1772,14 @@ def _dispatch_engine_events():
     _cur = None
 
 
-def _input_events():
-    """Keyboard and global mouse events, for the instances that have any."""
+def _input_events(paused=False):
+    """Keyboard and global mouse events, for the instances that have any (paused: that ignore the pause)."""
     global _cur
     keys = _keys
     lst = _lists["keyboard"]
     for i in range(len(lst)):
         o = lst[i]
-        if not o._alive:
+        if not o._alive or (paused and not _st[o._b + _L.F.UNPAUSED]):
             continue
         for index, name in _types[o._t].handlers.keys:
             if keys[index]:
@@ -1668,7 +1791,7 @@ def _input_events():
     lst = _lists["global_mouse"]
     for i in range(len(lst)):
         o = lst[i]
-        if not o._alive:
+        if not o._alive or (paused and not _st[o._b + _L.F.UNPAUSED]):
             continue
         for index, name in _types[o._t].handlers.global_mouse:
             if g[index]:
@@ -1716,8 +1839,11 @@ def _end_of_frame():
 
 def _commands():
     """What JavaScript must do after this frame, as JSON — or None for nothing."""
-    global _draw, _gui, _debug_changed, _room_changed, _save_changed
+    global _draw, _gui, _debug_changed, _room_changed, _save_changed, _tiles_back
     out = {}
+    if _tiles_back is not None:
+        out["tiles"] = _tiles_back
+        _tiles_back = None
     if _fx:
         out["fx"] = list(_fx)
         _fx.clear()
@@ -1758,14 +1884,19 @@ def _frame():
     try:
         _step_count += 1
         _publish_globals()
-        _step_tweens()
-        _call_all(_lists["on_begin_step"], "on_begin_step")
+        # Paused (game_pause): only instances that ignore the pause run their
+        # events; the engine holds everyone else still. Tweens wait too.
+        paused = _g[_L.G.PAUSED] == 1
+        run = _call_unpaused if paused else _call_all
+        if not paused:
+            _step_tweens()
+        run(_lists["on_begin_step"], "on_begin_step")
         _dispatch_engine_events()        # alarms and mouse-on-instance
-        _input_events()
-        _call_all(_lists["on_step"], "on_step")
+        _input_events(paused)
+        run(_lists["on_step"], "on_step")
         _js_motion()                     # engine: move, animate, collide
         _dispatch_engine_events()        # collisions, animation end, outside room
-        _call_all(_lists["on_end_step"], "on_end_step")
+        run(_lists["on_end_step"], "on_end_step")
         _draw_events()
         _overlays()
         _end_of_frame()

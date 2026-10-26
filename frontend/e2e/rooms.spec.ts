@@ -186,3 +186,47 @@ test("a background layer with a picture draws behind the game, scrolling", async
   await page.waitForTimeout(500);
   expect(errors.filter((e) => !e.includes("502"))).toEqual([]);
 });
+
+/** The game's own picture at some points, as [r, g, b]. */
+async function gamePixels(page: Page, points: [number, number][]): Promise<number[][]> {
+  return page.evaluate(async (pts) => {
+    const blob = await (window as any).__gameide.host.snapshot();
+    const bmp = await createImageBitmap(blob);
+    const c = new OffscreenCanvas(bmp.width, bmp.height);
+    const ctx = c.getContext("2d")!;
+    ctx.drawImage(bmp, 0, 0);
+    return pts.map(([x, y]) => [...ctx.getImageData(x, y, 1, 1).data.slice(0, 3)]);
+  }, points);
+}
+
+test("a background repeated across only is one strip at its offset, and camera_zoom draws the room bigger", async ({ page }) => {
+  await fromTemplate(page, "empty");
+  await makeObject(page, "Hero", "player"); // only for its sprite: the room has no instances
+  await openRoom(page);
+  await page.getByTestId("room-panel-layers").click();
+  await page.getByRole("button", { name: "Settings for Background" }).click();
+  await page.getByTestId("bg-sprite").selectOption({ label: "player" });
+  await page.getByLabel("Background fill").selectOption("tile_x");
+  await page.getByTestId("bg-offset-y").fill("200");
+  await playAndWait(page);
+  const row = (y: number) => Array.from({ length: 160 }, (_, i) => [i * 4, y] as [number, number]);
+  const room = [0x1e, 0x29, 0x3b]; // the room's own colour, behind everything
+  const bare = (px: number[][]) => px.every((p) => p.every((v, i) => Math.abs(v - room[i]!) < 6));
+  await expect.poll(async () => bare(await gamePixels(page, row(210))), { timeout: 10_000 }).toBe(false); // the strip
+  expect(bare(await gamePixels(page, row(100)))).toBe(true); // nothing above it…
+  expect(bare(await gamePixels(page, row(300)))).toBe(true); // …or below: it doesn't repeat down
+  // Zoomed 2× about the middle (the view is 320 × 240 at 160, 120): room y 200 is now screen y 160.
+  await py(page, "camera_zoom(2)");
+  await expect.poll(async () => bare(await gamePixels(page, row(170))), { timeout: 10_000 }).toBe(false);
+  expect(bare(await gamePixels(page, row(100)))).toBe(true);
+});
+
+test("a room can remember how it was left, and says what that means", async ({ page }) => {
+  await fromTemplate(page, "empty");
+  await openRoom(page);
+  await page.getByTestId("room-panel-room").click();
+  await expect(page.getByText("Each visit starts the room afresh")).toBeVisible();
+  await page.getByTestId("room-persistent").check();
+  await expect(page.getByText("everything is where it was")).toBeVisible();
+  // That it reaches the game is codegen.test.ts's; what the game does with it, rooms12.test.ts's.
+});

@@ -172,6 +172,8 @@ export class PythonGame {
       camera_follow: (s: number, smooth: number) => e().camera_follow(s, smooth),
       camera_set: (x: number, y: number) => e().camera_set(x, y),
       camera_shake: (strength: number, steps: number) => e().camera_shake(strength, steps),
+      camera_zoom: (zoom: number, steps: number) => e().camera_zoom(zoom, steps),
+      tiles_get: () => e().tiles_get(),
       hit_pause: (steps: number) => e().hit_pause(steps),
       tile_at: (x: number, y: number, layer: number) => e().tile_at(x, y, layer),
       tile_set: (x: number, y: number, tile: number, layer: number) => e().tile_set(x, y, tile, layer),
