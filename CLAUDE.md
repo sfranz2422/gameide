@@ -315,6 +315,11 @@ also serves the built editor (`frontend/dist`). Deployed by `render.yaml`
   sign-out for students are PyIDE's (signing in only adds abilities; GET
   /api/ is never activity). `/dev/login` exists only with
   `GAMEIDE_DEV_LOGIN=1` **and** no `DATABASE_URL`.
+- **The tests' SQLite enforces foreign keys** (`PRAGMA foreign_keys=ON` in
+  app.py), as Render's Postgres does. Without it, deleting an assignment
+  passed every test and was a 500 on the site. A delete must clear every
+  row that points at what it deletes, explicitly, by query — SQLAlchemy
+  can't order deletes between tables it has no relationship() for.
 - **The isolation headers go on every response** (`_headers`); without them
   the endless-loop interrupt silently loses its line numbers.
 
