@@ -274,7 +274,7 @@ python3 scripts/sabotage.py   # 337 deliberate bugs
 
 ### Known issues and gaps
 
-- **Your step:** add `https://gameide.onrender.com/classroom/callback` to the shared OAuth client's redirect addresses in Google Cloud, as PyIDE's, WebIDE's and FlaskIDE's are. Until then Connect Google Classroom fails at Google, and classes work with students added by email.
+- ~~Your step: add the Classroom callback to the OAuth client~~ — done by the user, 2026-10-26.
 - Classroom is tested against a fake Google, not yet the real one. It is PyIDE's code, which works with real Classroom.
 - **Students find their classes under Classes in the top bar**, not under their name menu as in PyIDE. Say if you'd rather have them in the menu.
 - Changing a due date after posting doesn't change it in Classroom; PyIDE can't do that either.
@@ -969,9 +969,11 @@ of its own after Phase 9.
 | 9½ Game feel (new) | — | **particles, lighting and blend modes, ready-made shader effects (glow, CRT, flash, outline), tweening and easing, a dialogue-box helper, hit-pause** |
 | 10 Classrooms | classes, assignments, dashboard | PyIDE's classes and Classroom instead of join codes |
 | 11 Tutorials | tutorial panel, checks, library | |
-| 12 Retro mode (new, agreed 2026-10-26) | — | **export to .gb, then .nes** (SNES left out): a restricted Python subset translated to C (GBDK-2020 / cc65), editor limits (4 shades, 8×8 tiles, 160×144), chiptune sound, tested in a browser emulator |
+| ~~12 Retro mode~~ | — | **Dropped 2026-10-26**: worries about copyright around console formats, and doubt students would use it |
 
-## Next: Phase 12 — Retro mode (see the table above)
+## Next: nothing planned
+
+Every phase in the spec is built (1–11, with 9 and 11 in parts). Retro mode was dropped.
 
 ## Phase 11 — Tutorials, with the notes tab, questions and tests (the plan; built as 11a and 11b above)
 
