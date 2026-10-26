@@ -12,6 +12,7 @@ As agreed: per-event sheets, explicit for-each instead of GDevelop's hidden pick
   - A row's conditions are all needed (`and`), or click **all (and)** to make any one enough (`or`).
   - **not** turns a condition around.
   - From a row's ⋯ menu: **sub-events** (nested `if`s), **Else** after a row (with conditions it's `elif`), **For each** inside, comments, move up/down, delete.
+  - **Drag and drop** (added after review): drag a row by its ⋮⋮ grip, and its sub-events come with it. Drop on the top of another row to put it before, the bottom for after, the middle to make it a sub-event, or below the last row for the end of the sheet. A line or a dashed outline shows where it will land. A row can't go into its own sub-events, nothing goes inside a comment, and a drag is one undo step.
 - **For each Enemy as e** is how a sheet works on other instances. The rows under it say `e.x`, `e.hspeed`, `destroy e`: the loop students will write in Python, in the open.
 - **Pickers come from the catalog:**
   - Every function that answers True or False is a condition.
@@ -39,20 +40,19 @@ The project format is now **version 7**: events and creation code can be sheets.
 
 ```
 cd frontend
-npm test                      # Vitest: 174
-npm run e2e                   # Playwright: 48 editor tests + 7 account tests
+npm test                      # Vitest: 177
+npm run e2e                   # Playwright: 49 editor tests + 7 account tests
 ../backend/.venv/bin/python ../backend/tests/test_server.py   # 53 server checks
-python3 scripts/sabotage.py   # 242 deliberate bugs
+python3 scripts/sabotage.py   # 248 deliberate bugs
 ```
 
 New this phase:
-- `src/eventsheets/sheet.test.ts`: the exact Python for and/or/not, no-condition rows, sub-events, else/elif, for-each, comments and Trigger once; the line map; the checks on what's typed; every catalog condition and action compiling in real Python with the arguments its boxes start with; Trigger once firing once and again after resetting, in a real game; renaming.
-- `e2e/sheets.spec.ts`: building a sheet with the pickers and playing it with the keyboard; name suggestions inside quotes; nesting, else, for-each and comments; a bad box marked; the Python/Sheet rules and Convert; an error outlining its action; Ctrl+Z on and off the sheet; creation code as a sheet, renamed.
+- `src/eventsheets/sheet.test.ts`: the exact Python for and/or/not, no-condition rows, sub-events, else/elif, for-each, comments and Trigger once; the line map; the checks on what's typed; every catalog condition and action compiling in real Python with the arguments its boxes start with; Trigger once firing once and again after resetting, in a real game; renaming; moving rows (before, after, inside, to the end; never into themselves or a comment).
+- `e2e/sheets.spec.ts`: dragging rows by their grips; building a sheet with the pickers and playing it with the keyboard; name suggestions inside quotes; nesting, else, for-each and comments; a bad box marked; the Python/Sheet rules and Convert; an error outlining its action; Ctrl+Z on and off the sheet; creation code as a sheet, renamed.
 
 ### Known issues and gaps
 
 - **Scripts can't be sheets**, as agreed. A script is function definitions, which aren't conditions → actions.
-- **No drag-and-drop of rows.** They move with Move up/down in the row menu; sub-events are added from it rather than dragged under a row.
 - A for-each row's object is a dropdown of objects only, not tile layers (those aren't instances).
 
 ---

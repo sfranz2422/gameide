@@ -11,8 +11,10 @@ import {
   checkExpr,
   checkLine,
   CONDITION_FUNCTIONS,
+  canDrop,
   defaultArg,
   fitCalls,
+  moveRow,
   renameInSheet,
   rowOf,
   sheetProblems,
@@ -198,6 +200,50 @@ describe("sheets in a game", () => {
     run(game, 10);
     expect(py(game, "global_vars.passed")).toBe(2);
     game.dispose();
+  });
+});
+
+describe("moving rows by drag and drop", () => {
+  const named = (name: string, children: Row[] = []): Row => ({ id: name, kind: "event", conditions: [], actions: [{ id: id(), type: "code", code: `${name}()` }], children });
+  const sheet = (): Sheet => ({ rows: [named("a", [named("a1"), named("a2")]), named("b"), { id: "c", kind: "comment", text: "note" }] });
+  const order = (s: Sheet) => sheetToPython(s).code;
+
+  it("goes before, after, or inside a row (as its last sub-event), with its own sub-events", () => {
+    let s = sheet();
+    expect(moveRow(s, "b", "a", "before")).toBe(true);
+    expect(order(s)).toBe(["b()", "a()", "a1()", "a2()", "# note"].join("\n"));
+    s = sheet();
+    expect(moveRow(s, "a", "c", "after")).toBe(true);
+    expect(order(s)).toBe(["b()", "# note", "a()", "a1()", "a2()"].join("\n"));
+    s = sheet();
+    expect(moveRow(s, "b", "a", "inside")).toBe(true);
+    expect(s.rows[0]!.kind !== "comment" && s.rows[0]!.children.map((r) => r.id)).toEqual(["a1", "a2", "b"]);
+    s = sheet();
+    expect(moveRow(s, "a2", null, "after")).toBe(true); // out of a sub-event, to the end
+    expect(s.rows.map((r) => r.id)).toEqual(["a", "b", "c", "a2"]);
+    s = sheet();
+    expect(moveRow(s, "a", "a2", "after")).toBe(false); // a2 is under a
+  });
+
+  it("never onto itself, into its own sub-events, or inside a comment", () => {
+    const s = sheet();
+    expect(canDrop(s, "a", "a", "before")).toBe(false);
+    expect(canDrop(s, "a", "a1", "after")).toBe(false);
+    expect(canDrop(s, "b", "c", "inside")).toBe(false);
+    expect(canDrop(s, "b", "c", "after")).toBe(true);
+    expect(moveRow(s, "a", "a1", "inside")).toBe(false);
+    expect(order(s)).toBe(order(sheet())); // nothing moved
+  });
+
+  it("finds its target again after taking the row out", () => {
+    // a1 is before a2 in the same list: once a1 is out, a2 moves up one.
+    const s = sheet();
+    expect(moveRow(s, "a1", "a2", "after")).toBe(true);
+    expect(s.rows[0]!.kind !== "comment" && s.rows[0]!.children.map((r) => r.id)).toEqual(["a2", "a1"]);
+    // Three in a row, so a stale place would show: p after q is q, p, r — not q, r, p.
+    const three: Sheet = { rows: [named("p"), named("q"), named("r")] };
+    expect(moveRow(three, "p", "q", "after")).toBe(true);
+    expect(three.rows.map((r) => r.id)).toEqual(["q", "p", "r"]);
   });
 });
 

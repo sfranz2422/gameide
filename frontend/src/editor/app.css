@@ -801,6 +801,33 @@ button:focus-visible {
   background: transparent;
   border-style: dashed;
 }
+/* Dragging rows: the grip, and where a drop would land. */
+.sheet-grip {
+  display: flex;
+  align-items: center;
+  padding: 0 3px;
+  color: var(--muted);
+  cursor: grab;
+  user-select: none;
+  letter-spacing: -2px;
+  font-size: 13px;
+}
+.sheet-grip:hover {
+  color: var(--text);
+}
+.sheet-row.drop-before {
+  box-shadow: 0 -3px 0 var(--accent);
+}
+.sheet-row.drop-after {
+  box-shadow: 0 3px 0 var(--accent);
+}
+.sheet-row.drop-inside {
+  outline: 2px dashed var(--accent);
+  outline-offset: 1px;
+}
+.sheet-rows.drop-end {
+  box-shadow: inset 0 -3px 0 var(--accent);
+}
 .sheet-children {
   margin-left: 22px;
   padding-left: 8px;

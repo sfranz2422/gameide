@@ -233,3 +233,39 @@ test("creation code can be a sheet, and renaming reaches its boxes", async ({ pa
   expect(await py(page, "instances('Ruby')[0].lives")).toBe(3);
   expect(errors).toEqual([]);
 });
+
+test("rows move by drag and drop: before, after, into a row as a sub-event, and out to the end", async ({ page }) => {
+  await emptyGame(page);
+  await newObjectWithEvent(page, "Mover");
+  await page.getByTestId("tab-sheet").click();
+  for (const [i, line] of ["self.a = 1", "self.b = 2"].entries()) {
+    await page.getByTestId("sheet-add-row").click();
+    await page.getByTestId("add-action").nth(i).click();
+    await page.getByTestId("pick-code").click();
+    await typeIn(page, "line", line, i);
+  }
+  await expect(python(page)).toHaveText(lines("self.a = 1", "self.b = 2"));
+  const rows = page.getByTestId("sheet-row");
+  const grip = (n: number) => page.getByTestId("sheet-grip").nth(n);
+  const at = async (n: number, fraction: number) => {
+    const b = (await rows.nth(n).boundingBox())!;
+    return { x: b.width / 2, y: b.height * fraction };
+  };
+
+  // b onto the top of a: before it.
+  await grip(1).dragTo(rows.nth(0), { targetPosition: await at(0, 0.1) });
+  await expect(python(page)).toHaveText(lines("self.b = 2", "self.a = 1"));
+  // b (now first) into the middle of a: a sub-event of a. With no conditions on a, it simply runs after a's action.
+  await page.getByTestId("add-condition").nth(1).click();
+  await page.getByTestId("pick-compare").click();
+  await grip(0).dragTo(rows.nth(1), { targetPosition: await at(1, 0.5) });
+  await expect(python(page)).toHaveText(lines("if self.x < 0:", "    self.a = 1", "    self.b = 2"));
+  // b can't go into itself; out to the end of the sheet instead, below the last row.
+  const area = (await page.getByTestId("sheet-rows").boundingBox())!;
+  await grip(1).dragTo(page.getByTestId("sheet-rows"), { targetPosition: { x: 40, y: area.height - 10 } });
+  await expect(python(page)).toHaveText(lines("if self.x < 0:", "    self.a = 1", "self.b = 2"));
+  // A drag is one undo step.
+  await page.locator(".sheet-rows").click({ position: { x: 5, y: area.height - 5 } });
+  await page.keyboard.press("ControlOrMeta+z");
+  await expect(python(page)).toHaveText(lines("if self.x < 0:", "    self.a = 1", "    self.b = 2"));
+});

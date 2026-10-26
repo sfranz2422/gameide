@@ -320,6 +320,63 @@ export function renameInSheet(sheet: Sheet, from: string, sub: (code: string) =>
   walk(sheet.rows);
 }
 
+// ---------------------------------------------------------------- moving rows
+
+/** Where a row is: the list holding it (the sheet's, or a row's children) and its place in it. */
+export interface RowPlace {
+  list: Row[];
+  index: number;
+}
+
+export function findRow(rows: Row[], id: string): RowPlace | null {
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i]!;
+    if (r.id === id) return { list: rows, index: i };
+    if (r.kind !== "comment") {
+      const inner = findRow(r.children, id);
+      if (inner) return inner;
+    }
+  }
+  return null;
+}
+
+/** Where a dragged row goes: before or after another row, inside it (its last sub-event), or at the end of the sheet. */
+export type DropWhere = "before" | "after" | "inside";
+
+/** Could row `id` be dropped there? Not on itself, not into its own sub-events, not inside a comment. */
+export function canDrop(sheet: Sheet, id: string, target: string | null, where: DropWhere): boolean {
+  const from = findRow(sheet.rows, id);
+  if (!from) return false;
+  if (target === null) return true;
+  if (target === id) return false;
+  const row = from.list[from.index]!;
+  if (row.kind !== "comment" && findRow(row.children, target)) return false;
+  const to = findRow(sheet.rows, target);
+  if (!to) return false;
+  return where !== "inside" || to.list[to.index]!.kind !== "comment";
+}
+
+/**
+ * Moves a row (with its sub-events) by drag and drop. `target` null means
+ * the end of the sheet. Returns whether it moved; a drop canDrop refuses
+ * changes nothing.
+ */
+export function moveRow(sheet: Sheet, id: string, target: string | null, where: DropWhere): boolean {
+  if (!canDrop(sheet, id, target, where)) return false;
+  const from = findRow(sheet.rows, id)!;
+  const [row] = from.list.splice(from.index, 1);
+  if (target === null) {
+    sheet.rows.push(row!);
+    return true;
+  }
+  // Found again: taking the row out may have moved the target up one.
+  const to = findRow(sheet.rows, target)!;
+  const t = to.list[to.index]!;
+  if (where === "inside" && t.kind !== "comment") t.children.push(row!);
+  else to.list.splice(to.index + (where === "after" ? 1 : 0), 0, row!);
+  return true;
+}
+
 /**
  * Fits calls to the scripts' functions to their parameters as they are now
  * — a box added for a new parameter (starting at 0), the box of a removed

@@ -161,6 +161,10 @@ testing.
 - A sheet has its own undo (SheetEditor), each box its own typing undo; the
   global Ctrl+Z skips `.sheet-editor`. Edits change a structuredClone of the
   sheet, found again by id — never the row objects on screen.
+- Rows move by HTML drag and drop from a grip only (a draggable row would
+  fight text selection in its boxes); `moveRow`/`canDrop` in sheet.ts do the
+  move, and the drag carries its own type so a dragged picture or text is
+  never taken for a row.
 - `codeMode.tsx` holds the rules for all three modes (`canUse`, `switchTo`,
   `confirmToPython`).
 

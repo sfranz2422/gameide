@@ -19,12 +19,17 @@ import {
   checkExpr,
   checkLine,
   CONDITION_FUNCTIONS,
+  canDrop,
   defaultArg,
+  findRow,
   fitCalls,
+  moveRow,
   sheetProblems,
   sheetToPython,
   type Action,
   type CompareOp,
+  type DropWhere,
+  type RowPlace,
   type Condition,
   type Row,
   type SetOp,
@@ -52,18 +57,11 @@ export interface SheetEditorProps {
 const UNDO_GROUP_MS = 1000;
 const MAX_UNDO = 200;
 
-type Where = { list: Row[]; index: number };
-function locate(rows: Row[], id: string): Where | null {
-  for (let i = 0; i < rows.length; i++) {
-    const r = rows[i]!;
-    if (r.id === id) return { list: rows, index: i };
-    if (r.kind !== "comment") {
-      const inner = locate(r.children, id);
-      if (inner) return inner;
-    }
-  }
-  return null;
-}
+type Where = RowPlace;
+const locate = findRow;
+
+/** The drag type of a row being moved: nothing else (a picture, text) is taken for one. */
+const ROW_DRAG = "application/x-gameide-sheet-row";
 
 const newRow = (kind: "event" | "else"): Row => ({ id: newId(), kind, conditions: [], actions: [], children: [] });
 
@@ -128,12 +126,34 @@ export default function SheetEditor(props: SheetEditorProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [props.errorLine?.nonce]);
 
+  // Drag and drop: the row being dragged, and where it would land.
+  const dragging = useRef<string | null>(null);
+  const [drop, setDrop] = useState<{ target: string | null; where: DropWhere } | null>(null);
+  const dropAt = (target: string | null, where: DropWhere) => {
+    const id = dragging.current;
+    const ok = !!id && canDrop(latest.current.sheet, id, target, where);
+    setDrop((d) => (ok ? (d?.target === target && d.where === where ? d : { target, where }) : null));
+    return ok;
+  };
+  const finishDrop = () => {
+    const id = dragging.current;
+    const d = drop;
+    dragging.current = null;
+    setDrop(null);
+    if (id && d) edit((s) => void moveRow(s, id, d.target, d.where));
+  };
+
   const ops: Ops = {
     names: () => latest.current.names(),
     problems,
     errorId: props.errorLine ? errorId : null,
     collision: !!props.collision,
     edit,
+    drop,
+    startDrag: (id) => (dragging.current = id),
+    endDrag: () => ((dragging.current = null), setDrop(null)),
+    dropAt,
+    finishDrop,
   };
 
   return (
@@ -178,7 +198,27 @@ export default function SheetEditor(props: SheetEditorProps) {
             ↷
           </button>
         </div>
-        <div className="sheet-rows">
+        <div
+          className={`sheet-rows${drop?.target === null ? " drop-end" : ""}`}
+          // Below the last row: the end of the sheet. In a gap between
+          // rows (also the container), the marker stays where it was rather
+          // than flicking to the end.
+          onDragOver={(e) => {
+            if (!e.dataTransfer.types.includes(ROW_DRAG)) return;
+            const top = e.currentTarget.querySelectorAll(":scope > .sheet-block, :scope > .sheet-row");
+            const last = top[top.length - 1];
+            if (last && e.clientY < last.getBoundingClientRect().bottom) {
+              if (drop) e.preventDefault();
+              return;
+            }
+            if (dropAt(null, "after")) e.preventDefault();
+          }}
+          onDrop={(e) => {
+            e.preventDefault();
+            finishDrop();
+          }}
+          data-testid="sheet-rows"
+        >
           {props.sheet.rows.length ? (
             <Rows rows={props.sheet.rows} ops={ops} />
           ) : (
@@ -207,6 +247,68 @@ interface Ops {
   errorId: string | null;
   collision: boolean;
   edit: (recipe: (s: Sheet) => void, group?: string | null) => void;
+  drop: { target: string | null; where: DropWhere } | null;
+  startDrag: (id: string) => void;
+  endDrag: () => void;
+  /** Shows where a drop would land; false (and nothing shown) if it can't go there. */
+  dropAt: (target: string | null, where: DropWhere) => boolean;
+  finishDrop: () => void;
+}
+
+/**
+ * A row as a drop target: its top part puts the dragged row before it, its
+ * bottom part after it, and its middle makes it a sub-event (a comment has
+ * no middle: nothing goes inside one).
+ */
+function dropTarget(row: Row, ops: Ops) {
+  const where = (e: React.DragEvent<HTMLElement>): DropWhere => {
+    const r = e.currentTarget.getBoundingClientRect();
+    const f = (e.clientY - r.top) / r.height;
+    if (row.kind === "comment") return f < 0.5 ? "before" : "after";
+    return f < 0.25 ? "before" : f > 0.75 ? "after" : "inside";
+  };
+  const mark = ops.drop?.target === row.id ? ` drop-${ops.drop.where}` : "";
+  return {
+    mark,
+    props: {
+      onDragOver: (e: React.DragEvent<HTMLElement>) => {
+        if (!e.dataTransfer.types.includes(ROW_DRAG)) return;
+        e.stopPropagation();
+        if (ops.dropAt(row.id, where(e))) {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = "move";
+        }
+      },
+      onDrop: (e: React.DragEvent<HTMLElement>) => {
+        e.preventDefault();
+        e.stopPropagation();
+        ops.finishDrop();
+      },
+    },
+  };
+}
+
+/** What a row is dragged by. Not the whole row: that would fight with selecting text in its boxes. */
+function Grip({ row, ops }: { row: Row; ops: Ops }) {
+  return (
+    <span
+      className="sheet-grip"
+      draggable
+      onDragStart={(e) => {
+        e.dataTransfer.setData(ROW_DRAG, row.id);
+        e.dataTransfer.effectAllowed = "move";
+        const el = e.currentTarget.closest(".sheet-row");
+        if (el) e.dataTransfer.setDragImage(el, 12, 12);
+        ops.startDrag(row.id);
+      }}
+      onDragEnd={ops.endDrag}
+      title="Drag to move this row, with its sub-events. Drop on the middle of a row to make it a sub-event."
+      aria-label="Drag to move this row"
+      data-testid="sheet-grip"
+    >
+      ⋮⋮
+    </span>
+  );
 }
 
 /** Changes the row with this id, wherever it is in the sheet. */
@@ -230,10 +332,12 @@ function RowView({ row, ops }: { row: Row; ops: Ops }) {
   const problem = ops.problems.get(row.id);
   const marked = ops.errorId === row.id || (row.kind !== "comment" && row.kind !== "foreach" && [...row.conditions, ...row.actions].some((x) => x.id === ops.errorId));
   const tools = <RowTools row={row} ops={ops} />;
+  const target = dropTarget(row, ops);
 
   if (row.kind === "comment")
     return (
-      <div className={`sheet-row comment${marked ? " error" : ""}`} data-item-id={row.id} data-testid="sheet-row">
+      <div className={`sheet-row comment${marked ? " error" : ""}${target.mark}`} data-item-id={row.id} data-testid="sheet-row" {...target.props}>
+        <Grip row={row} ops={ops} />
         <span className="sheet-hash">#</span>
         <input
           className="sheet-comment"
@@ -249,7 +353,8 @@ function RowView({ row, ops }: { row: Row; ops: Ops }) {
   if (row.kind === "foreach")
     return (
       <div className={`sheet-block${marked ? " error" : ""}`} data-item-id={row.id}>
-        <div className="sheet-row foreach" data-testid="sheet-row">
+        <div className={`sheet-row foreach${target.mark}`} data-testid="sheet-row" {...target.props}>
+          <Grip row={row} ops={ops} />
           <span className="sheet-kw">For each</span>
           <select
             value={row.object}
@@ -281,7 +386,8 @@ function RowView({ row, ops }: { row: Row; ops: Ops }) {
 
   return (
     <div className={`sheet-block${marked && ops.errorId === row.id ? " error" : ""}`} data-item-id={row.id}>
-      <div className={`sheet-row event${row.kind === "else" ? " else" : ""}`} data-testid="sheet-row">
+      <div className={`sheet-row event${row.kind === "else" ? " else" : ""}${target.mark}`} data-testid="sheet-row" {...target.props}>
+        <Grip row={row} ops={ops} />
         <div className="sheet-conds">
           {row.kind === "else" && <span className="sheet-kw">{row.conditions.length ? "Else if" : "Else"}</span>}
           {row.conditions.length > 1 && (

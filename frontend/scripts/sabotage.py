@@ -299,6 +299,12 @@ CASES = [
  ("error not marked on the sheet", SE, '${ops.errorId === act.id ? " error" : ""}', '${ops.errorId === act.id ? "" : ""}', "lands on the row and the action", E2E),
  ("no names in quotes", EB, '      if (ty && (before.match(/"/g) ?? []).length % 2 === 1) {', '      if (ty && (before.match(/"/g) ?? []).length % 2 === 3) {', "a sheet builds an event", E2E),
  ("calls not refitted", SH, "    if (!f || f.params.length === item.args.length) return;", "    if (!f || item.args.length >= 0) return;", "fitted to the function's parameters"),
+ ("dropped into itself", SH, "  if (row.kind !== \"comment\" && findRow(row.children, target)) return false;\n", "", "never onto itself"),
+ ("target not found again", SH, "  else to.list.splice(to.index + (where === \"after\" ? 1 : 0), 0, row!);", "  else to.list.splice(to.index + (where === \"after\" ? 1 : 0) + (to.list === from.list && to.index >= from.index ? 1 : 0), 0, row!);", "finds its target again"),
+ ("inside goes nowhere", SH, "  if (where === \"inside\" && t.kind !== \"comment\") t.children.push(row!);", "  if (where === \"inside\" && t.kind === \"comment\") t.children.push(row!);", "as its last sub-event"),
+ ("drop does nothing", SE, "        e.stopPropagation();\n        ops.finishDrop();", "        e.stopPropagation();", "rows move by drag and drop", E2E),
+ ("middle is not inside", SE, '    return f < 0.25 ? "before" : f > 0.75 ? "after" : "inside";', '    return f < 0.25 ? "before" : f > 0.75 ? "after" : "after";', "rows move by drag and drop", E2E),
+ ("no end of sheet", SE, '            if (dropAt(null, "after")) e.preventDefault();', '            if (dropAt(null, "after") && e.clientY < 0) e.preventDefault();', "rows move by drag and drop", E2E),
  ("bad box not marked", EB, '<span ref={host} className={`expr-box${problem ? " bad" : ""}`}', '<span ref={host} className={`expr-box${problem ? "" : ""}`}', "a box that isn't Python is marked", E2E),
 ]
 only = sys.argv[1:]
