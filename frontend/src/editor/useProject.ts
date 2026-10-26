@@ -9,6 +9,7 @@
  */
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { migrate, type Project } from "../store/project";
+import { History, type RecordOptions } from "./history";
 import { loadAssets, type ProjectStore, type SaveOutcome } from "../store/store";
 
 /**
@@ -21,7 +22,18 @@ export type SaveStatus = "saved" | "saving" | "offline" | "signed-out" | "error"
 export interface ProjectApi {
   project: Project;
   assets: Map<string, Blob>;
-  mutate: (recipe: (draft: Project) => void) => void;
+  /**
+   * Changes the project. `history: "skip"` for code (its editor has its own
+   * undo); `group`/`label` to shape the undo step (history.ts).
+   */
+  mutate: (recipe: (draft: Project) => void, opts?: MutateOptions) => void;
+  undo: () => void;
+  redo: () => void;
+  /** What Undo and Redo would do, or null when there's nothing to. */
+  undoLabel: string | null;
+  redoLabel: string | null;
+  /** The next change starts a new undo step (a drag ended). */
+  endUndoGroup: () => void;
   addAssets: (assets: Map<string, Blob>) => Promise<void>;
   status: SaveStatus;
   saveError: string | null;
@@ -30,6 +42,10 @@ export interface ProjectApi {
   /** Swap in a different version of the project (History's restore). */
   replace: (p: Project) => void;
   store: ProjectStore;
+}
+
+export interface MutateOptions extends RecordOptions {
+  history?: "record" | "skip";
 }
 
 export const ProjectContext = createContext<ProjectApi | null>(null);
@@ -167,15 +183,44 @@ export function useProjectState(store: ProjectStore, id: string) {
     };
   }, [save]);
 
-  const mutate = useCallback((recipe: (draft: Project) => void) => {
-    setProject((p) => {
-      if (!p) return p;
-      const next = structuredClone(p);
-      recipe(next);
-      next.modified = new Date().toISOString();
-      return next;
-    });
+  // One history per open project, for as long as it's open — not per tab.
+  const history = useRef(new History());
+  const [, setHistoryTick] = useState(0);
+
+  // From `latest` rather than a state updater: the updater form runs twice
+  // under StrictMode, and recording history twice would make every change
+  // two undo steps. `latest` is set here too, so changes made one after
+  // another before React re-renders build on each other.
+  const mutate = useCallback((recipe: (draft: Project) => void, opts: MutateOptions = {}) => {
+    const p = latest.current;
+    if (!p) return;
+    const next = structuredClone(p);
+    recipe(next);
+    next.modified = new Date().toISOString();
+    if (opts.history !== "skip") {
+      history.current.record(p, opts);
+      setHistoryTick((t) => t + 1);
+    }
+    latest.current = next;
+    setProject(next);
   }, []);
+
+  const travel = useCallback((dir: "undo" | "redo") => {
+    const p = latest.current;
+    if (!p) return;
+    const back = dir === "undo" ? history.current.undo(p) : history.current.redo(p);
+    if (!back) return;
+    back.modified = new Date().toISOString();
+    latest.current = back;
+    setProject(back);
+    setHistoryTick((t) => t + 1);
+  }, []);
+  const undo = useCallback(() => travel("undo"), [travel]);
+  const redo = useCallback(() => travel("redo"), [travel]);
+  const endUndoGroup = useCallback(() => history.current.endGroup(), []);
+  const h = history.current;
+  const undoLabel = h.past.length ? h.past[h.past.length - 1]!.label || "the last change" : null;
+  const redoLabel = h.future.length ? h.future[h.future.length - 1]!.label || "the change undone" : null;
 
   const addAssets = useCallback(
     async (more: Map<string, Blob>) => {
@@ -193,6 +238,10 @@ export function useProjectState(store: ProjectStore, id: string) {
    * (History's restore saved it there), so it is "loaded", not a change.
    */
   const replace = useCallback((p: Project) => {
+    // Going back to a saved version starts the undo history afresh: undoing
+    // "across" it would mix two timelines.
+    history.current = new History();
+    setHistoryTick((t) => t + 1);
     if (timer.current) clearTimeout(timer.current);
     timer.current = null;
     loaded.current = p;
@@ -202,5 +251,5 @@ export function useProjectState(store: ProjectStore, id: string) {
     void loadAssets(store, p).then(setAssets);
   }, [store]);
 
-  return { project, assets, mutate, addAssets, status, saveError, saveNote, setSaveNote, loadError, replace };
+  return { project, assets, mutate, addAssets, status, saveError, saveNote, setSaveNote, loadError, replace, undo, redo, undoLabel, redoLabel, endUndoGroup };
 }

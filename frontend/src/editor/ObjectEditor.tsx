@@ -188,10 +188,14 @@ export function ObjectEditor({
                 docKey={current.id}
                 value={current.code}
                 onChange={(code) =>
-                  set((o) => {
-                    const ev = o.events.find((x) => x.id === current.id);
-                    if (ev) ev.code = code;
-                  })
+                  // Code has its own undo, in its editor (history.ts).
+                  mutate(
+                    (p) => {
+                      const ev = find(p, "objects", objectId)?.events.find((x) => x.id === current.id);
+                      if (ev) ev.code = code;
+                    },
+                    { history: "skip" },
+                  )
                 }
                 names={() => projectNames(project)}
                 errorLine={focus && focus.eventId === current.id ? { line: focus.line, nonce: focus.nonce } : null}

@@ -18,7 +18,7 @@
 import { KEY_NAMES, MOUSE_BUTTONS, type KeyName } from "../engine/layout";
 
 /** Bump when the format changes, and teach `migrate` the old shape. */
-export const SCHEMA_VERSION = 3; // 2: room layers, grid, camera, instance overrides. 3: tilesets and tile layers
+export const SCHEMA_VERSION = 4; // 2: room layers, grid, camera, instance overrides. 3: tilesets and tile layers. 4: autotile sets
 
 export interface Project {
   format: "gameide-project";
@@ -91,6 +91,12 @@ export interface TilesetResource {
   spacingY: number;
   /** Tile numbers that are solid: walls and floors, for collisions. */
   solid: number[];
+  /**
+   * Autotile sets: 16 tiles each, one per way a cell joins its neighbours
+   * (editor/tiles/tileOps.ts), so painting "grass" picks edges and corners
+   * by itself.
+   */
+  autotiles: { id: string; name: string; tiles: number[] }[];
 }
 
 export interface ObjectResource {
@@ -299,7 +305,7 @@ export function newInstance(room: RoomResource, object: string, x: number, y: nu
 }
 
 export function newTileset(name: string): TilesetResource {
-  return { id: newId(), name, image: null, imageWidth: 0, imageHeight: 0, tileWidth: 32, tileHeight: 32, offsetX: 0, offsetY: 0, spacingX: 0, spacingY: 0, solid: [] };
+  return { id: newId(), name, image: null, imageWidth: 0, imageHeight: 0, tileWidth: 32, tileHeight: 32, offsetX: 0, offsetY: 0, spacingX: 0, spacingY: 0, solid: [], autotiles: [] };
 }
 
 /** How many tiles across and down a tileset's picture holds. */
@@ -307,6 +313,44 @@ export function tilesetGrid(t: TilesetResource): { columns: number; rows: number
   const across = (t.imageWidth - t.offsetX + t.spacingX) / (t.tileWidth + t.spacingX);
   const down = (t.imageHeight - t.offsetY + t.spacingY) / (t.tileHeight + t.spacingY);
   return { columns: Math.max(0, Math.floor(across)), rows: Math.max(0, Math.floor(down)) };
+}
+
+/**
+ * After a tileset's grid changed (a new picture, or a different tile size,
+ * offset or spacing), keeps every painted tile on the same picture tile —
+ * the same column and row of the sheet — rather than the same number.
+ * Tile n is row * columns + column, so a picture one tile wider would
+ * otherwise shift every tile below the first row to a different picture.
+ * Solid flags move with their tiles. Returns how many painted tiles pointed
+ * at a column or row the new grid no longer has; those are removed.
+ */
+export function remapTileset(project: Project, tilesetId: string, before: TilesetResource): number {
+  const after = find(project, "tilesets", tilesetId);
+  if (!after) return 0;
+  const was = tilesetGrid(before), now = tilesetGrid(after);
+  if (was.columns === now.columns && was.rows === now.rows) return 0;
+  const move = (n: number): number | null => {
+    const c = n % Math.max(1, was.columns), r = Math.floor(n / Math.max(1, was.columns));
+    return c < now.columns && r < now.rows ? r * now.columns + c : null;
+  };
+  let lost = 0;
+  for (const room of project.rooms)
+    for (const l of room.layers) {
+      if (l.kind !== "tiles" || l.tileset !== tilesetId) continue;
+      const out: Record<string, number> = {};
+      for (const [k, t] of Object.entries(l.tiles)) {
+        const m = move(t);
+        if (m === null) lost++;
+        else out[k] = m;
+      }
+      l.tiles = out;
+    }
+  after.solid = after.solid.flatMap((n) => {
+    const m = move(n);
+    return m === null ? [] : [m];
+  });
+  for (const set of after.autotiles) set.tiles = set.tiles.map((n) => (n < 0 ? n : move(n) ?? -1));
+  return lost;
 }
 
 export function newScript(name: string): ScriptResource {
@@ -533,7 +577,14 @@ export function migrate(data: unknown): Project {
     throw new Error("This project was made by a newer GameIDE. Reload the page to update.");
   if (p.schemaVersion < 2) upgradeTo2(p as Project);
   if (p.schemaVersion < 3) upgradeTo3(p as Project);
+  if (p.schemaVersion < 4) upgradeTo4(p as Project);
   return p as Project;
+}
+
+/** 3 → 4: tilesets gained autotile sets; older ones have none. */
+function upgradeTo4(p: Project) {
+  for (const t of p.tilesets) t.autotiles ??= [];
+  p.schemaVersion = 4;
 }
 
 /** 2 → 3: tilesets arrived; a project from before has none, and no tile layers. */

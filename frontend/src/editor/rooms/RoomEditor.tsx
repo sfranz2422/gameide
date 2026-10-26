@@ -15,7 +15,21 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { find, newId, newInstance, tilesetGrid, type Project, type RoomInstance, type RoomLayer, type RoomResource } from "../../store/project";
-import { erase as eraseTiles, fillRect, floodFill, paint, pick, single, stampFromPalette, type Stamp } from "../tiles/tileOps";
+import {
+  autotileErase,
+  autotilePaint,
+  erase as eraseTiles,
+  fillRect,
+  floodCells,
+  floodFill,
+  paint,
+  pick,
+  rectCells,
+  single,
+  stampFromPalette,
+  type AutotileSet,
+  type Stamp,
+} from "../tiles/tileOps";
 import { tileRect } from "../tiles/TilesetEditor";
 import { CodeEditor } from "../code/CodeEditor";
 import { projectNames } from "../ObjectEditor";
@@ -27,6 +41,7 @@ import { cameraPreview, copy, corners, drawOrder, hitTest, inBox, occupied, past
 let clipboard: Clip | null = null;
 
 export const OBJECT_DRAG_TYPE = "application/x-gameide-object";
+const MIN_ZOOM = 0.02;
 
 type TileLayer = Extract<RoomLayer, { kind: "tiles" }>;
 type Tool = "select" | "place" | "paint" | "rect" | "fill" | "pick" | "erase";
@@ -40,76 +55,76 @@ type Drag =
   | { kind: "paint" }
   | { kind: "erase" };
 
-/** The first frame of every sprite, decoded, for drawing the room. */
-function useSpriteImages(project: Project, assets: Map<string, Blob>) {
+/**
+ * Decoded pictures that are swapped, not closed early: the old set is closed
+ * only after the new one is showing. Closing them in the effect's cleanup
+ * left the canvas drawing closed pictures until the new ones decoded, and
+ * drawImage throws on those ("the image source is detached").
+ */
+function useBitmaps(key: string, load: () => Promise<Map<string, ImageBitmap>>) {
   const [images, setImages] = useState(new Map<string, ImageBitmap>());
-  const key = project.sprites.map((s) => `${s.id}:${s.frames[0] ?? ""}`).join(",");
+  const shown = useRef<Map<string, ImageBitmap>>(new Map());
   useEffect(() => {
     let alive = true;
-    const made: ImageBitmap[] = [];
-    void (async () => {
-      const out = new Map<string, ImageBitmap>();
-      for (const s of project.sprites) {
-        const blob = s.frames[0] ? assets.get(s.frames[0]) : undefined;
-        if (!blob) continue;
-        try {
-          const bmp = await createImageBitmap(blob);
-          made.push(bmp);
-          out.set(s.id, bmp);
-        } catch {
-          /* drawn as a stand-in box */
-        }
-      }
-      if (alive) setImages(out);
-    })();
+    void load().then((next) => {
+      if (!alive) return next.forEach((b) => b.close());
+      const old = shown.current;
+      shown.current = next;
+      setImages(next);
+      setTimeout(() => old.forEach((b) => b.close()), 0);
+    });
     return () => {
       alive = false;
-      made.forEach((b) => b.close());
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, assets]);
+  }, [key]);
+  useEffect(() => () => shown.current.forEach((b) => b.close()), []);
   return images;
+}
+
+/** The first frame of every sprite, decoded, for drawing the room. */
+function useSpriteImages(project: Project, assets: Map<string, Blob>) {
+  const key = project.sprites.map((s) => `${s.id}:${s.frames[0] ?? ""}:${assets.has(s.frames[0] ?? "")}`).join(",");
+  return useBitmaps(key, async () => {
+    const out = new Map<string, ImageBitmap>();
+    for (const s of project.sprites) {
+      const blob = s.frames[0] ? assets.get(s.frames[0]) : undefined;
+      if (!blob) continue;
+      try {
+        out.set(s.id, await createImageBitmap(blob));
+      } catch {
+        /* drawn as a stand-in box */
+      }
+    }
+    return out;
+  });
 }
 
 /** Every tileset's picture, decoded, for drawing tile layers and the palette. */
 function useTilesetImages(project: Project, assets: Map<string, Blob>) {
-  const [images, setImages] = useState(new Map<string, ImageBitmap>());
-  const key = project.tilesets.map((t) => `${t.id}:${t.image ?? ""}`).join(",");
-  useEffect(() => {
-    let alive = true;
-    const made: ImageBitmap[] = [];
-    void (async () => {
-      const out = new Map<string, ImageBitmap>();
-      for (const t of project.tilesets) {
-        const blob = t.image ? assets.get(t.image) : undefined;
-        if (!blob) continue;
-        try {
-          const b = await createImageBitmap(blob);
-          made.push(b);
-          out.set(t.id, b);
-        } catch {
-          /* drawn as nothing; the tileset editor says why */
-        }
+  const key = project.tilesets.map((t) => `${t.id}:${t.image ?? ""}:${assets.has(t.image ?? "")}`).join(",");
+  return useBitmaps(key, async () => {
+    const out = new Map<string, ImageBitmap>();
+    for (const t of project.tilesets) {
+      const blob = t.image ? assets.get(t.image) : undefined;
+      if (!blob) continue;
+      try {
+        out.set(t.id, await createImageBitmap(blob));
+      } catch {
+        /* drawn as nothing; the tileset editor says why */
       }
-      if (alive) setImages(out);
-    })();
-    return () => {
-      alive = false;
-      made.forEach((b) => b.close());
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, assets]);
-  return images;
+    }
+    return out;
+  });
 }
 
-/** Undo and redo for one room: whole-room snapshots, at most this many back. */
-const HISTORY = 100;
-
 export function RoomEditor({ roomId, focus }: { roomId: string; focus: { instanceId: string; line: number; nonce: number } | null }) {
-  const { project, assets, mutate } = useProjectApi();
+  const { project, assets, mutate, undo, redo, undoLabel, redoLabel, endUndoGroup } = useProjectApi();
   const room = find(project, "rooms", roomId);
   const [tool, setTool] = useState<Tool>("select");
   const [stamp, setStamp] = useState<Stamp>(single(0));
+  /** An autotile set chosen as the brush (its id), or null for ordinary tiles. */
+  const [autoSetId, setAutoSetId] = useState<string | null>(null);
   const [placeObject, setPlaceObject] = useState<string>(project.objects[0]?.id ?? "");
   const [layerId, setLayerId] = useState<string>(room?.layers.find((l) => l.kind === "instances")?.id ?? "");
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -126,44 +141,23 @@ export function RoomEditor({ roomId, focus }: { roomId: string; focus: { instanc
   const lastPaint = useRef<string>("");
 
   // ---------------------------------------------------------------- undo
-  // Every change goes through setRoom, which keeps the room as it was
-  // before. A drag (a painted stroke, a move) is one step: only its first
-  // change is recorded, so Undo takes back the whole stroke, not one tile.
-  const past = useRef<RoomResource[]>([]);
-  const future = useRef<RoomResource[]>([]);
-  const stroke = useRef<"none" | "open" | "recorded">("none");
-  const [, setHistoryTick] = useState(0);
-  const roomRef = useRef(room);
-  roomRef.current = room;
+  // Room edits go into the project's undo history (history.ts), so they can
+  // be undone after switching tabs and back. A drag — a painted stroke, a
+  // move, a rectangle — is one step: its changes share a group, which ends
+  // when the pointer comes up.
+  const strokeCount = useRef(0);
+  const stroke = useRef<string | null>(null);
+  const beginStroke = () => (stroke.current = `room:${roomId}:${++strokeCount.current}`);
+  const endStroke = () => {
+    stroke.current = null;
+    endUndoGroup();
+  };
 
   const setRoom = useCallback(
-    (recipe: (r: RoomResource) => void) => {
-      const before = roomRef.current;
-      if (before && stroke.current !== "recorded") {
-        past.current.push(structuredClone(before));
-        if (past.current.length > HISTORY) past.current.shift();
-        future.current = [];
-        if (stroke.current === "open") stroke.current = "recorded";
-        setHistoryTick((t) => t + 1);
-      }
-      mutate((p) => recipe(find(p, "rooms", roomId)!));
-    },
+    (recipe: (r: RoomResource) => void, label = "edit the room") =>
+      mutate((p) => recipe(find(p, "rooms", roomId)!), { label, ...(stroke.current ? { group: stroke.current } : {}) }),
     [mutate, roomId],
   );
-
-  const travel = (from: React.MutableRefObject<RoomResource[]>, to: React.MutableRefObject<RoomResource[]>) => {
-    const target = from.current.pop();
-    if (!target || !roomRef.current) return;
-    to.current.push(structuredClone(roomRef.current));
-    mutate((p) => {
-      const i = p.rooms.findIndex((r) => r.id === roomId);
-      if (i >= 0) p.rooms[i] = target;
-    });
-    setSelected(new Set());
-    setHistoryTick((t) => t + 1);
-  };
-  const undo = () => travel(past, future);
-  const redo = () => travel(future, past);
 
   // An error in an instance's creation code: select it and show its code.
   useEffect(() => {
@@ -184,6 +178,7 @@ export function RoomEditor({ roomId, focus }: { roomId: string; focus: { instanc
   const tileLayer = currentLayer?.kind === "tiles" ? currentLayer : null;
   const tileSet = tileLayer ? find(project, "tilesets", tileLayer.tileset) : undefined;
   const tileSize = tileSet ? { w: tileSet.tileWidth, h: tileSet.tileHeight } : null;
+  const autoSet: AutotileSet | null = (autoSetId && tileSet?.autotiles.find((a) => a.id === autoSetId)) || null;
   useEffect(() => {
     const tileTools: Tool[] = ["paint", "rect", "fill", "pick", "erase"];
     if (tileLayer && !tileTools.includes(tool)) setTool("paint");
@@ -204,7 +199,9 @@ export function RoomEditor({ roomId, focus }: { roomId: string; focus: { instanc
   const fit = useCallback(() => {
     const el = box.current;
     if (!el || !room) return;
-    const zoom = Math.max(0.1, Math.min(4, Math.min((el.clientWidth - 40) / room.width, (el.clientHeight - 40) / room.height)));
+    // Down to 2%: a 9600 px level has to fit too. (At a 10% floor it didn't,
+    // and Fit left most of a big room off screen.)
+    const zoom = Math.max(MIN_ZOOM, Math.min(4, Math.min((el.clientWidth - 40) / room.width, (el.clientHeight - 40) / room.height)));
     setView({ zoom, panX: (el.clientWidth - room.width * zoom) / 2, panY: (el.clientHeight - room.height * zoom) / 2, fitted: true });
   }, [room]);
 
@@ -216,7 +213,7 @@ export function RoomEditor({ roomId, focus }: { roomId: string; focus: { instanc
     const el = box.current!;
     const px = cx ?? el.clientWidth / 2, py = cy ?? el.clientHeight / 2;
     setView((v) => {
-      const zoom = Math.max(0.1, Math.min(16, v.zoom * factor));
+      const zoom = Math.max(MIN_ZOOM, Math.min(16, v.zoom * factor));
       return { zoom, panX: px - ((px - v.panX) / v.zoom) * zoom, panY: py - ((py - v.panY) / v.zoom) * zoom, fitted: true };
     });
   };
@@ -277,10 +274,29 @@ export function RoomEditor({ roomId, focus }: { roomId: string; focus: { instanc
       items.push({
         depth: l.depth,
         draw: () => {
-          for (const [k, tile] of Object.entries(l.tiles)) {
-            const [c, r] = k.split(",").map(Number) as [number, number];
+          // Only the cells on screen: on a huge level, walking every painted
+          // tile on each redraw (the pointer moving is a redraw) crawled.
+          const tw = ts.tileWidth, th = ts.tileHeight;
+          const c0 = Math.max(0, Math.floor(-view.panX / view.zoom / tw)), r0 = Math.max(0, Math.floor(-view.panY / view.zoom / th));
+          const c1 = Math.ceil((el.clientWidth - view.panX) / view.zoom / tw), r1 = Math.ceil((el.clientHeight - view.panY) / view.zoom / th);
+          const onScreen = (c1 - c0 + 1) * (r1 - r0 + 1);
+          const draw = (c: number, r: number, tile: number) => {
             const src = tileRect(ts, tile, columns);
-            ctx.drawImage(img, src.x, src.y, src.w, src.h, c * ts.tileWidth, r * ts.tileHeight, ts.tileWidth, ts.tileHeight);
+            ctx.drawImage(img, src.x, src.y, src.w, src.h, c * tw, r * th, tw, th);
+          };
+          const painted = Object.keys(l.tiles).length;
+          if (painted <= onScreen) {
+            // Fewer painted tiles than cells on screen: go through the tiles.
+            for (const [k, tile] of Object.entries(l.tiles)) {
+              const [c, r] = k.split(",").map(Number) as [number, number];
+              if (c >= c0 && c <= c1 && r >= r0 && r <= r1) draw(c, r, tile);
+            }
+          } else {
+            for (let r = r0; r <= r1; r++)
+              for (let c = c0; c <= c1; c++) {
+                const tile = l.tiles[`${c},${r}`];
+                if (tile !== undefined) draw(c, r, tile);
+              }
           }
         },
       });
@@ -338,7 +354,7 @@ export function RoomEditor({ roomId, focus }: { roomId: string; focus: { instanc
         ctx.fillRect(left * tileSize.w, top * tileSize.h, (Math.abs(drag.c1 - drag.c0) + 1) * tileSize.w, (Math.abs(drag.r1 - drag.r0) + 1) * tileSize.h);
       } else if (hover && (tool === "paint" || tool === "fill" || tool === "erase" || tool === "rect")) {
         const c = Math.floor(hover.x / tileSize.w), r = Math.floor(hover.y / tileSize.h);
-        if (tool === "paint" && tsImg && tileSet) {
+        if (tool === "paint" && tsImg && tileSet && !autoSet) {
           ctx.globalAlpha = 0.6;
           const { columns } = tilesetGrid(tileSet);
           for (let y = 0; y < stamp.rows; y++)
@@ -350,7 +366,8 @@ export function RoomEditor({ roomId, focus }: { roomId: string; focus: { instanc
         }
         ctx.strokeStyle = tool === "erase" ? "#ff6b6b" : "#4f8cff";
         ctx.lineWidth = 2 / view.zoom;
-        const w = tool === "paint" || tool === "erase" ? stamp.columns : 1, h = tool === "paint" || tool === "erase" ? stamp.rows : 1;
+        const brushed = (tool === "paint" || tool === "erase") && !autoSet;
+        const w = brushed ? stamp.columns : 1, h = brushed ? stamp.rows : 1;
         ctx.strokeRect(c * tileSize.w, r * tileSize.h, w * tileSize.w, h * tileSize.h);
       }
     }
@@ -421,23 +438,36 @@ export function RoomEditor({ roomId, focus }: { roomId: string; focus: { instanc
       const l = r.layers.find((x) => x.id === layerId);
       if (l?.kind === "tiles") l.tiles = make(l.tiles);
     });
+  /** One brush dab at (c, r): the stamp, or the autotile set (which also re-picks the neighbours). */
+  const dab = (t: Record<string, number>, c: number, r: number, erasing: boolean) =>
+    autoSet
+      ? erasing
+        ? autotileErase(t, [[c, r]], autoSet)
+        : autotilePaint(t, [[c, r]], autoSet, bounds)
+      : erasing
+        ? eraseTiles(t, c, r, stamp.columns, stamp.rows)
+        : paint(t, c, r, stamp, bounds);
+
   const tileDown = (e: React.PointerEvent, p: { x: number; y: number }) => {
     if (!tileLayer || !tileSize || layerLocked) return;
     const { c, r } = cellOf(p);
     const erasing = tool === "erase" || e.button === 2;
-    stroke.current = "open";
+    beginStroke();
     if (tool === "pick") {
       const got = pick(tileLayer.tiles, c, r);
-      if (got) setStamp(got);
+      if (got) {
+        setStamp(got);
+        setAutoSetId(null);
+      }
       setTool("paint");
       return;
     }
     if (tool === "fill") {
-      setTiles((t) => floodFill(t, c, r, stamp, bounds));
+      setTiles((t) => (autoSet ? autotilePaint(t, floodCells(t, c, r, bounds), autoSet, bounds) : floodFill(t, c, r, stamp, bounds)));
       return;
     }
     if (tool === "rect") return setDrag({ kind: "tilerect", c0: c, r0: r, c1: c, r1: r, erasing });
-    setTiles((t) => (erasing ? eraseTiles(t, c, r, stamp.columns, stamp.rows) : paint(t, c, r, stamp, bounds)));
+    setTiles((t) => dab(t, c, r, erasing));
     setDrag({ kind: "tiles", erasing, last: `${c},${r}` });
   };
 
@@ -464,7 +494,7 @@ export function RoomEditor({ roomId, focus }: { roomId: string; focus: { instanc
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     if (e.button === 1 || spaceDown.current) return setDrag({ kind: "pan", sx: e.clientX, sy: e.clientY, panX: view.panX, panY: view.panY });
     if (tileLayer) return tileDown(e, p);
-    stroke.current = "open";
+    beginStroke();
     if (tool === "place") {
       if (e.button === 2) {
         erase(p);
@@ -507,7 +537,7 @@ export function RoomEditor({ roomId, focus }: { roomId: string; focus: { instanc
       const k = `${c},${r}`;
       if (k === drag.last) return;
       setDrag({ ...drag, last: k });
-      return setTiles((t) => (drag.erasing ? eraseTiles(t, c, r, stamp.columns, stamp.rows) : paint(t, c, r, stamp, bounds)));
+      return setTiles((t) => dab(t, c, r, drag.erasing));
     }
     if (drag.kind === "erase") return erase(p);
     if (drag.kind === "paint") {
@@ -528,9 +558,14 @@ export function RoomEditor({ roomId, focus }: { roomId: string; focus: { instanc
   const up = () => {
     const d = drag;
     setDrag(null);
-    if (d?.kind === "tilerect") setTiles((t) => fillRect(t, d.c0, d.r0, d.c1, d.r1, d.erasing ? null : stamp, bounds));
+    if (d?.kind === "tilerect")
+      setTiles((t) => {
+        if (!autoSet) return fillRect(t, d.c0, d.r0, d.c1, d.r1, d.erasing ? null : stamp, bounds);
+        const cells = rectCells(d.c0, d.r0, d.c1, d.r1);
+        return d.erasing ? autotileErase(t, cells, autoSet) : autotilePaint(t, cells, autoSet, bounds);
+      });
     // The stroke ends after its last change, so the whole drag is one undo step.
-    stroke.current = "none";
+    endStroke();
     if (!d) return;
     if (d.kind === "box") {
       const caught = inBox(project, room, d.x0, d.y0, d.x1, d.y1).map((i) => i.id);
@@ -565,14 +600,6 @@ export function RoomEditor({ roomId, focus }: { roomId: string; focus: { instanc
       spaceDown.current = true;
       e.preventDefault();
       return;
-    }
-    if (mod && e.key.toLowerCase() === "z") {
-      e.preventDefault();
-      return e.shiftKey ? redo() : undo();
-    }
-    if (mod && e.key.toLowerCase() === "y") {
-      e.preventDefault();
-      return redo();
     }
     if (e.key === "Delete" || e.key === "Backspace") {
       if (!selected.size) return;
@@ -648,10 +675,10 @@ export function RoomEditor({ roomId, focus }: { roomId: string; focus: { instanc
             </button>
           ))}
         </div>
-        <button className="icon-btn" onClick={undo} disabled={!past.current.length} title="Undo (Ctrl+Z)" aria-label="Undo" data-testid="room-undo">
+        <button className="icon-btn" onClick={undo} disabled={!undoLabel} title={undoLabel ? `Undo ${undoLabel} (Ctrl+Z)` : "Nothing to undo"} aria-label="Undo" data-testid="room-undo">
           ↶
         </button>
-        <button className="icon-btn" onClick={redo} disabled={!future.current.length} title="Redo (Ctrl+Shift+Z)" aria-label="Redo" data-testid="room-redo">
+        <button className="icon-btn" onClick={redo} disabled={!redoLabel} title={redoLabel ? `Redo ${redoLabel} (Ctrl+Shift+Z)` : "Nothing to redo"} aria-label="Redo" data-testid="room-redo">
           ↷
         </button>
         {tool === "place" && (
@@ -726,7 +753,13 @@ export function RoomEditor({ roomId, focus }: { roomId: string; focus: { instanc
           stamp={stamp}
           setStamp={(st) => {
             setStamp(st);
+            setAutoSetId(null);
             if (tool !== "rect" && tool !== "fill") setTool("paint");
+          }}
+          autoSetId={autoSet?.id ?? null}
+          setAutoSetId={(id) => {
+            setAutoSetId(id);
+            if (tool !== "rect" && tool !== "fill" && tool !== "erase") setTool("paint");
           }}
           tileImages={tileImages}
           room={room}
@@ -750,6 +783,8 @@ function RoomPanel({
   tileLayer,
   stamp,
   setStamp,
+  autoSetId,
+  setAutoSetId,
   tileImages,
   room,
   panel,
@@ -764,6 +799,8 @@ function RoomPanel({
   tileLayer: TileLayer | null;
   stamp: Stamp;
   setStamp: (s: Stamp) => void;
+  autoSetId: string | null;
+  setAutoSetId: (id: string | null) => void;
   tileImages: Map<string, ImageBitmap>;
   room: RoomResource;
   panel: Panel;
@@ -775,7 +812,7 @@ function RoomPanel({
   setLayerId: (id: string) => void;
   focus: { instanceId: string; line: number; nonce: number } | null;
 }) {
-  const { project } = useProjectApi();
+  const { project, mutate } = useProjectApi();
   const num = (label: string, value: number, change: (v: number) => void, testid?: string, min?: number) => (
     <label className="num">
       {label}
@@ -806,7 +843,9 @@ function RoomPanel({
         ))}
       </div>
 
-      {panel === "tiles" && tileLayer && <TilePalette layer={tileLayer} stamp={stamp} setStamp={setStamp} images={tileImages} />}
+      {panel === "tiles" && tileLayer && (
+        <TilePalette layer={tileLayer} stamp={stamp} setStamp={setStamp} images={tileImages} autoSetId={autoSetId} setAutoSetId={setAutoSetId} />
+      )}
 
       {panel === "room" && (
         <div className="panel-body">
@@ -928,7 +967,16 @@ function RoomPanel({
                 <CodeEditor
                   docKey={`inst:${one.id}`}
                   value={one.code}
-                  onChange={(code) => eachSelected((i) => void (i.code = code))}
+                  // Code has its own undo, in its editor (history.ts).
+                  onChange={(code) =>
+                    mutate(
+                      (p) => {
+                        const inst = find(p, "rooms", room.id)?.instances.find((i) => i.id === one.id);
+                        if (inst) inst.code = code;
+                      },
+                      { history: "skip" },
+                    )
+                  }
                   names={() => projectNames(project)}
                   errorLine={focus && focus.instanceId === one.id ? { line: focus.line, nonce: focus.nonce } : null}
                   testId="creation-code"
@@ -957,7 +1005,21 @@ function RoomPanel({
  * The tile layer's tileset, to choose the brush from: click a tile, or drag
  * across several to paint them together.
  */
-function TilePalette({ layer, stamp, setStamp, images }: { layer: TileLayer; stamp: Stamp; setStamp: (s: Stamp) => void; images: Map<string, ImageBitmap> }) {
+function TilePalette({
+  layer,
+  stamp,
+  setStamp,
+  images,
+  autoSetId,
+  setAutoSetId,
+}: {
+  layer: TileLayer;
+  stamp: Stamp;
+  setStamp: (s: Stamp) => void;
+  images: Map<string, ImageBitmap>;
+  autoSetId: string | null;
+  setAutoSetId: (id: string | null) => void;
+}) {
   const { project } = useProjectApi();
   const ts = find(project, "tilesets", layer.tileset);
   const img = ts ? images.get(ts.id) : undefined;
@@ -974,7 +1036,7 @@ function TilePalette({ layer, stamp, setStamp, images }: { layer: TileLayer; sta
     const ctx = c.getContext("2d")!;
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(img, 0, 0, c.width, c.height);
-    const chosen = new Set(stamp.tiles);
+    const chosen = new Set(autoSetId ? [] : stamp.tiles);
     for (let n = 0; n < grid.columns * grid.rows; n++) {
       const r = tileRect(ts, n, grid.columns);
       ctx.strokeStyle = chosen.has(n) ? "#4f8cff" : "rgba(255,255,255,0.15)";
@@ -1017,10 +1079,37 @@ function TilePalette({ layer, stamp, setStamp, images }: { layer: TileLayer; sta
         />
       </div>
       <p className="muted small" data-testid="stamp-size">
-        Brush: {stamp.columns} × {stamp.rows} {stamp.columns * stamp.rows === 1 ? `(tile ${stamp.tiles[0]})` : "tiles"}
+        {autoSetId
+          ? `Brush: ${ts.autotiles.find((a) => a.id === autoSetId)?.name ?? "?"} (autotile)`
+          : `Brush: ${stamp.columns} × ${stamp.rows} ${stamp.columns * stamp.rows === 1 ? `(tile ${stamp.tiles[0]})` : "tiles"}`}
       </p>
+      {ts.autotiles.length > 0 && (
+        <div className="autotile-brushes" data-tutorial="autotile-brushes">
+          <p className="muted small">Autotile: paint, and the edges and corners pick themselves.</p>
+          {ts.autotiles.map((a) => {
+            const r = tileRect(ts, a.tiles[0] !== undefined && a.tiles[0]! >= 0 ? a.tiles[0]! : 0, grid.columns);
+            return (
+              <button key={a.id} className={`btn small ${autoSetId === a.id ? "on" : ""}`} onClick={() => setAutoSetId(a.id)} data-testid={`autotile-${a.name}`}>
+                <AutotileThumb img={img} rect={r} /> {a.name}
+              </button>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
+}
+
+function AutotileThumb({ img, rect }: { img: ImageBitmap; rect: { x: number; y: number; w: number; h: number } }) {
+  const c = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const ctx = c.current?.getContext("2d");
+    if (!ctx) return;
+    ctx.imageSmoothingEnabled = false;
+    ctx.clearRect(0, 0, 16, 16);
+    ctx.drawImage(img, rect.x, rect.y, rect.w, rect.h, 0, 0, 16, 16);
+  }, [img, rect.x, rect.y, rect.w, rect.h]);
+  return <canvas ref={c} width={16} height={16} className="thumb" />;
 }
 
 function LayersPanel({

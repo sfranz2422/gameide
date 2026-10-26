@@ -35,6 +35,8 @@ export interface WorkerStats {
   instances: number;
   pythonMs: number;
   motionMs: number;
+  /** Tiles the renderer is drawing (only those near the view). */
+  tiles: number;
 }
 
 export type GameState = "loading" | "running" | "stopped" | "crashed";

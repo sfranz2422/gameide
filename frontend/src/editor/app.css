@@ -1415,3 +1415,52 @@ a.btn {
   cursor: pointer;
   touch-action: none;
 }
+.banner.warn {
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: rgba(255, 204, 102, 0.15);
+  color: var(--warn);
+}
+.autotile-brushes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.btn.on {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.autotile-row {
+  align-items: center;
+  margin-bottom: 4px;
+}
+.autotile-row input {
+  width: 120px;
+}
+.slot-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+  margin: 8px 0;
+}
+.slot {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding: 4px;
+  background: var(--panel-2);
+  border: 2px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.slot.on {
+  border-color: var(--accent);
+}
+.slot canvas {
+  image-rendering: pixelated;
+  background: #2d374b;
+}
+.slot-diagram rect {
+  fill: var(--accent-2);
+}

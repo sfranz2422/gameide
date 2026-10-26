@@ -1,6 +1,46 @@
 # Progress
 
-## Phase 6 — Tilesets and tile maps ✅ (2026-10-26, waiting for review)
+## Phase 6 gaps, fixed (2026-10-26, waiting for review)
+
+You asked for Phase 6's known gaps to be fixed before Phase 7. Three of them are fixed, and one more turned out to be a crash.
+
+1. **Undo covers the whole project:** sprites, tilesets, objects, rooms and the resource tree, including deleting things. It lasts for as long as the project is open, whatever tab the change was made in.
+   - The **↶ ↷** buttons in the top bar say what they'd undo ("Undo delete Coin"). Ctrl+Z, Ctrl+Shift+Z and Ctrl+Y work everywhere except while typing in a box.
+   - Changes close together are one step: a painted stroke, or typing a number into a box.
+   - **Undo never changes code.** Code keeps its own undo inside its editor, and restoring an older snapshot keeps every event's, script's and creation code's current text. Without that, undoing a sprite change would wipe out typing done since.
+2. **Replacing a tileset's picture** (or changing its tile size, offset or spacing) keeps painted tiles on the same part of the picture. Solid flags and autotile sets move with them. Tiles with nowhere to go are removed with a notice, and Undo brings them back.
+3. **Huge levels:** the game draws tile layers in 16 × 16-tile chunks, built only when they come near the view, hidden when they leave, and freed when far away. The room editor draws only the cells on screen, and **Fit now zooms out to 2%** (it stopped at 10%, which left big rooms off screen).
+
+   An honest note: on this laptop, even drawing all 86 000 tiles held 60 fps. The gain is memory, and frame time on slower machines like Chromebooks. So the test checks what is drawn (about 1 700 of the 86 000), not speed. The Debug overlay shows "tiles drawn" too.
+4. **Autotiling:**
+   - A tileset can have **autotile sets**: 16 tiles, one for each way a cell joins its neighbours.
+   - Build one in the tileset editor: pick a slot (each shows which sides it joins) and click its tile; it moves on to the next slot. Or use **Take 16 in order**.
+   - In the room editor, the Tiles panel lists autotile **brushes**. Paint, rectangle, bucket fill and erase all pick edges and corners by themselves, and update the neighbours too.
+   - The starter tileset now has a 16-piece **grass** set, and the Platformer template's ground is painted with it.
+
+**Not changed, on purpose:** tiles still don't send collision *events*. GameMaker's don't either, and an event firing every step a player stands on the floor would be noise. `place_meeting`, `place_free` and `move_and_collide` cover it.
+
+**Found along the way:**
+- **A crash: replacing a tileset's picture crashed the tileset editor.** The old picture was closed while still on screen. The room editor's picture hooks had the same pattern. All three now close old pictures only after the new ones are showing, and a test pins it.
+- **The platformer's enemies shook in place** (you spotted this one). They stood a row above the ground, so the "edge of a drop" check found nothing under them and turned them round every step. They now stand on the floor, look half a tile ahead (they used to walk until their middle was past the edge), and a test checks that they walk and turn at both ends.
+- **A tile cleared during play was hidden but kept.** Its sprite is now freed.
+- **A weak test the sabotage run exposed:** the autotile-set test only checked a button appeared. It now paints with the set and checks the tile.
+
+The project format is at **version 4** (autotile sets). Older projects upgrade on load, unchanged.
+
+### Tests
+
+```
+cd frontend
+npm test                      # Vitest: 131
+npm run e2e                   # Playwright: 35 editor tests + 7 account tests
+../backend/.venv/bin/python ../backend/tests/test_server.py   # 50 server checks
+python3 scripts/sabotage.py   # 170 deliberate bugs
+```
+
+---
+
+## Phase 6 — Tilesets and tile maps ✅ (2026-10-26, reviewed; gaps fixed above)
 
 **The spec's acceptance demo passes**, as an automated browser test that does it the way a student would, from an empty project:
 - import a character sprite sheet and slice it;

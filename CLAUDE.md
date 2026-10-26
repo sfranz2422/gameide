@@ -79,9 +79,30 @@ testing.
   don't survive a restart.
 - `move_and_collide` steps to the next whole pixel before stepping whole
   pixels: from 402.6 it used to stop at 415.6, hovering over a floor at 416.
-- Painting goes through `editor/tiles/tileOps.ts` (pure, tested). Room undo
-  keeps whole-room snapshots; a drag records only its first change
-  (`stroke`), so one stroke is one undo step.
+- Painting goes through `editor/tiles/tileOps.ts` (pure, tested), autotiling
+  too: a cell's piece is `set.tiles[mask]`, mask = up 1 + right 2 + down 4 +
+  left 8 for neighbours in the same set; painting or erasing re-picks the
+  cell and its four neighbours.
+- A tileset's grid changing (picture, size, offset, spacing) goes through
+  `remapTileset`, which keeps painted tiles, solid flags and autotile slots
+  on the same picture tile.
+- The game draws tiles in 16 × 16 chunks near the view (`placeTiles`); the
+  room editor draws only on-screen cells.
+
+## Undo
+
+- One history per open project (`editor/history.ts`, held by
+  `useProjectState`), not per tab. `mutate(recipe, { label, group,
+  history })`: changes with the same label within 1 s, or with the same
+  explicit `group` (a drag), are one step.
+- **Code edits pass `history: "skip"`** (their editor has its own undo), and
+  an undo restores a snapshot with *current* code (`keepCode`). A new place
+  that edits code must skip history too, or undo gains invisible steps.
+- `mutate` builds on `latest`, not a state updater: StrictMode runs updaters
+  twice, which recorded every change twice.
+- Decoded pictures are closed only after their replacements are showing
+  (`useBitmaps`, `useTilesetImage`); closing them in an effect's cleanup let
+  the canvas draw a closed picture, which throws, and crashed the editor.
 
 ## Projects and code generation
 

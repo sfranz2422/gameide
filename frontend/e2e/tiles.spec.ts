@@ -208,3 +208,143 @@ test("the platformer template: stands on its tiles, and the camera follows", asy
   expect((await py(page, "view_x")) as number).toBeGreaterThan(0);
   expect(errors.filter((e) => !e.includes("502"))).toEqual([]);
 });
+
+test("the platformer template: enemies walk their floor and turn at its ends", async ({ page }) => {
+  // They once stood a row above the ground: with nothing under them, the
+  // edge check turned them round every step and they shook in place.
+  const errors = watchErrors(page);
+  await fromTemplate(page, "platformer");
+  await playAndWait(page);
+  type Sample = [number, number][]; // [x, hspeed] per enemy
+  const sample = async () => (await py(page, "[[e.x, e.hspeed] for e in instances('Enemy')]")) as Sample;
+  // Distance walked, added up every half second: shaking in place adds up to
+  // a step or two, walking to hundreds — even if an enemy turns round between
+  // two looks and ends near where it began.
+  let prev = await sample();
+  expect(prev.length).toBe(2);
+  const walked = [0, 0];
+  const seen = new Set<number>();
+  for (let n = 0; n < 16; n++) {
+    await page.waitForTimeout(500);
+    const now = await sample();
+    now.forEach(([x, v], i) => {
+      walked[i]! += Math.abs(x - prev[i]![0]);
+      seen.add(Math.sign(v));
+    });
+    prev = now;
+  }
+  for (const w of walked) expect(w).toBeGreaterThan(200);
+  // Long enough to reach an end of the floor and come back: both directions seen.
+  expect([...seen].sort()).toEqual([-1, 1]);
+  // Never over the gap: the floor they share runs from column 15 to 31.
+  for (const [x] of prev) expect(x > 15 * 32 && x < 32 * 32).toBe(true);
+  expect(errors.filter((e) => !e.includes("502"))).toEqual([]);
+});
+
+test("a huge level — 86 000 tiles — still plays at full speed", async ({ page }) => {
+  const errors = watchErrors(page);
+  await fromTemplate(page, "platformer");
+  await treeItem(page, "Level1 start").click();
+  await page.getByTestId("room-panel-room").click();
+  await page.getByTestId("room-width").fill("9600"); // 300 tiles
+  await page.getByTestId("room-height").fill("9600");
+  await page.getByRole("button", { name: "Fit" }).click();
+  // Fit really fits: the whole 9600 px room is on the canvas.
+  const fitZoom = Number(await page.getByTestId("room-canvas").getAttribute("data-zoom"));
+  const canvasBox = (await page.getByTestId("room-canvas").boundingBox())!;
+  expect(9600 * fitZoom).toBeLessThanOrEqual(Math.min(canvasBox.width, canvasBox.height));
+  await page.getByTestId("current-layer").selectOption({ label: "Ground" });
+  await page.getByTestId("room-panel-tiles").click();
+  await page.getByTestId("tile-palette").click({ position: { x: 40, y: 4 } }); // dirt
+  await page.getByTestId("tool-rect").click();
+  // Rows 13 to 299, every column: a floor 287 deep under the whole level.
+  await drag(page, await screenAt(page, 4, 13 * 32 + 4), await screenAt(page, 9600 - 4, 9600 - 4));
+  await page.getByTestId("room-panel-layers").click();
+  await expect(page.getByTestId("layer-list").getByRole("button", { name: /^Ground \d+ tiles$/ })).toContainText("86");
+  await playAndWait(page);
+  await page.locator("canvas[data-testid=game-canvas]").click();
+  await page.keyboard.down("ArrowRight");
+  await page.waitForTimeout(3000);
+  await page.keyboard.up("ArrowRight");
+  const fps = Number(await page.getByTestId("fps").textContent());
+  const drawn = Number(await page.getByTestId("tiles-drawn").textContent());
+  console.log(`huge level: ${fps} fps, ${drawn} of 86 000 tiles drawn`);
+  expect(fps).toBeGreaterThanOrEqual(40); // a moment of chunk-building while scrolling can dip it
+  // Only the chunks near the 640 × 480 view: at most 5 × 4 chunks of 256.
+  // (Drawing all 86 000 held 60 fps on a fast laptop too — this is about
+  // memory and slower machines, so it checks what is drawn, not the speed.)
+  expect(drawn).toBeGreaterThan(0);
+  expect(drawn).toBeLessThanOrEqual(5 * 4 * 256);
+  expect((await py(page, "view_x")) as number).toBeGreaterThan(0);
+  expect(errors.filter((e) => !e.includes("502"))).toEqual([]);
+});
+
+test("the autotile brush picks ends and middles, and erasing grows new edges", async ({ page }) => {
+  await fromTemplate(page, "platformer");
+  await treeItem(page, "Level1 start").click();
+  await page.getByRole("button", { name: "Fit" }).click();
+  await page.getByTestId("current-layer").selectOption({ label: "Ground" });
+  await page.getByTestId("room-panel-tiles").click();
+  await page.getByTestId("autotile-grass").click();
+  await expect(page.getByTestId("stamp-size")).toHaveText("Brush: grass (autotile)");
+  const cell = (c: number, r: number) => screenAt(page, c * 32 + 16, r * 32 + 16);
+  await drag(page, await cell(2, 2), await cell(4, 2)); // three in a row, up in the sky
+  await page.getByTestId("tool-erase").click();
+  await page.mouse.click((await cell(6, 2)).x, (await cell(6, 2)).y); // nothing there: nothing changes
+  await playAndWait(page);
+  // Tile 8 + mask: right = 2, left = 8.
+  expect(await py(page, "[tile_at(c * 32 + 1, 2 * 32 + 1) for c in (2, 3, 4)]")).toEqual([10, 18, 16]);
+  await page.getByTestId("stop").click();
+  await page.mouse.click((await cell(3, 2)).x, (await cell(3, 2)).y); // erase the middle
+  await playAndWait(page);
+  expect(await py(page, "[tile_at(c * 32 + 1, 2 * 32 + 1) for c in (2, 3, 4)]")).toEqual([8, undefined, 8]); // None arrives as undefined
+});
+
+test("a new autotile set can be filled in order and then painted with", async ({ page }) => {
+  await fromTemplate(page, "platformer");
+  await treeItem(page, "terrain").click();
+  await page.getByTestId("new-autotile").click();
+  await page.getByLabel("First tile").fill("8");
+  await page.getByTestId("autotile-in-order").click();
+  await treeItem(page, "Level1 start").click();
+  await page.getByTestId("current-layer").selectOption({ label: "Ground" });
+  await page.getByTestId("room-panel-tiles").click();
+  await page.getByTestId("autotile-set2").click();
+  await page.getByRole("button", { name: "Fit" }).click();
+  const at = await screenAt(page, 2 * 32 + 16, 2 * 32 + 16);
+  await page.mouse.click(at.x, at.y); // one cell alone: the island piece, slot 0
+  await playAndWait(page);
+  expect(await py(page, "tile_at(2 * 32 + 1, 2 * 32 + 1)")).toBe(8); // "from tile 8": slot 0 is tile 8
+});
+
+test("a wider replacement picture keeps painted tiles on the same part of the picture", async ({ page }) => {
+  await fromTemplate(page, "empty");
+  await page.getByTestId("add-tilesets").click();
+  await nameBox(page).press("Enter");
+  const pick = async (width: number) => {
+    const chooser = page.waitForEvent("filechooser");
+    await page.getByTestId("tileset-image").click();
+    await (await chooser).setFiles({ name: "t.png", mimeType: "image/png", buffer: await png(page, { width, height: 64, rects: [[0, 0, width, 64, "#888"]] }) });
+  };
+  await pick(64); // 2 × 2 tiles: column 0, row 1 is tile 2
+  await addTileLayer(page);
+  const pal = (await page.getByTestId("tile-palette").boundingBox())!; // drawn zoomed: aim by its size
+  await page.getByTestId("tile-palette").click({ position: { x: 4, y: pal.height * 0.75 } });
+  await expect(page.getByTestId("stamp-size")).toHaveText("Brush: 1 × 1 (tile 2)");
+  const at = await screenAt(page, 16, 16);
+  await page.mouse.click(at.x, at.y);
+  await treeItem(page, "tileset1").click();
+  await pick(96); // 3 × 2 tiles: column 0, row 1 is now tile 3
+  await expect(page.getByTestId("tileset-count")).toContainText("3 × 2");
+  await playAndWait(page);
+  expect(await py(page, "tile_at(1, 1)")).toBe(3);
+});
+
+test("a tile changed while playing changes on screen", async ({ page }) => {
+  await fromTemplate(page, "platformer");
+  await playAndWait(page);
+  await page.waitForTimeout(600);
+  const before = Number(await page.getByTestId("tiles-drawn").textContent());
+  await py(page, "tile_set(5 * 32, 12 * 32, None, 'Ground')"); // a grass tile in view
+  await expect.poll(async () => Number(await page.getByTestId("tiles-drawn").textContent())).toBe(before - 1);
+});

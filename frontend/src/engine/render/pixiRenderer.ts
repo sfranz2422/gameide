@@ -147,11 +147,26 @@ function cutTiles(t: TilesetDef): Texture[] {
   return out;
 }
 
-/** A tile layer on screen: its container, and the sprite in each painted cell. */
+/**
+ * A tile layer on screen, in chunks of CHUNK × CHUNK tiles. A chunk's
+ * sprites are made only when it comes near the view, hidden when it leaves,
+ * and freed when it is far away — so a level of 100 000 tiles costs about
+ * what is on screen, not what is in the room. (Every tile as its own sprite,
+ * all the time, was fine for small rooms and slow for big ones.)
+ */
+interface Chunk {
+  container: Container;
+  sprites: Map<number, Sprite>; // cell → sprite
+}
+
 interface TileView {
   container: Container;
-  cells: (Sprite | null)[];
+  chunks: Map<number, Chunk>; // chunk key → chunk
 }
+
+const CHUNK = 16;
+/** Chunks this many chunk-widths beyond the view are freed. */
+const FREE_BEYOND = 3;
 
 /** One background layer's display objects. */
 interface Backdrop {
@@ -181,6 +196,8 @@ export class PixiRenderer {
   private roomShown = -1;
   private viewShown = "";
   showDebug = false;
+  /** Tiles in chunks that are showing: what the chunking keeps small on a big level. */
+  tilesShown = 0;
   /** One line of figures for the debug overlay, set by the session. */
   statsLine = "";
 
@@ -268,28 +285,70 @@ export class PixiRenderer {
       container.zIndex = -t.def.depth;
       container.visible = t.def.visible;
       this.world.addChild(container);
-      const view: TileView = { container, cells: new Array(t.cells.length).fill(null) };
-      for (let cell = 0; cell < t.cells.length; cell++) this.drawTile(view, t, cell);
-      return view;
+      return { container, chunks: new Map() };
     });
   }
 
-  private drawTile(view: TileView, t: Engine["tiles"][number], cell: number) {
+  private chunkKey(cx: number, cy: number) {
+    return cy * 100000 + cx;
+  }
+
+  /** Makes (or refreshes) one tile's sprite in its chunk. */
+  private drawTile(chunk: Chunk, t: Engine["tiles"][number], cell: number) {
     const tile = t.cells[cell]!;
     const tex = tile >= 0 ? this.tileTextures.get(t.tileset.name)?.[tile] : undefined;
-    let sp = view.cells[cell] ?? null;
+    let sp = chunk.sprites.get(cell);
     if (!tex) {
-      if (sp) sp.visible = false;
+      // Cleared (tile_set None): free the sprite rather than keep it hidden.
+      sp?.destroy();
+      chunk.sprites.delete(cell);
       return;
     }
     if (!sp) {
       sp = new Sprite(tex);
       sp.position.set((cell % t.def.columns) * t.tileset.tileWidth, Math.floor(cell / t.def.columns) * t.tileset.tileHeight);
-      view.container.addChild(sp);
-      view.cells[cell] = sp;
+      chunk.container.addChild(sp);
+      chunk.sprites.set(cell, sp);
     }
     sp.texture = tex;
     sp.visible = true;
+  }
+
+  private buildChunk(view: TileView, t: Engine["tiles"][number], cx: number, cy: number): Chunk {
+    const chunk: Chunk = { container: new Container(), sprites: new Map() };
+    view.container.addChild(chunk.container);
+    const cols = t.def.columns;
+    for (let r = cy * CHUNK; r < Math.min(t.def.rows, (cy + 1) * CHUNK); r++)
+      for (let c = cx * CHUNK; c < Math.min(cols, (cx + 1) * CHUNK); c++) if (t.cells[r * cols + c]! >= 0) this.drawTile(chunk, t, r * cols + c);
+    view.chunks.set(this.chunkKey(cx, cy), chunk);
+    return chunk;
+  }
+
+  /** Shows the chunks the view can see (plus a margin), hides the rest, frees far ones. */
+  private placeTiles(vx: number, vy: number) {
+    const cam = this.engine.camera;
+    this.tilesShown = 0;
+    for (let L = 0; L < this.tileViews.length; L++) {
+      const view = this.tileViews[L]!, t = this.engine.tiles[L]!;
+      const cw = CHUNK * t.tileset.tileWidth, ch = CHUNK * t.tileset.tileHeight;
+      const x0 = Math.floor(vx / cw) - 1, x1 = Math.floor((vx + cam.w) / cw) + 1;
+      const y0 = Math.floor(vy / ch) - 1, y1 = Math.floor((vy + cam.h) / ch) + 1;
+      for (const [key, chunk] of view.chunks) {
+        const cx = key % 100000, cy = Math.floor(key / 100000);
+        const near = cx >= x0 && cx <= x1 && cy >= y0 && cy <= y1;
+        chunk.container.visible = near;
+        const far = cx < x0 - FREE_BEYOND || cx > x1 + FREE_BEYOND || cy < y0 - FREE_BEYOND || cy > y1 + FREE_BEYOND;
+        if (far) {
+          chunk.container.destroy({ children: true });
+          view.chunks.delete(key);
+        }
+      }
+      const maxCx = Math.ceil(t.def.columns / CHUNK) - 1, maxCy = Math.ceil(t.def.rows / CHUNK) - 1;
+      for (let cy = Math.max(0, y0); cy <= Math.min(maxCy, y1); cy++)
+        for (let cx = Math.max(0, x0); cx <= Math.min(maxCx, x1); cx++)
+          if (!view.chunks.has(this.chunkKey(cx, cy))) this.buildChunk(view, t, cx, cy);
+      for (const chunk of view.chunks.values()) if (chunk.container.visible) this.tilesShown += chunk.sprites.size;
+    }
   }
 
   /** Background layers follow the view: a colour and a repeating picture always fill the window. */
@@ -331,12 +390,17 @@ export class PixiRenderer {
     const vx = Math.round(cam.x + cam.offX), vy = Math.round(cam.y + cam.offY);
     this.world.position.set(-vx, -vy);
     this.placeBackdrops(vx, vy, g[G.FRAME]!);
-    // Tiles tile_set() changed since the last frame.
+    // Tiles tile_set() changed since the last frame. A chunk not built yet
+    // will read the cell when it is; only built ones need telling.
     for (const [layer, cell] of this.engine.tileChanges) {
       const view = this.tileViews[layer], t = this.engine.tiles[layer];
-      if (view && t) this.drawTile(view, t, cell);
+      if (!view || !t) continue;
+      const c = cell % t.def.columns, r = Math.floor(cell / t.def.columns);
+      const chunk = view.chunks.get(this.chunkKey(Math.floor(c / CHUNK), Math.floor(r / CHUNK)));
+      if (chunk) this.drawTile(chunk, t, cell);
     }
     this.engine.tileChanges.length = 0;
+    this.placeTiles(vx, vy);
 
     for (let s = 0; s < n; s++) {
       const b = s * STRIDE;

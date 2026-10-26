@@ -57,6 +57,7 @@ setInterval(() => {
       instances: game.engine.instanceCount(),
       pythonMs: game.timing.pythonMs,
       motionMs: game.timing.motionMs,
+      tiles: renderer?.tilesShown ?? 0,
     },
   });
 }, 250);
@@ -117,7 +118,7 @@ async function play(msg: Extract<ToWorker, { type: "play" }>) {
     () => {
       if (loop && game) {
         const s = loop.stats;
-        r.statsLine = `${s.stepsPerSecond} fps · ${game.engine.instanceCount()} instances · Python ${game.timing.pythonMs.toFixed(2)} ms`;
+        r.statsLine = `${s.stepsPerSecond} fps · ${game.engine.instanceCount()} instances · ${r.tilesShown} tiles drawn · Python ${game.timing.pythonMs.toFixed(2)} ms`;
       }
       r.render();
     },

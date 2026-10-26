@@ -37,7 +37,7 @@ const TAB_ICON = { sprites: Icon.sprite, tilesets: Icon.tileset, objects: Icon.o
 
 export function EditorPage({ store, id }: { store: ProjectStore; id: string }) {
   const state = useProjectState(store, id);
-  const { project, assets, mutate, addAssets, status, saveError, saveNote, setSaveNote, loadError, replace } = state;
+  const { project, assets, mutate, addAssets, status, saveError, saveNote, setSaveNote, loadError, replace, undo, redo, undoLabel, redoLabel, endUndoGroup } = state;
 
   const [tabs, setTabs] = useState<TabRef[]>([]);
   const [active, setActive] = useState<TabRef | null>(null);
@@ -123,10 +123,20 @@ export function EditorPage({ store, id }: { store: ProjectStore; id: string }) {
         e.preventDefault();
         play();
       }
+      // Ctrl+Z everywhere but where text is being typed: a code editor or a
+      // box has its own undo, and taking the key there would undo the
+      // project instead of the typing.
+      const t = e.target as HTMLElement | null;
+      const typing = !!t && (!!t.closest(".cm-editor") || t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable);
+      if (!typing && (e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === "z" || e.key.toLowerCase() === "y")) {
+        e.preventDefault();
+        if (e.key.toLowerCase() === "y" || e.shiftKey) redo();
+        else undo();
+      }
     };
     window.addEventListener("keydown", key);
     return () => window.removeEventListener("keydown", key);
-  }, [play]);
+  }, [play, undo, redo]);
 
   const jump = useCallback(
     (e: MappedError) => {
@@ -243,8 +253,11 @@ export function EditorPage({ store, id }: { store: ProjectStore; id: string }) {
   }, [startImport, addLines]);
 
   const api: ProjectApi | null = useMemo(
-    () => (project ? { project, assets, mutate, addAssets, status, saveError, saveNote, replace, store } : null),
-    [project, assets, mutate, addAssets, status, saveError, saveNote, replace, store],
+    () =>
+      project
+        ? { project, assets, mutate, addAssets, status, saveError, saveNote, replace, store, undo, redo, undoLabel, redoLabel, endUndoGroup }
+        : null,
+    [project, assets, mutate, addAssets, status, saveError, saveNote, replace, store, undo, redo, undoLabel, redoLabel, endUndoGroup],
   );
 
   // "Another tab saved too" and the like: worth a line in the console.
@@ -281,6 +294,12 @@ export function EditorPage({ store, id }: { store: ProjectStore; id: string }) {
             data-tutorial="project-name"
           />
           <SaveStatusView status={status} error={saveError} />
+          <button className="icon-btn" onClick={undo} disabled={!undoLabel} title={undoLabel ? `Undo ${undoLabel} (Ctrl+Z)` : "Nothing to undo"} aria-label="Undo" data-testid="undo">
+            ↶
+          </button>
+          <button className="icon-btn" onClick={redo} disabled={!redoLabel} title={redoLabel ? `Redo ${redoLabel} (Ctrl+Shift+Z)` : "Nothing to redo"} aria-label="Redo" data-testid="redo">
+            ↷
+          </button>
           <span className="spacer" />
           <HistoryButton />
           <ExportButton />

@@ -63,6 +63,7 @@ export function GamePane({
           {state === "running" && stats && (
             <>
               <b data-testid="fps">{stats.fps}</b> fps · {stats.instances} inst · {stats.pythonMs.toFixed(1)} ms
+              <span hidden data-testid="tiles-drawn">{stats.tiles}</span>
             </>
           )}
           {state === "stopped" && !ready && "Loading Python…"}

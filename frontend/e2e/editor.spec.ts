@@ -181,3 +181,33 @@ test("importing something that isn't a game says so", async ({ page }) => {
   await page.getByTestId("import-file").setInputFiles({ name: "notes.zip", mimeType: "application/zip", buffer: Buffer.from("not a zip") });
   await expect(page.getByRole("alert")).toHaveText("That isn't a .zip file GameIDE can open.");
 });
+
+test("undo reaches across tabs, never undoes typing, and brings back a deleted object", async ({ page }) => {
+  await fromTemplate(page, "coins");
+  page.on("dialog", (d) => void d.accept());
+  // 1. Change the Player's sprite.
+  await treeItem(page, "Player").click();
+  await page.getByTestId("object-sprite").selectOption({ label: "wall" });
+  // 2. In another tab, place a wall.
+  await placeInRoom(page, "Maze start", "Wall", 320, 32);
+  // 3. Back in the Player, type some code after both changes.
+  await treeItem(page, "Player").click();
+  await page.getByTestId("event-Create").click();
+  await setCode(page, "self.move_speed = 4\nself.typed_after = True\n");
+  // Undo twice, from the top bar: the wall, then the sprite.
+  await page.getByTestId("undo").click();
+  await page.getByTestId("undo").click();
+  await expect(page.getByTestId("object-sprite").locator("option:checked")).toHaveText("player");
+  await expect(page.getByTestId("event-code")).toContainText("self.typed_after = True");
+  await page.getByTestId("redo").click();
+  await expect(page.getByTestId("object-sprite").locator("option:checked")).toHaveText("wall");
+
+  // Delete Coin — which takes its 15 instances and the Player's collision event — then undo.
+  await treeItem(page, "Coin").click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Delete" }).click();
+  await expect(treeItem(page, "Coin")).toHaveCount(0);
+  await page.getByTestId("undo").click();
+  await expect(treeItem(page, "Coin")).toBeVisible();
+  await playAndWait(page);
+  expect(await py(page, "instance_number('Coin')")).toBe(15);
+});

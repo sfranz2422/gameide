@@ -61,7 +61,7 @@ export function ScriptEditor({ scriptId, focus }: { scriptId: string; focus: { l
       <CodeEditor
         docKey={script.id}
         value={script.code}
-        onChange={(code) => mutate((p) => void (find(p, "scripts", scriptId)!.code = code))}
+        onChange={(code) => mutate((p) => void (find(p, "scripts", scriptId)!.code = code), { history: "skip" })}
         names={() => projectNames(project)}
         errorLine={focus}
         testId="script-code"

@@ -66,7 +66,7 @@ describe("loading an older project", () => {
     };
     const p = migrate(old);
     const room = p.rooms[0]!;
-    expect(p.schemaVersion).toBe(3);
+    expect(p.schemaVersion).toBe(4);
     expect(p.tilesets).toEqual([]); // 2 → 3 added tilesets
     expect(room.camera).toEqual({ enabled: false, width: 800, height: 600, follow: null, smoothing: 1 });
     expect([room.gridWidth, room.snap]).toEqual([32, true]);
@@ -93,5 +93,35 @@ describe("tilesets", () => {
     const layer = p.rooms[0]!.layers.find((l) => l.id === "L") as { tileset: string | null; tiles: object };
     expect(layer.tileset).toBeNull();
     expect(layer.tiles).toEqual({});
+  });
+});
+
+describe("changing a tileset's grid", () => {
+  it("keeps painted tiles and solid flags on the same picture tile, not the same number", async () => {
+    const { remapTileset, newTileset } = await import("./project");
+    const p = blankProject("t");
+    // 2 × 2 tiles of 16 px; tile 2 is column 0, row 1.
+    const before = { ...newTileset("terrain"), id: "ts", image: "a", imageWidth: 32, imageHeight: 32, tileWidth: 16, tileHeight: 16, solid: [2, 3],
+      autotiles: [{ id: "g", name: "grass", tiles: [2, -1, ...new Array(14).fill(-1)] }] };
+    p.tilesets.push(structuredClone(before));
+    p.rooms[0]!.layers.push({ id: "L", name: "Ground", kind: "tiles", depth: 0, visible: true, locked: false, tileset: "ts", tiles: { "0,0": 2, "1,0": 3 } });
+    // A new picture one tile wider: column 0, row 1 is now tile 3.
+    p.tilesets[0]!.imageWidth = 48;
+    expect(remapTileset(p, "ts", before)).toBe(0);
+    expect(p.rooms[0]!.layers.find((l) => l.id === "L")).toMatchObject({ tiles: { "0,0": 3, "1,0": 4 } });
+    expect(p.tilesets[0]!.solid).toEqual([3, 4]);
+    expect(p.tilesets[0]!.autotiles[0]!.tiles.slice(0, 2)).toEqual([3, -1]); // autotile slots move too
+  });
+
+  it("removes, and counts, tiles the new grid doesn't have", async () => {
+    const { remapTileset, newTileset } = await import("./project");
+    const p = blankProject("t");
+    const before = { ...newTileset("terrain"), id: "ts", image: "a", imageWidth: 32, imageHeight: 32, tileWidth: 16, tileHeight: 16, solid: [] };
+    p.tilesets.push(structuredClone(before));
+    p.rooms[0]!.layers.push({ id: "L", name: "Ground", kind: "tiles", depth: 0, visible: true, locked: false, tileset: "ts", tiles: { "0,0": 0, "1,0": 3 } });
+    p.tilesets[0]!.imageWidth = 16; // one column now: tile 3 (column 1) has nowhere to go
+    expect(remapTileset(p, "ts", before)).toBe(1);
+    const tiles = (p.rooms[0]!.layers.find((l) => l.id === "L") as { tiles: object }).tiles;
+    expect(tiles).toEqual({ "0,0": 0 });
   });
 });

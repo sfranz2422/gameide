@@ -212,17 +212,20 @@ export async function paintStarter(s: StarterSprite): Promise<Blob[]> {
 
 /**
  * A starter tileset, drawn in code like the starter sprites: 32 px tiles,
- * four across and two down.
+ * four across and six down.
  *   0 grass top   1 dirt     2 brick    3 stone
  *   4 platform ◀  5 platform  6 platform ▶  7 bush (not solid: scenery)
+ *   8–23  grass as an autotile set: tile 8 + mask, where the mask adds up
+ *         the sides joined to more grass (up 1, right 2, down 4, left 8)
  */
 export const STARTER_TILESET = {
   name: "terrain",
   tileWidth: 32,
   tileHeight: 32,
   columns: 4,
-  rows: 2,
-  solid: [0, 1, 2, 3, 4, 5, 6],
+  rows: 6,
+  solid: [0, 1, 2, 3, 4, 5, 6, ...Array.from({ length: 16 }, (_, m) => 8 + m)],
+  autotiles: [{ name: "grass", tiles: Array.from({ length: 16 }, (_, m) => 8 + m) }],
   paint(ctx: OffscreenCanvasRenderingContext2D) {
     const T = 32;
     const at = (n: number) => [(n % 4) * T, Math.floor(n / 4) * T] as const;
@@ -275,6 +278,25 @@ export const STARTER_TILESET = {
     ctx.arc(x + 22, y + 22, 9, 0, Math.PI * 2);
     ctx.arc(x + 16, y + 15, 9, 0, Math.PI * 2);
     ctx.fill();
+    // 8–23 the grass autotile set: dirt, with grass where nothing is above,
+    // and a dark rim on every side that isn't joined to more ground.
+    for (let mask = 0; mask < 16; mask++) {
+      [x, y] = at(8 + mask);
+      ctx.fillStyle = "#8b5a2b";
+      ctx.fillRect(x, y, T, T);
+      ctx.fillStyle = "#6d4421";
+      for (const [dx, dy] of [[6, 14], [20, 20], [12, 26]]) ctx.fillRect(x + dx!, y + dy!, 3, 3);
+      ctx.fillStyle = "#5a3818";
+      if (!(mask & 2)) ctx.fillRect(x + T - 3, y, 3, T);
+      if (!(mask & 8)) ctx.fillRect(x, y, 3, T);
+      if (!(mask & 4)) ctx.fillRect(x, y + T - 3, T, 3);
+      if (!(mask & 1)) {
+        ctx.fillStyle = "#4caf50";
+        ctx.fillRect(x, y, T, 9);
+        ctx.fillStyle = "#66bb6a";
+        for (let i = 2; i < T - 2; i += 6) ctx.fillRect(x + i, y + 7, 3, 4);
+      }
+    }
   },
 };
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { erase, fillRect, floodFill, paint, pick, single, stampFromPalette } from "./tileOps";
+import { autotileErase, autotilePaint, erase, fillRect, floodFill, paint, pick, rectCells, single, stampFromPalette, type AutotileSet } from "./tileOps";
 
 const B = { columns: 10, rows: 5 };
 
@@ -44,5 +44,40 @@ describe("painting tiles", () => {
 
   it("a block chosen on the palette, dragged either way", () => {
     expect(stampFromPalette(5, 0, 4)).toEqual({ columns: 2, rows: 2, tiles: [0, 1, 4, 5] });
+  });
+});
+
+// Tile number = 100 + mask, so a result reads as the mask it was chosen for.
+const grass: AutotileSet = { id: "g", name: "grass", tiles: Array.from({ length: 16 }, (_, m) => 100 + m) };
+
+describe("autotiling", () => {
+  it("one cell alone is an island; a row joins its ends to the middle", () => {
+    expect(autotilePaint({}, [[2, 2]], grass, B)).toEqual({ "2,2": 100 });
+    const row = autotilePaint({}, rectCells(1, 2, 3, 2), grass, B);
+    expect(row).toEqual({ "1,2": 102, "2,2": 110, "3,2": 108 }); // right; right+left; left
+  });
+
+  it("painting next to a cell changes the cell already there", () => {
+    let t = autotilePaint({}, [[2, 2]], grass, B);
+    t = autotilePaint(t, [[2, 3]], grass, B); // one below
+    expect(t).toEqual({ "2,2": 104, "2,3": 101 }); // top edge (joined down); bottom (joined up)
+  });
+
+  it("a filled block has edges, corners and a middle", () => {
+    const t = autotilePaint({}, rectCells(0, 0, 2, 2), grass, B);
+    expect(t["1,1"]).toBe(115); // all four sides
+    expect(t["1,0"]).toBe(100 + 2 + 4 + 8); // top edge: right, down, left
+    expect(t["0,0"]).toBe(100 + 2 + 4); // top-left corner
+  });
+
+  it("erasing lets the neighbours grow an edge; other tiles are left alone", () => {
+    let t = autotilePaint({ "5,0": 7 }, rectCells(0, 0, 2, 0), grass, B);
+    t = autotileErase(t, [[1, 0]], grass);
+    expect(t).toEqual({ "0,0": 100, "2,0": 100, "5,0": 7 });
+  });
+
+  it("an unfinished set borrows its fully joined tile for missing pieces", () => {
+    const half: AutotileSet = { id: "h", name: "half", tiles: [...new Array(15).fill(-1), 42] };
+    expect(autotilePaint({}, [[0, 0]], half, B)).toEqual({ "0,0": 42 });
   });
 });

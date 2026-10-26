@@ -72,14 +72,23 @@ export function floodFill(tiles: TileMap, c: number, r: number, stamp: Stamp, b:
   const target = tiles[key(c, r)];
   if (stamp.columns === 1 && stamp.rows === 1 && stamp.tiles[0] === target) return tiles; // nothing would change
   const out = { ...tiles };
+  for (const [x, y] of floodCells(tiles, c, r, b, limit)) out[key(x, y)] = patternAt(stamp, x, y, c, r);
+  return out;
+}
+
+/** The cells the bucket would fill from (c, r): joined (up, down, left, right) and alike, inside the room. */
+export function floodCells(tiles: TileMap, c: number, r: number, b: Bounds, limit = 20000): [number, number][] {
+  if (!inside(c, r, b)) return [];
+  const target = tiles[key(c, r)];
   const seen = new Set<string>();
+  const out: [number, number][] = [];
   const stack: [number, number][] = [[c, r]];
   while (stack.length && seen.size < limit) {
     const [x, y] = stack.pop()!;
     const k = key(x, y);
     if (seen.has(k) || !inside(x, y, b) || tiles[k] !== target) continue;
     seen.add(k);
-    out[k] = patternAt(stamp, x, y, c, r);
+    out.push([x, y]);
     stack.push([x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]);
   }
   return out;
@@ -98,4 +107,80 @@ export function stampFromPalette(a: number, b: number, columns: number): Stamp {
   const tiles: number[] = [];
   for (let r = top; r <= bottom; r++) for (let c = left; c <= right; c++) tiles.push(r * columns + c);
   return { columns: right - left + 1, rows: bottom - top + 1, tiles };
+}
+
+// ---------------------------------------------------------------- autotiling
+
+/**
+ * An autotile set: 16 tiles, one for each way a cell can join its
+ * neighbours. The index is a sum — up 1, right 2, down 4, left 8 — of the
+ * sides where the next cell is in the same set: 0 is an island, 15 is
+ * surrounded, 4 is a top edge (only joined below), and so on. A slot with
+ * no tile (-1) borrows the fully joined tile, so a half-made set still paints.
+ */
+export interface AutotileSet {
+  id: string;
+  name: string;
+  tiles: number[]; // 16
+}
+
+export const UP = 1, RIGHT = 2, DOWN = 4, LEFT = 8;
+
+function tileFor(set: AutotileSet, mask: number): number {
+  const t = set.tiles[mask];
+  if (t !== undefined && t >= 0) return t;
+  return set.tiles[15] !== undefined && set.tiles[15]! >= 0 ? set.tiles[15]! : set.tiles.find((x) => x >= 0) ?? 0;
+}
+
+/** Re-picks the tile of each listed cell that belongs to the set, from its neighbours now. */
+function retile(tiles: TileMap, cells: [number, number][], set: AutotileSet): TileMap {
+  const members = new Set(set.tiles.filter((t) => t >= 0));
+  const isMember = (c: number, r: number) => {
+    const t = tiles[key(c, r)];
+    return t !== undefined && members.has(t);
+  };
+  const out = { ...tiles };
+  for (const [c, r] of cells) {
+    if (!isMember(c, r)) continue;
+    const mask = (isMember(c, r - 1) ? UP : 0) | (isMember(c + 1, r) ? RIGHT : 0) | (isMember(c, r + 1) ? DOWN : 0) | (isMember(c - 1, r) ? LEFT : 0);
+    out[key(c, r)] = tileFor(set, mask);
+  }
+  return out;
+}
+
+/** The cells and their neighbours, each once: everything a change there can affect. */
+function withNeighbours(cells: [number, number][]): [number, number][] {
+  const seen = new Map<string, [number, number]>();
+  for (const [c, r] of cells)
+    for (const [x, y] of [[c, r], [c, r - 1], [c + 1, r], [c, r + 1], [c - 1, r]] as [number, number][]) seen.set(key(x, y), [x, y]);
+  return [...seen.values()];
+}
+
+/**
+ * Paints cells with an autotile set: each becomes a member, then it and
+ * its neighbours pick the right piece. `cells` is one cell for the brush,
+ * a block for the rectangle.
+ */
+export function autotilePaint(tiles: TileMap, cells: [number, number][], set: AutotileSet, b: Bounds): TileMap {
+  const inRoom = cells.filter(([c, r]) => inside(c, r, b));
+  if (!inRoom.length) return tiles;
+  let out = { ...tiles };
+  const placeholder = tileFor(set, 15);
+  for (const [c, r] of inRoom) out[key(c, r)] = placeholder;
+  out = retile(out, withNeighbours(inRoom), set);
+  return out;
+}
+
+/** Erases cells, then lets neighbours in the set re-pick their pieces (an edge appears). */
+export function autotileErase(tiles: TileMap, cells: [number, number][], set: AutotileSet): TileMap {
+  const out = { ...tiles };
+  for (const [c, r] of cells) delete out[key(c, r)];
+  return retile(out, withNeighbours(cells), set);
+}
+
+/** Every cell of the rectangle between two cells. */
+export function rectCells(c0: number, r0: number, c1: number, r1: number): [number, number][] {
+  const out: [number, number][] = [];
+  for (let r = Math.min(r0, r1); r <= Math.max(r0, r1); r++) for (let c = Math.min(c0, c1); c <= Math.max(c0, c1); c++) out.push([c, r]);
+  return out;
 }

@@ -82,7 +82,7 @@ export function ResourceTree({
     if (kind === "sprites") return addSprite();
     const name = freeName(project, kind, FOLDERS.find((f) => f.kind === kind)!.base);
     const r = kind === "objects" ? newObject(name) : kind === "rooms" ? newRoom(name) : kind === "tilesets" ? newTileset(name) : newScript(name);
-    mutate((p) => void (p[kind] as Resource[]).push(r));
+    mutate((p) => void (p[kind] as Resource[]).push(r), { label: `add ${name}` });
     open({ kind, id: r.id });
     setRenaming(r.id);
   };
@@ -97,7 +97,7 @@ export function ResourceTree({
     const effects = deleteResource(structuredClone(project), kind, id);
     const also = effects.length ? `\n\nThis also removes: ${effects.join(", ")}.` : "";
     if (!confirm(`Delete ${r.name}?${also}`)) return;
-    mutate((p) => void deleteResource(p, kind, id));
+    mutate((p) => void deleteResource(p, kind, id), { label: `delete ${r.name}` });
     closeTabs([id]);
   };
 
@@ -109,7 +109,7 @@ export function ResourceTree({
       const [item] = list.splice(from, 1);
       const to = beforeId ? list.findIndex((r) => r.id === beforeId) : list.length;
       list.splice(to < 0 ? list.length : to, 0, item!);
-    });
+    }, { label: "reorder" });
   };
 
   return (
@@ -190,10 +190,13 @@ export function ResourceTree({
                                 .map((u) => u.where)
                                 .join(", ")}).\n\nChange those to "${name}" too?`,
                             );
-                          mutate((p) => {
-                            (p[f.kind] as Resource[]).find((x) => x.id === r.id)!.name = name;
-                            if (alsoCode) replaceQuoted(p, r.name, name);
-                          });
+                          mutate(
+                            (p) => {
+                              (p[f.kind] as Resource[]).find((x) => x.id === r.id)!.name = name;
+                              if (alsoCode) replaceQuoted(p, r.name, name);
+                            },
+                            { label: `rename ${r.name}` },
+                          );
                         }}
                       />
                     ) : (
@@ -261,10 +264,13 @@ export function ResourceTree({
             onClick={() => {
               const r = (project[menu.kind] as Resource[]).find((x) => x.id === menu.id)!;
               const copy = duplicate(project, menu.kind, r);
-              mutate((p) => {
-                const list = p[menu.kind] as Resource[];
-                list.splice(list.findIndex((x) => x.id === menu.id) + 1, 0, copy);
-              });
+              mutate(
+                (p) => {
+                  const list = p[menu.kind] as Resource[];
+                  list.splice(list.findIndex((x) => x.id === menu.id) + 1, 0, copy);
+                },
+                { label: `duplicate ${r.name}` },
+              );
               open({ kind: menu.kind, id: copy.id });
               setMenu(null);
             }}

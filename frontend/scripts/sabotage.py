@@ -31,6 +31,7 @@ PY = "py"    # …or the server's checks (backend/tests/test_server.py); caught 
 APP = "../backend/app.py"
 RO, RE = "src/editor/rooms/roomOps.ts", "src/editor/rooms/RoomEditor.tsx"
 SP, TO = "src/engine/sprites.ts", "src/editor/tiles/tileOps.ts"
+HI = "src/editor/history.ts"
 CASES = [
  ("layout drift", RT, '"x": boxy(F.X)', '"x": boxy(F.Y)', "every built-in property"),
  ("no polar sync", RT, "            _st[b + i] = v\n            set_polar(b)", "            _st[b + i] = v", "two views of one motion"),
@@ -171,7 +172,8 @@ CASES = [
  ("tree drag not an object", "src/editor/ResourceTree.tsx", '                      if (f.kind === "objects") e.dataTransfer.setData(OBJECT_DRAG_TYPE, r.id);', '                      if (f.kind === "sprites") e.dataTransfer.setData(OBJECT_DRAG_TYPE, r.id);', "dragged from the tree lands", E2E),
  ("paint stacks", RE, "        if (!occupied(room, placeObject, at.x, at.y)) place(placeObject, at);\n      }", "        place(placeObject, at);\n      }", "without stacking copies", E2E),
  ("move not saved", RE, "        for (const i of r.instances) if (selected.has(i.id)) (i.x += dx), (i.y += dy);", "        for (const i of r.instances) if (selected.has(i.id) && dx > 1e9) (i.x += dx), (i.y += dy);", "move with the keys", E2E),
- ("creation code not saved", RE, "                  onChange={(code) => eachSelected((i) => void (i.code = code))}", "                  onChange={(code) => eachSelected((i) => void (i.code = code.slice(0, 0)))}", "creation code runs for that one", E2E),
+ ("enemies in the air", "src/store/templates.ts", '  "    ====                                ",\n  " P               E      *    E          ",', '  "    ====         E           E          ",\n  " P                      *               ",', "enemies walk their floor", E2E),
+ ("creation code not saved", RE, "                        if (inst) inst.code = code;", "                        if (inst) inst.code = code.slice(0, 0);", "creation code runs for that one", E2E),
  ("scaling not whole", "src/editor/gameHost.ts", "    const scale = this.pixelScaling && fit >= 1 ? Math.floor(fit) : fit;", "    const scale = this.pixelScaling && fit >= 1e9 ? Math.floor(fit) : fit;", "scales by whole numbers", E2E),
  # Phase 6: tiles
  ("scenery collides", EN, "          if (tile < 0 || !solid[tile]) continue;", "          if (tile < 0) continue;", "scenery doesn't"),
@@ -193,8 +195,29 @@ CASES = [
  ("bucket unbounded", TO, "  while (stack.length && seen.size < limit) {", "  while (stack.length && seen.size < limit * 1000) {", "stops at its limit"),
  ("palette one way", TO, "  const left = Math.min(ca, cb), right = Math.max(ca, cb), top = Math.min(ra, rb), bottom = Math.max(ra, rb);\n  const tiles: number[] = [];", "  const left = ca, right = cb, top = ra, bottom = rb;\n  const tiles: number[] = [];", "dragged either way"),
  ("solid click ignored", "src/editor/tiles/TilesetEditor.tsx", "        set((t) => void (t.solid = t.solid.includes(n) ? t.solid.filter((s) => s !== n) : [...t.solid, n].sort((a, b) => a - b)));", "        set((t) => void (t.solid = t.solid.filter((s) => s !== n)));", "solid tiles chosen", E2E),
- ("undo per tile", RE, "    stroke.current = \"open\";\n    if (tool === \"pick\") {", "    stroke.current = \"none\";\n    if (tool === \"pick\") {", "painting a level", E2E),
+ ("undo per tile", RE, "{ label, ...(stroke.current ? { group: stroke.current } : {}) }", "{ label, ...(stroke.current ? { group: stroke.current + Math.random() } : {}) }", "painting a level", E2E),
  ("palette single only", RE, "            if (n !== null) setStamp(stampFromPalette(anchor, n, grid.columns));", "            if (n !== null) setStamp(stampFromPalette(n, n, grid.columns));", "painting a level", E2E),
+ # Phase 6 gaps: undo, remap, chunks, autotiling
+ ("undo changes code", HI, "  const out = structuredClone(snapshot);\n  const events", "  const out = structuredClone(snapshot);\n  if (out) return out;\n  const events", "never changes code"),
+ ("undo groups forever", HI, "    const same = this.group === group && (opts.group !== undefined || now - this.at < GROUP_MS);", "    const same = this.group === group;", "close together are one"),
+ ("groups time out", HI, "    const same = this.group === group && (opts.group !== undefined || now - this.at < GROUP_MS);", "    const same = this.group === group && now - this.at < GROUP_MS;", "one step however long"),
+ ("redo kept", HI, "    this.future = [];\n    this.group = group;", "    this.group = group;", "clears redo"),
+ ("code edits are undo steps", "src/editor/ObjectEditor.tsx", '                    { history: "skip" },', '                    { history: "record" },', "never undoes typing", E2E),
+ ("room edits not undoable", RE, "      mutate((p) => recipe(find(p, \"rooms\", roomId)!), { label, ...(stroke.current ? { group: stroke.current } : {}) }),", "      mutate((p) => recipe(find(p, \"rooms\", roomId)!), { label, history: \"skip\" }),", "never undoes typing", E2E),
+ ("no remap on change", "src/editor/tiles/TilesetEditor.tsx", "        lost = remapTileset(p, tilesetId, before);", "        lost = remapTileset(p, tilesetId, before.id === t.id ? t : before);", "wider replacement picture", E2E),
+ ("solid not remapped", "src/store/project.ts", "  after.solid = after.solid.flatMap((n) => {", "  after.solid = after.solid.flatMap((n) => {\n    if (n >= 0) return [n];", "same picture tile, not the same number"),
+ ("autotiles not remapped", "src/store/project.ts", "  for (const set of after.autotiles) set.tiles = set.tiles.map((n) => (n < 0 ? n : move(n) ?? -1));", "", "same picture tile, not the same number"),
+ ("all chunks drawn", "src/engine/render/pixiRenderer.ts", "        const near = cx >= x0 && cx <= x1 && cy >= y0 && cy <= y1;", "        const near = cx >= x0 - 1e9 && cx <= x1 + 1e9 && cy >= y0 - 1e9 && cy <= y1 + 1e9;", "86 000 tiles", E2E,
+  ("      for (let cy = Math.max(0, y0); cy <= Math.min(maxCy, y1); cy++)\n        for (let cx = Math.max(0, x0); cx <= Math.min(maxCx, x1); cx++)", "      for (let cy = Math.max(0, y0 - 1e9); cy <= Math.min(maxCy, y1 + 1e9); cy++)\n        for (let cx = Math.max(0, x0 - 1e9); cx <= Math.min(maxCx, x1 + 1e9); cx++)")),
+ ("tile changes unseen", "src/engine/render/pixiRenderer.ts", "      if (chunk) this.drawTile(chunk, t, cell);", "      if (chunk && cell < 0) this.drawTile(chunk, t, cell);", "changed while playing", E2E),
+ ("fit stops at 10%", RE, "const MIN_ZOOM = 0.02;", "const MIN_ZOOM = 0.1;", "86 000 tiles", E2E),
+ ("left and right swapped", TO, "    const mask = (isMember(c, r - 1) ? UP : 0) | (isMember(c + 1, r) ? RIGHT : 0) | (isMember(c, r + 1) ? DOWN : 0) | (isMember(c - 1, r) ? LEFT : 0);", "    const mask = (isMember(c, r - 1) ? UP : 0) | (isMember(c + 1, r) ? LEFT : 0) | (isMember(c, r + 1) ? DOWN : 0) | (isMember(c - 1, r) ? RIGHT : 0);", "row joins its ends"),
+ ("neighbours not retiled", TO, "  out = retile(out, withNeighbours(inRoom), set);", "  out = retile(out, inRoom, set);", "changes the cell already there"),
+ ("erase leaves old edges", TO, "  return retile(out, withNeighbours(cells), set);", "  return out;", "erasing lets the neighbours"),
+ ("no fallback piece", TO, "  return set.tiles[15] !== undefined && set.tiles[15]! >= 0 ? set.tiles[15]! : set.tiles.find((x) => x >= 0) ?? 0;", "  return 0;", "borrows its fully joined"),
+ ("autotile brush ignored", RE, "  const dab = (t: Record<string, number>, c: number, r: number, erasing: boolean) =>\n    autoSet", "  const dab = (t: Record<string, number>, c: number, r: number, erasing: boolean) =>\n    autoSet && c < -1e9", "autotile brush picks", E2E),
+ ("in order does nothing", "src/editor/tiles/TilesetEditor.tsx", "              onClick={() => change((t) => void (t.autotiles.find((x) => x.id === current.id)!.tiles = Array.from({ length: 16 }, (_, i) => from + i)))}", "              onClick={() => change((t) => void (t.autotiles.find((x) => x.id === current.id)!.tiles = t.autotiles.find((x) => x.id === current.id)!.tiles.map((n) => n + 0 * from)))}", "filled in order", E2E),
+ ("picture closed early", "src/editor/tiles/TilesetEditor.tsx", "    return () => {\n      alive = false;\n    };\n  }, [blob]);", "    return () => {\n      alive = false;\n      shown.current?.close();\n    };\n  }, [blob]);", "wider replacement picture", E2E),
  ("no isolation", "vite.config.ts", '  "Cross-Origin-Embedder-Policy": "credentialless",', "", "stopped at its line", E2E),
 ]
 only = sys.argv[1:]

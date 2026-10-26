@@ -15,6 +15,7 @@ import {
   type Project,
   type SpriteResource,
 } from "./project";
+import { autotilePaint } from "../editor/tiles/tileOps";
 import { boundsOfBlobs } from "./imageTools";
 import { paintStarter, paintStarterTileset, STARTER_SPRITES, STARTER_TILESET } from "./starterArt";
 
@@ -187,6 +188,7 @@ export async function addStarterTileset(project: Project, assets: Map<string, Bl
     tileWidth: t.tileWidth,
     tileHeight: t.tileHeight,
     solid: [...t.solid],
+    autotiles: t.autotiles.map((a) => ({ id: newId(), name: a.name, tiles: [...a.tiles] })),
   };
   project.tilesets.push(ts);
   return ts;
@@ -206,8 +208,8 @@ const LEVEL = [
   "            ====        c          c    ",
   "                       BBB        BBB   ",
   "     c                                  ",
-  "    ====         E           E          ",
-  " P                      *               ",
+  "    ====                                ",
+  " P               E      *    E          ",
   "GGGGGGGGGGGG   GGGGGGGGGGGGGGGGG  GGGGGG",
   "DDDDDDDDDDDD   DDDDDDDDDDDDDDDDD  DDDDDD",
   "DDDDDDDDDDDD   DDDDDDDDDDDDDDDDD  DDDDDD",
@@ -268,7 +270,7 @@ else:
   ev(coin, { type: "create" }, "self.image_speed = 1\n");
   ev(enemy, { type: "create" }, "self.hspeed = 1.5\n");
   ev(enemy, { type: "step" }, `# Turn round at a wall, or at the edge of a drop
-ahead = self.x + self.hspeed * 10
+ahead = self.x + self.hspeed * 16   # half a tile ahead
 if not place_free(ahead, self.y) or place_free(ahead, self.y + 14):
     self.hspeed = -self.hspeed
 `);
@@ -287,11 +289,14 @@ draw_text(10, 30, "Arrows to move, Space to jump")
   const ground = { id: newId(), name: "Ground", kind: "tiles" as const, depth: 100, visible: true, locked: false, tileset: terrain.id, tiles: {} as Record<string, number> };
   room.layers.unshift(ground);
   const T = 32;
+  // The ground is painted with the grass autotile set, as a student would
+  // with the autotile brush: edges and corners pick themselves.
+  const grassCells: [number, number][] = [];
+  LEVEL.forEach((row, r) => [...row].forEach((ch, c) => (ch === "G" || ch === "D") && grassCells.push([c, r])));
+  ground.tiles = autotilePaint(ground.tiles, grassCells, terrain.autotiles[0]!, { columns: 40, rows: 15 });
   LEVEL.forEach((row, r) =>
     [...row].forEach((ch, c) => {
       const x = c * T, y = r * T;
-      if (ch === "G") ground.tiles[`${c},${r}`] = 0;
-      if (ch === "D") ground.tiles[`${c},${r}`] = 1;
       if (ch === "B") ground.tiles[`${c},${r}`] = 2;
       if (ch === "*") ground.tiles[`${c},${r}`] = 7;
       if (ch === "=") ground.tiles[`${c},${r}`] = row[c - 1] !== "=" ? 4 : row[c + 1] !== "=" ? 6 : 5;
