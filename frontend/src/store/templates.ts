@@ -6,6 +6,7 @@ import {
   blankProject,
   newEvent,
   newId,
+  newInstance,
   newObject,
   newScript,
   type EventKey,
@@ -95,7 +96,7 @@ move_and_collide(dx, dy, "Wall")
 `);
   ev(player, { type: "collision", object: coin.id }, "other.destroy()\nglobal_vars.score += 1\n");
   ev(hud, { type: "game_start" }, 'global_vars.score = 0\nglobal_vars.total = instance_number("Coin")\n');
-  ev(hud, { type: "draw" }, `draw_set_color("white")
+  ev(hud, { type: "draw_gui" }, `draw_set_color("white")
 draw_text(8, 452, f"Coins: {global_vars.score} / {global_vars.total}")
 if not instance_exists("Coin"):
     draw_set_color("yellow")
@@ -110,12 +111,12 @@ if not instance_exists("Coin"):
   MAZE.forEach((row, r) =>
     [...row].forEach((ch, c) => {
       const x = c * T, y = r * T;
-      if (ch === "#") room.instances.push({ id: newId(), object: wall.id, x, y });
-      if (ch === "c") room.instances.push({ id: newId(), object: coin.id, x: x + 16, y: y + 16 });
-      if (ch === "P") room.instances.push({ id: newId(), object: player.id, x: x + 4, y: y + 4 });
+      if (ch === "#") room.instances.push(newInstance(room, wall.id, x, y));
+      if (ch === "c") room.instances.push(newInstance(room, coin.id, x + 16, y + 16));
+      if (ch === "P") room.instances.push(newInstance(room, player.id, x + 4, y + 4));
     }),
   );
-  room.instances.push({ id: newId(), object: hud.id, x: 0, y: 0 });
+  room.instances.push(newInstance(room, hud.id, 0, 0));
   return { project: p, assets };
 }
 
@@ -167,8 +168,8 @@ draw_text(8, 8, f"{instance_number('Ball')} balls — Space adds 100, Backspace 
   room.height = 600;
   room.background = "#020617";
   for (const [x, y] of [[160, 140], [576, 140], [368, 268], [160, 396], [576, 396]])
-    room.instances.push({ id: newId(), object: block.id, x: x!, y: y! });
-  room.instances.push({ id: newId(), object: spawner.id, x: 0, y: 0 });
+    room.instances.push(newInstance(room, block.id, x!, y!));
+  room.instances.push(newInstance(room, spawner.id, 0, 0));
   return { project: p, assets };
 }
 

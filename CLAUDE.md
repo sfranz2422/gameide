@@ -45,6 +45,25 @@ testing.
   (`useFrameUrls`), never in a useMemo: React runs effect cleanups twice in
   development and revoked pictures still on screen.
 
+## Rooms and the camera
+
+- The room editor's geometry is in `editor/rooms/roomOps.ts` (pure, tested);
+  `RoomEditor.tsx` is the canvas and panels. A drag previews and saves once
+  on release; a save per pointer move would clone the project 60×/s.
+- `snap` allows 1e-6 of noise: zoom arithmetic turns a click on a line into
+  95.99999, and a plain floor moved the instance a whole row.
+- The camera lives in the engine (`Engine.camera`, `updateCamera` at the end
+  of every step). Shake is `offX/offY`: it moves the picture only, never
+  `view_x`, the mouse or collisions. Python's `view_*` are published at the
+  start of a step, so they are where the camera was at the end of the last.
+- `on_draw_gui` draws in screen pixels on a layer the camera doesn't move.
+- Room instance overrides (scale, angle) apply before Create; creation code
+  runs after it, compiled as `def _creation(self)` under `<instance r:i>`,
+  so its line numbers are one more than the student's (codegen subtracts).
+- Schema version 2 (`upgradeTo2` in project.ts) added layers, grid, camera
+  and instance overrides. A new field needs the same: a version bump and an
+  upgrade that leaves old projects looking exactly as they did.
+
 ## Projects and code generation
 
 - The project is plain JSON (`store/project.ts`), resources linked by id.
@@ -95,7 +114,9 @@ bug lands where the check can't see it (an error on an event's last line
 hides an off-by-one), the test never produced the condition it names, a
 test setting left changed by an earlier check (a lowered cap) hides the
 next one's failure, or stale Python bytecode runs the previous sabotage's
-code (the harness turns bytecode caching off for that reason).
+code (the harness turns bytecode caching off for that reason), or a
+mistyped case name ran nothing and still reported success (the harness now
+refuses unknown names).
 
 Server tests are plain scripts, as in PyIDE: `backend/tests/test_server.py`
 prints ok/FAIL per check and exits non-zero. Browser tests use Playwright in

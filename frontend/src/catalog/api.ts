@@ -21,9 +21,10 @@ export type Category =
   | "Motion"
   | "Drawing"
   | "Rooms"
+  | "Camera"
   | "Debug";
 
-export type ParamType = "number" | "string" | "object" | "sprite" | "key" | "button" | "color" | "boolean" | "room" | "any";
+export type ParamType = "number" | "string" | "object" | "sprite" | "key" | "button" | "color" | "boolean" | "room" | "instance" | "any";
 
 export interface Param {
   name: string;
@@ -127,6 +128,18 @@ export const API: ApiEntry[] = [
     description: "Somewhere to keep values every object can see: global_vars.score = 0" },
   { kind: "variable", name: "room_width", category: "Rooms", type: "number", description: "The width of the room." },
   { kind: "variable", name: "room_height", category: "Rooms", type: "number", description: "The height of the room." },
+
+  // Camera
+  fn("Camera", "camera_follow", [p("instance", "instance"), p("smoothing", "number", "None")], "nothing",
+    "Keeps the view centred on an instance (camera_follow(self)). smoothing: 1 sticks to it, 0.1 glides. None stops following."),
+  fn("Camera", "camera_set", [p("x", "number"), p("y", "number")], "nothing",
+    "Puts the view's top-left corner at (x, y) in the room, and stops following."),
+  fn("Camera", "camera_shake", [p("strength", "number", "4"), p("steps", "number", "15")], "nothing",
+    "Shakes the screen by up to `strength` pixels, fading out over `steps` steps. Great for hits and explosions."),
+  { kind: "variable", name: "view_x", category: "Camera", type: "number", description: "Where the view's left edge is in the room." },
+  { kind: "variable", name: "view_y", category: "Camera", type: "number", description: "Where the view's top edge is in the room." },
+  { kind: "variable", name: "view_width", category: "Camera", type: "number", description: "How wide the view is (the game window)." },
+  { kind: "variable", name: "view_height", category: "Camera", type: "number", description: "How tall the view is." },
 
   // Debug
   fn("Debug", "show_debug", [p("text", "any")], "nothing",

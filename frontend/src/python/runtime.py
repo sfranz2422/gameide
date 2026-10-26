@@ -37,6 +37,7 @@ import builtins
 import difflib
 import json
 import linecache
+import re
 import math
 import traceback
 from array import array
@@ -63,6 +64,8 @@ __all__ = [
     "draw_self", "draw_sprite", "draw_text", "draw_rect", "draw_set_color",
     # rooms and the game
     "room_goto", "room_restart", "game_restart", "global_vars", "room_width", "room_height",
+    # the camera
+    "camera_follow", "camera_set", "camera_shake", "view_x", "view_y", "view_width", "view_height",
     # debugging
     "show_debug",
 ]
@@ -71,12 +74,16 @@ __all__ = [
 # frame, so they are re-written into the students' namespace each frame
 # (`_publish_globals`) — `from x import *` would copy them once and leave
 # them stale.
-_LIVE_GLOBALS = ("mouse_x", "mouse_y", "room_width", "room_height")
+_LIVE_GLOBALS = ("mouse_x", "mouse_y", "room_width", "room_height", "view_x", "view_y", "view_width", "view_height")
 
 mouse_x = 0.0
 mouse_y = 0.0
 room_width = 0
 room_height = 0
+view_x = 0.0
+view_y = 0.0
+view_width = 0
+view_height = 0
 global_vars = SimpleNamespace()
 
 # ---------------------------------------------------------------- shared state
@@ -119,7 +126,10 @@ _lists = {}
 _cur = None          # the instance whose event is running (for place_meeting(...))
 _in_draw = False
 _draw_depth = 0.0
-_draw = []           # draw commands this frame
+_draw = []           # draw commands this frame, in the room
+_gui = []            # …and on the screen, from Draw GUI events (not moved by the camera)
+_draw_list = _draw   # where draw_* functions are writing now
+_creation_fns = {}   # (room index, instance index) -> that instance's creation code
 _color = 0xFFFFFF
 _debug = None
 _debug_changed = False
@@ -138,11 +148,11 @@ _ns = {}             # the namespace student code runs in
 # sign anything is wrong.
 _SIMPLE_EVENTS = {
     "on_create", "on_destroy", "on_cleanup",
-    "on_begin_step", "on_step", "on_end_step", "on_draw",
+    "on_begin_step", "on_step", "on_end_step", "on_draw", "on_draw_gui",
     "on_room_start", "on_room_end", "on_game_start",
     "on_animation_end", "on_outside_room", "on_intersect_boundary",
 }
-_PER_FRAME = ("on_begin_step", "on_step", "on_end_step", "on_draw")
+_PER_FRAME = ("on_begin_step", "on_step", "on_end_step", "on_draw", "on_draw_gui")
 _KEY_KINDS = ("down", "pressed", "released")
 _BUTTONS = ("left", "right", "middle")
 _EDGES = ("pressed", "released")
@@ -597,7 +607,7 @@ def _check_draw(fn):
     # Drawing outside a Draw event does nothing in GameMaker either, but
     # there it is silent, and "my text doesn't show" is an afternoon lost.
     if not _in_draw:
-        _warn(f"{fn}() only draws inside an on_draw event.")
+        _warn(f"{fn}() only draws inside an on_draw or on_draw_gui event.")
         return False
     return True
 
@@ -609,17 +619,17 @@ def draw_self():
 
 def draw_sprite(sprite, frame, x, y):
     if _check_draw("draw_sprite"):
-        _draw.append(["sprite", _draw_depth, _sprite_of(sprite), frame, x, y])
+        _draw_list.append(["sprite", _draw_depth, _sprite_of(sprite), frame, x, y])
 
 
 def draw_text(x, y, text):
     if _check_draw("draw_text"):
-        _draw.append(["text", _draw_depth, x, y, str(text), _color])
+        _draw_list.append(["text", _draw_depth, x, y, str(text), _color])
 
 
 def draw_rect(x1, y1, x2, y2, outline=False):
     if _check_draw("draw_rect"):
-        _draw.append(["rect", _draw_depth, x1, y1, x2, y2, _color, 1 if outline else 0])
+        _draw_list.append(["rect", _draw_depth, x1, y1, x2, y2, _color, 1 if outline else 0])
 
 
 def draw_set_color(color):
@@ -668,6 +678,26 @@ def game_restart():
     _pending_room = "restart"
 
 
+def camera_follow(instance, smoothing=None):
+    """Keeps the view centred on an instance (None stops). smoothing: 1 sticks, 0.1 glides."""
+    if instance is None:
+        _js.camera_follow(-1, -1.0)
+        return
+    if not isinstance(instance, GameObject):
+        raise TypeError(f"camera_follow wants an instance, like camera_follow(self), not {instance!r}.")
+    _js.camera_follow(instance._slot, -1.0 if smoothing is None else max(0.0, min(1.0, float(smoothing))))
+
+
+def camera_set(x, y):
+    """Puts the view's top-left corner at (x, y), and stops following."""
+    _js.camera_set(x, y)
+
+
+def camera_shake(strength=4, steps=15):
+    """Shakes the view by up to `strength` pixels, fading out over `steps` steps."""
+    _js.camera_shake(strength, steps)
+
+
 def show_debug(text):
     """Shows text in the corner of the game, over everything, until changed."""
     global _debug, _debug_changed
@@ -706,7 +736,9 @@ def _call_all(lst, name):
     _cur = None
 
 
-def _create(t, x, y):
+def _create(t, x, y, placed=None):
+    """A new instance. `placed` is a room instance's overrides (scale,
+    angle), applied before its Create event as GameMaker does."""
     global _next
     if _free:
         slot = _free.pop()
@@ -727,6 +759,10 @@ def _create(t, x, y):
     _st[b + _F_DIRTY] = was_dirty
     _st[b + F.X] = _st[b + F.XPREV] = x
     _st[b + F.Y] = _st[b + F.YPREV] = y
+    if placed:
+        _st[b + F.XSCALE] = placed.get("scaleX", 1)
+        _st[b + F.YSCALE] = placed.get("scaleY", 1)
+        _st[b + F.ANGLE] = placed.get("angle", 0)
     _mark_dirty(slot, b)
 
     ty = _types[t]
@@ -802,7 +838,7 @@ def _kill_quietly(o):
 
 def _goto(index, first=False):
     """Leaves the current room (if any) and builds room `index`."""
-    global _room_now, _room_changed, room_width, room_height
+    global _room_now, _room_changed, room_width, room_height, _cur
     if _room_now >= 0:
         for o in list(_all):
             if o._alive:
@@ -819,10 +855,17 @@ def _goto(index, first=False):
     _g[_L.G.ROOM_WIDTH] = room_width
     _g[_L.G.ROOM_HEIGHT] = room_height
     _publish_globals()
-    # GameMaker's order: every instance's Create, then Game Start (first room
-    # only), then Room Start.
-    for inst in room["instances"]:
-        _create(_type_of(inst["object"]), inst["x"], inst["y"])
+    # GameMaker's order: each instance's Create then its creation code, then
+    # Game Start (first room only), then Room Start.
+    for i, inst in enumerate(room["instances"]):
+        o = _create(_type_of(inst["object"]), inst["x"], inst["y"], inst)
+        code = _creation_fns.get((index, i))
+        if code is not None and o._alive:
+            prev, _cur = _cur, o
+            try:
+                code(o)
+            finally:
+                _cur = prev
     if first:
         for o in list(_all):
             if o._alive:
@@ -843,14 +886,21 @@ def _restart_game():
 
 
 def _publish_globals():
-    global mouse_x, mouse_y
-    mouse_x = _g[_L.G.MOUSE_X]
-    mouse_y = _g[_L.G.MOUSE_Y]
+    global mouse_x, mouse_y, view_x, view_y, view_width, view_height
+    G = _L.G
+    mouse_x = _g[G.MOUSE_X]
+    mouse_y = _g[G.MOUSE_Y]
+    view_x, view_y = _g[G.VIEW_X], _g[G.VIEW_Y]
+    view_width, view_height = int(_g[G.VIEW_W]), int(_g[G.VIEW_H])
     ns = _ns
     ns["mouse_x"] = mouse_x
     ns["mouse_y"] = mouse_y
     ns["room_width"] = room_width
     ns["room_height"] = room_height
+    ns["view_x"] = view_x
+    ns["view_y"] = view_y
+    ns["view_width"] = view_width
+    ns["view_height"] = view_height
 
 
 # ---------------------------------------------------------------- the frame
@@ -928,22 +978,25 @@ def _input_events():
 
 
 def _draw_events():
-    global _in_draw, _draw_depth, _cur, _color
-    lst = _lists["on_draw"]
-    if not lst:
-        return
-    _in_draw = True
-    _color = 0xFFFFFF
-    try:
-        for i in range(len(lst)):
-            o = lst[i]
-            if o._alive:
-                _cur = o
-                _draw_depth = o.depth
-                o.on_draw()
-    finally:
-        _in_draw = False
-        _cur = None
+    """Draw, into the room, then Draw GUI, onto the screen over everything."""
+    global _in_draw, _draw_depth, _cur, _color, _draw_list
+    for name, target in (("on_draw", _draw), ("on_draw_gui", _gui)):
+        lst = _lists[name]
+        if not lst:
+            continue
+        _in_draw = True
+        _draw_list = target
+        _color = 0xFFFFFF
+        try:
+            for i in range(len(lst)):
+                o = lst[i]
+                if o._alive:
+                    _cur = o
+                    _draw_depth = o.depth
+                    getattr(o, name)()
+        finally:
+            _in_draw = False
+            _cur = None
 
 
 def _end_of_frame():
@@ -959,11 +1012,14 @@ def _end_of_frame():
 
 def _commands():
     """What JavaScript must do after this frame, as JSON — or None for nothing."""
-    global _draw, _debug_changed, _room_changed
+    global _draw, _gui, _debug_changed, _room_changed
     out = {}
     if _draw:
         out["draw"] = _draw
         _draw = []
+    if _gui:
+        out["gui"] = _gui
+        _gui = []
     if _debug_changed:
         out["debug"] = _debug
         _debug_changed = False
@@ -1014,7 +1070,7 @@ def _start():
 # ---------------------------------------------------------------- errors
 
 def _student_frame(filename):
-    return filename.startswith("<object ") or filename.startswith("<script ")
+    return filename.startswith(("<object ", "<script ", "<instance "))
 
 
 def _error_report(e):
@@ -1094,7 +1150,7 @@ def _setup(layout_json, game_json):
         _sprite_index[s["name"]] = i
         _sprite_names.append(s["name"])
     _rooms = game["rooms"]
-    for name in ("on_begin_step", "on_step", "on_end_step", "on_draw", "keyboard", "global_mouse"):
+    for name in ("on_begin_step", "on_step", "on_end_step", "on_draw", "on_draw_gui", "keyboard", "global_mouse"):
         _lists[name] = []
 
     _ns = {"__name__": "game", "__builtins__": builtins}
@@ -1130,6 +1186,25 @@ def _load_game(game):
         if name not in _type_index:
             _warn(f'There is code for "{name}", but no object called that.')
         _compile_into_ns("object", name, source)
+
+    # Each room instance's creation code, as a function of `self`, under a
+    # filename naming the room and instance so errors can point at it.
+    for ri, room in enumerate(game["rooms"]):
+        for ii, inst in enumerate(room["instances"]):
+            code = inst.get("code") or ""
+            if not code.strip():
+                continue
+            # Leading tabs become 4 spaces, as in object code (codegen.ts).
+            body = [("    " + re.sub(r"^\t+", lambda m: "    " * len(m.group()), line)) if line.strip() else ""
+                    for line in code.replace("\r\n", "\n").split("\n")]
+            if not any(l.strip() and not l.strip().startswith("#") for l in body):
+                body.append("    pass")
+            source = "def _creation(self):\n" + "\n".join(body) + "\n"
+            filename = f"<instance {ri}:{ii}>"
+            linecache.cache[filename] = (len(source), None, source.splitlines(True), filename)
+            scope = {}
+            exec(compile(source, filename, "exec"), _ns, scope)
+            _creation_fns[(ri, ii)] = scope["_creation"]
 
     # One class per object. Objects with no code still get one, inheriting
     # from their parent's, so a child with no events behaves like its parent.

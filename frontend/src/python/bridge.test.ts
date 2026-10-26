@@ -4,6 +4,7 @@
  * and every way a student's code can fail reaches the IDE in words.
  */
 import { describe, expect, it } from "vitest";
+import type { CameraDef, RoomInstance } from "../engine/game";
 import { F, G, STRIDE } from "../engine/layout";
 import { key, load, py, run } from "./testkit";
 
@@ -383,6 +384,75 @@ describe("sprites in the game", () => {
   });
 });
 
+describe("rooms and the camera", () => {
+  it("room overrides apply before Create; creation code runs after it, as that instance", async () => {
+    const { game } = await load({
+      code: { H: one("H", "    def on_create(self):\n        self.seen_scale = self.image_xscale\n        self.hp = 3\n") },
+      instances: [{ object: "H", x: 0, y: 0, scaleX: 2, code: "self.hp += 10\nself.mine = True\n" }, { object: "H", x: 50, y: 0 }],
+    });
+    expect(py(game, "[(h.seen_scale, h.hp, getattr(h, 'mine', False)) for h in instances('H')]")).toEqual([[2, 13, true], [1, 3, false]]);
+  });
+
+  const camRoom = (camera: CameraDef, extra: RoomInstance[] = []) => ({
+    code: { P: one("P", "    pass\n") },
+    rooms: [{ name: "Big", width: 1000, height: 800, instances: [{ object: "P", x: 500, y: 400 }, ...extra], camera }],
+  });
+
+  it("a camera following an object starts on it, and stays inside the room", async () => {
+    const { game } = await load(camRoom({ width: 200, height: 100, follow: "P", smoothing: 1 }));
+    const cam = game.engine.camera;
+    expect([cam.x, cam.y, cam.w, cam.h]).toEqual([400, 350, 200, 100]);
+    // Python sees the view as it was at the end of the last step.
+    run(game, 1);
+    expect(py(game, "(view_x, view_y, view_width, view_height)")).toEqual([400, 350, 200, 100]);
+    py(game, "instances('P')[0].x = 990");
+    run(game, 1);
+    expect(game.engine.camera.x).toBe(800); // 1000 - 200: never past the edge
+  });
+
+  it("a smoothed camera glides toward its target", async () => {
+    const { game } = await load(camRoom({ width: 200, height: 100, follow: "P", smoothing: 0.5 }));
+    py(game, "instances('P')[0].x = 700");
+    run(game, 2);
+    // Target 600 from 400: halfway each step → 500, then 550.
+    expect(game.engine.camera.x).toBe(550);
+  });
+
+  it("camera_set and camera_follow from code; a shake moves the picture, never view_x", async () => {
+    const { game } = await load(camRoom({ width: 200, height: 100, smoothing: 1 }));
+    py(game, "camera_set(120, 30)");
+    run(game, 1);
+    expect([game.engine.camera.x, game.engine.camera.y]).toEqual([120, 30]);
+    py(game, "camera_follow(instances('P')[0])");
+    run(game, 1);
+    expect(game.engine.camera.x).toBe(400);
+    py(game, "camera_shake(10, 5)");
+    run(game, 2);
+    expect(py(game, "view_x")).toBe(400);
+    const c = game.engine.camera;
+    expect(Math.abs(c.offX) + Math.abs(c.offY)).toBeGreaterThan(0);
+    run(game, 4);
+    expect([game.engine.camera.offX, game.engine.camera.offY]).toEqual([0, 0]); // faded out
+  });
+
+  it("the mouse is where it points in the room, not on the screen", async () => {
+    const { game } = await load(camRoom({ width: 200, height: 100, follow: "P", smoothing: 1 }));
+    game.engine.input.mouseMove(10, 20);
+    run(game, 1);
+    expect(py(game, "(mouse_x, mouse_y)")).toEqual([410, 370]);
+  });
+
+  it("Draw GUI goes on the screen layer, apart from Draw", async () => {
+    const { game } = await load({
+      code: { H: one("H", "    def on_draw(self):\n        draw_text(1, 1, 'room')\n    def on_draw_gui(self):\n        draw_text(2, 2, 'screen')\n") },
+      instances: [{ object: "H", x: 0, y: 0 }],
+    });
+    run(game, 1);
+    expect(game.engine.drawList.map((c) => c[4])).toEqual(["room"]);
+    expect(game.engine.guiList.map((c) => c[4])).toEqual(["screen"]);
+  });
+});
+
 describe("instances", () => {
   it("a destroyed instance keeps reading its own values after its slot is reused", async () => {
     const { game } = await load({
@@ -529,7 +599,7 @@ describe("errors and warnings", () => {
     expect(warnings).toHaveLength(3);
     expect(warnings.join("\n")).toContain('on_stepp, which is not an event, so it never runs. Did you mean "on_step"');
     expect(warnings.join("\n")).toContain('no object called "coyn". Did you mean "coin"');
-    expect(warnings.join("\n")).toContain("draw_text() only draws inside an on_draw event");
+    expect(warnings.join("\n")).toContain("draw_text() only draws inside an on_draw or on_draw_gui event");
   });
 
   it("naming an object, key or sprite that doesn't exist says what was meant", async () => {

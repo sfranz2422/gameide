@@ -41,6 +41,8 @@ export interface SharedViews {
 /** What Python returns from a frame, after JSON.parse. */
 export interface FrameCommands {
   draw?: DrawCommand[];
+  /** Draw GUI: in screen coordinates, over everything, not moved by the camera. */
+  gui?: DrawCommand[];
   debug?: string | null;
   room?: number;
   error?: PythonGameError;
@@ -60,7 +62,7 @@ export type DrawCommand =
 /** A Python exception, already traced back to the student's code. */
 export interface PythonGameError {
   /** Whose code: an object's, a script's (the Scripts folder), or neither. */
-  kind: "object" | "script" | null;
+  kind: "object" | "script" | "instance" | null;
   object: string | null; // "Player" (or the script's name), null when in neither
   event: string | null; // "on_step"
   line: number | null; // line in that object's code
@@ -68,6 +70,31 @@ export interface PythonGameError {
   traceback: string; // only the student's own frames
   /** The game stopped responding and was interrupted (an endless loop, usually). */
   hang?: boolean;
+}
+
+/**
+ * The view: what part of the room the game window shows. With no camera
+ * set for the room it is the whole room and never moves. `x`/`y` are where
+ * the camera is; `offX`/`offY` are this frame's shake, which moves only the
+ * picture — view_x, the mouse and collisions never see it.
+ */
+export interface CameraState {
+  enabled: boolean;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  followType: number; // follow the first instance of this type, or -1
+  followSlot: number; // or this instance (camera_follow), or -1
+  followGen: number;
+  smoothing: number;
+  shake: number;
+  shakeLeft: number;
+  shakeTotal: number;
+  offX: number;
+  offY: number;
+  /** Just entered the room: jump to the target rather than glide from 0, 0. */
+  fresh: boolean;
 }
 
 const scratch: Box = { left: 0, top: 0, right: 0, bottom: 0 };
@@ -91,7 +118,12 @@ export class Engine {
 
   /** Last frame's drawing, for the renderer. */
   drawList: DrawCommand[] = [];
+  guiList: DrawCommand[] = [];
   debugText: string | null = null;
+  camera: CameraState = {
+    enabled: false, x: 0, y: 0, w: 0, h: 0, followType: -1, followSlot: -1, followGen: 0, smoothing: 1,
+    shake: 0, shakeLeft: 0, shakeTotal: 0, offX: 0, offY: 0, fresh: true,
+  };
   roomIndex = 0;
   /** Set when there were more events than the events array holds. */
   overflowed = false;
@@ -318,12 +350,114 @@ export class Engine {
     events[0] = n + 1;
   }
 
+  // ---------------------------------------------------------------- the camera
+
+  /** A new room: its camera settings, and a view that starts where it should, not glides there. */
+  setRoom(index: number) {
+    this.roomIndex = index;
+    const room = this.def.rooms[index];
+    if (!room) return;
+    const cam = room.camera;
+    const c = this.camera;
+    c.enabled = !!cam;
+    c.w = cam?.width ?? room.width;
+    c.h = cam?.height ?? room.height;
+    c.followType = cam?.follow ? (this.typeIndex.get(cam.follow) ?? -1) : -1;
+    c.followSlot = -1;
+    c.smoothing = cam?.smoothing ?? 1;
+    c.x = c.y = 0;
+    c.shakeLeft = 0;
+    c.offX = c.offY = 0;
+    c.fresh = true;
+    this.updateCamera();
+  }
+
+  camera_follow(slot: number, smoothing: number) {
+    const { st } = this.fresh();
+    this.camera.followSlot = slot;
+    this.camera.followGen = slot >= 0 ? st[slot * STRIDE + F.GEN]! : 0;
+    if (slot < 0) this.camera.followType = -1;
+    if (smoothing >= 0) this.camera.smoothing = smoothing;
+  }
+
+  camera_set(x: number, y: number) {
+    const c = this.camera;
+    c.followSlot = c.followType = -1;
+    c.x = x;
+    c.y = y;
+    this.clampCamera();
+    this.publishView();
+  }
+
+  camera_shake(strength: number, steps: number) {
+    const c = this.camera;
+    c.shake = Math.max(0, strength);
+    c.shakeLeft = c.shakeTotal = Math.max(0, Math.round(steps));
+  }
+
+  private clampCamera() {
+    const c = this.camera;
+    const room = this.def.rooms[this.roomIndex];
+    if (!room) return;
+    // Keep the view inside the room; a room smaller than the view sits at its top-left.
+    c.x = Math.max(0, Math.min(c.x, room.width - c.w));
+    c.y = Math.max(0, Math.min(c.y, room.height - c.h));
+  }
+
+  private publishView() {
+    const { g } = this.fresh();
+    g[G.VIEW_X] = this.camera.x;
+    g[G.VIEW_Y] = this.camera.y;
+    g[G.VIEW_W] = this.camera.w;
+    g[G.VIEW_H] = this.camera.h;
+  }
+
+  /** Moves the view for this step, after the game's own code has run. */
+  updateCamera() {
+    const { st, g } = this.fresh();
+    const c = this.camera;
+    if (c.enabled) {
+      let target = -1;
+      if (c.followSlot >= 0) {
+        const b = c.followSlot * STRIDE;
+        // The followed instance was destroyed (or its slot handed to another): stop.
+        if (st[b + F.ALIVE] && st[b + F.GEN] === c.followGen) target = c.followSlot;
+        else c.followSlot = -1;
+      } else if (c.followType >= 0) {
+        const n = g[G.SLOTS]!;
+        for (let s = 0; s < n && target < 0; s++) if (this.matches(st, s, c.followType)) target = s;
+      }
+      if (target >= 0) {
+        const b = target * STRIDE;
+        const tx = st[b + F.X]! - c.w / 2, ty = st[b + F.Y]! - c.h / 2;
+        const k = c.fresh ? 1 : c.smoothing;
+        c.x += (tx - c.x) * k;
+        c.y += (ty - c.y) * k;
+      }
+      this.clampCamera();
+    }
+    c.fresh = false;
+    if (c.shakeLeft > 0) {
+      const amp = (c.shake * c.shakeLeft) / c.shakeTotal;
+      c.offX = (Math.random() * 2 - 1) * amp;
+      c.offY = (Math.random() * 2 - 1) * amp;
+      c.shakeLeft--;
+    } else {
+      c.offX = c.offY = 0;
+    }
+    this.publishView();
+  }
+
   /** Everything that happens before Python's frame. */
   beginStep() {
     const { st, events, keys, g } = this.fresh();
     events[0] = 0;
     events[1] = 0;
     this.input.commit(keys, g);
+    // The input knows where the pointer is on the canvas; the game wants
+    // where that is in the room.
+    g[G.MOUSE_X] = g[G.MOUSE_X]! + this.camera.x;
+    g[G.MOUSE_Y] = g[G.MOUSE_Y]! + this.camera.y;
     g[G.FRAME] = g[G.FRAME]! + 1;
     const n = g[G.SLOTS]!;
     for (let s = 0; s < n; s++) {
@@ -471,14 +605,12 @@ export class Engine {
   /** Everything after Python's frame. Returns the error, if the frame raised one. */
   endStep(commands: FrameCommands | null): PythonGameError | null {
     this.flushDirty();
-    if (!commands) {
-      this.drawList = [];
-      return null;
-    }
-    this.drawList = commands.draw ?? [];
-    if (commands.debug !== undefined) this.debugText = commands.debug;
-    if (commands.room !== undefined) this.roomIndex = commands.room;
-    return commands.error ?? null;
+    this.drawList = commands?.draw ?? [];
+    this.guiList = commands?.gui ?? [];
+    if (commands?.debug !== undefined) this.debugText = commands.debug;
+    if (commands?.room !== undefined) this.setRoom(commands.room);
+    else this.updateCamera();
+    return commands?.error ?? null;
   }
 
   /** Live instances, for the FPS readout and tests. */

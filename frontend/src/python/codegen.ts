@@ -24,8 +24,8 @@
  *     no events, so a child always has its parent to inherit from.
  */
 import type { PythonGameError } from "../engine/engine";
-import type { GameDefinition, MaskShape, SpriteDef } from "../engine/game";
-import { eventLabel, find, type EventKey, type ObjectResource, type Project, type SpriteResource } from "../store/project";
+import type { BackgroundDef, GameDefinition, MaskShape, RoomDef, SpriteDef } from "../engine/game";
+import { eventLabel, find, type EventKey, type ObjectResource, type Project, type RoomResource, type SpriteResource } from "../store/project";
 
 /** One event's lines in the generated source. Lines are 1-based. */
 export interface EventSpan {
@@ -168,20 +168,73 @@ export function buildGame(project: Project, images: Map<string, Blob>): BuiltGam
       depth: o.depth,
       ...(find(project, "objects", o.parent) ? { parent: find(project, "objects", o.parent)!.name } : {}),
     })),
-    rooms: project.rooms.map((r) => ({
-      name: r.name,
-      width: r.width,
-      height: r.height,
-      background: hex(r.background),
-      instances: r.instances
-        .map((i) => ({ object: find(project, "objects", i.object)?.name, x: i.x, y: i.y }))
-        .filter((i): i is { object: string; x: number; y: number } => !!i.object),
-    })),
+    rooms: project.rooms.map((r) => buildRoom(project, r, hex)),
     code,
     stepsPerSecond: project.settings.stepsPerSecond,
+    pixelScaling: project.settings.pixelScaling !== false,
     scripts: Object.fromEntries(project.scripts.map((s) => [s.name, s.code])),
   };
   return { def, sources };
+}
+
+/**
+ * A room as the engine wants it. Instances keep their order (the engine
+ * creates them in it, and creation-code errors name them by it). Background
+ * layers hidden in the editor are left out; instance layers only organise
+ * the editor, so their instances are always in the game.
+ */
+function buildRoom(project: Project, r: RoomResource, hex: (c: string) => number): RoomDef {
+  const instances: RoomDef["instances"] = [];
+  for (const i of r.instances) {
+    const object = find(project, "objects", i.object)?.name;
+    if (!object) continue;
+    instances.push({
+      object,
+      x: i.x,
+      y: i.y,
+      ...(i.scaleX !== 1 ? { scaleX: i.scaleX } : {}),
+      ...(i.scaleY !== 1 ? { scaleY: i.scaleY } : {}),
+      ...(i.angle ? { angle: i.angle } : {}),
+      ...(i.code.trim() ? { code: i.code } : {}),
+    });
+  }
+  const backgrounds: BackgroundDef[] = [];
+  for (const l of r.layers) {
+    if (l.kind !== "background" || !l.visible || (!l.color && !l.sprite)) continue;
+    const sprite = find(project, "sprites", l.sprite)?.name;
+    backgrounds.push({
+      depth: l.depth,
+      ...(l.color ? { color: hex(l.color) } : {}),
+      ...(sprite ? { sprite } : {}),
+      mode: l.mode,
+      hspeed: l.hspeed,
+      vspeed: l.vspeed,
+      parallax: l.parallax,
+    });
+  }
+  const follow = find(project, "objects", r.camera.follow)?.name;
+  return {
+    name: r.name,
+    width: r.width,
+    height: r.height,
+    background: hex(r.background),
+    instances,
+    ...(backgrounds.length ? { backgrounds } : {}),
+    ...(r.camera.enabled
+      ? { camera: { width: r.camera.width, height: r.camera.height, smoothing: r.camera.smoothing, ...(follow ? { follow } : {}) } }
+      : {}),
+  };
+}
+
+/** Which room instance a creation-code error came from: "<instance 0:3>" is room 0's 4th instance in the game. */
+function placedInstance(project: Project, where: string) {
+  const [ri, ii] = where.split(":").map(Number);
+  const room = project.rooms[ri ?? -1];
+  if (!room) return null;
+  // The game skips instances whose object was deleted; count the same way.
+  const placed = room.instances.filter((i) => find(project, "objects", i.object));
+  const inst = placed[ii ?? -1];
+  return inst ? { room, inst, object: find(project, "objects", inst.object)!.name } : null;
 }
 
 /** A Python error, pointed at what the student wrote. */
@@ -191,7 +244,11 @@ export interface MappedError {
   message: string;
   traceback: string;
   /** Where to jump to when the student clicks it. */
-  target: { kind: "event"; objectId: string; eventId: string; line: number } | { kind: "script"; scriptId: string; line: number } | null;
+  target:
+    | { kind: "event"; objectId: string; eventId: string; line: number }
+    | { kind: "script"; scriptId: string; line: number }
+    | { kind: "instance"; roomId: string; instanceId: string; line: number }
+    | null;
   hang: boolean;
 }
 
@@ -223,14 +280,26 @@ export function mapError(project: Project, sources: Record<string, ObjectSource>
     } else {
       where = e.object;
     }
+  } else if (e.kind === "instance" && e.object) {
+    // Line 1 of the generated function is its `def`; the student's line 1 is line 2.
+    const found = placedInstance(project, e.object);
+    const line = Math.max(1, (e.line ?? 2) - 1);
+    if (found) {
+      where = `${found.room.name} → ${found.object} at (${found.inst.x}, ${found.inst.y}), creation code line ${line}`;
+      target = { kind: "instance", roomId: found.room.id, instanceId: found.inst.id, line };
+    }
   } else if (e.kind === "script" && e.object) {
     where = `script ${e.object}${e.line != null ? `, line ${e.line}` : ""}`;
     const script = project.scripts.find((s) => s.name === e.object);
     if (script) target = { kind: "script", scriptId: script.id, line: e.line ?? 1 };
   }
   // Rewrite each `File "<object Player>", line 9, in on_step` the same way.
-  const traceback = e.traceback.replace(/File "<(object|script) ([^>]+)>", line (\d+), in (\S+)/g, (_m, kind, name, ln) => {
+  const traceback = e.traceback.replace(/File "<(object|script|instance) ([^>]+)>", line (\d+), in (\S+)/g, (_m, kind, name, ln) => {
     if (kind === "script") return `script ${name}, line ${ln}`;
+    if (kind === "instance") {
+      const found = placedInstance(project, name);
+      return found ? `${found.room.name} → ${found.object}'s creation code, line ${Math.max(1, Number(ln) - 1)}` : `creation code, line ${ln}`;
+    }
     const { span, bodyLine } = locate(sources, name, Number(ln));
     return span ? `${name} → ${span.label}, line ${bodyLine}` : `${name}, line ${ln}`;
   });

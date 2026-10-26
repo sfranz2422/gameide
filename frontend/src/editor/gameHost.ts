@@ -48,7 +48,10 @@ export class GameHost {
   // worker's own work, can take a few seconds, and isn't a student's loop.
   private isReady = false;
   private canvas: HTMLCanvasElement | null = null;
+  /** The game window's size in game pixels (the room, or its camera's view). */
   private room = { width: 640, height: 480 };
+  private pixelScaling = true;
+  private resizer: ResizeObserver | null = null;
   private detachInput: (() => void) | null = null;
   private evals = new Map<number, (v: unknown) => void>();
   private nextEval = 1;
@@ -131,6 +134,7 @@ export class GameHost {
         break;
       case "room":
         this.room = { width: m.width, height: m.height };
+        this.layout();
         break;
       case "eval":
         this.evals.get(m.id)?.(m.error ? { error: m.error } : m.value);
@@ -194,7 +198,8 @@ export class GameHost {
     this.detachInput?.();
     this.canvas?.remove();
     const room = def.rooms[0]!;
-    this.room = { width: room.width, height: room.height };
+    this.room = { width: room.camera?.width ?? room.width, height: room.camera?.height ?? room.height };
+    this.pixelScaling = def.pixelScaling !== false;
     const canvas = document.createElement("canvas");
     canvas.width = room.width;
     canvas.height = room.height;
@@ -203,6 +208,7 @@ export class GameHost {
     canvas.dataset.testid = "game-canvas";
     container.appendChild(canvas);
     this.canvas = canvas;
+    this.layout();
     const offscreen = canvas.transferControlToOffscreen();
     // Blobs in the definition are posted as references, not copied.
     this.send({ type: "play", def, canvas: offscreen, debug: this.debug }, [offscreen]);
@@ -217,8 +223,41 @@ export class GameHost {
     canvas.focus();
   }
 
+  private box: HTMLElement | null = null;
+
   /** Where the game's canvas goes. Set by the game pane. */
-  container: HTMLElement | null = null;
+  get container(): HTMLElement | null {
+    return this.box;
+  }
+  set container(el: HTMLElement | null) {
+    this.resizer?.disconnect();
+    this.box = el;
+    if (el) {
+      this.resizer = new ResizeObserver(() => this.layout());
+      this.resizer.observe(el);
+    }
+  }
+
+  /**
+   * Sizes the canvas in its pane. With pixel scaling it grows only by whole
+   * numbers, so every game pixel is the same number of screen pixels — at
+   * 2.4× some pixels would be two wide and some three, and pixel art goes
+   * lumpy. Smaller than the room, it shrinks smoothly (better than cropping).
+   */
+  private layout() {
+    const canvas = this.canvas, box = this.box;
+    if (!canvas || !box) return;
+    const { width: w, height: h } = this.room;
+    const fit = Math.min(box.clientWidth / w, box.clientHeight / h);
+    const scale = this.pixelScaling && fit >= 1 ? Math.floor(fit) : fit;
+    canvas.style.width = `${Math.max(1, Math.floor(w * scale))}px`;
+    canvas.style.height = `${Math.max(1, Math.floor(h * scale))}px`;
+  }
+
+  /** The game pane fills the screen; Esc (the browser's own) brings it back. */
+  fullscreen() {
+    void this.box?.requestFullscreen?.().catch(() => undefined);
+  }
 
   stop() {
     // A stuck game can't read "stop"; interrupt it straight away rather
@@ -281,16 +320,13 @@ export class GameHost {
   }
 
   /**
-   * A pointer position in room coordinates. The canvas is letterboxed into
-   * its pane (CSS object-fit: contain), so the picture may not fill the
-   * element: work out where the picture actually is.
+   * A pointer position in game-window pixels (the engine adds the camera's
+   * position to make it a room position). The canvas is sized exactly to
+   * the picture (layout), so this is just a rescale.
    */
   private toRoom(e: PointerEvent): { x: number; y: number } {
     const r = this.canvas!.getBoundingClientRect();
     const { width: W, height: H } = this.room;
-    const scale = Math.min(r.width / W, r.height / H);
-    const left = r.left + (r.width - W * scale) / 2;
-    const top = r.top + (r.height - H * scale) / 2;
-    return { x: (e.clientX - left) / scale, y: (e.clientY - top) / scale };
+    return { x: ((e.clientX - r.left) / r.width) * W, y: ((e.clientY - r.top) / r.height) * H };
   }
 }

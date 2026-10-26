@@ -231,6 +231,7 @@ function AddEventMenu({ project, obj, onPick, onClose }: { project: Project; obj
         {simple("Create", "create", "Runs once, when an instance appears")}
         {simple("Step", "step", "Runs every frame (60 times a second)")}
         {simple("Draw", "draw", "Draw it yourself; the sprite is drawn only if you call draw_self()")}
+        {simple("Draw GUI", "draw_gui", "Draw on the screen, over everything, where the camera can't move it: scores, health, menus")}
         {simple("Destroy", "destroy", "Runs when the instance is destroyed")}
       </div>
       <div className="menu-group">

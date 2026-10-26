@@ -128,6 +128,9 @@ export class PythonGame {
       collision_point: (x: number, y: number, t: number) => e().collision_point(x, y, t),
       instance_nearest: (x: number, y: number, t: number, ex: number) => e().instance_nearest(x, y, t, ex),
       move_and_collide: (s: number, dx: number, dy: number, t: number) => e().move_and_collide(s, dx, dy, t),
+      camera_follow: (s: number, smooth: number) => e().camera_follow(s, smooth),
+      camera_set: (x: number, y: number) => e().camera_set(x, y),
+      camera_shake: (strength: number, steps: number) => e().camera_shake(strength, steps),
     };
     py.registerJsModule("_engine", api);
     const fresh = py.runPython(FRESH_MODULE) as PyProxy & ((src: string) => PyProxy);

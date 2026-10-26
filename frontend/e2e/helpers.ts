@@ -37,3 +37,24 @@ export async function playAndWait(page: Page) {
   await expect(page.getByTestId("fps")).toBeVisible({ timeout: 30_000 });
 }
 
+
+/** Screen position of a room point, from the room editor's own zoom and pan. */
+export async function screenAt(page: Page, x: number, y: number) {
+  const c = page.getByTestId("room-canvas");
+  const b = (await c.boundingBox())!;
+  const zoom = Number(await c.getAttribute("data-zoom"));
+  const panX = Number(await c.getAttribute("data-pan-x"));
+  const panY = Number(await c.getAttribute("data-pan-y"));
+  return { x: b.x + panX + x * zoom, y: b.y + panY + y * zoom };
+}
+
+/** Opens the first room and places one instance of `object` at (x, y) with the Place tool. */
+export async function placeInRoom(page: Page, room: string, object: string, x: number, y: number) {
+  await treeItem(page, room).click();
+  await page.getByRole("button", { name: "Fit" }).click();
+  await page.getByTestId("tool-place").click();
+  await page.getByTestId("place-object").selectOption({ label: object });
+  const p = await screenAt(page, x, y);
+  await page.mouse.click(p.x, p.y);
+  await page.getByTestId("tool-select").click();
+}

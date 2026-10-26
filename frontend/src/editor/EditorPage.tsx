@@ -10,7 +10,8 @@ import type { ProjectStore } from "../store/store";
 import { addStarterSprite } from "../store/templates";
 import { GameHost } from "./gameHost";
 import { ObjectEditor, type EventFocus } from "./ObjectEditor";
-import { RoomEditor, ScriptEditor, SettingsEditor, SpritePicker } from "./OtherEditors";
+import { ScriptEditor, SettingsEditor, SpritePicker } from "./OtherEditors";
+import { RoomEditor } from "./rooms/RoomEditor";
 import { SpriteEditor } from "./sprites/SpriteEditor";
 import { SpriteImport, type ImportResult } from "./sprites/SpriteImport";
 import { decodeImage, type Decoded } from "../store/imageTools";
@@ -42,6 +43,7 @@ export function EditorPage({ store, id }: { store: ProjectStore; id: string }) {
   const [selectedEvent, setSelectedEvent] = useState<Record<string, string | null>>({});
   const [focus, setFocus] = useState<EventFocus | null>(null);
   const [scriptFocus, setScriptFocus] = useState<{ id: string; line: number; nonce: number } | null>(null);
+  const [roomFocus, setRoomFocus] = useState<{ roomId: string; instanceId: string; line: number; nonce: number } | null>(null);
   const [picking, setPicking] = useState(false);
   const [importing, setImporting] = useState<{ source: Decoded; fileName: string; appendTo?: string } | null>(null);
   const [dropping, setDropping] = useState(false);
@@ -133,9 +135,12 @@ export function EditorPage({ store, id }: { store: ProjectStore; id: string }) {
         open({ kind: "objects", id: t.objectId });
         setSelectedEvent((s) => ({ ...s, [t.objectId]: t.eventId }));
         setFocus({ eventId: t.eventId, line: t.line, nonce: Date.now() });
-      } else {
+      } else if (t.kind === "script") {
         open({ kind: "scripts", id: t.scriptId });
         setScriptFocus({ id: t.scriptId, line: t.line, nonce: Date.now() });
+      } else {
+        open({ kind: "rooms", id: t.roomId });
+        setRoomFocus({ roomId: t.roomId, instanceId: t.instanceId, line: t.line, nonce: Date.now() });
       }
     },
     [open],
@@ -311,7 +316,9 @@ export function EditorPage({ store, id }: { store: ProjectStore; id: string }) {
                 />
               )}
               {current?.kind === "sprites" && <SpriteEditor key={current.id} spriteId={current.id} addFrames={() => chooseFile(current.id)} />}
-              {current?.kind === "rooms" && <RoomEditor key={current.id} roomId={current.id} />}
+              {current?.kind === "rooms" && (
+                <RoomEditor key={current.id} roomId={current.id} focus={roomFocus?.roomId === current.id ? roomFocus : null} />
+              )}
               {current?.kind === "scripts" && (
                 <ScriptEditor key={current.id} scriptId={current.id} focus={scriptFocus?.id === current.id ? scriptFocus : null} />
               )}

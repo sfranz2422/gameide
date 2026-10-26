@@ -29,6 +29,7 @@ CG, PJ, HOST, UP = "src/python/codegen.ts", "src/store/project.ts", "src/editor/
 E2E = "e2e"  # a sixth item: run the Playwright test of that name instead of Vitest
 PY = "py"    # …or the server's checks (backend/tests/test_server.py); caught = that check prints FAIL
 APP = "../backend/app.py"
+RO, RE = "src/editor/rooms/roomOps.ts", "src/editor/rooms/RoomEditor.tsx"
 CASES = [
  ("layout drift", RT, '"x": boxy(F.X)', '"x": boxy(F.Y)', "every built-in property"),
  ("no polar sync", RT, "            _st[b + i] = v\n            set_polar(b)", "            _st[b + i] = v", "two views of one motion"),
@@ -55,7 +56,7 @@ CASES = [
  ("warn every time", RT, "    if message not in _warned:\n        _warned.add(message)\n        _warnings.append(message)", "    _warnings.append(message)", "warned about, once"),
  ("no suggestion", RT, "    close = difflib.get_close_matches(word, list(choices), n=1)", "    close = []", "says what was meant"),
  ("slow getters", RT, "        def get(self):\n            return _st[self._b + i]\n\n        def set_(self, v):\n            b = self._b\n            _st[b + i] = v\n            if not", "        def get(self):\n            sum(range(3000))\n            return _st[self._b + i]\n\n        def set_(self, v):\n            b = self._b\n            _st[b + i] = v\n            if not", "frame's budget"),
- ("param renamed", RT, "def draw_text(x, y, text):\n    if _check_draw(\"draw_text\"):\n        _draw.append([\"text\", _draw_depth, x, y, str(text), _color])", "def draw_text(x, y, txt):\n    if _check_draw(\"draw_text\"):\n        _draw.append([\"text\", _draw_depth, x, y, str(txt), _color])", "matches runtime.py"),
+ ("param renamed", RT, "def draw_text(x, y, text):\n    if _check_draw(\"draw_text\"):\n        _draw_list.append([\"text\", _draw_depth, x, y, str(text), _color])", "def draw_text(x, y, txt):\n    if _check_draw(\"draw_text\"):\n        _draw_list.append([\"text\", _draw_depth, x, y, str(txt), _color])", "matches runtime.py"),
  ("undocumented function", RT, '    "show_debug",\n]', '    "show_debug", "point_distance2",\n]\npoint_distance2 = lambda a, b: 0', "matches runtime.py"),
  ("default differs", RT, 'def mouse_check(button="left"):', 'def mouse_check(button="right"):', "matches runtime.py"),
  ("property undocumented", "src/catalog/api.ts", '  { name: "depth", description: "Lower depth draws on top." },\n', "", "only properties"),
@@ -144,9 +145,41 @@ CASES = [
  ("frames not skippable", "src/editor/sprites/SpriteImport.tsx", "      if (n.has(i)) n.delete(i);\n      else n.add(i);", "      void n;", "dropped on the editor", E2E),
  ("any size appended", "src/editor/sprites/SpriteImport.tsx", "  const wrongSize = appendTo && (fw !== appendTo.width || fh !== appendTo.height);", "  const wrongSize = appendTo && fw < 0;", "must be its size", E2E),
  ("drag doesn't draw", "src/editor/sprites/SpriteEditor.tsx", '    if (right > left && bottom > top) set((s) => void (s.mask = { kind: "rect", left, top, right, bottom }));', '    if (right > left && bottom < top) set((s) => void (s.mask = { kind: "rect", left, top, right, bottom }));', "drawn by hand", E2E),
+ # Phase 5: rooms and the camera
+ ("snap rounds", RO, "  return grid > 0 ? Math.floor(v / grid + 1e-6) * grid : Math.round(v);", "  return grid > 0 ? Math.round(v / grid) * grid : Math.round(v);", "snaps to grid lines"),
+ ("snap noise", RO, "  return grid > 0 ? Math.floor(v / grid + 1e-6) * grid : Math.round(v);", "  return grid > 0 ? Math.floor(v / grid) * grid : Math.round(v);", "snaps to grid lines"),
+ ("unrotated hit test", RO, "  const c = Math.cos(inst.angle * DEG), s = Math.sin(inst.angle * DEG);\n  const dx", "  const c = 1, s = 0;\n  const dx", "turned and scaled as the game draws"),
+ ("locked clickable", RO, '  return new Set(room.layers.filter((l) => l.kind === "instances" && l.visible && !l.locked).map((l) => l.id));', '  return new Set(room.layers.filter((l) => l.kind === "instances" && l.visible).map((l) => l.id));', "never a hidden or locked layer"),
+ ("bottom one clicked", RO, "  for (let i = order.length - 1; i >= 0; i--) {", "  for (let i = 0; i < order.length; i++) {", "clicks the one drawn on top"),
+ ("box catches touching", RO, "corners(inst, spriteFor(project, inst)).every(", "corners(inst, spriteFor(project, inst)).some(", "wholly inside"),
+ ("paste keeps old ids", RO, "map((i) => ({ ...i, id: newId(), layer, x: i.x + x, y: i.y + y }));", "map((i) => ({ ...i, id: \"same\", layer, x: i.x + x, y: i.y + y }));", "paste where asked with new ids"),
+ ("camera off the edge", RO, "  x = Math.max(0, Math.min(x, room.width - c.width));", "  void 0;", "where the game would start it"),
+ ("no upgrade", "src/store/project.ts", "  if (p.schemaVersion < 2) upgradeTo2(p as Project);", "  if (p.schemaVersion < 0) upgradeTo2(p as Project);", "look exactly as they did"),
+ ("overrides always sent", CG, "      ...(i.scaleX !== 1 ? { scaleX: i.scaleX } : {}),", "      scaleX: i.scaleX,", "carry overrides only where set"),
+ ("hidden backgrounds drawn", CG, '    if (l.kind !== "background" || !l.visible || (!l.color && !l.sprite)) continue;', '    if (l.kind !== "background" || (!l.color && !l.sprite)) continue;', "carry overrides only where set"),
+ ("creation error unplaced", CG, "    const line = Math.max(1, (e.line ?? 2) - 1);", "    const line = e.line ?? 1;", "creation code points at that instance"),
+ ("overrides after create", RT, "    if placed:\n        _st[b + F.XSCALE]", "    if placed and False:\n        _st[b + F.XSCALE]", "overrides apply before Create"),
+ ("creation code skipped", RT, "        if code is not None and o._alive:", "        if code is not None and o._alive and False:", "overrides apply before Create"),
+ ("camera unclamped", EN, "    c.x = Math.max(0, Math.min(c.x, room.width - c.w));", "    void room;", "stays inside the room"),
+ ("camera never glides", EN, "        const k = c.fresh ? 1 : c.smoothing;", "        const k = 1;", "glides toward"),
+ ("camera starts at 0", EN, "        const k = c.fresh ? 1 : c.smoothing;", "        const k = c.fresh ? 0 : c.smoothing;", "starts on it"),
+ ("shake moves the view", EN, "      c.offX = (Math.random() * 2 - 1) * amp;", "      c.x += 3; c.offX = (Math.random() * 2 - 1) * amp;", "shake moves the picture"),
+ ("shake never ends", EN, "      c.shakeLeft--;", "      void 0;", "shake moves the picture"),
+ ("mouse on screen", EN, "    g[G.MOUSE_X] = g[G.MOUSE_X]! + this.camera.x;", "    void 0;", "mouse is where it points in the room"),
+ ("gui in the room", RT, '    for name, target in (("on_draw", _draw), ("on_draw_gui", _gui)):', '    for name, target in (("on_draw", _draw), ("on_draw_gui", _draw)):', "Draw GUI goes on the screen"),
+ ("tree drag not an object", "src/editor/ResourceTree.tsx", '                      if (f.kind === "objects") e.dataTransfer.setData(OBJECT_DRAG_TYPE, r.id);', '                      if (f.kind === "sprites") e.dataTransfer.setData(OBJECT_DRAG_TYPE, r.id);', "dragged from the tree lands", E2E),
+ ("paint stacks", RE, "        if (!occupied(room, placeObject, at.x, at.y)) place(placeObject, at);\n      }", "        place(placeObject, at);\n      }", "without stacking copies", E2E),
+ ("move not saved", RE, "        for (const i of r.instances) if (selected.has(i.id)) (i.x += dx), (i.y += dy);", "        for (const i of r.instances) if (selected.has(i.id) && dx > 1e9) (i.x += dx), (i.y += dy);", "move with the keys", E2E),
+ ("creation code not saved", RE, "                  onChange={(code) => eachSelected((i) => void (i.code = code))}", "                  onChange={(code) => eachSelected((i) => void (i.code = code.slice(0, 0)))}", "creation code runs for that one", E2E),
+ ("scaling not whole", "src/editor/gameHost.ts", "    const scale = this.pixelScaling && fit >= 1 ? Math.floor(fit) : fit;", "    const scale = this.pixelScaling && fit >= 1e9 ? Math.floor(fit) : fit;", "scales by whole numbers", E2E),
  ("no isolation", "vite.config.ts", '  "Cross-Origin-Embedder-Policy": "credentialless",', "", "stopped at its line", E2E),
 ]
 only = sys.argv[1:]
+# A name that matches no case would otherwise run nothing and still say
+# "ALL SABOTAGES CAUGHT" — which happened once, after a typo.
+unknown = [n for n in only if n not in {c[0] for c in CASES}]
+if unknown:
+    sys.exit(f"No sabotage case called: {unknown}")
 bad = []
 for name, f, old, new, test, *extra in CASES:
     runner = [r for r in extra[:1] if r != "vitest"]  # "vitest" just holds the place for extra pairs

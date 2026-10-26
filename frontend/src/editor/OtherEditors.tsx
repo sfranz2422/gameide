@@ -5,11 +5,10 @@
  * editor (Phase 5) replace parts of these.
  */
 import { useEffect, useState } from "react";
-import { find, newId, type RoomInstance } from "../store/project";
+import { find } from "../store/project";
 import { STARTER_SPRITES } from "../store/starterArt";
 import { CodeEditor } from "./code/CodeEditor";
 import { projectNames } from "./ObjectEditor";
-import { Icon } from "./ui/icons";
 import { useProjectApi } from "./useProject";
 
 export function SpritePicker({ onPick, onImport, onClose }: { onPick: (key: string) => void; onImport: () => void; onClose: () => void }) {
@@ -52,99 +51,6 @@ export function SpritePicker({ onPick, onImport, onClose }: { onPick: (key: stri
   );
 }
 
-export function RoomEditor({ roomId }: { roomId: string }) {
-  const { project, mutate } = useProjectApi();
-  const room = find(project, "rooms", roomId);
-  const [adding, setAdding] = useState(project.objects[0]?.id ?? "");
-  if (!room) return <div className="empty-pane">This room was deleted.</div>;
-  const set = (recipe: (r: NonNullable<typeof room>) => void) => mutate((p) => recipe(find(p, "rooms", roomId)!));
-  const setInst = (id: string, recipe: (i: RoomInstance) => void) => set((r) => recipe(r.instances.find((i) => i.id === id)!));
-  const counts = new Map<string, number>();
-  for (const i of room.instances) counts.set(i.object, (counts.get(i.object) ?? 0) + 1);
-
-  return (
-    <div className="room-editor" data-tutorial="room-editor">
-      <div className="props">
-        <label>
-          Width <input type="number" min={16} value={room.width} onChange={(e) => set((r) => void (r.width = Math.max(16, Number(e.target.value) || 16)))} />
-        </label>
-        <label>
-          Height <input type="number" min={16} value={room.height} onChange={(e) => set((r) => void (r.height = Math.max(16, Number(e.target.value) || 16)))} />
-        </label>
-        <label>
-          Background <input type="color" value={room.background} onChange={(e) => set((r) => void (r.background = e.target.value))} />
-        </label>
-      </div>
-      <p className="muted small pad">
-        The drag-and-drop room editor comes in a later phase. For now, list the instances the room starts with here — or make them in code with{" "}
-        <code>instance_create</code>.
-      </p>
-      <div className="inst-add pad">
-        <select value={adding} onChange={(e) => setAdding(e.target.value)} aria-label="Object to add" data-testid="room-add-object">
-          {project.objects.map((o) => (
-            <option key={o.id} value={o.id}>
-              {o.name}
-            </option>
-          ))}
-        </select>
-        <button
-          className="btn"
-          disabled={!adding}
-          data-testid="room-add"
-          onClick={() => {
-            const inst = { id: newId(), object: adding, x: Math.round(room.width / 2), y: Math.round(room.height / 2) };
-            set((r) => void r.instances.push(inst));
-          }}
-        >
-          {Icon.plus()} Add instance
-        </button>
-        <span className="muted small">
-          {room.instances.length} instance{room.instances.length === 1 ? "" : "s"}
-        </span>
-      </div>
-      <div className="inst-table-wrap pad">
-        <table className="inst-table">
-          <thead>
-            <tr>
-              <th>Object</th>
-              <th>x</th>
-              <th>y</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {room.instances.slice(0, 300).map((i) => (
-              <tr key={i.id}>
-                <td>
-                  <select value={i.object} onChange={(e) => setInst(i.id, (x) => void (x.object = e.target.value))} aria-label="Object">
-                    {project.objects.map((o) => (
-                      <option key={o.id} value={o.id}>
-                        {o.name}
-                      </option>
-                    ))}
-                  </select>
-                </td>
-                <td>
-                  <input type="number" value={i.x} onChange={(e) => setInst(i.id, (x) => void (x.x = Number(e.target.value) || 0))} aria-label="x" />
-                </td>
-                <td>
-                  <input type="number" value={i.y} onChange={(e) => setInst(i.id, (x) => void (x.y = Number(e.target.value) || 0))} aria-label="y" />
-                </td>
-                <td>
-                  <button className="icon-btn" aria-label="Remove instance" onClick={() => set((r) => void (r.instances = r.instances.filter((x) => x.id !== i.id)))}>
-                    {Icon.trash()}
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {room.instances.length > 300 && <p className="muted small">Showing the first 300 of {room.instances.length}.</p>}
-      </div>
-    </div>
-  );
-}
-
 export function ScriptEditor({ scriptId, focus }: { scriptId: string; focus: { line: number; nonce: number } | null }) {
   const { project, mutate } = useProjectApi();
   const script = find(project, "scripts", scriptId);
@@ -182,6 +88,18 @@ export function SettingsEditor() {
           onChange={(e) => mutate((p) => void (p.settings.stepsPerSecond = Math.min(240, Math.max(1, Number(e.target.value) || 60))))}
         />
         <span className="muted small">How many times a second Step runs. 60 is usual; speeds are in pixels per step.</span>
+      </label>
+      <label className="check field">
+        <input
+          type="checkbox"
+          checked={project.settings.pixelScaling !== false}
+          onChange={(e) => mutate((p) => void (p.settings.pixelScaling = e.target.checked))}
+          data-testid="pixel-scaling"
+        />
+        Crisp pixel scaling
+        <span className="muted small">
+          Grow the game window only by whole steps (2×, 3×…), so every pixel stays square. Turn off to fill the space exactly.
+        </span>
       </label>
     </div>
   );

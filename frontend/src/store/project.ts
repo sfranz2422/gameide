@@ -18,7 +18,7 @@
 import { KEY_NAMES, MOUSE_BUTTONS, type KeyName } from "../engine/layout";
 
 /** Bump when the format changes, and teach `migrate` the old shape. */
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2; // 2: rooms have layers, a grid, a camera; instances have scale, angle, code
 
 export interface Project {
   format: "gameide-project";
@@ -38,6 +38,8 @@ export interface Project {
 
 export interface ProjectSettings {
   stepsPerSecond: number;
+  /** Whole-number scaling of the game window (crisp pixel art). Absent = on. */
+  pixelScaling?: boolean;
 }
 
 export interface SpriteResource {
@@ -97,6 +99,7 @@ export const SIMPLE_EVENTS = [
   "step",
   "end_step",
   "draw",
+  "draw_gui",
   "room_start",
   "room_end",
   "game_start",
@@ -123,15 +126,66 @@ export interface RoomResource {
   name: string;
   width: number;
   height: number;
-  background: string; // "#rrggbb"
+  background: string; // "#rrggbb", behind everything
+  /** The editor's grid; instances snap to it when `snap` is on. */
+  gridWidth: number;
+  gridHeight: number;
+  snap: boolean;
+  /**
+   * Drawn back to front by depth (highest first), like everything else.
+   * Instance layers only organise the editor — show, hide, lock — and an
+   * instance still draws at its object's depth; background layers draw a
+   * colour or picture at their own depth. Tile layers arrive in Phase 6.
+   */
+  layers: RoomLayer[];
+  /** The view: what part of the room the game window shows. */
+  camera: RoomCamera;
   instances: RoomInstance[];
+}
+
+export type RoomLayer =
+  | { id: string; name: string; kind: "instances"; depth: number; visible: boolean; locked: boolean }
+  | {
+      id: string;
+      name: string;
+      kind: "background";
+      depth: number;
+      visible: boolean;
+      locked: boolean;
+      color: string | null; // "#rrggbb" or none
+      sprite: string | null; // sprite id
+      /** "tile" repeats the picture, "stretch" fills the room with it, "once" draws it at the top-left. */
+      mode: "tile" | "stretch" | "once";
+      /** Pixels per step it scrolls by itself (a moving sky). */
+      hspeed: number;
+      vspeed: number;
+      /** 0 = fixed to the room, 1 = fixed to the screen; between is parallax. */
+      parallax: number;
+    };
+
+export interface RoomCamera {
+  /** Off: the window shows the whole room. */
+  enabled: boolean;
+  width: number;
+  height: number;
+  /** Follow the first instance of this object (id), keeping it in the middle. */
+  follow: string | null;
+  /** 1 = snap to the target every step; smaller = glide (0.1 is gentle). */
+  smoothing: number;
 }
 
 export interface RoomInstance {
   id: string;
   object: string; // object id
+  layer: string; // layer id (an instance layer)
   x: number;
   y: number;
+  /** Overrides, applied before its Create event. */
+  scaleX: number;
+  scaleY: number;
+  angle: number;
+  /** Creation code: Python run for this one instance, after its Create event. */
+  code: string;
 }
 
 export interface ScriptResource {
@@ -177,7 +231,33 @@ export function newObject(name: string): ObjectResource {
 }
 
 export function newRoom(name: string): RoomResource {
-  return { id: newId(), name, width: 640, height: 480, background: "#1e293b", instances: [] };
+  const layers = defaultLayers();
+  return {
+    id: newId(),
+    name,
+    width: 640,
+    height: 480,
+    background: "#1e293b",
+    gridWidth: 32,
+    gridHeight: 32,
+    snap: true,
+    layers,
+    camera: { enabled: false, width: 640, height: 480, follow: null, smoothing: 1 },
+    instances: [],
+  };
+}
+
+export function defaultLayers(): RoomLayer[] {
+  return [
+    { id: newId(), name: "Instances", kind: "instances", depth: 0, visible: true, locked: false },
+    { id: newId(), name: "Background", kind: "background", depth: 1000, visible: true, locked: false, color: null, sprite: null, mode: "tile", hspeed: 0, vspeed: 0, parallax: 0 },
+  ];
+}
+
+/** A room instance with nothing overridden, on the room's first instance layer. */
+export function newInstance(room: RoomResource, object: string, x: number, y: number, layer?: string): RoomInstance {
+  const target = layer ?? room.layers.find((l) => l.kind === "instances")?.id ?? "";
+  return { id: newId(), object, layer: target, x, y, scaleX: 1, scaleY: 1, angle: 0, code: "" };
 }
 
 export function newScript(name: string): ScriptResource {
@@ -333,6 +413,7 @@ const SIMPLE_LABELS: Record<SimpleEventType, string> = {
   step: "Step",
   end_step: "End Step",
   draw: "Draw",
+  draw_gui: "Draw GUI",
   room_start: "Room Start",
   room_end: "Room End",
   game_start: "Game Start",
@@ -365,7 +446,7 @@ export function eventLabel(project: Project, key: EventKey): string {
 /** The order events are listed in, roughly GameMaker's. */
 export function eventSortKey(key: EventKey): number {
   const order = ["create", "destroy", "cleanup", "begin_step", "step", "end_step", "alarm", "key", "mouse", "collision",
-    "draw", "room_start", "room_end", "game_start", "animation_end", "outside_room", "intersect_boundary"];
+    "draw", "draw_gui", "room_start", "room_end", "game_start", "animation_end", "outside_room", "intersect_boundary"];
   const i = order.indexOf(key.type);
   return i * 1000 + (key.type === "alarm" ? key.n : 0);
 }
@@ -389,6 +470,25 @@ export function migrate(data: unknown): Project {
   if (!p || p.format !== "gameide-project") throw new Error("This isn't a GameIDE project.");
   if (typeof p.schemaVersion !== "number" || p.schemaVersion > SCHEMA_VERSION)
     throw new Error("This project was made by a newer GameIDE. Reload the page to update.");
-  // schemaVersion 1 is the first; future upgrades go here.
+  if (p.schemaVersion < 2) upgradeTo2(p as Project);
   return p as Project;
+}
+
+/**
+ * 1 → 2: rooms got layers, a grid and a camera, and room instances got
+ * scale, angle and creation code. Every room keeps exactly what it showed:
+ * its instances go on a new Instances layer, the camera is off (the whole
+ * room, as before), and nothing is scaled or turned.
+ */
+function upgradeTo2(p: Project) {
+  for (const room of p.rooms as (RoomResource & Partial<RoomResource>)[]) {
+    room.gridWidth ??= 32;
+    room.gridHeight ??= 32;
+    room.snap ??= true;
+    room.layers ??= defaultLayers();
+    room.camera ??= { enabled: false, width: room.width, height: room.height, follow: null, smoothing: 1 };
+    const layer = room.layers.find((l) => l.kind === "instances")!.id;
+    room.instances = room.instances.map((i) => ({ ...i, layer: i.layer ?? layer, scaleX: i.scaleX ?? 1, scaleY: i.scaleY ?? 1, angle: i.angle ?? 0, code: i.code ?? "" }));
+  }
+  p.schemaVersion = 2;
 }

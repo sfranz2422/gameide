@@ -65,6 +65,33 @@ export interface RoomInstance {
   object: string;
   x: number;
   y: number;
+  /** Overrides, applied before the instance's Create event. */
+  scaleX?: number;
+  scaleY?: number;
+  angle?: number;
+  /** Python run for this instance after its Create event (its body, using `self`). */
+  code?: string;
+}
+
+/** What the game window shows. Absent: the whole room. */
+export interface CameraDef {
+  width: number;
+  height: number;
+  /** Keep the first instance of this object in the middle. */
+  follow?: string;
+  /** 1 = snap to the target every step; smaller glides. */
+  smoothing: number;
+}
+
+/** A background layer: a colour, a picture, or a picture over a colour. */
+export interface BackgroundDef {
+  depth: number;
+  color?: number;
+  sprite?: string;
+  mode: "tile" | "stretch" | "once";
+  hspeed: number;
+  vspeed: number;
+  parallax: number;
 }
 
 export interface RoomDef {
@@ -73,6 +100,8 @@ export interface RoomDef {
   height: number;
   background?: number; // 0xRRGGBB
   instances: RoomInstance[];
+  camera?: CameraDef;
+  backgrounds?: BackgroundDef[];
 }
 
 export interface GameDefinition {
@@ -89,6 +118,11 @@ export interface GameDefinition {
    * so a traceback says which object an error came from.
    */
   code: Record<string, string>;
+  /**
+   * Scale the game window by whole numbers only (2×, 3×…), so every pixel
+   * of pixel art is the same size. Default true. Off: fill the space exactly.
+   */
+  pixelScaling?: boolean;
   /** Steps per second (GameMaker's room speed). Default 60. */
   stepsPerSecond?: number;
   /** Shared functions every object can call (the Scripts folder). */

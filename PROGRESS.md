@@ -1,6 +1,77 @@
 # Progress
 
-## Phase 4 — Sprites ✅ (2026-10-25, waiting for review)
+## Phase 5 — Room editor ✅ (2026-10-25, waiting for review)
+
+### Done
+
+- **A drag-and-drop room editor** replaces Phase 2's instance table.
+  - **Placing:** drag an object from the resource tree onto the room. Or use the **Place** tool: click to place, drag to paint a row along the grid (painting never stacks a second copy in the same place), right-click to erase.
+  - **Selecting:** click, Shift-click to add, or drag a box (it catches what lies wholly inside).
+  - **Moving:** drag (snapped to the grid; hold Alt for free) or use the arrow keys.
+  - **Keys:** Delete, Ctrl+C / X / V (pastes where the pointer is, even into another room), Ctrl+D to duplicate, Ctrl+A for the whole layer, Esc to clear.
+  - **Zoom and pan:** Ctrl+wheel or a pinch zooms about the pointer, the wheel scrolls, Space-drag or the middle button pans, and **Fit** shows the whole room. Coordinates show as you move.
+  - Instances are drawn with their sprite, turned and scaled. An object without a sprite shows as a labelled box so it can still be found and moved.
+- **Room settings:** size, background colour, grid size, and a Snap switch.
+- **Layers:**
+  - **Instance layers** organise the editor: show and hide, lock (a locked layer can't be clicked or painted on), and choose which layer new instances go on. An instance still draws at its object's depth.
+  - **Background layers** have a colour and/or a picture that repeats, stretches or sits once, with its own depth and scroll speed (a moving sky), and **parallax** (0 = moves with the room, 1 = fixed to the screen, between = far away).
+  - Tile layers come in Phase 6.
+- **Per-instance settings:** object, x and y, scale x and y, angle, and **creation code**: Python run for that one instance after its Create event, with `self` meaning that instance.
+  - An error in creation code says "Room1 → Ball at (128, 96), creation code line 2", and clicking it selects the instance and highlights the line.
+- **Camera:** a room can show part of itself, a view of any size, following an object (snapping to it, or gliding with smoothing), and always kept inside the room. The editor draws the view as a dashed box where the game would start it.
+  - In code: `camera_follow(self)`, `camera_follow(self, 0.1)` to glide, `camera_set(x, y)`, `camera_shake(strength, steps)`, and `view_x`, `view_y`, `view_width`, `view_height`.
+  - `mouse_x`/`mouse_y` are room positions under the camera.
+- **Added to this phase:**
+  - **Screen shake**: `camera_shake`. It moves only the picture: `view_x`, the mouse and collisions never shake.
+  - **A smooth camera**: the room's smoothing setting, or `camera_follow`'s second argument.
+  - **Full screen**: a button by Play; Esc leaves.
+  - **Crisp pixel scaling**: the game window grows only by whole numbers (2×, 3×…), so every pixel stays square. It's on by default and in Game settings. The camera's position is drawn on whole pixels, so pixel art doesn't shimmer as it glides.
+- **A Draw GUI event** draws on the screen over everything, where the camera can't move it: scores, health, menus. The coins template's HUD uses it now.
+- **The project format is at version 2.** Older projects are upgraded as they load and look exactly as they did: their instances go on an Instances layer, the camera is off, and nothing is scaled or turned. A test pins this.
+
+### Tests
+
+```
+cd frontend
+npm test                      # Vitest: 102
+npm run e2e                   # Playwright: 24 editor/sprite/room tests + 7 account tests
+../backend/.venv/bin/python ../backend/tests/test_server.py   # 50 server checks
+python3 scripts/sabotage.py   # 129 deliberate bugs
+```
+
+New this phase:
+- the room editor's geometry: snapping, hit-testing turned and scaled pictures, the topmost instance, locked and hidden layers, box selection, copy and paste;
+- the camera preview;
+- the upgrade from version 1 to 2;
+- building rooms: overrides only where set, hidden backgrounds left out;
+- creation-code errors mapped to their instance;
+- in real Python: overrides before Create and creation code after it, follow and clamp, smoothing, `camera_set`, `camera_follow`, shake fading out without moving `view_x`, the mouse in room coordinates, and Draw GUI apart from Draw.
+
+In the browser:
+- dropping from the tree;
+- painting without stacking, and erasing;
+- box select, nudge, copy, paste and delete;
+- locked layers;
+- creation code, and its errors;
+- a following camera with whole-number scaling;
+- a scrolling background layer.
+
+**Found along the way:**
+- **A real bug: clicking exactly on a grid line could place an instance a whole row up.** Floating-point zoom arithmetic turned 96 into 95.99999. Snapping now allows for that, and a test pins it.
+- **The sabotage harness passed silently on a mistyped case name.** It printed "ALL SABOTAGES CAUGHT" for a case that didn't exist. Now it refuses unknown names.
+- **Weak tests the sabotage run caught:** the box-select test had nothing partly inside the box, the paste test didn't check the copies' ids differ from each other, and one sabotage broke the build instead of the behaviour. All fixed.
+
+### Known issues and gaps
+
+1. Instance layers don't set depth: an instance draws at its **object's** depth. That keeps Phase 2's Depth setting meaningful. GameMaker 2 does it the other way: the layer sets the depth.
+2. The room editor draws each instance's first frame; it doesn't animate.
+3. `view_x` in Python is where the camera was at the end of the last step. It's always current for drawing; it just doesn't change in the middle of a step.
+4. Hiding an instance layer only hides it in the editor; its instances are still in the game. Hiding a background layer leaves it out of the game.
+5. There's no undo for room edits yet. Code has its own undo, per event.
+
+---
+
+## Phase 4 — Sprites ✅ (2026-10-25, reviewed)
 
 ### Done
 
@@ -164,9 +235,9 @@ of its own after Phase 9.
 | 10 Classrooms | classes, assignments, dashboard | |
 | 11 Tutorials | tutorial panel, checks, library | |
 
-## Next: Phase 5 — Room editor
+## Next: Phase 6 — Tilesets and tile maps
 
-Drag-and-drop instance placement, layers, room settings, camera and multiple rooms; plus (added) screen shake, a smooth camera, full screen and clean pixel scaling.
+Tilesets from pictures (tile size, offset, spacing); tile layers in the room editor with paint, erase, rectangle, bucket fill, eyedropper and multi-tile stamps; show, hide, lock and reorder; per-tile **solid** flags wired into place_meeting and move_and_collide; tile_at().
 
 ---
 

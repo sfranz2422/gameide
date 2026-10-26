@@ -1,15 +1,22 @@
 /**
  * Draws the engine's state with PixiJS. It only ever reads: positions,
  * frames and depths come straight out of the shared state array each frame,
- * and the Draw-event commands Python returned come from Engine.drawList.
+ * Draw-event commands from Engine.drawList and guiList, the view from
+ * Engine.camera.
+ *
+ * Three layers, back to front:
+ *   world    the room: background layers, instances and Draw-event drawing,
+ *            all sorted by depth, and moved by the camera (and its shake);
+ *   gui      Draw GUI drawing, in screen pixels, which the camera never moves;
+ *   overlay  the debug overlay.
  *
  * One Pixi Sprite per slot, reused for as long as the slot's GEN is the
  * same. A slot handed to a new instance (GEN changed) gets its sprite reset,
  * so a bullet never briefly appears with the last bullet's frame.
  */
-import { Application, Container, Graphics, Sprite, Text, Texture } from "pixi.js";
-import type { Engine } from "../engine";
-import type { GameDefinition, SpriteDef } from "../game";
+import { Application, Container, Graphics, Sprite, Text, Texture, TilingSprite } from "pixi.js";
+import type { DrawCommand, Engine } from "../engine";
+import type { BackgroundDef, GameDefinition, SpriteDef } from "../game";
 import { F, G, HANDLES, STRIDE } from "../layout";
 import { boxOf, type Box } from "../sprites";
 
@@ -43,22 +50,114 @@ async function loadFrames(def: SpriteDef): Promise<Texture[]> {
   return frames;
 }
 
+/**
+ * The output of Draw (or Draw GUI) events: rectangles, text and sprites,
+ * pooled and reused by position in the list, because making a Text's
+ * texture is the expensive part and a HUD says the same thing most frames.
+ */
+class DrawLayer {
+  private graphicsByDepth = new Map<number, Graphics>();
+  private texts: Text[] = [];
+  private sprites: Sprite[] = [];
+
+  constructor(
+    private readonly into: Container,
+    private readonly frames: Texture[][],
+    private readonly anchors: { x: number; y: number }[],
+  ) {}
+
+  private graphicsAt(depth: number): Graphics {
+    let gfx = this.graphicsByDepth.get(depth);
+    if (!gfx) {
+      gfx = new Graphics();
+      gfx.zIndex = -depth;
+      this.graphicsByDepth.set(depth, gfx);
+      this.into.addChild(gfx);
+    }
+    return gfx;
+  }
+
+  render(list: DrawCommand[]) {
+    for (const gfx of this.graphicsByDepth.values()) gfx.clear();
+    let ti = 0;
+    let si = 0;
+    for (const cmd of list) {
+      switch (cmd[0]) {
+        case "rect": {
+          const [, depth, x1, y1, x2, y2, color, outline] = cmd;
+          const gfx = this.graphicsAt(depth);
+          gfx.rect(Math.min(x1, x2), Math.min(y1, y2), Math.abs(x2 - x1), Math.abs(y2 - y1));
+          if (outline) gfx.stroke({ color, width: 1, alignment: 1 });
+          else gfx.fill({ color });
+          break;
+        }
+        case "text": {
+          const [, depth, x, y, text, color] = cmd;
+          let t = this.texts[ti];
+          if (!t) {
+            t = new Text({ text: "", style: { fill: 0xffffff, fontFamily: "monospace", fontSize: 16 } });
+            this.texts.push(t);
+            this.into.addChild(t);
+          }
+          ti++;
+          if (t.text !== text) t.text = text;
+          if (t.style.fill !== color) t.style.fill = color;
+          t.position.set(x, y);
+          t.zIndex = -depth;
+          t.visible = true;
+          break;
+        }
+        case "sprite": {
+          const [, depth, sprite, frame, x, y] = cmd;
+          const frames = this.frames[sprite];
+          if (!frames) break;
+          let sp = this.sprites[si];
+          if (!sp) {
+            sp = new Sprite(frames[0]!);
+            this.sprites.push(sp);
+            this.into.addChild(sp);
+          }
+          si++;
+          sp.texture = frames[((Math.floor(frame) % frames.length) + frames.length) % frames.length]!;
+          const a = this.anchors[sprite]!;
+          sp.anchor.set(a.x, a.y);
+          sp.position.set(x, y);
+          sp.zIndex = -depth;
+          sp.visible = true;
+          break;
+        }
+      }
+    }
+    for (let i = ti; i < this.texts.length; i++) this.texts[i]!.visible = false;
+    for (let i = si; i < this.sprites.length; i++) this.sprites[i]!.visible = false;
+  }
+}
+
+/** One background layer's display objects. */
+interface Backdrop {
+  def: BackgroundDef;
+  color: Graphics | null;
+  picture: TilingSprite | Sprite | null;
+}
+
 export class PixiRenderer {
   private readonly frames: Texture[][];
   private readonly anchors: { x: number; y: number }[];
   private readonly world = new Container({ sortableChildren: true });
+  private readonly gui = new Container({ sortableChildren: true });
   private readonly overlay = new Container();
   private readonly masks = new Graphics();
   private readonly debugLabel = new Text({
     text: "",
     style: { fill: 0xffffff, fontFamily: "monospace", fontSize: 12, stroke: { color: 0x000000, width: 3 } },
   });
+  private readonly worldDraw: DrawLayer;
+  private readonly guiDraw: DrawLayer;
   private sprites: (Sprite | null)[] = [];
   private gens: number[] = [];
-  private graphicsByDepth = new Map<number, Graphics>();
-  private texts: Text[] = [];
-  private drawnSprites: Sprite[] = [];
+  private backdrops: Backdrop[] = [];
   private roomShown = -1;
+  private viewShown = "";
   showDebug = false;
   /** One line of figures for the debug overlay, set by the session. */
   statsLine = "";
@@ -74,8 +173,12 @@ export class PixiRenderer {
       x: s.width ? s.originX / s.width : 0,
       y: s.height ? s.originY / s.height : 0,
     }));
-    app.stage.addChild(this.world, this.overlay);
-    this.overlay.addChild(this.masks, this.debugLabel);
+    this.worldDraw = new DrawLayer(this.world, this.frames, this.anchors);
+    this.guiDraw = new DrawLayer(this.gui, this.frames, this.anchors);
+    app.stage.addChild(this.world, this.gui, this.overlay);
+    this.overlay.addChild(this.debugLabel);
+    this.world.addChild(this.masks);
+    this.masks.zIndex = 1e9; // collision boxes over everything in the room
     this.debugLabel.position.set(6, 4);
   }
 
@@ -85,14 +188,13 @@ export class PixiRenderer {
    * gameWorker.ts); a plain canvas works too.
    */
   static async create(canvas: OffscreenCanvas | HTMLCanvasElement, def: GameDefinition, engine: Engine): Promise<PixiRenderer> {
-    const room = def.rooms[0]!;
     const frames = await Promise.all(def.sprites.map(loadFrames));
     const app = new Application();
     await app.init({
       canvas: canvas as HTMLCanvasElement,
-      width: room.width,
-      height: room.height,
-      background: room.background ?? 0x000000,
+      width: engine.camera.w || def.rooms[0]!.width,
+      height: engine.camera.h || def.rooms[0]!.height,
+      background: def.rooms[0]!.background ?? 0x000000,
       antialias: false,
       autoStart: false, // the game loop decides when to draw, not Pixi's ticker
       preference: "webgl",
@@ -100,17 +202,72 @@ export class PixiRenderer {
     return new PixiRenderer(app, def, engine, frames);
   }
 
-  /** The room being shown changed size; the page needs to know to fit the canvas. */
+  /** The game window changed size (a new room, or its view); the page fits the canvas to it. */
   onRoomSize: (w: number, h: number) => void = () => {};
 
   private syncRoom() {
     const i = this.engine.roomIndex;
+    const cam = this.engine.camera;
+    const view = `${cam.w}x${cam.h}`;
+    if (view !== this.viewShown) {
+      this.viewShown = view;
+      this.app.renderer.resize(cam.w, cam.h);
+      this.onRoomSize(cam.w, cam.h);
+    }
     if (i === this.roomShown) return;
     this.roomShown = i;
     const room = this.def.rooms[i]!;
-    this.app.renderer.resize(room.width, room.height);
-    this.onRoomSize(room.width, room.height);
     this.app.renderer.background.color = room.background ?? 0x000000;
+    for (const b of this.backdrops) {
+      b.color?.destroy();
+      b.picture?.destroy();
+    }
+    this.backdrops = (room.backgrounds ?? []).map((bg) => {
+      const color = bg.color !== undefined ? new Graphics() : null;
+      if (color) {
+        color.rect(0, 0, 1, 1).fill({ color: bg.color! });
+        color.zIndex = -bg.depth;
+        this.world.addChild(color);
+      }
+      const si = bg.sprite ? this.def.sprites.findIndex((s) => s.name === bg.sprite) : -1;
+      const tex = si >= 0 ? this.frames[si]?.[0] : undefined;
+      let picture: TilingSprite | Sprite | null = null;
+      if (tex) {
+        picture = bg.mode === "tile" ? new TilingSprite({ texture: tex }) : new Sprite(tex);
+        picture.zIndex = -bg.depth + 0.5; // over its own colour
+        this.world.addChild(picture);
+      }
+      return { def: bg, color, picture };
+    });
+  }
+
+  /** Background layers follow the view: a colour and a repeating picture always fill the window. */
+  private placeBackdrops(vx: number, vy: number, step: number) {
+    const cam = this.engine.camera;
+    const room = this.def.rooms[this.roomShown]!;
+    for (const { def: bg, color, picture } of this.backdrops) {
+      if (color) {
+        color.position.set(vx, vy);
+        color.scale.set(cam.w, cam.h);
+      }
+      if (!picture) continue;
+      // Parallax 0 sits in the room; 1 is fixed to the screen; between,
+      // it slides more slowly than the room — further away.
+      const px = vx * bg.parallax + bg.hspeed * step;
+      const py = vy * bg.parallax + bg.vspeed * step;
+      if (picture instanceof TilingSprite) {
+        picture.position.set(vx, vy);
+        picture.width = cam.w;
+        picture.height = cam.h;
+        picture.tilePosition.set(px - vx, py - vy);
+      } else if (bg.mode === "stretch") {
+        picture.position.set(px, py);
+        picture.width = room.width;
+        picture.height = room.height;
+      } else {
+        picture.position.set(px, py);
+      }
+    }
   }
 
   render() {
@@ -118,6 +275,11 @@ export class PixiRenderer {
     const { st, g } = this.engine.fresh();
     const n = g[G.SLOTS]!;
     const flags = this.engine.flags;
+    const cam = this.engine.camera;
+    // Whole pixels, so pixel art doesn't shimmer as a smooth camera glides.
+    const vx = Math.round(cam.x + cam.offX), vy = Math.round(cam.y + cam.offY);
+    this.world.position.set(-vx, -vy);
+    this.placeBackdrops(vx, vy, g[G.FRAME]!);
 
     for (let s = 0; s < n; s++) {
       const b = s * STRIDE;
@@ -158,79 +320,10 @@ export class PixiRenderer {
       sp.zIndex = -st[b + F.DEPTH]!;
     }
 
-    this.drawCommands();
+    this.worldDraw.render(this.engine.drawList);
+    this.guiDraw.render(this.engine.guiList);
     this.drawOverlay(st, n);
     this.app.renderer.render(this.app.stage);
-  }
-
-  private graphicsAt(depth: number): Graphics {
-    let gfx = this.graphicsByDepth.get(depth);
-    if (!gfx) {
-      gfx = new Graphics();
-      gfx.zIndex = -depth;
-      this.graphicsByDepth.set(depth, gfx);
-      this.world.addChild(gfx);
-    }
-    return gfx;
-  }
-
-  /** Draw-event output. Text and sprite objects are pooled and reused by position in the list. */
-  private drawCommands() {
-    for (const gfx of this.graphicsByDepth.values()) gfx.clear();
-    let ti = 0;
-    let si = 0;
-    for (const cmd of this.engine.drawList) {
-      switch (cmd[0]) {
-        case "rect": {
-          const [, depth, x1, y1, x2, y2, color, outline] = cmd;
-          const gfx = this.graphicsAt(depth);
-          const x = Math.min(x1, x2), y = Math.min(y1, y2);
-          gfx.rect(x, y, Math.abs(x2 - x1), Math.abs(y2 - y1));
-          if (outline) gfx.stroke({ color, width: 1, alignment: 1 });
-          else gfx.fill({ color });
-          break;
-        }
-        case "text": {
-          const [, depth, x, y, text, color] = cmd;
-          let t = this.texts[ti];
-          if (!t) {
-            t = new Text({ text: "", style: { fill: 0xffffff, fontFamily: "monospace", fontSize: 16 } });
-            this.texts.push(t);
-            this.world.addChild(t);
-          }
-          ti++;
-          // Re-rendering a Text's texture is the expensive part; skip it
-          // when nothing changed, which is nearly every frame for a HUD.
-          if (t.text !== text) t.text = text;
-          if (t.style.fill !== color) t.style.fill = color;
-          t.position.set(x, y);
-          t.zIndex = -depth;
-          t.visible = true;
-          break;
-        }
-        case "sprite": {
-          const [, depth, sprite, frame, x, y] = cmd;
-          const frames = this.frames[sprite];
-          if (!frames) break;
-          let sp = this.drawnSprites[si];
-          if (!sp) {
-            sp = new Sprite(frames[0]!);
-            this.drawnSprites.push(sp);
-            this.world.addChild(sp);
-          }
-          si++;
-          sp.texture = frames[((Math.floor(frame) % frames.length) + frames.length) % frames.length]!;
-          const a = this.anchors[sprite]!;
-          sp.anchor.set(a.x, a.y);
-          sp.position.set(x, y);
-          sp.zIndex = -depth;
-          sp.visible = true;
-          break;
-        }
-      }
-    }
-    for (let i = ti; i < this.texts.length; i++) this.texts[i]!.visible = false;
-    for (let i = si; i < this.drawnSprites.length; i++) this.drawnSprites[i]!.visible = false;
   }
 
   private drawOverlay(st: Float64Array, n: number) {

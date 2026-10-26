@@ -68,7 +68,7 @@ describe("generated classes", () => {
     const p = project();
     const o = addObj(p, "A");
     addEv(o, { type: "step" }, "# nothing yet\n");
-    p.rooms[0]!.instances.push({ id: "i", object: o.id, x: 0, y: 0 });
+    p.rooms[0]!.instances.push({ id: "i", object: o.id, layer: "", x: 0, y: 0, scaleX: 1, scaleY: 1, angle: 0, code: "" });
     expect(await runUntilError(p)).toBeNull();
   });
 
@@ -78,7 +78,7 @@ describe("generated classes", () => {
     // The editor shows a tab as 4 columns, so these two lines look level —
     // but untouched, Python would see 8 spaces + a tab against 12 spaces.
     addEv(o, { type: "step" }, "if True:\n\tself.x = 5\n    self.y = 6\n");
-    p.rooms[0]!.instances.push({ id: "i", object: o.id, x: 0, y: 0 });
+    p.rooms[0]!.instances.push({ id: "i", object: o.id, layer: "", x: 0, y: 0, scaleX: 1, scaleY: 1, angle: 0, code: "" });
     expect(await runUntilError(p)).toBeNull();
   });
 });
@@ -102,6 +102,46 @@ describe("sprites in the built game", () => {
   });
 });
 
+describe("rooms in the built game", () => {
+  it("carry overrides only where set, visible backgrounds only, and the camera when it is on", () => {
+    const p = project();
+    const o = addObj(p, "Hero");
+    const room = p.rooms[0]!;
+    room.instances.push(
+      { id: "a", object: o.id, layer: "", x: 1, y: 2, scaleX: 1, scaleY: 1, angle: 0, code: "" },
+      { id: "b", object: o.id, layer: "", x: 3, y: 4, scaleX: -1, scaleY: 2, angle: 30, code: "self.hp = 9\n" },
+      { id: "c", object: "deleted", layer: "", x: 0, y: 0, scaleX: 1, scaleY: 1, angle: 0, code: "" },
+    );
+    const bg = room.layers.find((l) => l.kind === "background")!;
+    if (bg.kind === "background") Object.assign(bg, { color: "#112233", depth: 900 });
+    room.layers.push({ ...bg, id: "hidden", visible: false });
+    Object.assign(room.camera, { enabled: true, width: 320, height: 240, follow: o.id, smoothing: 0.2 });
+    const r = buildGame(p, new Map()).def.rooms[0]!;
+    expect(r.instances).toEqual([
+      { object: "Hero", x: 1, y: 2 },
+      { object: "Hero", x: 3, y: 4, scaleX: -1, scaleY: 2, angle: 30, code: "self.hp = 9\n" },
+    ]);
+    expect(r.backgrounds).toEqual([{ depth: 900, color: 0x112233, mode: "tile", hspeed: 0, vspeed: 0, parallax: 0 }]);
+    expect(r.camera).toEqual({ width: 320, height: 240, smoothing: 0.2, follow: "Hero" });
+    room.camera.enabled = false;
+    expect(buildGame(p, new Map()).def.rooms[0]!.camera).toBeUndefined();
+  });
+
+  it("an error in an instance's creation code points at that instance and line", async () => {
+    const p = project();
+    const o = addObj(p, "Hero");
+    addEv(o, { type: "create" }, "self.hp = 3\n");
+    const room = p.rooms[0]!;
+    room.instances.push(
+      { id: "ok", object: o.id, layer: "", x: 0, y: 0, scaleX: 1, scaleY: 1, angle: 0, code: "" },
+      { id: "bad", object: o.id, layer: "", x: 64, y: 32, scaleX: 1, scaleY: 1, angle: 0, code: "self.hp += 1\nself.hp += oops\n" },
+    );
+    const e = await runUntilError(p);
+    expect(e?.where).toBe("Room1 → Hero at (64, 32), creation code line 2");
+    expect(e?.target).toEqual({ kind: "instance", roomId: room.id, instanceId: "bad", line: 2 });
+  });
+});
+
 describe("errors point at what the student typed", () => {
   it("a runtime error in the third event, line 2", async () => {
     const p = project();
@@ -111,7 +151,7 @@ describe("errors point at what the student typed", () => {
     // The error is on a middle line: on the last line, mapping one line too
     // far would be hidden by the clamp that maps an added `pass`.
     const step = addEv(o, { type: "step" }, "self.x += 1\nself.x += spead\nself.y += 1\n");
-    p.rooms[0]!.instances.push({ id: "i", object: o.id, x: 0, y: 0 });
+    p.rooms[0]!.instances.push({ id: "i", object: o.id, layer: "", x: 0, y: 0, scaleX: 1, scaleY: 1, angle: 0, code: "" });
     const e = await runUntilError(p);
     expect(e?.where).toBe("Player → Step, line 2");
     expect(e?.target).toEqual({ kind: "event", objectId: o.id, eventId: step.id, line: 2 });
@@ -134,7 +174,7 @@ describe("errors point at what the student typed", () => {
     p.scripts.push({ id: "s1", name: "helpers", code: "def boom():\n    return 1 / 0\n" });
     const o = addObj(p, "A");
     addEv(o, { type: "create" }, "boom()\n");
-    p.rooms[0]!.instances.push({ id: "i", object: o.id, x: 0, y: 0 });
+    p.rooms[0]!.instances.push({ id: "i", object: o.id, layer: "", x: 0, y: 0, scaleX: 1, scaleY: 1, angle: 0, code: "" });
     const e = await runUntilError(p);
     expect(e?.where).toBe("script helpers, line 2");
     expect(e?.target).toEqual({ kind: "script", scriptId: "s1", line: 2 });

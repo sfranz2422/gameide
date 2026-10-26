@@ -6,7 +6,7 @@
  */
 import { expect, test } from "@playwright/test";
 
-import { fromTemplate, nameBox, playAndWait, py, setCode, SHOTS, treeItem, watchErrors } from "./helpers";
+import { fromTemplate, nameBox, placeInRoom, playAndWait, py, setCode, SHOTS, treeItem, watchErrors } from "./helpers";
 
 test("a game built from an empty project runs", async ({ page }) => {
   const errors = watchErrors(page);
@@ -26,9 +26,7 @@ test("a game built from an empty project runs", async ({ page }) => {
   await page.getByTestId("pick-create").click();
   await setCode(page, 'print("hello from", self.object_name)\nself.hspeed = 2\n');
 
-  await treeItem(page, "Room1 start").click();
-  await page.getByTestId("room-add-object").selectOption({ label: "Hero" });
-  await page.getByTestId("room-add").click();
+  await placeInRoom(page, "Room1 start", "Hero", 320, 224);
 
   await playAndWait(page);
   await expect(page.getByTestId("console")).toContainText("hello from Hero");

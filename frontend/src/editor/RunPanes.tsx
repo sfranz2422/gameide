@@ -42,6 +42,11 @@ export function GamePane({
         <button className="btn" onClick={onStop} disabled={!running} data-tutorial="stop" data-testid="stop">
           {Icon.stop()} Stop
         </button>
+        <button className="icon-btn" onClick={() => host?.fullscreen()} disabled={!running} title="Full screen (Esc to leave)" aria-label="Full screen" data-testid="fullscreen" data-tutorial="fullscreen">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true">
+            <path d="M2.5 6V2.5H6M10 2.5h3.5V6M13.5 10v3.5H10M6 13.5H2.5V10" />
+          </svg>
+        </button>
         <label className="check" title="Show FPS and collision boxes" data-tutorial="debug-toggle">
           <input
             type="checkbox"
@@ -109,7 +114,7 @@ export function ConsolePane({ lines, clear, jump }: { lines: ConsoleLine[]; clea
   );
 }
 
-const CATEGORIES: Category[] = ["Instances", "Collision", "Input", "Motion", "Drawing", "Rooms", "Debug"];
+const CATEGORIES: Category[] = ["Instances", "Collision", "Input", "Motion", "Drawing", "Rooms", "Camera", "Debug"];
 
 /** The API catalog as a searchable list. Clicking an entry types it at the cursor. */
 export function DocsPane() {

@@ -3,7 +3,7 @@
  * — and the masks then decide collisions in a running game.
  */
 import { expect, test, type Page } from "@playwright/test";
-import { fromTemplate, playAndWait, py, treeItem, watchErrors } from "./helpers";
+import { fromTemplate, placeInRoom, playAndWait, py, treeItem, watchErrors } from "./helpers";
 
 /** Rectangles to paint, then the picture as a PNG: [x, y, w, h, colour]. */
 type Paint = { width: number; height: number; rects: [number, number, number, number, string][]; clear?: [number, number, number, number][] };
@@ -135,9 +135,7 @@ test("an exact-pixel mask: the hole in a ring is not part of it", async ({ page 
   await page.getByRole("textbox", { name: "Name", exact: true }).fill("Ring");
   await page.getByRole("textbox", { name: "Name", exact: true }).press("Enter");
   await page.getByTestId("object-sprite").selectOption({ label: "ring" });
-  await treeItem(page, "Room1 start").click();
-  await page.getByTestId("room-add-object").selectOption({ label: "Ring" });
-  await page.getByTestId("room-add").click(); // at 320, 240
+  await placeInRoom(page, "Room1 start", "Ring", 320, 224);
 
   await playAndWait(page);
   // In the hole, on the rim, and (for contrast) what a plain box would say.

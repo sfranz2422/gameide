@@ -101,8 +101,13 @@ export const G = {
   MOUSE_PRESSED: 9, // 9, 10, 11
   MOUSE_RELEASED: 12, // 12, 13, 14
   SLOTS: 15,
+  // The view (camera), in room coordinates, as of the end of the last step.
+  VIEW_X: 16,
+  VIEW_Y: 17,
+  VIEW_W: 18,
+  VIEW_H: 19,
 } as const;
-export const G_SIZE = 16;
+export const G_SIZE = 20;
 
 /**
  * Keys Python can name, in order; a key's code is its index. Names follow

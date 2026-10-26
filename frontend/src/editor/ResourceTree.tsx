@@ -19,6 +19,7 @@ import {
   type Resource,
   type ResourceKind,
 } from "../store/project";
+import { OBJECT_DRAG_TYPE } from "./rooms/RoomEditor";
 import { Icon } from "./ui/icons";
 import { useProjectApi } from "./useProject";
 
@@ -157,7 +158,12 @@ export function ResourceTree({
                     key={r.id}
                     className={`tree-item ${active?.id === r.id ? "active" : ""}`}
                     draggable={renaming !== r.id}
-                    onDragStart={() => setDrag({ kind: f.kind, id: r.id })}
+                    onDragStart={(e) => {
+                      setDrag({ kind: f.kind, id: r.id });
+                      // An object can also be dropped into a room to place it.
+                      if (f.kind === "objects") e.dataTransfer.setData(OBJECT_DRAG_TYPE, r.id);
+                      e.dataTransfer.effectAllowed = "copyMove";
+                    }}
                     onDragEnd={() => setDrag(null)}
                     onDragOver={(e) => drag?.kind === f.kind && e.preventDefault()}
                     onDrop={(e) => {

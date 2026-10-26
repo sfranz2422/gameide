@@ -24,7 +24,7 @@ describe("deleting", () => {
     const p = withObjects("Coin", "Player", "Gem");
     p.objects[2]!.parent = "Coin";
     p.objects[1]!.events.push(newEvent({ type: "collision", object: "Coin" }), newEvent({ type: "step" }));
-    p.rooms[0]!.instances.push({ id: "a", object: "Coin", x: 0, y: 0 }, { id: "b", object: "Player", x: 0, y: 0 });
+    p.rooms[0]!.instances.push({ id: "a", object: "Coin", layer: "", x: 0, y: 0, scaleX: 1, scaleY: 1, angle: 0, code: "" }, { id: "b", object: "Player", layer: "", x: 0, y: 0, scaleX: 1, scaleY: 1, angle: 0, code: "" });
     const effects = deleteResource(p, "objects", "Coin");
     expect(p.objects.map((o) => o.id)).toEqual(["Player", "Gem"]);
     expect(p.rooms[0]!.instances.map((i) => i.id)).toEqual(["b"]);
@@ -53,5 +53,23 @@ describe("renaming references in code", () => {
     expect(quotedUses(p, "Coin")).toEqual([{ where: "Player → Step", count: 2 }]);
     replaceQuoted(p, "Coin", "Gem");
     expect(p.objects[1]!.events[0]!.code).toBe(`if place_meeting(x, y, "Gem") or instance_exists('Gem'):\n    Coin = "Coins"\n`);
+  });
+});
+
+describe("loading an older project", () => {
+  it("version 1 rooms get layers, a grid and a camera, and look exactly as they did", async () => {
+    const { migrate } = await import("./project");
+    const old = {
+      format: "gameide-project", schemaVersion: 1, id: "x", name: "Old", created: "", modified: "",
+      settings: { stepsPerSecond: 60 }, sprites: [], objects: [], scripts: [],
+      rooms: [{ id: "r", name: "Room1", width: 800, height: 600, background: "#000000", instances: [{ id: "i", object: "o", x: 5, y: 6 }] }],
+    };
+    const p = migrate(old);
+    const room = p.rooms[0]!;
+    expect(p.schemaVersion).toBe(2);
+    expect(room.camera).toEqual({ enabled: false, width: 800, height: 600, follow: null, smoothing: 1 });
+    expect([room.gridWidth, room.snap]).toEqual([32, true]);
+    const layer = room.layers.find((l) => l.kind === "instances")!;
+    expect(room.instances[0]).toEqual({ id: "i", object: "o", x: 5, y: 6, layer: layer.id, scaleX: 1, scaleY: 1, angle: 0, code: "" });
   });
 });
