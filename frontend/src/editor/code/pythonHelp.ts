@@ -14,7 +14,7 @@
 import { snippetCompletion, type Completion, type CompletionContext, type CompletionResult } from "@codemirror/autocomplete";
 import { hoverTooltip } from "@codemirror/view";
 import { API, PROPERTIES, type ApiFunction, type ParamType } from "../../catalog/api";
-import { KEY_NAMES, MOUSE_BUTTONS } from "../../engine/layout";
+import { KEY_NAMES, MOUSE_BUTTONS, PAD_AXES, PAD_BUTTONS } from "../../engine/layout";
 
 /** Names the project currently has, for suggestions inside quotes. */
 export interface ProjectNames {
@@ -23,6 +23,8 @@ export interface ProjectNames {
   rooms: string[];
   /** Tile layer names, from every room (a collision check can name one). */
   layers?: string[];
+  sounds?: string[];
+  fonts?: string[];
 }
 
 const COLORS = ["white", "black", "red", "green", "blue", "yellow", "orange", "purple", "aqua", "lime", "gray", "silver", "navy", "teal", "maroon", "olive", "fuchsia", "dkgray", "ltgray"];
@@ -117,6 +119,14 @@ export function valuesFor(type: ParamType, names: ProjectNames): string[] {
       return [...MOUSE_BUTTONS];
     case "color":
       return COLORS;
+    case "sound":
+      return names.sounds ?? [];
+    case "font":
+      return names.fonts ?? [];
+    case "padbutton":
+      return [...PAD_BUTTONS];
+    case "axis":
+      return [...PAD_AXES];
     default:
       return [];
   }

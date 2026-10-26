@@ -170,7 +170,7 @@ test("a game exported as a .zip imports as a new game that plays", async ({ page
   await page.getByTestId("import-file").setInputFiles(path!);
   await page.waitForURL(/#\/p\//);
   await expect(page.getByRole("textbox", { name: "Game name" })).toHaveValue("Collect the coins (imported)");
-  await expect(treeItem(page, "coin")).toBeVisible();
+  await expect(treeItem(page, "coin", "sprites")).toBeVisible(); // (a sound is called coin too)
   await playAndWait(page);
   expect(await py(page, "instance_number('Coin')")).toBe(15);
   expect(errors).toEqual([]);

@@ -20,7 +20,7 @@
  * blocks and Python, and every box is checked as it is typed (checkExpr).
  */
 import { pythonLanguage } from "@codemirror/lang-python";
-import { API, type ApiFunction, type Param } from "../catalog/api";
+import { API, type ApiFunction, type Category, type Param } from "../catalog/api";
 
 // ---------------------------------------------------------------- the format
 
@@ -70,6 +70,9 @@ export const CONDITION_FUNCTIONS = API.filter((e): e is ApiFunction => e.kind ==
 /** Functions called for what they do: the action picker. */
 export const ACTION_FUNCTIONS = API.filter((e): e is ApiFunction => e.kind === "function" && (e.returns === "nothing" || !!e.alsoStatement));
 
+/** The pickers' order: input and collisions first, as conditions mostly are. */
+export const PICKER_ORDER: Category[] = ["Input", "Collision", "Instances", "Motion", "Drawing", "Sound", "Saving", "Rooms", "Camera", "Debug"];
+
 const NUMBER_DEFAULTS: Record<string, string> = { speed: "4", strength: "4", steps: "15", x2: "100", y2: "100" };
 
 /**
@@ -90,12 +93,18 @@ export function defaultArg(p: Param, firstName: (kind: Param["type"]) => string 
       return '"left"';
     case "color":
       return '"white"';
+    case "padbutton":
+      return '"a"';
+    case "axis":
+      return '"left_x"';
     case "instance":
       return "self";
     case "object":
     case "sprite":
     case "room":
-    case "layer": {
+    case "layer":
+    case "sound":
+    case "font": {
       const n = firstName(p.type);
       return n ? JSON.stringify(n) : '""';
     }

@@ -7,7 +7,17 @@
  */
 import { expect, it } from "vitest";
 import { load, py } from "../python/testkit";
-import { API, PROPERTIES } from "./api";
+import { toolbox } from "../blocks/toolbox";
+import { PICKER_ORDER } from "../eventsheets/sheet";
+import { API, CATEGORIES, PROPERTIES } from "./api";
+
+it("every category is in the docs' list, the blocks palette and the sheet pickers", () => {
+  const used = [...new Set(API.map((e) => e.category))].sort();
+  expect([...CATEGORIES].sort()).toEqual(used);
+  expect([...PICKER_ORDER].sort()).toEqual(used);
+  const palette = (toolbox() as unknown as { contents: { name: string }[] }).contents.map((c) => c.name);
+  for (const c of used) expect(palette, c).toContain(c);
+});
 
 it("matches runtime.py's public names, parameters and defaults", async () => {
   const { game } = await load({ code: {} , objects: [] , rooms: [{ name: "R", width: 10, height: 10, instances: [] }] });

@@ -18,7 +18,7 @@
 import type { PyodideInterface } from "pyodide";
 import type { PyBuffer, PyProxy } from "pyodide/ffi";
 import { Engine, type FrameCommands, type PythonGameError, type SharedViews } from "../engine/engine";
-import type { GameDefinition } from "../engine/game";
+import type { GameDefinition, SoundOrder } from "../engine/game";
 import { layoutForPython } from "../engine/layout";
 import runtimeSource from "./runtime.py?raw";
 
@@ -51,6 +51,10 @@ export interface GameCallbacks {
   stderr?: (text: string) => void;
   /** A problem worth showing once (a misspelt event name, say). */
   warning?: (text: string) => void;
+  /** Sounds to play or stop: the page plays them (editor/sound.ts). */
+  sounds?: (orders: SoundOrder[]) => void;
+  /** The game's whole save data, after it changed. */
+  save?: (data: Record<string, unknown>) => void;
 }
 
 /** Timings of the last step, for the FPS readout. */
@@ -147,7 +151,7 @@ export class PythonGame {
     const setup = module._setup as ((a: string, b: string) => string | undefined) & PyProxy;
     // Pictures and pixel masks stay on this side: Python never needs them,
     // and a pixel mask stringified is a key per pixel.
-    const forPython = JSON.stringify(def, (k, v) => (k === "images" || k === "pixelMasks" || k === "image" || k === "cells" ? undefined : v));
+    const forPython = JSON.stringify(def, (k, v) => (["images", "pixelMasks", "image", "cells", "sound", "font"].includes(k) ? undefined : v));
     const loadOut = setup(JSON.stringify(layoutForPython()), forPython);
     setup.destroy();
     let error = game.handle(loadOut);
@@ -190,6 +194,8 @@ export class PythonGame {
   private handle(out: string | undefined): PythonGameError | null {
     const cmds: FrameCommands | null = out ? (JSON.parse(out) as FrameCommands) : null;
     for (const w of cmds?.warnings ?? []) this.callbacks.warning?.(w);
+    if (cmds?.sounds) this.callbacks.sounds?.(cmds.sounds);
+    if (cmds?.save) this.callbacks.save?.(cmds.save);
     return this.engine.endStep(cmds);
   }
 

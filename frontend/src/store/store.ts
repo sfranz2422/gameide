@@ -4,7 +4,7 @@
  * CloudStore (cloudStore.ts) keeps it on the server, with a LocalStore of
  * its own as the offline cache (signed in).
  */
-import { migrate, type Project } from "./project";
+import { assetIds, migrate, type Project } from "./project";
 
 export interface ProjectSummary {
   id: string;
@@ -166,7 +166,7 @@ export class LocalStore implements ProjectStore {
 /** Every asset a project uses, fetched. Missing ones are left out (and the sprite draws blank). */
 export async function loadAssets(store: ProjectStore, project: Project): Promise<Map<string, Blob>> {
   const out = new Map<string, Blob>();
-  const ids = [...project.sprites.flatMap((s) => s.frames), ...project.tilesets.flatMap((t) => (t.image ? [t.image] : []))];
+  const ids = assetIds(project);
   await Promise.all(
     ids.map(async (id) => {
       const b = await store.getAsset(project.id, id);

@@ -11,7 +11,8 @@
  * is input going in; stats and output come out a few times a second.
  */
 import type { PythonGameError } from "../engine/engine";
-import type { GameDefinition } from "../engine/game";
+import type { GameDefinition, SoundOrder } from "../engine/game";
+import type { PadState } from "../engine/input";
 
 export type InputMessage =
   | { k: "down"; code: number }
@@ -19,7 +20,8 @@ export type InputMessage =
   | { k: "mdown"; button: number }
   | { k: "mup"; button: number }
   | { k: "move"; x: number; y: number }
-  | { k: "blur" };
+  | { k: "blur" }
+  | { k: "pads"; pads: PadState[] };
 
 export type ToWorker =
   | { type: "init"; indexURL: string; interrupt: SharedArrayBuffer | null }
@@ -49,4 +51,6 @@ export type FromWorker =
   | { type: "stats"; stats: WorkerStats | null }
   | { type: "room"; width: number; height: number }
   | { type: "eval"; id: number; value?: unknown; error?: string }
-  | { type: "fatal"; message: string };
+  | { type: "fatal"; message: string }
+  | { type: "sounds"; orders: SoundOrder[] }
+  | { type: "save"; data: Record<string, unknown> };

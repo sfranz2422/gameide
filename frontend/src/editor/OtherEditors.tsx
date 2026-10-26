@@ -9,6 +9,7 @@ import { emptyBlocks } from "../blocks/blockState";
 import { find, type ScriptResource } from "../store/project";
 import { STARTER_SPRITES } from "../store/starterArt";
 import { CodeEditor } from "./code/CodeEditor";
+import { readSave, saveKey } from "./gameHost";
 import { blockNamesFor, BlocksEditor, confirmToPython, isBlocks, ModeTabs, projectNames, toBlocks, toPython } from "./codeMode";
 import { useProjectApi } from "./useProject";
 
@@ -136,6 +137,44 @@ export function SettingsEditor() {
           Grow the game window only by whole steps (2×, 3×…), so every pixel stays square. Turn off to fill the space exactly.
         </span>
       </label>
+      <SavedData gameId={project.id} />
+    </div>
+  );
+}
+
+/**
+ * What this game has saved in this browser (save_set), with a way to wipe
+ * it — testing "first time playing" otherwise means digging in the
+ * browser's settings.
+ */
+function SavedData({ gameId }: { gameId: string }) {
+  const [data, setData] = useState(() => readSave(gameId));
+  const keys = Object.keys(data);
+  return (
+    <div className="field" data-testid="saved-data">
+      Saved data
+      <span className="muted small">
+        {keys.length
+          ? `In this browser, the game has saved: ${keys.slice(0, 8).join(", ")}${keys.length > 8 ? "…" : ""}.`
+          : "Nothing saved yet. save_set() keeps values here between plays."}
+      </span>
+      {keys.length > 0 && (
+        <button
+          className="btn small"
+          onClick={() => {
+            if (!confirm("Forget everything this game has saved in this browser?")) return;
+            try {
+              localStorage.removeItem(saveKey(gameId));
+            } catch {
+              /* nothing was stored, or storage is blocked */
+            }
+            setData({});
+          }}
+          data-testid="clear-save"
+        >
+          Clear saved data
+        </button>
+      )}
     </div>
   );
 }

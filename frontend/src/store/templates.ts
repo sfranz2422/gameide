@@ -6,6 +6,7 @@ import {
   blankProject,
   newEvent,
   newId,
+  newSound,
   newInstance,
   newTileset,
   newObject,
@@ -13,11 +14,13 @@ import {
   type EventKey,
   type ObjectResource,
   type Project,
+  type SoundResource,
   type SpriteResource,
 } from "./project";
 import { autotilePaint } from "../editor/tiles/tileOps";
 import { boundsOfBlobs } from "./imageTools";
 import { paintStarter, paintStarterTileset, STARTER_SPRITES, STARTER_TILESET } from "./starterArt";
+import { starterSoundBlob } from "./starterSounds";
 
 export interface Built {
   project: Project;
@@ -25,6 +28,15 @@ export interface Built {
 }
 
 /** Adds a starter sprite (painting its frames) and returns it. */
+/** A starter sound (store/starterSounds.ts) in the Sounds folder, under its own name. */
+export function addStarterSound(project: Project, assets: Map<string, Blob>, key: string): SoundResource {
+  const id = newId();
+  assets.set(id, starterSoundBlob(key));
+  const sound: SoundResource = { ...newSound(key), asset: id };
+  project.sounds.push(sound);
+  return sound;
+}
+
 export async function addStarterSprite(project: Project, assets: Map<string, Blob>, key: string, name?: string): Promise<SpriteResource> {
   const s = STARTER_SPRITES.find((x) => x.key === key)!;
   const blobs = await paintStarter(s);
@@ -85,6 +97,7 @@ async function coins(): Promise<Built> {
   const sPlayer = await addStarterSprite(p, assets, "player");
   const sWall = await addStarterSprite(p, assets, "wall");
   const sCoin = await addStarterSprite(p, assets, "coin");
+  addStarterSound(p, assets, "coin");
 
   const wall = obj(p, "Wall", sWall, { solid: true });
   const coin = obj(p, "Coin", sCoin, { depth: 10 });
@@ -96,7 +109,7 @@ async function coins(): Promise<Built> {
 dy = (keyboard_check("down") - keyboard_check("up")) * self.move_speed
 move_and_collide(dx, dy, "Wall")
 `);
-  ev(player, { type: "collision", object: coin.id }, "other.destroy()\nglobal_vars.score += 1\n");
+  ev(player, { type: "collision", object: coin.id }, 'other.destroy()\nglobal_vars.score += 1\nsound_play("coin")\n');
   ev(hud, { type: "game_start" }, 'global_vars.score = 0\nglobal_vars.total = instance_number("Coin")\n');
   ev(hud, { type: "draw_gui" }, `draw_set_color("white")
 draw_text(8, 452, f"Coins: {global_vars.score} / {global_vars.total}")
@@ -226,6 +239,7 @@ async function platformer(): Promise<Built> {
   sHero.originY = 24;
   const sCoin = await addStarterSprite(p, assets, "coin");
   const sEnemy = await addStarterSprite(p, assets, "enemy");
+  for (const key of ["coin", "jump", "hit"]) addStarterSound(p, assets, key);
 
   const player = obj(p, "Player", sHero, { depth: -10 });
   const coin = obj(p, "Coin", sCoin);
@@ -246,6 +260,7 @@ self.vy = min(self.vy + 0.6, 12)
 on_ground = not place_free(self.x, self.y + 1)
 if on_ground and keyboard_check_pressed("space"):
     self.vy = -11
+    sound_play("jump")
 
 # Move, stopping against walls, floors and solid tiles
 if move_and_collide(self.vx, 0):
@@ -257,12 +272,13 @@ if move_and_collide(0, self.vy):
 if self.y > room_height + 64:
     room_restart()
 `);
-  ev(player, { type: "collision", object: coin.id }, "other.destroy()\nglobal_vars.score += 1\n");
+  ev(player, { type: "collision", object: coin.id }, 'other.destroy()\nglobal_vars.score += 1\nsound_play("coin")\n');
   ev(player, { type: "collision", object: enemy.id }, `# Landing on top squashes it; walking into it doesn't end well
 if self.vy > 0 and self.y < other.y:
     other.destroy()
     self.vy = -8
     global_vars.score += 5
+    sound_play("hit")
 else:
     camera_shake(6, 20)
     room_restart()

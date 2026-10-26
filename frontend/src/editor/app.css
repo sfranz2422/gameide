@@ -1855,3 +1855,72 @@ a.btn {
 .slot-diagram rect {
   fill: var(--accent-2);
 }
+
+/* ---------------------------------------------------------------- sounds and fonts */
+.media-editor {
+  overflow: auto;
+  max-width: 760px;
+}
+.media-editor h2 {
+  margin: 0 0 10px;
+}
+.media-editor h3 {
+  margin: 18px 0 6px;
+  font-size: 13px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.media-editor .row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 8px 0;
+}
+.error-text {
+  color: var(--danger);
+}
+.copy-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0;
+}
+.copy-line code {
+  font-family: var(--mono);
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 3px 8px;
+}
+.starter-sounds {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 4px;
+}
+.starter-sounds li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.starter-sounds li .btn {
+  margin-left: auto;
+}
+.font-sample-input {
+  width: 100%;
+  margin: 10px 0;
+  font: inherit;
+  padding: 5px 8px;
+  background: var(--code-bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.font-samples > div {
+  margin: 6px 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

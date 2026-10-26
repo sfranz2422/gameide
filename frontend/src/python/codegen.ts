@@ -192,6 +192,17 @@ export function buildGame(project: Project, images: Map<string, Blob>): BuiltGam
     stepsPerSecond: project.settings.stepsPerSecond,
     pixelScaling: project.settings.pixelScaling !== false,
     scripts: Object.fromEntries(project.scripts.map((s) => [s.name, s.code])),
+    // Every sound and font is listed, even without a file yet, so its name
+    // works in the game (silent, or the built-in font) instead of "no sound
+    // called…" for one the student can see in the tree.
+    sounds: (project.sounds ?? []).map((s) => {
+      const blob = s.asset ? images.get(s.asset) : undefined;
+      return { name: s.name, volume: s.volume, ...(blob ? { sound: blob } : {}) };
+    }),
+    fonts: (project.fonts ?? []).map((f) => {
+      const blob = f.asset ? images.get(f.asset) : undefined;
+      return { name: f.name, ...(blob ? { font: blob } : {}) };
+    }),
   };
   return { def, sources };
 }

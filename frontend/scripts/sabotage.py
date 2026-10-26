@@ -35,6 +35,8 @@ HI = "src/editor/history.ts"
 CB, PB, TB = "src/blocks/catalogBlocks.ts", "src/blocks/python.ts", "src/blocks/toolbox.ts"
 BE, OE = "src/blocks/BlocksEditor.tsx", "src/editor/ObjectEditor.tsx"
 SH, SE, EB = "src/eventsheets/sheet.ts", "src/eventsheets/SheetEditor.tsx", "src/eventsheets/ExprBox.tsx"
+GH, SND, AT = "src/editor/gameHost.ts", "src/editor/sound.ts", "src/store/assetTypes.ts"
+GS = "../backend/gamestore.py"
 CM, BS = "src/editor/codeMode.tsx", "src/blocks/blockState.ts"
 CASES = [
  ("layout drift", RT, '"x": boxy(F.X)', '"x": boxy(F.Y)', "every built-in property"),
@@ -62,7 +64,7 @@ CASES = [
  ("warn every time", RT, "    if message not in _warned:\n        _warned.add(message)\n        _warnings.append(message)", "    _warnings.append(message)", "warned about, once"),
  ("no suggestion", RT, "    close = difflib.get_close_matches(word, list(choices), n=1)", "    close = []", "says what was meant"),
  ("slow getters", RT, "        def get(self):\n            return _st[self._b + i]\n\n        def set_(self, v):\n            b = self._b\n            _st[b + i] = v\n            if not", "        def get(self):\n            sum(range(3000))\n            return _st[self._b + i]\n\n        def set_(self, v):\n            b = self._b\n            _st[b + i] = v\n            if not", "frame's budget"),
- ("param renamed", RT, "def draw_text(x, y, text):\n    if _check_draw(\"draw_text\"):\n        _draw_list.append([\"text\", _draw_depth, x, y, str(text), _color])", "def draw_text(x, y, txt):\n    if _check_draw(\"draw_text\"):\n        _draw_list.append([\"text\", _draw_depth, x, y, str(txt), _color])", "matches runtime.py"),
+ ("param renamed", RT, "def draw_text(x, y, text):\n    if _check_draw(\"draw_text\"):\n        _draw_list.append([\"text\", _draw_depth, x, y, str(text), _color, _font, _font_size])", "def draw_text(x, y, txt):\n    if _check_draw(\"draw_text\"):\n        _draw_list.append([\"text\", _draw_depth, x, y, str(txt), _color, _font, _font_size])", "matches runtime.py"),
  ("undocumented function", RT, '    "show_debug",\n]', '    "show_debug", "point_distance2",\n]\npoint_distance2 = lambda a, b: 0', "matches runtime.py"),
  ("default differs", RT, 'def mouse_check(button="left"):', 'def mouse_check(button="right"):', "matches runtime.py"),
  ("property undocumented", "src/catalog/api.ts", '  { name: "depth", description: "Lower depth draws on top." },\n', "", "only properties"),
@@ -105,8 +107,8 @@ CASES = [
  ("id hijack", APP, "            if p.owner_id != user.id:\n                # The id is someone else's", "            if False:\n                # The id is someone else's", "its id is taken", PY),
  ("replaced not kept", APP, '                _snapshot(db, p, "replaced", "Replaced by a save from another tab or computer")\n', "", "what it replaced is kept", PY),
  ("not unpacked", APP, '        if isinstance(data, dict) and set(data) == {"_packed"}:', "        if False:", "a packed body", PY),
- ("any file is a picture", "../backend/gamestore.py", "    return None\n\n\nclass GameProject", '    return "image/png"\n\n\nclass GameProject', "isn't a picture is refused", PY),
- ("asset overwritten", APP, '            return jsonify(ok=True) if existing.data == data else err("That picture id is already used.", 409)', "            return jsonify(ok=True)", "different bytes can't take", PY),
+ ("any file is a picture", "../backend/gamestore.py", "    return (kind, MAX_SOUND_BYTES) if kind else (None, 0)", '    return (kind, MAX_SOUND_BYTES) if kind else ("image/png", MAX_ASSET_BYTES)', "isn't a picture is refused", PY),
+ ("asset overwritten", APP, '            return jsonify(ok=True) if existing.data == data else err("That asset id is already used.", 409)', "            return jsonify(ok=True)", "different bytes can't take", PY),
  ("no project size limit", APP, "        if size > gamestore.MAX_PROJECT_BYTES:", "        if size > gamestore.MAX_PROJECT_BYTES * 100:", "over the limit is refused, with the sizes", PY),
  ("never pruned", APP, "        if old:\n            db.query(GameVersion)", "        if old and False:\n            db.query(GameVersion)", "pruned to the newest", PY),
  ("snapshot every save", APP, "                if last_auto is None or (", "                if True or (", "within the interval", PY),
@@ -306,6 +308,35 @@ CASES = [
  ("middle is not inside", SE, '    return f < 0.25 ? "before" : f > 0.75 ? "after" : "inside";', '    return f < 0.25 ? "before" : f > 0.75 ? "after" : "after";', "rows move by drag and drop", E2E),
  ("no end of sheet", SE, '            if (dropAt(null, "after")) e.preventDefault();', '            if (dropAt(null, "after") && e.clientY < 0) e.preventDefault();', "rows move by drag and drop", E2E),
  ("bad box not marked", EB, '<span ref={host} className={`expr-box${problem ? " bad" : ""}`}', '<span ref={host} className={`expr-box${problem ? "" : ""}`}', "a box that isn't Python is marked", E2E),
+ # Phase 9a: sounds, gamepads, save files, fonts
+ ("sound orders lost", RT, '        out["sounds"] = list(_sound_orders)', '        out["sound"] = list(_sound_orders)', "go out to the page as orders"),
+ ("sounds never end", RT, "    ends = None if loop else _step_count + max(1, round(_sound_length[name] * _steps_per_second))", "    ends = None", "worked out from each sound's length"),
+ ("music not one at a time", RT, "    if _music == name:\n        return True", "    if _music is not None:\n        return True", "music is one at a time"),
+ ("restart keeps playing", RT, '    _sound_orders.append(["stop_all"])\n    _sound_orders.append(["music_stop"])\n    _playing.clear()\n    _music = None\n    for o in list(_all):', "    for o in list(_all):", "music is one at a time"),
+ ("unknown sound allowed", RT, "    if isinstance(sound, str) and sound in _sound_length:\n        return sound", "    if isinstance(sound, str):\n        return sound", "isn't in the Sounds folder"),
+ ("pad pressed every step", IN, "    this.padPressed.fill(0);\n", "", "held, pressed and released per step"),
+ ("pad tap lost", IN, "        if (!down && this.padHeld[at]) this.padReleased[at] = 1;", "        if (!down && this.padHeld[at]) this.padPressed[at] = 0;", "held, pressed and released per step"),
+ ("no dead zone", IN, "        return Math.abs(v) < DEAD_ZONE ? 0 : Math.max(-1, Math.min(1, v));", "        return Math.abs(v) < 0 ? 0 : Math.max(-1, Math.min(1, v));", "read with a dead zone"),
+ ("every pad is pad 0", RT, '    return _g[_L.G.PAD_DOWN + _pad(pad) * len(_L.PAD_BUTTONS) + _pad_button(button)] == 1', '    return _g[_L.G.PAD_DOWN + 0 * _pad(pad) + _pad_button(button)] == 1', "held, pressed and released per step"),
+ ("save keeps the caller's list", RT, "    _save[key] = json.loads(text)", "    _save[key] = value", "are copies"),
+ ("save sent every frame", RT, '        out["save"] = _save\n        _save_changed = False', '        out["save"] = _save', "keep values between plays"),
+ ("save starts empty", RT, '    _save = json.loads(json.dumps(game.get("save") or {}))', "    _save = {}", "keep values between plays"),
+ ("font not drawn", RT, '        _draw_list.append(["text", _draw_depth, x, y, str(text), _color, _font, _font_size])', '        _draw_list.append(["text", _draw_depth, x, y, str(text), _color, -1, 16])', "draw_set_font picks a font"),
+ ("fonts not loaded in the worker", "src/python/gameWorker.ts", "  const fonts = await loadFonts(msg.def);", "  const fonts = await loadFonts({ ...msg.def, fonts: [] });", "the game draws with it", E2E),
+ ("renderer ignores the font", "src/engine/render/pixiRenderer.ts", '          const family = this.fonts.has(font) ? `gameide-font-${font}` : "monospace";', '          const family = this.fonts.has(font + 1e9) ? `gameide-font-${font}` : "monospace";', "the game draws with it", E2E),
+ ("page plays nothing", GH, "      case \"sounds\":\n        this.sound.run(m.orders);", "      case \"sounds\":\n        void m.orders;", "a starter sound plays", E2E),
+ ("sounds not decoded", SND, "      if (buffer) this.buffers.set(s.name, { buffer, volume: s.volume ?? 1 });", "      if (buffer && !buffer) this.buffers.set(s.name, { buffer, volume: s.volume ?? 1 });", "a starter sound plays", E2E),
+ ("save not kept", GH, "            localStorage.setItem(saveKey(this.saveId), JSON.stringify(m.data));", "            void m.data;", "save files keep values", E2E),
+ ("save not handed back", GH, "save: gameId ? readSave(gameId) : {} };", "save: gameId ? {} : {} };", "save files keep values", E2E),
+ ("pads not polled", GH, '        this.send({ type: "input", events: [{ k: "pads", pads }] });', "        void pads;", "a gamepad moves the player", E2E),
+ ("server refuses sounds", GS, "    kind = sniff_sound(data)\n", "    kind = None\n", "a WAV sound is accepted", PY),
+ ("sounds get the picture limit", GS, "    return (kind, MAX_SOUND_BYTES) if kind else (None, 0)", "    return (kind, MAX_ASSET_BYTES) if kind else (None, 0)", "3 MB sound is fine", PY),
+ ("any file is a sound", AT, "  if (!type || kindOf(type) !== want) throw new Error", "  if (!type || (kindOf(type) !== want && want.length < 0)) throw new Error", "turned away, saying what is wanted", E2E),
+ ("sound files not kept", PJ, '      ...(project.sounds ?? []).flatMap((s) => (s.asset ? [s.asset] : [])),\n', "", "sounds and fonts go into the built game"),
+ ("old projects lack sound folders", PJ, "    p.sounds ??= [];\n    p.fonts ??= [];\n", "", "sounds and fonts go into the built game"),
+ ("a category left out", "src/catalog/api.ts", 'export const CATEGORIES: Category[] = ["Instances", "Collision", "Input", "Motion", "Drawing", "Sound", "Saving",', 'export const CATEGORIES: Category[] = ["Instances", "Collision", "Input", "Motion", "Drawing", "Saving",', "every category is in the docs"),
+ ("WAV says the wrong length", "src/store/starterSounds.ts", "  v.setUint32(40, samples.length * 2, true);", "  v.setUint32(40, samples.length, true);", "real WAV files"),
+ ("MP3 without a tag refused", AT, "  if (ascii(b, 0, \"ID3\") || (b[0] === 0xff && ((b[1] ?? 0) & 0xe0) === 0xe0)) return \"audio/mpeg\";", "  if (ascii(b, 0, \"ID3\")) return \"audio/mpeg\";", "known by their first bytes"),
 ]
 only = sys.argv[1:]
 # A name that matches no case would otherwise run nothing and still say

@@ -250,7 +250,7 @@ describe("events", () => {
       instances: [{ object: "D", x: 0, y: 0 }],
     });
     run(game, 1);
-    expect(game.engine.drawList).toEqual([["text", 5, 1, 2, "hi", 0xff0000]]);
+    expect(game.engine.drawList).toEqual([["text", 5, 1, 2, "hi", 0xff0000, -1, 16]]); // -1: the built-in font, size 16
     const slot = py(game, "instances('D')[0]._slot") as number;
     expect(game.engine.fresh().st[slot * STRIDE + F.DRAWN]).toBe(1);
   });

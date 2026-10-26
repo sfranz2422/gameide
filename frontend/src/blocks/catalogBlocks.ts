@@ -21,7 +21,7 @@ import "blockly/blocks";
 import * as En from "blockly/msg/en";
 import { Order, type PythonGenerator } from "blockly/python";
 import { API, PROPERTIES, type ApiFunction, type ApiVariable, type Category, type Param } from "../catalog/api";
-import { KEY_NAMES, MOUSE_BUTTONS } from "../engine/layout";
+import { KEY_NAMES, MOUSE_BUTTONS, PAD_AXES, PAD_BUTTONS } from "../engine/layout";
 import { NAME_FIELD_BLOCKS, type ScriptFunction } from "./blockState";
 
 /** The project's names, for the object/sprite/room/layer dropdowns. Set by the editor; empty when headless. */
@@ -30,6 +30,8 @@ export interface BlockNames {
   sprites: string[];
   rooms: string[];
   layers: string[];
+  sounds?: string[];
+  fonts?: string[];
   /** Functions the project's scripts define, for the call blocks. */
   functions: ScriptFunction[];
 }
@@ -52,6 +54,8 @@ export const COLOURS: Record<Category | "Variables" | "Logic" | "Loops" | "Math"
   Drawing: "#9966FF",
   Rooms: "#5562D9",
   Camera: "#2E7FA8",
+  Sound: "#CF63CF", // Scratch's Sound
+  Saving: "#8D6E63",
   Debug: "#7A8699",
   Variables: "#FF8C1A",
   Logic: "#FFAB19",
@@ -104,10 +108,10 @@ class NameDropdown extends Blockly.FieldDropdown {
   }
 }
 
-function nameField(kind: "objects" | "sprites" | "rooms" | "layers", none: string | null, alsoLayers = false) {
+function nameField(kind: "objects" | "sprites" | "rooms" | "layers" | "sounds" | "fonts", none: string | null, alsoLayers = false) {
   return new NameDropdown(function (this: Blockly.FieldDropdown) {
     const n = currentNames();
-    const options: [string, string][] = n[kind].map((x) => [x, x]);
+    const options: [string, string][] = (n[kind] ?? []).map((x) => [x, x]);
     if (alsoLayers) for (const l of n.layers) options.push([`layer ${l}`, l]);
     const value = this.getValue();
     if (value && value !== NONE && !options.some((o) => o[1] === value)) options.push([value, value]);
@@ -180,6 +184,11 @@ pick("gm_sprite", COLOURS.Drawing, () => nameField("sprites", null), nameOrNone,
 pick("gm_room", COLOURS.Rooms, () => nameField("rooms", null), nameOrNone, "A room.");
 pick("gm_layer", COLOURS.Collision, () => nameField("layers", null), nameOrNone, "A tile layer.");
 pick("gm_layer_any", COLOURS.Collision, () => nameField("layers", "the top tile layer"), nameOrNone, "A tile layer, or the top one.");
+pick("gm_sound", COLOURS.Sound, () => nameField("sounds", null), nameOrNone, "A sound from the Sounds folder.");
+pick("gm_sound_any", COLOURS.Sound, () => nameField("sounds", "every sound"), nameOrNone, "A sound — or every sound.");
+pick("gm_font", COLOURS.Drawing, () => nameField("fonts", "the built-in font"), nameOrNone, "A font from the Fonts folder, or the built-in one.");
+pick("gm_padbutton", COLOURS.Input, () => new Blockly.FieldDropdown(PAD_BUTTONS.map((k) => [k, k])), (v, g) => quote(g, v), "A gamepad button.");
+pick("gm_axis", COLOURS.Input, () => new Blockly.FieldDropdown(PAD_AXES.map((k) => [k, k])), (v, g) => quote(g, v), "A gamepad stick's direction.");
 pick("gm_key", COLOURS.Input, () => new Blockly.FieldDropdown(KEY_NAMES.map((k) => [k, k])), (v, g) => quote(g, v), "A key.");
 pick("gm_button", COLOURS.Input, () => new Blockly.FieldDropdown(MOUSE_BUTTONS.map((k) => [k, k])), (v, g) => quote(g, v), "A mouse button.");
 const COLOR_NAMES = ["white", "black", "red", "orange", "yellow", "green", "blue", "purple", "pink", "gray"];
@@ -232,6 +241,14 @@ export function shadowFor(p: Param): { type: string; fields?: Record<string, unk
       return { type: "gm_button", fields: { NAME: p.default ? JSON.parse(p.default) : "left" } };
     case "color":
       return { type: "gm_color", fields: { NAME: "white" } };
+    case "sound":
+      return { type: p.default === "None" ? "gm_sound_any" : "gm_sound" };
+    case "font":
+      return { type: "gm_font" };
+    case "padbutton":
+      return { type: "gm_padbutton", fields: { NAME: "a" } };
+    case "axis":
+      return { type: "gm_axis", fields: { NAME: "left_x" } };
     case "instance":
       return { type: "gm_self" };
     default:

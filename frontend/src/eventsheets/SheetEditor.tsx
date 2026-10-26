@@ -8,7 +8,7 @@
  * change to the sheet. The project's undo leaves sheets alone (history.ts).
  */
 import { useEffect, useMemo, useRef, useState } from "react";
-import { type ApiFunction, type Category } from "../catalog/api";
+import { type ApiFunction } from "../catalog/api";
 import { CodeEditor } from "../editor/code/CodeEditor";
 import type { ProjectNames } from "../editor/code/pythonHelp";
 import { Icon } from "../editor/ui/icons";
@@ -16,6 +16,7 @@ import { newId } from "../store/project";
 import { ExprBox } from "./ExprBox";
 import {
   ACTION_FUNCTIONS,
+  PICKER_ORDER,
   checkExpr,
   checkLine,
   CONDITION_FUNCTIONS,
@@ -657,7 +658,6 @@ function AddButton({ what, row, ops }: { what: "condition" | "action"; row: Even
   );
 }
 
-const ORDER: Category[] = ["Input", "Collision", "Instances", "Motion", "Drawing", "Rooms", "Camera", "Debug"];
 
 function Picker({ what, ops, onPick, onClose }: { what: "condition" | "action"; ops: Ops; onPick: (item: Condition | Action) => void; onClose: () => void }) {
   const [filter, setFilter] = useState("");
@@ -695,7 +695,7 @@ function Picker({ what, ops, onPick, onClose }: { what: "condition" | "action"; 
             {s.label} <span className="muted small">{s.hint}</span>
           </button>
         ))}
-        {ORDER.map((cat) => {
+        {PICKER_ORDER.map((cat) => {
           const list = fns.filter((f) => f.category === cat && match(f.name));
           if (!list.length) return null;
           return (

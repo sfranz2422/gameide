@@ -13,7 +13,7 @@ export default defineConfig({
   timeout: 90_000,
   use: { viewport: { width: 1366, height: 768 } },
   projects: [
-    { name: "editor", testMatch: /(editor|sprites|rooms|tiles|blocks|sheets)\.spec\.ts/, use: { baseURL: "http://localhost:4173" } },
+    { name: "editor", testMatch: /(editor|sprites|rooms|tiles|blocks|sheets|media)\.spec\.ts/, use: { baseURL: "http://localhost:4173" } },
     { name: "account", testMatch: "account.spec.ts", use: { baseURL: "http://127.0.0.1:5055" } },
   ],
   webServer: [

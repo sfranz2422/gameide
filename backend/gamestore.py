@@ -27,8 +27,9 @@ from accounts import Base, now
 # shared database. The error each produces names the limit in words.
 
 MAX_PROJECT_BYTES = 2_000_000          # the JSON: objects, events, rooms
-MAX_ASSET_BYTES = 2_000_000            # one picture
-MAX_PROJECT_ASSET_BYTES = 40_000_000   # all of one project's pictures
+MAX_ASSET_BYTES = 2_000_000            # one picture or font
+MAX_SOUND_BYTES = 8_000_000            # one sound: a few minutes of music as MP3
+MAX_PROJECT_ASSET_BYTES = 40_000_000   # all of one project's pictures, sounds and fonts
 MAX_USER_BYTES = 200_000_000           # everything one person stores
 MAX_PROJECTS_PER_USER = 300
 AUTO_SNAPSHOT_SECONDS = 10 * 60        # an automatic version at most this often
@@ -53,6 +54,43 @@ def sniff_image(data: bytes):
     if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
         return "image/webp"
     return None
+
+
+def sniff_sound(data: bytes):
+    """The audio type these bytes really are (MP3, OGG, WAV), or None."""
+    if data[:4] == b"RIFF" and data[8:12] == b"WAVE":
+        return "audio/wav"
+    if data.startswith(b"OggS"):
+        return "audio/ogg"
+    # MP3: an ID3 tag first, or straight into a frame (11 sync bits set).
+    if data.startswith(b"ID3") or (len(data) > 1 and data[0] == 0xFF and data[1] & 0xE0 == 0xE0):
+        return "audio/mpeg"
+    return None
+
+
+FONT_MAGIC = [
+    (b"\x00\x01\x00\x00", "font/ttf"),
+    (b"true", "font/ttf"),
+    (b"OTTO", "font/otf"),
+    (b"wOFF", "font/woff"),
+    (b"wOF2", "font/woff2"),
+]
+
+
+def sniff_font(data: bytes):
+    for magic, kind in FONT_MAGIC:
+        if data.startswith(magic):
+            return kind
+    return None
+
+
+def sniff_asset(data: bytes):
+    """What an uploaded asset really is — a picture, a sound or a font — and its size limit; (None, 0) if none of them."""
+    kind = sniff_image(data) or sniff_font(data)
+    if kind:
+        return kind, MAX_ASSET_BYTES
+    kind = sniff_sound(data)
+    return (kind, MAX_SOUND_BYTES) if kind else (None, 0)
 
 
 class GameProject(Base):

@@ -16,8 +16,9 @@ export async function fromTemplate(page: Page, key: string, query = "") {
   await page.waitForURL(/#\/p\//);
 }
 
-export const treeItem = (page: Page, name: string) =>
-  page.getByRole("navigation", { name: "Resources" }).getByRole("button", { name, exact: true });
+/** An item in the resource tree — in one folder ("sprites", "sounds"…) when a name is used by more than one kind. */
+export const treeItem = (page: Page, name: string, folder?: string) =>
+  (folder ? page.locator(`[data-tutorial="folder-${folder}"]`) : page.getByRole("navigation", { name: "Resources" })).getByRole("button", { name, exact: true });
 export const nameBox = (page: Page) => page.getByRole("textbox", { name: "Name", exact: true });
 
 /** Replaces the code in the open event (or script) with `text`, exactly as given. */

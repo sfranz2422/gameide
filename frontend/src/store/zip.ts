@@ -8,30 +8,28 @@
  * " (imported)" when a game of that name already exists.
  */
 import { unzipSync, zipSync, strToU8, strFromU8 } from "fflate";
-import { migrate, newId, type Project } from "./project";
+import { extensionOf, sniffType, typeOfExtension } from "./assetTypes";
+import { assetIds, migrate, newId, type Project } from "./project";
 
 const MAX_IMPORT_BYTES = 60_000_000;
 
-function extensionFor(type: string) {
-  return type === "image/jpeg" ? "jpg" : type === "image/gif" ? "gif" : type === "image/webp" ? "webp" : "png";
-}
 
 export async function exportZip(project: Project, getAsset: (id: string) => Promise<Blob | null>): Promise<Blob> {
   const files: Record<string, Uint8Array> = {
     "project.json": strToU8(JSON.stringify(project, null, 2)),
   };
   const index: Record<string, string> = {};
-  for (const id of new Set([...project.sprites.flatMap((s) => s.frames), ...(project.tilesets ?? []).flatMap((t) => (t.image ? [t.image] : []))])) {
+  for (const id of assetIds(project)) {
     const blob = await getAsset(id);
     if (!blob) continue;
-    const name = `assets/${id}.${extensionFor(blob.type)}`;
+    const name = `assets/${id}.${extensionOf(blob.type)}`;
     files[name] = new Uint8Array(await blob.arrayBuffer());
     index[id] = name;
   }
   files["assets/index.json"] = strToU8(JSON.stringify(index, null, 2));
   files["README.txt"] = strToU8(
     `${project.name}\n\nA GameIDE project. To open it, go to GameIDE's front page and use Import.\n` +
-      "project.json holds the objects, events, rooms and scripts; assets/ holds the pictures.\n",
+      "project.json holds the objects, events, rooms and scripts; assets/ holds the pictures, sounds and fonts.\n",
   );
   // Pictures are already compressed; level 6 still shrinks the JSON well.
   const zipped = zipSync(files, { level: 6 });
@@ -67,8 +65,8 @@ export async function importZip(file: Blob, existingNames: string[]): Promise<Im
   for (const [id, name] of Object.entries(names)) {
     const bytes = entries[prefix + name];
     if (!bytes) continue;
-    const ext = name.split(".").pop() ?? "png";
-    const type = ext === "jpg" ? "image/jpeg" : `image/${ext}`;
+    // By what the bytes are, not the name in the zip (made by hand, maybe).
+    const type = sniffType(bytes.subarray(0, 16)) ?? typeOfExtension(name.split(".").pop() ?? "");
     assets.set(id, new Blob([bytes as BlobPart], { type }));
   }
   const now = new Date().toISOString();

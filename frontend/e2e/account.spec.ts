@@ -69,7 +69,7 @@ test("work saved to the account opens on another computer", async ({ page, brows
   await other.page.getByTestId("project-link").filter({ hasText: "Collect the coins" }).click();
   await editPlayerCreate(other.page, "self.move_speed = 6\n"); // opens the same event to look at it
   await expect(other.page.getByTestId("event-code")).toContainText("self.move_speed = 6");
-  await expect(treeItem(other.page, "coin")).toBeVisible();
+  await expect(treeItem(other.page, "coin", "sprites")).toBeVisible(); // (a sound is called coin too)
   await other.ctx.close();
   expect(errors).toEqual([]);
 });

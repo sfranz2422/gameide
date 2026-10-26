@@ -2,7 +2,7 @@
  * The right-hand column: the game, then Console and Docs as tabs under it.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
-import { API, PROPERTIES, type Category } from "../catalog/api";
+import { API, CATEGORIES, PROPERTIES } from "../catalog/api";
 import type { MappedError } from "../python/codegen";
 import type { GameState, WorkerStats } from "../python/protocol";
 import { activeEditor } from "./code/CodeEditor";
@@ -115,7 +115,7 @@ export function ConsolePane({ lines, clear, jump }: { lines: ConsoleLine[]; clea
   );
 }
 
-const CATEGORIES: Category[] = ["Instances", "Collision", "Input", "Motion", "Drawing", "Rooms", "Camera", "Debug"];
+// (The catalog's own list: catalog.test.ts holds the palettes to it too.)
 
 /** The API catalog as a searchable list. Clicking an entry types it at the cursor. */
 export function DocsPane() {

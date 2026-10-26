@@ -144,6 +144,22 @@ r = alice.put("/api/projects/aaa1/assets/pic2", data=b"<?php echo 1; ?>", conten
 check("a file that isn't a picture is refused, whatever it claims", r.status_code == 415, r.data)
 r = alice.put("/api/projects/aaa1/assets/pic3", data=b"\x89PNG\r\n\x1a\n" + b"0" * (gamestore.MAX_ASSET_BYTES + 1))
 check("a picture over the limit is refused", r.status_code == 413)
+# Sounds and fonts, judged by their bytes like pictures; sounds may be bigger.
+WAV = b"RIFF\x24\x00\x00\x00WAVEfmt " + b"\x00" * 28
+check("a WAV sound is accepted", alice.put("/api/projects/aaa1/assets/snd1", data=WAV).status_code == 201)
+r = alice.get("/api/projects/aaa1/assets/snd1")
+check("…and comes back as audio", r.status_code == 200 and r.mimetype == "audio/wav", r.mimetype)
+check("an MP3 (ID3 tag) is accepted", alice.put("/api/projects/aaa1/assets/snd2", data=b"ID3\x04\x00" + b"\x00" * 50).status_code == 201)
+check("an OGG is accepted", alice.put("/api/projects/aaa1/assets/snd3", data=b"OggS" + b"\x00" * 50).status_code == 201)
+check("a font (OTF) is accepted", alice.put("/api/projects/aaa1/assets/fnt1", data=b"OTTO" + b"\x00" * 50).status_code == 201)
+r = alice.put("/api/projects/aaa1/assets/snd4", data=b"ID3" + b"\x00" * 3_000_000)
+check("a 3 MB sound is fine (music)", r.status_code == 201, r.status_code)
+r = alice.put("/api/projects/aaa1/assets/pic9", data=PNG + b"\x00" * 3_000_000)
+check("…but a 3 MB picture is too big", r.status_code == 413 and "picture" in r.get_json()["error"], r.status_code)
+r = alice.put("/api/projects/aaa1/assets/snd5", data=b"ID3" + b"\x00" * (gamestore.MAX_SOUND_BYTES + 1))
+check("a sound over its limit is refused, by name", r.status_code == 413 and "sound" in r.get_json()["error"], r.status_code)
+r = alice.put("/api/projects/aaa1/assets/txt1", data=b"just some text pretending to be a song")
+check("anything else is refused, saying what is allowed", r.status_code == 415 and "MP3" in r.get_json()["error"])
 check("a bad asset id is refused", alice.put("/api/projects/aaa1/assets/../x", data=PNG).status_code in (400, 404))
 
 # ---------------------------------------------------------------- history

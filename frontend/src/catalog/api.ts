@@ -10,8 +10,8 @@
  * entry), event-sheet pickers (Phase 8) and the in-IDE docs — so a function added here and in runtime.py appears in all of
  * them, and one added to only one of the two fails the test.
  *
- * Functions planned for later phases (camera_*, sound_*, tile_at) are not
- * listed until they exist: a catalog entry is a promise the runtime keeps.
+ * A function is listed only once it exists: a catalog entry is a promise
+ * the runtime keeps.
  */
 
 export type Category =
@@ -22,9 +22,20 @@ export type Category =
   | "Drawing"
   | "Rooms"
   | "Camera"
+  | "Sound"
+  | "Saving"
   | "Debug";
 
-export type ParamType = "number" | "string" | "object" | "sprite" | "key" | "button" | "color" | "boolean" | "room" | "instance" | "layer" | "any";
+/**
+ * Every category, in the order the docs list them. The docs pane, the
+ * blocks palette and the sheet pickers each list categories; catalog.test.ts
+ * holds all three to this, so a new category can't go missing from one.
+ */
+export const CATEGORIES: Category[] = ["Instances", "Collision", "Input", "Motion", "Drawing", "Sound", "Saving", "Rooms", "Camera", "Debug"];
+
+export type ParamType =
+  | "number" | "string" | "object" | "sprite" | "key" | "button" | "color" | "boolean" | "room" | "instance" | "layer" | "any"
+  | "sound" | "font" | "padbutton" | "axis";
 
 export interface Param {
   name: string;
@@ -105,6 +116,15 @@ export const API: ApiEntry[] = [
     "Was this mouse button pressed this step?"),
   fn("Input", "mouse_check_released", [p("button", "button", '"left"')], "True or False",
     "Was this mouse button let go this step?"),
+  fn("Input", "gamepad_check", [p("button", "padbutton"), p("pad", "number", "0")], "True or False",
+    'Is this button held on a gamepad? "a", "b", "x", "y", "lb", "rb", "lt", "rt", "start", "select", "up", "down", "left", "right"… pad 0 is the first one plugged in.'),
+  fn("Input", "gamepad_check_pressed", [p("button", "padbutton"), p("pad", "number", "0")], "True or False",
+    "Was this gamepad button pressed this step?"),
+  fn("Input", "gamepad_check_released", [p("button", "padbutton"), p("pad", "number", "0")], "True or False",
+    "Was this gamepad button let go this step?"),
+  fn("Input", "gamepad_axis", [p("axis", "axis"), p("pad", "number", "0")], "a number from -1 to 1",
+    'How far a stick is pushed: "left_x", "left_y", "right_x" or "right_y". Right and down are positive; a stick at rest is 0.'),
+  fn("Input", "gamepad_connected", [p("pad", "number", "0")], "True or False", "Is a gamepad plugged in as this number?"),
   { kind: "variable", name: "mouse_x", category: "Input", type: "number", description: "The mouse's x in the room." },
   { kind: "variable", name: "mouse_y", category: "Input", type: "number", description: "The mouse's y in the room." },
 
@@ -131,6 +151,8 @@ export const API: ApiEntry[] = [
     "nothing", "Draws a rectangle between two corners, filled unless outline is True."),
   fn("Drawing", "draw_set_color", [p("color", "color")], "nothing",
     'Sets the colour for what is drawn next: "red", "#ff8800" or (255, 136, 0).'),
+  fn("Drawing", "draw_set_font", [p("font", "font", "None"), p("size", "number", "16")], "nothing",
+    "Sets the font for draw_text from now on: one from the Fonts folder, and its size. draw_set_font() goes back to the built-in font."),
 
   // Rooms and the game
   fn("Rooms", "room_goto", [p("room", "room")], "nothing", "Goes to another room at the end of this step."),
@@ -152,6 +174,24 @@ export const API: ApiEntry[] = [
   { kind: "variable", name: "view_y", category: "Camera", type: "number", description: "Where the view's top edge is in the room." },
   { kind: "variable", name: "view_width", category: "Camera", type: "number", description: "How wide the view is (the game window)." },
   { kind: "variable", name: "view_height", category: "Camera", type: "number", description: "How tall the view is." },
+
+  // Sound
+  fn("Sound", "sound_play", [p("sound", "sound"), p("loop", "boolean", "False"), p("volume", "number", "1")], "nothing",
+    "Plays a sound from the Sounds folder. loop=True plays it again and again until sound_stop. volume: 0 (silent) to 1."),
+  fn("Sound", "sound_stop", [p("sound", "sound", "None")], "nothing",
+    "Stops a sound everywhere it is playing — or, with none named, every sound (not the music)."),
+  fn("Sound", "sound_playing", [p("sound", "sound")], "True or False", "Is this sound playing right now?"),
+  fn("Sound", "music_play", [p("sound", "sound"), p("loop", "boolean", "True"), p("volume", "number", "1")], "nothing",
+    "Plays a sound as the music. There is only ever one music: this replaces any already playing."),
+  fn("Sound", "music_stop", [], "nothing", "Stops the music."),
+
+  // Saving
+  fn("Saving", "save_set", [p("key", "string"), p("value", "any")], "nothing",
+    'Keeps a value for next time the game is played, under a name: save_set("best", score). Numbers, text, True/False, lists and dicts.'),
+  fn("Saving", "save_get", [p("key", "string"), p("default", "any", "None")], "the saved value, or default",
+    'A value kept with save_set — or `default` if nothing is saved under that name: save_get("best", 0).'),
+  fn("Saving", "save_delete", [p("key", "string")], "nothing", "Forgets one saved value."),
+  fn("Saving", "save_clear", [], "nothing", "Forgets everything this game saved."),
 
   // Debug
   fn("Debug", "show_debug", [p("text", "any")], "nothing",

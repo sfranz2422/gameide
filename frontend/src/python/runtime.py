@@ -58,14 +58,19 @@ __all__ = [
     # input
     "keyboard_check", "keyboard_check_pressed", "keyboard_check_released",
     "mouse_check", "mouse_check_pressed", "mouse_check_released", "mouse_x", "mouse_y",
+    "gamepad_check", "gamepad_check_pressed", "gamepad_check_released", "gamepad_axis", "gamepad_connected",
     # movement
     "move_towards", "point_direction", "point_distance", "move_and_collide",
     # drawing
-    "draw_self", "draw_sprite", "draw_text", "draw_rect", "draw_set_color",
+    "draw_self", "draw_sprite", "draw_text", "draw_rect", "draw_set_color", "draw_set_font",
     # rooms and the game
     "room_goto", "room_restart", "game_restart", "global_vars", "room_width", "room_height",
     # the camera
     "camera_follow", "camera_set", "camera_shake", "view_x", "view_y", "view_width", "view_height",
+    # sound
+    "sound_play", "sound_stop", "sound_playing", "music_play", "music_stop",
+    # saving
+    "save_set", "save_get", "save_delete", "save_clear",
     # debugging
     "show_debug",
 ]
@@ -661,7 +666,27 @@ def draw_sprite(sprite, frame, x, y):
 
 def draw_text(x, y, text):
     if _check_draw("draw_text"):
-        _draw_list.append(["text", _draw_depth, x, y, str(text), _color])
+        _draw_list.append(["text", _draw_depth, x, y, str(text), _color, _font, _font_size])
+
+
+_font = -1        # index into the game's fonts, or -1 for the built-in one
+_font_size = 16
+_font_index = {}  # name -> index, from the game's fonts
+
+
+def draw_set_font(font=None, size=16):
+    """Sets the font for draw_text from now on: one from the Fonts folder (None: the built-in one), and its size."""
+    global _font, _font_size
+    if font is None:
+        _font = -1
+    elif font in _font_index:
+        _font = _font_index[font]
+    else:
+        known = ", ".join(sorted(_font_index)) or "none yet — add one in the Fonts folder"
+        raise NameError(f"There is no font called {font!r}. Fonts: {known}.")
+    if not isinstance(size, (int, float)) or size <= 0:
+        raise ValueError(f"A font size is a number above 0, like 16, not {size!r}.")
+    _font_size = float(size)
 
 
 def draw_rect(x1, y1, x2, y2, outline=False):
@@ -766,6 +791,163 @@ def show_debug(text):
     global _debug, _debug_changed
     _debug = None if text is None else str(text)
     _debug_changed = True
+
+
+# ---------------------------------------------------------------- sound
+#
+# The game runs in a worker, where browsers have no audio, so Python only
+# says what to play: each frame's orders go out with its other commands
+# (_commands) and the page plays them (editor/sound.ts). The page measured
+# every sound before the game started, so whether one is still playing is
+# worked out here, from when it started and how long it is — nothing has
+# to come back from the page.
+
+_sound_length = {}   # name -> seconds
+_sound_orders = []   # this frame's orders for the page
+_playing = {}        # name -> [step each play ends at, or None while looping]
+_music = None        # the name of the music playing, or None
+_steps_per_second = 60
+_step_count = 0
+
+
+def _sound(sound):
+    if isinstance(sound, str) and sound in _sound_length:
+        return sound
+    known = ", ".join(sorted(_sound_length)) or "none yet — add one in the Sounds folder"
+    raise NameError(f"There is no sound called {sound!r}. Sounds: {known}.")
+
+
+def _volume(volume):
+    if not isinstance(volume, (int, float)) or not 0 <= volume <= 1:
+        raise ValueError(f"A volume is from 0 (silent) to 1 (full), not {volume!r}.")
+    return float(volume)
+
+
+def sound_play(sound, loop=False, volume=1):
+    """Plays a sound from the Sounds folder. loop=True plays it until sound_stop."""
+    name, vol = _sound(sound), _volume(volume)
+    _sound_orders.append(["play", name, 1 if loop else 0, vol])
+    ends = None if loop else _step_count + max(1, round(_sound_length[name] * _steps_per_second))
+    _playing.setdefault(name, []).append(ends)
+
+
+def sound_stop(sound=None):
+    """Stops a sound wherever it is playing — or, with none named, every sound (not the music)."""
+    if sound is None:
+        _sound_orders.append(["stop_all"])
+        _playing.clear()
+    else:
+        name = _sound(sound)
+        _sound_orders.append(["stop", name])
+        _playing.pop(name, None)
+
+
+def sound_playing(sound):
+    name = _sound(sound)
+    if _music == name:
+        return True
+    return any(end is None or end > _step_count for end in _playing.get(name, []))
+
+
+def music_play(sound, loop=True, volume=1):
+    """Plays a sound as the music: only one at a time, so it replaces any music playing."""
+    global _music
+    name, vol = _sound(sound), _volume(volume)
+    _sound_orders.append(["music", name, 1 if loop else 0, vol])
+    _music = name if loop else None
+
+
+def music_stop():
+    global _music
+    _sound_orders.append(["music_stop"])
+    _music = None
+
+
+# ---------------------------------------------------------------- gamepads
+
+_PAD_BUTTONS = {}   # name -> index, from layout.ts
+
+
+def _pad(pad):
+    if not isinstance(pad, int) or not 0 <= pad < _L.PAD_COUNT:
+        raise ValueError(f"Gamepads are numbered 0 to {_L.PAD_COUNT - 1}, not {pad!r}.")
+    return pad
+
+
+def _pad_button(button):
+    if button in _PAD_BUTTONS:
+        return _PAD_BUTTONS[button]
+    raise NameError(f"There is no gamepad button called {button!r}. Buttons: {', '.join(_L.PAD_BUTTONS)}.")
+
+
+def gamepad_check(button, pad=0):
+    """Is this button held on that gamepad? "a", "b", "x", "y", "lb", "rb", "lt", "rt", "start", "up"…"""
+    return _g[_L.G.PAD_DOWN + _pad(pad) * len(_L.PAD_BUTTONS) + _pad_button(button)] == 1
+
+
+def gamepad_check_pressed(button, pad=0):
+    return _g[_L.G.PAD_PRESSED + _pad(pad) * len(_L.PAD_BUTTONS) + _pad_button(button)] == 1
+
+
+def gamepad_check_released(button, pad=0):
+    return _g[_L.G.PAD_RELEASED + _pad(pad) * len(_L.PAD_BUTTONS) + _pad_button(button)] == 1
+
+
+def gamepad_axis(axis, pad=0):
+    """How far a stick is pushed, -1 to 1: "left_x", "left_y", "right_x", "right_y" (down is +)."""
+    if axis not in _L.PAD_AXES:
+        raise NameError(f"There is no gamepad axis called {axis!r}. Axes: {', '.join(_L.PAD_AXES)}.")
+    return _g[_L.G.PAD_AXIS + _pad(pad) * len(_L.PAD_AXES) + _L.PAD_AXES.index(axis)]
+
+
+def gamepad_connected(pad=0):
+    return _g[_L.G.PAD_CONNECTED + _pad(pad)] == 1
+
+
+# ---------------------------------------------------------------- save files
+#
+# What a game keeps between plays — progress, high scores — in the
+# player's browser. The page hands the saved data over as the game starts;
+# a change goes out with the frame's commands (whole: it is small) and the
+# page stores it. Values are copied in and out through JSON, so a list
+# changed after saving doesn't change the save behind the game's back.
+
+SAVE_LIMIT = 1_000_000  # characters of JSON
+_save = {}
+_save_changed = False
+
+
+def save_set(key, value):
+    """Keeps a value (number, text, True/False, None, or a list/dict of those) under a name, for next time."""
+    global _save_changed
+    if not isinstance(key, str):
+        raise TypeError(f"A save name is text, like save_set(\"best\", 10), not {key!r}.")
+    try:
+        text = json.dumps(value)
+    except (TypeError, ValueError):
+        raise TypeError(f"save_set can keep numbers, text, True/False, None and lists or dicts of those — not {value!r}.") from None
+    if len(json.dumps(_save)) + len(text) > SAVE_LIMIT:
+        raise ValueError("There's too much saved: a game can keep about 1 MB. Save less, or save_delete what isn't needed.")
+    _save[key] = json.loads(text)
+    _save_changed = True
+
+
+def save_get(key, default=None):
+    """A value kept with save_set — or `default` if nothing was saved under that name."""
+    return json.loads(json.dumps(_save[key])) if key in _save else default
+
+
+def save_delete(key):
+    global _save_changed
+    if key in _save:
+        del _save[key]
+        _save_changed = True
+
+
+def save_clear():
+    global _save_changed
+    _save.clear()
+    _save_changed = True
 
 
 # ---------------------------------------------------------------- lifecycle
@@ -939,7 +1121,12 @@ def _goto(index, first=False):
 
 
 def _restart_game():
-    global _room_now
+    global _room_now, _music
+    # Starting again silences the old game: its sounds and music stop.
+    _sound_orders.append(["stop_all"])
+    _sound_orders.append(["music_stop"])
+    _playing.clear()
+    _music = None
     for o in list(_all):
         _kill_quietly(o)
     _reap()
@@ -1075,8 +1262,14 @@ def _end_of_frame():
 
 def _commands():
     """What JavaScript must do after this frame, as JSON — or None for nothing."""
-    global _draw, _gui, _debug_changed, _room_changed
+    global _draw, _gui, _debug_changed, _room_changed, _save_changed
     out = {}
+    if _sound_orders:
+        out["sounds"] = list(_sound_orders)
+        _sound_orders.clear()
+    if _save_changed:
+        out["save"] = _save
+        _save_changed = False
     if _draw:
         out["draw"] = _draw
         _draw = []
@@ -1101,8 +1294,9 @@ def _frame():
     engine's beginStep(). Never raises: a student's error comes back as
     {"error": ...} so the engine can stop and show it.
     """
-    global _cur, _in_draw
+    global _cur, _in_draw, _step_count
     try:
+        _step_count += 1
         _publish_globals()
         _call_all(_lists["on_begin_step"], "on_begin_step")
         _dispatch_engine_events()        # alarms and mouse-on-instance
@@ -1213,6 +1407,22 @@ def _setup(layout_json, game_json):
         _sprite_index[s["name"]] = i
         _sprite_names.append(s["name"])
     _rooms = game["rooms"]
+    global _steps_per_second, _save, _font, _step_count, _music
+    _steps_per_second = game.get("stepsPerSecond") or 60
+    _step_count = 0
+    _music = None
+    _playing.clear()
+    _sound_orders.clear()
+    _sound_length.clear()
+    for snd in game.get("sounds", []):
+        _sound_length[snd["name"]] = snd.get("duration", 0)
+    _font_index.clear()
+    for i, f in enumerate(game.get("fonts", [])):
+        _font_index[f["name"]] = i
+    _font = -1
+    _save = json.loads(json.dumps(game.get("save") or {}))
+    _PAD_BUTTONS.clear()
+    _PAD_BUTTONS.update({b: i for i, b in enumerate(_L.PAD_BUTTONS)})
     for name in ("on_begin_step", "on_step", "on_end_step", "on_draw", "on_draw_gui", "keyboard", "global_mouse"):
         _lists[name] = []
 

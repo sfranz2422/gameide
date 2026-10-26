@@ -10,6 +10,7 @@ import type { ProjectStore } from "../store/store";
 import { addStarterSprite } from "../store/templates";
 import { GameHost } from "./gameHost";
 import { ObjectEditor, type EventFocus } from "./ObjectEditor";
+import { FontEditor, SoundEditor } from "./MediaEditors";
 import { ScriptEditor, SettingsEditor, SpritePicker } from "./OtherEditors";
 import { RoomEditor } from "./rooms/RoomEditor";
 import { TilesetEditor } from "./tiles/TilesetEditor";
@@ -33,7 +34,16 @@ function tabLabel(p: Project, t: TabRef): string | null {
   return find(p, t.kind, t.id)?.name ?? null;
 }
 
-const TAB_ICON = { sprites: Icon.sprite, tilesets: Icon.tileset, objects: Icon.object, rooms: Icon.room, scripts: Icon.script, settings: Icon.settings };
+const TAB_ICON = {
+  sprites: Icon.sprite,
+  tilesets: Icon.tileset,
+  objects: Icon.object,
+  rooms: Icon.room,
+  scripts: Icon.script,
+  sounds: Icon.sound,
+  fonts: Icon.font,
+  settings: Icon.settings,
+};
 
 export function EditorPage({ store, id }: { store: ProjectStore; id: string }) {
   const state = useProjectState(store, id);
@@ -112,7 +122,8 @@ export function EditorPage({ store, id }: { store: ProjectStore; id: string }) {
     sources.current = built.sources;
     addLines([{ kind: "info", text: `▶ ${p.name}` }]);
     setBottom("console");
-    void host.play(built.def);
+    // The project's id names where its save data (save_set) lives in this browser.
+    void host.play(built.def, p.id);
   }, [host, assets, addLines]);
 
   const stop = useCallback(() => host?.stop(), [host]);
@@ -343,6 +354,8 @@ export function EditorPage({ store, id }: { store: ProjectStore; id: string }) {
                 <ScriptEditor key={current.id} scriptId={current.id} focus={scriptFocus?.id === current.id ? scriptFocus : null} />
               )}
               {current?.kind === "tilesets" && <TilesetEditor key={current.id} tilesetId={current.id} />}
+              {current?.kind === "sounds" && <SoundEditor key={current.id} soundId={current.id} />}
+              {current?.kind === "fonts" && <FontEditor key={current.id} fontId={current.id} />}
               {current?.kind === "settings" && <SettingsEditor />}
             </div>
           </main>

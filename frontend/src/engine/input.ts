@@ -1,4 +1,39 @@
-import { G, KEY_COUNT, KEY_NAMES, type KeyName } from "./layout";
+import { G, KEY_COUNT, KEY_NAMES, PAD_AXES, PAD_BUTTONS, PAD_COUNT, type KeyName } from "./layout";
+
+/** One gamepad as the page last saw it: which buttons are down, where the sticks are. */
+export interface PadState {
+  connected: boolean;
+  buttons: boolean[]; // PAD_BUTTONS order
+  axes: number[]; // PAD_AXES order, dead zone already applied
+}
+
+/** Below this a stick counts as centred: worn sticks never quite rest at 0. */
+export const DEAD_ZONE = 0.2;
+
+/**
+ * Reads the browser's gamepads into PadStates. Only "standard" mapping pads
+ * have buttons where PAD_BUTTONS says; others are read the same way, which
+ * is right for almost every pad sold for PCs.
+ */
+export function readPads(list: readonly (Gamepad | null)[]): PadState[] {
+  const out: PadState[] = [];
+  for (let p = 0; p < PAD_COUNT; p++) {
+    const g = list[p];
+    if (!g || !g.connected) {
+      out.push({ connected: false, buttons: PAD_BUTTONS.map(() => false), axes: PAD_AXES.map(() => 0) });
+      continue;
+    }
+    out.push({
+      connected: true,
+      buttons: PAD_BUTTONS.map((_, i) => !!g.buttons[i] && (g.buttons[i]!.pressed || g.buttons[i]!.value > 0.5)),
+      axes: PAD_AXES.map((_, i) => {
+        const v = g.axes[i] ?? 0;
+        return Math.abs(v) < DEAD_ZONE ? 0 : Math.max(-1, Math.min(1, v));
+      }),
+    });
+  }
+  return out;
+}
 
 /** KeyboardEvent.code → our key name. Physical keys, so WASD works on AZERTY. */
 const CODE_TO_KEY: Record<string, KeyName> = {
@@ -39,6 +74,8 @@ export interface InputSink {
   mouseUp(button: number): void;
   mouseMove(x: number, y: number): void;
   releaseAll(): void;
+  /** The gamepads, sent whenever they change. */
+  pads(state: PadState[]): void;
 }
 
 /**
@@ -61,6 +98,26 @@ export class InputState implements InputSink {
   /** Presses and releases this step, for the engine's instance mouse events. */
   readonly mouseEdges: { button: number; released: boolean }[] = [];
   private pendingEdges: { button: number; released: boolean }[] = [];
+  // Gamepads: what the page last said, and what the last step saw (for
+  // pressed/released). A tap between two steps is latched like a key's.
+  private padHeld = new Uint8Array(PAD_COUNT * PAD_BUTTONS.length);
+  private padPressed = new Uint8Array(PAD_COUNT * PAD_BUTTONS.length);
+  private padReleased = new Uint8Array(PAD_COUNT * PAD_BUTTONS.length);
+  private padAxes = new Float64Array(PAD_COUNT * PAD_AXES.length);
+  private padConnected = new Uint8Array(PAD_COUNT);
+
+  pads(state: PadState[]) {
+    state.slice(0, PAD_COUNT).forEach((p, pad) => {
+      this.padConnected[pad] = p.connected ? 1 : 0;
+      p.axes.forEach((v, i) => (this.padAxes[pad * PAD_AXES.length + i] = v));
+      p.buttons.forEach((down, i) => {
+        const at = pad * PAD_BUTTONS.length + i;
+        if (down && !this.padHeld[at]) this.padPressed[at] = 1;
+        if (!down && this.padHeld[at]) this.padReleased[at] = 1;
+        this.padHeld[at] = down ? 1 : 0;
+      });
+    });
+  }
 
   mouseMove(x: number, y: number) {
     this.mouseX = x;
@@ -81,6 +138,7 @@ export class InputState implements InputSink {
   releaseAll() {
     for (let i = 0; i < KEY_COUNT; i++) if (this.held[i]) this.keyUp(i);
     for (let b = 0; b < 3; b++) if (this.mouseHeld[b]) this.mouseUp(b);
+    // Not the gamepads: they keep working without focus (the page polls them).
   }
 
   mouseDown(button: number) {
@@ -130,6 +188,16 @@ export class InputState implements InputSink {
     this.mouseEdges.length = 0;
     this.mouseEdges.push(...this.pendingEdges);
     this.pendingEdges.length = 0;
+
+    for (let i = 0; i < this.padHeld.length; i++) {
+      g[G.PAD_DOWN + i] = this.padHeld[i]!;
+      g[G.PAD_PRESSED + i] = this.padPressed[i]!;
+      g[G.PAD_RELEASED + i] = this.padReleased[i]!;
+    }
+    this.padPressed.fill(0);
+    this.padReleased.fill(0);
+    for (let i = 0; i < this.padAxes.length; i++) g[G.PAD_AXIS + i] = this.padAxes[i]!;
+    for (let p = 0; p < PAD_COUNT; p++) g[G.PAD_CONNECTED + p] = this.padConnected[p]!;
   }
 }
 

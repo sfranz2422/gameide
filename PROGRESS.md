@@ -1,6 +1,74 @@
 # Progress
 
-## Phase 8 — Event sheets ✅ (2026-10-26, waiting for review)
+## Phase 9a — Sounds, gamepads, save files, fonts ✅ (2026-10-26, waiting for review)
+
+Phase 9 is in three parts, as agreed:
+- **9a** (this): sounds, gamepads, save files and custom fonts.
+- **9b:** HTML5 export and publishing, with the approval queue.
+- **9c:** the Steam-ready desktop export.
+
+### Done
+
+- **A Sounds folder.**
+  - Add a sound, then choose an MP3, OGG or WAV file (up to 8 MB, so a few minutes of music fits), or one of six **starter sounds**: coin, jump, hit, explosion, powerup, laser. They're made in code the 8-bit way, so no audio files live in the repo.
+  - The sound editor plays it, shows its length and size, sets its volume, and has the Python to copy.
+  - In Python: `sound_play("coin")` (with `loop=True` and `volume=`), `sound_stop("coin")` or `sound_stop()` for every sound, `sound_playing("coin")`, `music_play("theme")` (one music at a time: it replaces any playing) and `music_stop()`.
+- **How sound works:** browsers give a worker no audio, so Python sends orders with each frame and the page plays them with Web Audio. Each sound is measured when the game starts, so `sound_playing` is worked out in Python from its length; nothing waits on the page. Stop, Restart and `game_restart()` silence everything.
+- **Gamepads, up to four:**
+  - `gamepad_check("a")`, `gamepad_check_pressed`, `gamepad_check_released` (buttons named as on an Xbox pad: a, b, x, y, lb, rb, lt, rt, select, start, ls, rs, up, down, left, right, home).
+  - `gamepad_axis("left_x")`, from -1 to 1, with a dead zone so a worn stick rests at 0.
+  - `gamepad_connected()`.
+  - The page polls the pads while the game runs. A press between two steps still counts as pressed for one step, as keys do.
+- **Save files:** `save_set("best", score)`, `save_get("best", 0)`, `save_delete`, `save_clear`.
+  - They keep numbers, text, True/False, lists and dicts between plays, in the player's browser.
+  - Values are copied in and out, so changing a list after saving it doesn't change the save. The limit is about 1 MB, and the error says so.
+  - **Game settings** shows what the game has saved here, and **Clear saved data** resets it, for testing "first time playing".
+- **A Fonts folder:** TTF, OTF, WOFF or WOFF2 files, previewed at four sizes with your own sample text. `draw_set_font("pixel", 24)` sets the font and size for `draw_text`; `draw_set_font()` goes back to the built-in font.
+- **Everywhere at once:** the new functions are in the catalog, so they're in autocomplete and the docs, the blocks palette (new **Sound** and **Saving** categories, with pickers for sounds, fonts, gamepad buttons and sticks), and the event sheet pickers.
+- **The templates use sound:** Collect the coins plays "coin"; the Platformer plays "jump", "coin" and "hit".
+- **The server** accepts sounds and fonts, judged by their first bytes like pictures, with an 8 MB limit for a sound and 2 MB for a picture or font. The page applies the same checks before saving, so a file it accepts is never refused later.
+
+The project format is now **version 8** (Sounds and Fonts folders). Older projects load unchanged.
+
+### Found along the way
+
+- **A font that failed to load was drawn in the browser's default font**, though its warning said "the built-in font". The renderer now uses a game font only if it really loaded, and the built-in font otherwise. The sabotage run found this: the font test passed even with fonts never loaded, because the fallback still looked different.
+- **The docs pane had its own list of categories**, so new functions would have quietly gone missing from it. The docs, the blocks palette and the sheet pickers are now each checked against one list in the catalog.
+
+### Tests
+
+```
+cd frontend
+npm test                      # Vitest: 190
+npm run e2e                   # Playwright: 54 editor tests + 7 account tests
+../backend/.venv/bin/python ../backend/tests/test_server.py   # 62 server checks
+python3 scripts/sabotage.py   # 276 deliberate bugs
+```
+
+New:
+- `src/python/media.test.ts`, in the real Pyodide:
+  - sound orders, `sound_playing` from length, music, and restart silencing;
+  - gamepad held/pressed/released, taps, sticks and pad numbers, and the dead zone;
+  - save values handed in, sent out only when changed, copied, refusing what JSON can't hold, and the 1 MB limit;
+  - fonts in text commands;
+  - starter sounds being real WAVs, file sniffing, and sounds and fonts in the built game and the project's assets.
+- `e2e/media.spec.ts`:
+  - a starter sound really starting through Web Audio;
+  - a fake file turned away;
+  - a pretend gamepad moving the player;
+  - save data surviving a reload, then cleared;
+  - a font file drawing differently from the built-in font (compared by screenshot, so a font that never reached the game would fail).
+- Server checks for WAV, MP3, OGG and OTF uploads, a 3 MB sound accepted where a 3 MB picture isn't, and non-media refused.
+
+### Known issues and gaps
+
+- **No sound editing** (trimming, effects). Choose a finished file, or a starter sound.
+- **Fonts aren't checked as fonts on the server** beyond their first bytes. A damaged font is skipped with a warning when the game starts and the text uses the built-in font.
+- Sounds are decoded when Play is pressed, so a game with many long sounds takes a moment longer to start. Decoded sounds are kept between plays.
+
+---
+
+## Phase 8 — Event sheets ✅ (2026-10-26, reviewed)
 
 As agreed: per-event sheets, explicit for-each instead of GDevelop's hidden picking, typed Python boxes, and sheets for creation code but not scripts.
 

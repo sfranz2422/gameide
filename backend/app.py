@@ -94,7 +94,9 @@ app.config.update(
     # carry the cookie, or sign-in silently fails.
     SESSION_COOKIE_SAMESITE="Lax",
     SESSION_COOKIE_SECURE=bool(os.environ.get("DATABASE_URL")),
-    MAX_CONTENT_LENGTH=gamestore.MAX_PROJECT_BYTES * 2,
+    # The largest body is a sound (projects are checked against their own,
+    # smaller limit in save_project); a little over, for the request's own bytes.
+    MAX_CONTENT_LENGTH=gamestore.MAX_SOUND_BYTES + 1_000_000,
 )
 
 
@@ -512,28 +514,29 @@ def delete_project(slug):
 
 @app.put("/api/projects/<slug>/assets/<asset_id>")
 def put_asset(slug, asset_id):
-    """The raw bytes of one picture. An asset never changes, so sending the
-    same id again (a retry after a dropped connection) is accepted, not an
-    error — but it can't replace different bytes already stored."""
+    """The raw bytes of one picture, sound or font. An asset never changes,
+    so sending the same id again (a retry after a dropped connection) is
+    accepted, not an error — but it can't replace different bytes already
+    stored. What a file is comes from its first bytes, never its name."""
     db = _db()
     try:
         user = _need_user(db)
         p = _own_project(db, user, slug)
         if not (1 <= len(asset_id) <= 32 and asset_id.isalnum()):
-            return err("That isn't a picture id.", 400)
+            return err("That isn't an asset id.", 400)
         data = request.get_data(cache=False)
-        if len(data) > gamestore.MAX_ASSET_BYTES:
-            return err(f"That picture is too big ({_mb(len(data))}; the limit is "
-                       f"{_mb(gamestore.MAX_ASSET_BYTES)}).", 413)
-        kind = gamestore.sniff_image(data)
+        kind, limit = gamestore.sniff_asset(data)
         if kind is None:
-            return err("That file isn't a PNG, JPEG, GIF or WebP picture.", 415)
+            return err("That file isn't a picture (PNG, JPEG, GIF, WebP), a sound (MP3, OGG, WAV) or a font (TTF, OTF, WOFF).", 415)
+        what = "sound" if kind.startswith("audio/") else "font" if kind.startswith("font/") else "picture"
+        if len(data) > limit:
+            return err(f"That {what} is too big ({_mb(len(data))}; the limit is {_mb(limit)}).", 413)
         existing = db.query(GameAsset).filter_by(project_id=p.id, asset_id=asset_id).first()
         if existing:
-            return jsonify(ok=True) if existing.data == data else err("That picture id is already used.", 409)
+            return jsonify(ok=True) if existing.data == data else err("That asset id is already used.", 409)
         used = db.query(func.coalesce(func.sum(GameAsset.size), 0)).filter_by(project_id=p.id).scalar()
         if used + len(data) > gamestore.MAX_PROJECT_ASSET_BYTES:
-            return err(f"This game's pictures add up to more than {_mb(gamestore.MAX_PROJECT_ASSET_BYTES)}.", 413)
+            return err(f"This game's pictures, sounds and fonts add up to more than {_mb(gamestore.MAX_PROJECT_ASSET_BYTES)}.", 413)
         if _user_bytes(db, user.id) + len(data) > gamestore.MAX_USER_BYTES:
             return err(f"Your account is full ({_mb(gamestore.MAX_USER_BYTES)}).", 413)
         db.add(GameAsset(project_id=p.id, asset_id=asset_id, content_type=kind, data=data, size=len(data)))
@@ -551,7 +554,7 @@ def get_asset(slug, asset_id):
         p = _own_project(db, user, slug)
         a = db.query(GameAsset).filter_by(project_id=p.id, asset_id=asset_id).first()
         if a is None:
-            return err("That picture isn't here.", 404)
+            return err("That asset isn't here.", 404)
         r = Response(a.data, mimetype=a.content_type)
         # Private: it is the student's. Immutable: an asset id never changes.
         r.headers["Cache-Control"] = "private, max-age=31536000, immutable"

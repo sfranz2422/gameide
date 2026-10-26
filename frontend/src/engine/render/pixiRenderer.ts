@@ -64,6 +64,8 @@ class DrawLayer {
     private readonly into: Container,
     private readonly frames: Texture[][],
     private readonly anchors: { x: number; y: number }[],
+    /** The game's fonts that really loaded (gameWorker.loadFonts), by their place in the list. */
+    private readonly fonts: ReadonlySet<number>,
   ) {}
 
   private graphicsAt(depth: number): Graphics {
@@ -92,7 +94,7 @@ class DrawLayer {
           break;
         }
         case "text": {
-          const [, depth, x, y, text, color] = cmd;
+          const [, depth, x, y, text, color, font = -1, size = 16] = cmd;
           let t = this.texts[ti];
           if (!t) {
             t = new Text({ text: "", style: { fill: 0xffffff, fontFamily: "monospace", fontSize: 16 } });
@@ -100,6 +102,14 @@ class DrawLayer {
             this.into.addChild(t);
           }
           ti++;
+          // A game's own font (draw_set_font) is loaded in the worker as
+          // "gameide-font-<n>" (gameWorker.loadFonts); -1 is the built-in one.
+          // One that didn't load is drawn in the built-in font, as its
+          // warning says — asking for the missing family would get the
+          // browser's default instead, a third font nobody chose.
+          const family = this.fonts.has(font) ? `gameide-font-${font}` : "monospace";
+          if (t.style.fontFamily !== family) t.style.fontFamily = family;
+          if (t.style.fontSize !== size) t.style.fontSize = size;
           if (t.text !== text) t.text = text;
           if (t.style.fill !== color) t.style.fill = color;
           t.position.set(x, y);
@@ -206,6 +216,7 @@ export class PixiRenderer {
     private readonly def: GameDefinition,
     private readonly engine: Engine,
     frames: Texture[][],
+    fonts: ReadonlySet<number>,
   ) {
     this.frames = frames;
     this.anchors = def.sprites.map((s) => ({
@@ -213,8 +224,8 @@ export class PixiRenderer {
       y: s.height ? s.originY / s.height : 0,
     }));
     for (const t of def.tilesets ?? []) this.tileTextures.set(t.name, cutTiles(t));
-    this.worldDraw = new DrawLayer(this.world, this.frames, this.anchors);
-    this.guiDraw = new DrawLayer(this.gui, this.frames, this.anchors);
+    this.worldDraw = new DrawLayer(this.world, this.frames, this.anchors, fonts);
+    this.guiDraw = new DrawLayer(this.gui, this.frames, this.anchors, fonts);
     app.stage.addChild(this.world, this.gui, this.overlay);
     this.overlay.addChild(this.debugLabel);
     this.world.addChild(this.masks);
@@ -227,7 +238,7 @@ export class PixiRenderer {
    * game's worker (pixi's WebWorkerAdapter must be set first, see
    * gameWorker.ts); a plain canvas works too.
    */
-  static async create(canvas: OffscreenCanvas | HTMLCanvasElement, def: GameDefinition, engine: Engine): Promise<PixiRenderer> {
+  static async create(canvas: OffscreenCanvas | HTMLCanvasElement, def: GameDefinition, engine: Engine, fonts: ReadonlySet<number> = new Set()): Promise<PixiRenderer> {
     const frames = await Promise.all(def.sprites.map(loadFrames));
     const app = new Application();
     await app.init({
@@ -239,7 +250,7 @@ export class PixiRenderer {
       autoStart: false, // the game loop decides when to draw, not Pixi's ticker
       preference: "webgl",
     });
-    return new PixiRenderer(app, def, engine, frames);
+    return new PixiRenderer(app, def, engine, frames, fonts);
   }
 
   /** The game window changed size (a new room, or its view); the page fits the canvas to it. */

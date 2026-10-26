@@ -9,6 +9,7 @@ import { GameLoop } from "../engine/loop";
 import { PixiRenderer } from "../engine/render/pixiRenderer";
 import { getPyodide, PythonGame } from "./bridge";
 import { prepareSprites } from "./spritePrep";
+import type { GameDefinition } from "../engine/game";
 import type { FromWorker, InputMessage, ToWorker } from "./protocol";
 
 // Pixi looks for `document` unless told it is in a worker.
@@ -74,6 +75,39 @@ function stop(state: "stopped" | "crashed" = "stopped") {
   post({ type: "state", state });
 }
 
+/**
+ * The game's fonts, added to the worker's own font list (workers have one,
+ * separate from the page's) under names the renderer asks for:
+ * "gameide-font-0", "gameide-font-1"… in the order draw_set_font counts them.
+ * A file that isn't a font is skipped with a warning: the text falls back to
+ * the built-in font rather than the game failing to start. Returns the
+ * places of the fonts that loaded, for the renderer.
+ */
+const loadedFonts = new Map<Blob, FontFace>();
+async function loadFonts(def: GameDefinition): Promise<Set<number>> {
+  const loaded = new Set<number>();
+  const fonts = (self as unknown as { fonts: FontFaceSet }).fonts;
+  for (const [i, f] of (def.fonts ?? []).entries()) {
+    if (!f.font) continue;
+    const family = `gameide-font-${i}`;
+    try {
+      // Kept between plays; made again only if the font moved in the list
+      // (a face keeps the family it was made with).
+      let face = loadedFonts.get(f.font);
+      if (!face || face.family !== family) {
+        face = new FontFace(family, await f.font.arrayBuffer());
+        await face.load();
+        loadedFonts.set(f.font, face);
+      }
+      fonts.add(face);
+      loaded.add(i);
+    } catch {
+      emit(`The font ${f.name} couldn't be read, so its text uses the built-in font.\n`, "warn");
+    }
+  }
+  return loaded;
+}
+
 async function play(msg: Extract<ToWorker, { type: "play" }>) {
   stop();
   const mine = run;
@@ -81,11 +115,14 @@ async function play(msg: Extract<ToWorker, { type: "play" }>) {
   // An interrupt left over from a previous run must not hit this one.
   if (interrupt) interrupt[0] = 0;
   await prepareSprites(msg.def);
+  const fonts = await loadFonts(msg.def);
   if (mine !== run) return;
   const { game: g, error } = await PythonGame.load(msg.def, {
     stdout: (t) => emit(t, "out"),
     stderr: (t) => emit(t, "err"),
     warning: (t) => emit(t, "warn"),
+    sounds: (orders) => post({ type: "sounds", orders }),
+    save: (data) => post({ type: "save", data }),
   });
   if (mine !== run) return g.dispose();
   game = g;
@@ -94,7 +131,7 @@ async function play(msg: Extract<ToWorker, { type: "play" }>) {
     post({ type: "error", error });
     return stop("crashed");
   }
-  const r = await PixiRenderer.create(msg.canvas, msg.def, g.engine);
+  const r = await PixiRenderer.create(msg.canvas, msg.def, g.engine, fonts);
   if (mine !== run) return r.destroy();
   renderer = r;
   r.showDebug = debug;
@@ -137,6 +174,7 @@ function input(events: InputMessage[]) {
     else if (e.k === "mdown") inp.mouseDown(e.button);
     else if (e.k === "mup") inp.mouseUp(e.button);
     else if (e.k === "move") inp.mouseMove(e.x, e.y);
+    else if (e.k === "pads") inp.pads(e.pads);
     else inp.releaseAll();
   }
 }

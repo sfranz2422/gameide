@@ -71,7 +71,7 @@ export function hasBlocks(state: BlocksState | undefined): boolean {
 }
 
 /** Pickers whose NAME field holds a project name. */
-export const NAME_FIELD_BLOCKS = ["gm_object", "gm_object_any", "gm_sprite", "gm_room", "gm_layer", "gm_layer_any"];
+export const NAME_FIELD_BLOCKS = ["gm_object", "gm_object_any", "gm_sprite", "gm_room", "gm_layer", "gm_layer_any", "gm_sound", "gm_sound_any", "gm_font"];
 
 /**
  * Renaming a resource changes it in blocks too, matching what

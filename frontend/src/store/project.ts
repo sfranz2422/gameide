@@ -20,7 +20,7 @@ import { renameInSheet, type Sheet } from "../eventsheets/sheet";
 import { KEY_NAMES, MOUSE_BUTTONS, type KeyName } from "../engine/layout";
 
 /** Bump when the format changes, and teach `migrate` the old shape. */
-export const SCHEMA_VERSION = 7; // 2: room layers, grid, camera, instance overrides. 3: tilesets and tile layers. 4: autotile sets. 5: blocks in events. 6: blocks in scripts and creation code. 7: event sheets
+export const SCHEMA_VERSION = 8; // 2: room layers, grid, camera, instance overrides. 3: tilesets and tile layers. 4: autotile sets. 5: blocks in events. 6: blocks in scripts and creation code. 7: event sheets. 8: sounds and fonts
 
 export interface Project {
   format: "gameide-project";
@@ -37,6 +37,27 @@ export interface Project {
   rooms: RoomResource[];
   /** Shared Python, run before any object's code, in this order. */
   scripts: ScriptResource[];
+  /** For sound_play and music_play. */
+  sounds: SoundResource[];
+  /** For draw_set_font. */
+  fonts: FontResource[];
+}
+
+/** A sound from the Sounds folder: an MP3, OGG or WAV file, and how loud it plays. */
+export interface SoundResource {
+  id: string;
+  name: string;
+  /** Asset id of the file; null until one is chosen. */
+  asset: string | null;
+  /** 0–1, multiplied with the volume sound_play is given. */
+  volume: number;
+}
+
+/** A font from the Fonts folder: a TTF, OTF or WOFF file. */
+export interface FontResource {
+  id: string;
+  name: string;
+  asset: string | null;
 }
 
 export interface ProjectSettings {
@@ -253,8 +274,24 @@ export interface ScriptResource {
   blocks?: BlocksState;
 }
 
-export type ResourceKind = "sprites" | "tilesets" | "objects" | "rooms" | "scripts";
-export type Resource = SpriteResource | TilesetResource | ObjectResource | RoomResource | ScriptResource;
+export type ResourceKind = "sprites" | "tilesets" | "objects" | "rooms" | "scripts" | "sounds" | "fonts";
+export type Resource = SpriteResource | TilesetResource | ObjectResource | RoomResource | ScriptResource | SoundResource | FontResource;
+
+/**
+ * Every asset a project uses: sprite frames, tileset pictures, sound and
+ * font files. The one list saving, loading and the zip export all go by — a
+ * kind of asset missing here would be quietly left behind by all three.
+ */
+export function assetIds(project: Project): string[] {
+  return [
+    ...new Set([
+      ...project.sprites.flatMap((s) => s.frames),
+      ...project.tilesets.flatMap((t) => (t.image ? [t.image] : [])),
+      ...(project.sounds ?? []).flatMap((s) => (s.asset ? [s.asset] : [])),
+      ...(project.fonts ?? []).flatMap((f) => (f.asset ? [f.asset] : [])),
+    ]),
+  ];
+}
 
 // ---------------------------------------------------------------- ids
 
@@ -283,7 +320,17 @@ export function blankProject(name: string): Project {
     objects: [],
     rooms: [newRoom("Room1")],
     scripts: [],
+    sounds: [],
+    fonts: [],
   };
+}
+
+export function newSound(name: string): SoundResource {
+  return { id: newId(), name, asset: null, volume: 1 };
+}
+
+export function newFont(name: string): FontResource {
+  return { id: newId(), name, asset: null };
 }
 
 export function newObject(name: string): ObjectResource {
@@ -617,6 +664,12 @@ export function migrate(data: unknown): Project {
   // 6 → 7: events and creation code may be sheets. Everything older is
   // Python, as it says (a missing mode means Python).
   if (p.schemaVersion < 7) p.schemaVersion = 7;
+  // 7 → 8: the Sounds and Fonts folders arrived; older projects have none.
+  if (p.schemaVersion < 8) {
+    p.sounds ??= [];
+    p.fonts ??= [];
+    p.schemaVersion = 8;
+  }
   return p as Project;
 }
 

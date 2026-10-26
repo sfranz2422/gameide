@@ -168,6 +168,28 @@ testing.
 - `codeMode.tsx` holds the rules for all three modes (`canUse`, `switchTo`,
   `confirmToPython`).
 
+## Sounds, gamepads, save files, fonts
+
+- **Sound plays on the page** (`editor/sound.ts`), never in the worker (no
+  audio there). Python appends orders to `_sound_orders`; they leave with
+  the frame's commands and reach `GameHost` as a "sounds" message. The host
+  decodes every sound before the game starts and hands Python names and
+  lengths only; `sound_playing` is computed in Python from those.
+- **Gamepads** live in `G` (PAD_* in layout.ts, read by Python by those
+  indices). `GameHost` polls `navigator.getGamepads()` every animation
+  frame while running and sends a "pads" input when they change; InputState
+  latches pressed/released like keys.
+- **Save data** is localStorage `gameide-save:<id>` — the project id in the
+  editor; a published game's own id later. Handed in as `def.save`, sent
+  out whole as "save" when it changes.
+- **Fonts** load in the worker (`gameWorker.loadFonts`) as
+  `gameide-font-<index>`; text commands carry the font index and size.
+- Uploads: `store/assetTypes.ts` and `gamestore.sniff_asset` must agree
+  (bytes, not names; per-kind limits). `assetIds()` is the one list of a
+  project's files — save, load and zip all use it.
+- Every catalog category must be in `CATEGORIES` (docs), the blocks
+  toolbox and `PICKER_ORDER` (sheets); catalog.test.ts checks.
+
 ## Projects and code generation
 
 - The project is plain JSON (`store/project.ts`), resources linked by id.

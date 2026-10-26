@@ -22,7 +22,8 @@
  */
 import type { PythonGameError } from "../engine/engine";
 import type { GameDefinition } from "../engine/game";
-import { attachInput, type InputSink } from "../engine/input";
+import { attachInput, readPads, type InputSink } from "../engine/input";
+import { SoundPlayer } from "./sound";
 import type { FromWorker, GameState, InputMessage, ToWorker, WorkerStats } from "../python/protocol";
 
 export const HANG_MS = 2000;
@@ -37,7 +38,25 @@ export interface HostEvents {
   ready: (ready: boolean) => void;
 }
 
+/** Where a game keeps what it saves (save_set), in this browser. */
+export const saveKey = (gameId: string) => `gameide-save:${gameId}`;
+
+export function readSave(gameId: string): Record<string, unknown> {
+  try {
+    const raw = localStorage.getItem(saveKey(gameId));
+    const data = raw ? (JSON.parse(raw) as unknown) : null;
+    return data && typeof data === "object" && !Array.isArray(data) ? (data as Record<string, unknown>) : {};
+  } catch {
+    return {}; // storage blocked (a private window) or not JSON: start fresh
+  }
+}
+
 export class GameHost {
+  /** Plays the game's sounds: the worker can't. */
+  readonly sound = new SoundPlayer();
+  private saveId: string | null = null;
+  private padTimer = 0;
+  private lastPads = "";
   private worker!: Worker;
   private readyPromise!: Promise<void>;
   private interrupt: Int32Array | null = null;
@@ -109,6 +128,30 @@ export class GameHost {
   private setState(s: GameState) {
     this.state = s;
     this.events.state(s);
+    if (s === "running") this.pollPads();
+    else {
+      cancelAnimationFrame(this.padTimer);
+      if (s !== "loading") this.sound.stopAll();
+    }
+  }
+
+  /**
+   * Gamepads can't be listened to, only asked about, so while a game runs
+   * they are read every animation frame and sent on when something changed.
+   */
+  private pollPads() {
+    cancelAnimationFrame(this.padTimer);
+    const tick = () => {
+      const pads = readPads(navigator.getGamepads?.() ?? []);
+      const key = JSON.stringify(pads);
+      if (key !== this.lastPads) {
+        this.lastPads = key;
+        this.send({ type: "input", events: [{ k: "pads", pads }] });
+      }
+      this.padTimer = requestAnimationFrame(tick);
+    };
+    this.lastPads = "";
+    this.padTimer = requestAnimationFrame(tick);
   }
 
   private receive(m: FromWorker) {
@@ -143,6 +186,17 @@ export class GameHost {
       case "fatal":
         this.events.output([{ text: `The game engine failed: ${m.message}`, kind: "err" }]);
         this.setState("crashed");
+        break;
+      case "sounds":
+        this.sound.run(m.orders);
+        break;
+      case "save":
+        if (this.saveId)
+          try {
+            localStorage.setItem(saveKey(this.saveId), JSON.stringify(m.data));
+          } catch {
+            this.events.output([{ text: "This browser wouldn't keep the game's save data (it may be full, or in a private window).", kind: "warn" }]);
+          }
         break;
     }
   }
@@ -188,8 +242,17 @@ export class GameHost {
    * Runs a game in `container`. Each run gets a new canvas: a canvas can only
    * be handed to a worker once.
    */
-  async play(def: GameDefinition) {
+  /**
+   * `gameId` names where the game's save data lives (save_set): the
+   * project's id in the editor, the published game's on its play page.
+   */
+  async play(def: GameDefinition, gameId: string | null = null) {
     this.setState("loading");
+    this.sound.stopAll();
+    this.saveId = gameId;
+    const warn = (text: string) => this.events.output([{ text, kind: "warn" }]);
+    // The worker gets the sounds' names and lengths, not their files.
+    def = { ...def, sounds: await this.sound.prepare(def.sounds ?? [], warn), save: gameId ? readSave(gameId) : {} };
     this.lastBeat = performance.now();
     await this.readyPromise;
     this.lastBeat = performance.now();
@@ -264,6 +327,8 @@ export class GameHost {
     // than making the student wait for the watchdog.
     if (performance.now() - this.lastBeat > 500 && this.interrupt) this.interrupt[0] = 2;
     this.send({ type: "stop" });
+    this.sound.stopAll();
+    cancelAnimationFrame(this.padTimer);
     this.detachInput?.();
     this.detachInput = null;
     this.canvas?.remove();
@@ -316,6 +381,7 @@ export class GameHost {
       mouseUp: (button) => push({ k: "mup", button }),
       mouseMove: (x, y) => push({ k: "move", x, y }),
       releaseAll: () => push({ k: "blur" }),
+      pads: (pads) => push({ k: "pads", pads }),
     };
   }
 

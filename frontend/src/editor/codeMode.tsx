@@ -82,6 +82,8 @@ export function projectNames(p: Project): ProjectNames {
     sprites: p.sprites.map((s) => s.name),
     rooms: p.rooms.map((r) => r.name),
     layers: [...new Set(p.rooms.flatMap((r) => r.layers.filter((l) => l.kind === "tiles").map((l) => l.name)))],
+    sounds: (p.sounds ?? []).map((s) => s.name),
+    fonts: (p.fonts ?? []).map((f) => f.name),
   };
 }
 

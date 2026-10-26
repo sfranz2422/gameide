@@ -106,8 +106,23 @@ export const G = {
   VIEW_Y: 17,
   VIEW_W: 18,
   VIEW_H: 19,
+  // Gamepads (input.ts fills these each step): PAD_COUNT pads, each with
+  // PAD_AXES.length axes and PAD_BUTTONS.length buttons held/pressed/released.
+  PAD_CONNECTED: 20, // 20–23
+  PAD_AXIS: 24, // 24–39
+  PAD_DOWN: 40, // 40–107
+  PAD_PRESSED: 108, // 108–175
+  PAD_RELEASED: 176, // 176–243
 } as const;
-export const G_SIZE = 20;
+export const G_SIZE = 244;
+
+/**
+ * Gamepad buttons Python can name, in the order of the browser's "standard"
+ * mapping (Xbox names; a PlayStation pad's cross is "a", circle "b"…).
+ */
+export const PAD_BUTTONS = ["a", "b", "x", "y", "lb", "rb", "lt", "rt", "select", "start", "ls", "rs", "up", "down", "left", "right", "home"] as const;
+export const PAD_AXES = ["left_x", "left_y", "right_x", "right_y"] as const;
+export const PAD_COUNT = 4;
 
 /**
  * Keys Python can name, in order; a key's code is its index. Names follow
@@ -153,6 +168,9 @@ export function layoutForPython() {
     EVENTS_HEADER,
     G,
     G_SIZE,
+    PAD_BUTTONS: [...PAD_BUTTONS],
+    PAD_AXES: [...PAD_AXES],
+    PAD_COUNT,
     HANDLES,
     KEY_NAMES: [...KEY_NAMES],
     MOUSE_BUTTONS: [...MOUSE_BUTTONS],

@@ -23,7 +23,7 @@
  * the frame still crosses the bridge only once from the JavaScript side.
  */
 import { EV, EVENTS_HEADER, F, G, HANDLES, STRIDE } from "./layout";
-import type { GameDefinition } from "./game";
+import type { GameDefinition, SoundOrder } from "./game";
 import { InputState } from "./input";
 import { SpatialHash } from "./spatialHash";
 import { boxOf, containsPoint, maskOverlapsBox, masksOverlap, overlaps, spriteInfo, type Box, type SpriteInfo } from "./sprites";
@@ -65,6 +65,10 @@ export interface FrameCommands {
   room?: number;
   error?: PythonGameError;
   warnings?: string[];
+  /** Sounds to play or stop (the page does it: workers have no audio). */
+  sounds?: SoundOrder[];
+  /** The game's whole save data, when it changed this frame. */
+  save?: Record<string, unknown>;
 }
 
 /**
@@ -73,7 +77,7 @@ export interface FrameCommands {
  * event made it), so the renderer can put it in the right layer.
  */
 export type DrawCommand =
-  | ["text", number, number, number, string, number] // depth, x, y, text, color
+  | ["text", number, number, number, string, number, number, number] // depth, x, y, text, color, font (-1 built-in), size
   | ["rect", number, number, number, number, number, number, number] // depth, x1, y1, x2, y2, color, outline
   | ["sprite", number, number, number, number, number]; // depth, sprite, frame, x, y
 

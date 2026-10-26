@@ -162,4 +162,37 @@ export interface GameDefinition {
   stepsPerSecond?: number;
   /** Shared functions every object can call (the Scripts folder). */
   scripts?: Record<string, string>;
+  /**
+   * The Sounds folder. Python needs only the names and how long each one is
+   * (to answer sound_playing); the page plays them, so the host takes the
+   * files out before the definition goes to the game's worker.
+   */
+  sounds?: SoundDef[];
+  /** The Fonts folder, for draw_set_font: loaded in the worker, where the game draws. */
+  fonts?: FontDef[];
+  /** What the game saved last time it was played here (save_set), handed back as it starts. */
+  save?: Record<string, unknown>;
 }
+
+export interface SoundDef {
+  name: string;
+  /** In seconds. Measured by the host before the game starts. */
+  duration?: number;
+  /** The sound's own volume, 0–1, multiplied with the one sound_play is given. */
+  volume?: number;
+  /** The file. Only on the page: never sent to the worker. */
+  sound?: Blob;
+}
+
+export interface FontDef {
+  name: string;
+  font?: Blob;
+}
+
+/** What Python asks the page to do with sounds: ["play", name, loop, volume], ["stop", name]… */
+export type SoundOrder =
+  | ["play", string, number, number]
+  | ["stop", string]
+  | ["stop_all"]
+  | ["music", string, number, number]
+  | ["music_stop"];

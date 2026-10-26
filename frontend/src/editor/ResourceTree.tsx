@@ -12,7 +12,9 @@ import {
   newId,
   newObject,
   newRoom,
+  newFont,
   newScript,
+  newSound,
   newTileset,
   quotedUses,
   replaceQuoted,
@@ -35,12 +37,12 @@ const FOLDERS: { kind: ResourceKind; label: string; icon: () => React.ReactNode;
   { kind: "objects", label: "Objects", icon: Icon.object, base: "Object" },
   { kind: "rooms", label: "Rooms", icon: Icon.room, base: "Room" },
   { kind: "scripts", label: "Scripts", icon: Icon.script, base: "script" },
+  { kind: "sounds", label: "Sounds", icon: Icon.sound, base: "sound" },
+  { kind: "fonts", label: "Fonts", icon: Icon.font, base: "font" },
 ];
 
 // Shown so students can see what is coming, and greyed out until then.
-const LATER: { label: string; icon: () => React.ReactNode; phase: string }[] = [
-  { label: "Sounds", icon: Icon.sound, phase: "Sounds arrive with audio support." },
-];
+const LATER: { label: string; icon: () => React.ReactNode; phase: string }[] = [];
 
 /** A copy with fresh ids throughout, named "<name>_copy", "<name>_copy2", ... */
 function duplicate(project: Project, kind: ResourceKind, r: Resource): Resource {
@@ -81,7 +83,13 @@ export function ResourceTree({
   const create = (kind: ResourceKind) => {
     if (kind === "sprites") return addSprite();
     const name = freeName(project, kind, FOLDERS.find((f) => f.kind === kind)!.base);
-    const r = kind === "objects" ? newObject(name) : kind === "rooms" ? newRoom(name) : kind === "tilesets" ? newTileset(name) : newScript(name);
+    const r =
+      kind === "objects" ? newObject(name)
+      : kind === "rooms" ? newRoom(name)
+      : kind === "tilesets" ? newTileset(name)
+      : kind === "sounds" ? newSound(name)
+      : kind === "fonts" ? newFont(name)
+      : newScript(name);
     mutate((p) => void (p[kind] as Resource[]).push(r), { label: `add ${name}` });
     open({ kind, id: r.id });
     setRenaming(r.id);
@@ -181,7 +189,7 @@ export function ResourceTree({
                         done={(name) => {
                           setRenaming(null);
                           if (name === null || name === r.name) return;
-                          const uses = f.kind === "objects" || f.kind === "sprites" || f.kind === "rooms" ? quotedUses(project, r.name) : [];
+                          const uses = ["objects", "sprites", "rooms", "sounds", "fonts"].includes(f.kind) ? quotedUses(project, r.name) : [];
                           const total = uses.reduce((n, u) => n + u.count, 0);
                           const alsoCode =
                             total > 0 &&
