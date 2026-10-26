@@ -9,6 +9,7 @@ self.options = ["New game"] + (["Continue"] if self.saved is not None else [])
 self.choice = len(self.options) - 1
 self.started = False
 music_play("music_forest")
+touch_controls(True, ["space"])     # on a touchscreen: a button to start
 
 # === step
 self.t += 1

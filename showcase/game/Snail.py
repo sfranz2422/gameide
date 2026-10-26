@@ -27,7 +27,7 @@ else:
     if ledge_ahead(self, self.facing, 12):
         self.facing = -self.facing
     self.move_and_collide(self.facing * 0.35, 0)
-fall(self, half_width=8)
+fall(self)
 self.image_xscale = -self.facing      # the picture faces left
 
 # === collision Slash

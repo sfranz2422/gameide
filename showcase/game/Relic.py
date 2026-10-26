@@ -1,10 +1,12 @@
 # object: Relic
 # sprite: relic
 # parent: Pickup
-# The Feather of the Wind: a second jump, in the air.
+# Each level's gift: a new way to move (ABILITIES in config). Which one is
+# set by the level (its creation code: self.ability = "dash").
 
 # === create
 super().on_create()
+self.ability = "double_jump"
 self.glow = "#9be7ff"
 
 # === step
@@ -13,11 +15,12 @@ if random.random() < 0.15:
     particles(self.x + random.uniform(-6, 6), self.y - 6, count=1, color="#bff6ff", speed=0.4, size=2, life=40, direction=90, spread=30)
 
 # === collision Player
-global_vars.abilities.add("double_jump")
+global_vars.abilities.add(self.ability)
 mark_done(self)
 sound_play("power")
 screen_flash("white", 12)
 effect("confetti", self.x, self.y - 10)
-show_message("The Feather of the Wind: press jump again in the air.", 300)
+name, how = ABILITIES[self.ability]
+show_message(f"{name}: {how}", 300)
 save_progress()
 self.destroy()

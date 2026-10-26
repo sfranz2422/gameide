@@ -15,16 +15,25 @@ JUMP_BUFFER = 7        # steps before landing that a jump press is remembered
 HURT_TIME = 75         # steps of flashing after being hit, when nothing can hurt you
 KNOCKBACK = 2.6
 
+# The dash (the Deep Cave's relic): a burst sideways, once in the air, gravity off
+DASH_SPEED = 6.0
+DASH_STEPS = 14          # 84 px: the Deep Cave's pool is 64, so a dash from a step back still makes it
+DASH_COOLDOWN = 24
+
 # The sword
 SWING_STEPS = 14       # one swing, start to finish
 SLASH_FROM, SLASH_TO = 3, 9   # the steps of a swing that can hit
 SLASH_REACH = 22       # how far in front of the hero the blade reaches
 
-# Tiles of the plank layer that can be stood on (one-way platforms)
-PLANK_TILES = (155, 156, 157)
-
 # Animation lengths, for holding the last frame of a jump or a fall
-FRAMES = {"hero_jump": 5, "hero_fall": 5, "hero_dead": 8}
+FRAMES = {"hero_jump": 5, "hero_fall": 5, "hero_dead": 8, "shellmaw_hide": 8, "shellmaw_dead": 8}
 
 # The levels, in order: (room, the name shown as it starts, its music)
-LEVELS = [("Thornwood", "The Thornwood", "music_forest")]
+LEVELS = [("Thornwood", "The Thornwood", "music_forest"),
+          ("DeepCave", "The Deep Cave", "music_cave")]
+
+# What each relic gives, and what it says when found
+ABILITIES = {
+    "double_jump": ("The Feather of the Wind", "press jump again in the air."),
+    "dash": ("The Boots of the Gale", "press C (or Shift) to dash, once in the air too."),
+}

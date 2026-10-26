@@ -15,7 +15,7 @@ if is_done(self):
 
 # === step
 if self.dropped:
-    fall(self, half_width=4)
+    fall(self)
 else:
     self.t += 0.07
     self.y = self.base_y + math.sin(self.t) * 2

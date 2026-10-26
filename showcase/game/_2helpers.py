@@ -56,6 +56,11 @@ def jump_held():
             or keyboard_check("w") or gamepad_check("a"))
 
 
+def dash_pressed():
+    return (keyboard_check_pressed("c") or keyboard_check_pressed("shift") or keyboard_check_pressed("l")
+            or gamepad_check_pressed("rb") or gamepad_check_pressed("y"))
+
+
 def attack_pressed():
     return (keyboard_check_pressed("x") or keyboard_check_pressed("j") or keyboard_check_pressed("k")
             or gamepad_check_pressed("x") or gamepad_check_pressed("b") or mouse_check_pressed("left"))
@@ -66,36 +71,14 @@ def confirm_pressed():
             or gamepad_check_pressed("a") or gamepad_check_pressed("start"))
 
 
-# ---------------------------------------------------------------- planks
-# Planks are a tile layer that is NOT solid, so they are platforms you can
-# jump up through. Things land on them by asking, as they fall, whether
-# their feet are about to pass the top of a plank.
+# ---------------------------------------------------------------- walking
+# Planks are one-way tiles (the tileset marks them): the engine lets things
+# jump up through them and stand on them, and drop through while their
+# drop_through counts down. So falling is just gravity and move_and_collide.
 
-def plank_below(inst, dy, half_width=5):
-    """The y of a plank top that inst's feet would reach falling by dy, or None."""
-    if dy <= 0:
-        return None
-    top = int((inst.y + dy) // 16) * 16
-    if not (inst.y <= top <= inst.y + dy):
-        return None
-    for x in (inst.x - half_width, inst.x + half_width):
-        if tile_at(x, top + 1, "Planks") in PLANK_TILES:
-            return top
-    return None
-
-
-def fall(inst, half_width=5, through_planks=False):
-    """
-    Gravity and the vertical move for anything that walks: lands on solid
-    ground and on planks. Returns True when it landed this step.
-    """
+def fall(inst):
+    """Gravity, and the move down: lands on the ground and on planks. True when it landed this step."""
     inst.vy = min(inst.vy + GRAVITY, MAX_FALL)
-    if not through_planks:
-        top = plank_below(inst, inst.vy, half_width)
-        if top is not None:
-            inst.y = top
-            inst.vy = 0
-            return True
     if inst.move_and_collide(0, inst.vy):
         landed = inst.vy > 0
         inst.vy = 0
@@ -103,17 +86,20 @@ def fall(inst, half_width=5, through_planks=False):
     return False
 
 
-def standing(inst, half_width=5):
-    """On solid ground, or on a plank."""
-    return not inst.place_free(inst.x, inst.y + 1) or plank_below(inst, 1, half_width) is not None
+def standing(inst):
+    """On something: the ground, or a plank."""
+    return not inst.place_free(inst.x, inst.y + 1)
+
+
+def on_plank(inst):
+    """Standing on a plank (which Down drops through), not the ground."""
+    return standing(inst) and tile_at(inst.x, inst.y + 1, "Planks") is not None
 
 
 def ledge_ahead(inst, facing, reach):
     """True at a wall, or at the edge of a drop: where a walking enemy turns round."""
     ahead = inst.x + facing * reach
-    if not inst.place_free(ahead, inst.y - 2):
-        return True
-    return inst.place_free(ahead, inst.y + 4) and tile_at(ahead, inst.y + 2, "Planks") not in PLANK_TILES
+    return not inst.place_free(ahead, inst.y - 2) or inst.place_free(ahead, inst.y + 4)
 
 
 # ---------------------------------------------------------------- the hero
@@ -216,6 +202,7 @@ def boss_defeated(boss):
     effect("confetti", boss.x, boss.y - 40, scale=2)
     sound_play("power")
     music_play(LEVELS[global_vars.level][2])
+    camera_zoom(1, 40)
     show_message(f"{boss.name} is beaten. A door has opened.", 240)
     save_progress()
 
@@ -262,10 +249,14 @@ def save_progress():
 
 
 # ---------------------------------------------------------------- text
-# The game's own pixel font: sprites "font1" and "font1_gold" (and "font2…"
-# at twice the size), one frame per character (FONT_CHARS, in the font
-# script), each with its shadow drawn in. draw_text would do, but a smooth
-# font at 8 pixels blurs; these stay as sharp as the art.
+# The game's own pixel font: the sprite "font", one frame per character
+# (FONT_CHARS, in the font script), white with its shadow drawn in.
+# draw_sprite_ext colours it (a tint: white becomes the colour, the dark
+# shadow stays dark) and sizes it. draw_text would do, but a smooth font at
+# 8 pixels blurs; this stays as sharp as the art.
+
+CREAM, GOLD = "#fff6d5", "#ffd166"
+
 
 def text_width(text, size=1):
     return len(str(text)) * 6 * size
@@ -273,11 +264,11 @@ def text_width(text, size=1):
 
 def draw_words(x, y, text, size=1, gold=False):
     """Draws text with its top-left at (x, y). Use inside a Draw or Draw GUI event."""
-    name = f"font{size}" + ("_gold" if gold else "")
+    color = GOLD if gold else CREAM
     for i, ch in enumerate(str(text)):
         n = FONT_INDEX.get(ch, -1)
         if n > 0:                  # 0 is a space; -1 a character the font doesn't have
-            draw_sprite(name, n, x + i * 6 * size, y)
+            draw_sprite_ext("font", n, x + i * 6 * size, y, size, size, 0, color)
 
 
 def draw_words_centered(cx, y, text, size=1, gold=False):

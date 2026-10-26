@@ -21,7 +21,7 @@ interface Played {
   out: string[];
 }
 
-async function start(room = "Thornwood"): Promise<Played> {
+async function start(room = "Thornwood", level = 0, abilities: string[] = []): Promise<Played> {
   const project = JSON.parse(readFileSync(BUILT, "utf8")) as Project;
   const { def } = buildGame(project, new Map());
   const warnings: string[] = [];
@@ -30,6 +30,7 @@ async function start(room = "Thornwood"): Promise<Played> {
   if (error) throw new Error(`${error.object} ${error.event} line ${error.line}: ${error.message}`);
   step(game, 2);
   game.evalPython(`new_game()`);
+  game.evalPython(`global_vars.level = ${level}; global_vars.abilities = set(${JSON.stringify(abilities)})`);
   game.evalPython(`room_goto(${JSON.stringify(room)})`);
   step(game, 2);
   return { game, warnings, out };
@@ -163,5 +164,101 @@ describe.skipIf(!have)("Tusk, the boss", () => {
     game.evalPython(`e = instances("Exit")[0]; p = player(); p.x, p.y = e.x, e.y`);
     step(game, 80);
     expect(py(game, `global_vars.level`)).toBe(1);
+    expect(py(game, `player() is not None and instances("Hud") != []`)).toBe(true); // in the Deep Cave
+  });
+});
+
+describe.skipIf(!have)("The Deep Cave", () => {
+  it("the dash crosses the pool under the low ceiling; walking off, the hero falls in", async () => {
+    const { game } = await start("DeepCave", 1, ["double_jump", "dash"]);
+    step(game, 5);
+    const edge = () => game.evalPython(`p = player(); p.x, p.y = 72 * 16 + 8, 37 * 16; p.vx = p.vy = 0; p.facing = 1; global_vars.hp = 5`);
+    edge();
+    step(game, 3);
+    down(game, "right");
+    step(game, 4);
+    down(game, "c");
+    step(game, 1);
+    up(game, "c");
+    step(game, 30);
+    up(game, "right");
+    expect(hero(game)[0]).toBeGreaterThan(77 * 16); // across
+    expect(py(game, "global_vars.hp")).toBe(5); // and dry
+    // Without the dash: into the water, and back out where it last stood, a life point poorer.
+    game.evalPython(`global_vars.abilities.discard("dash")`);
+    edge();
+    step(game, 3);
+    down(game, "right");
+    down(game, "space");
+    step(game, 60);
+    up(game, "right");
+    up(game, "space");
+    expect(py(game, "global_vars.hp")).toBe(4);
+  });
+
+  it("Esc pauses the game: the hero can't move, and Esc again lets him", async () => {
+    const { game } = await start("DeepCave", 1, ["double_jump"]);
+    step(game, 10);
+    down(game, "escape");
+    step(game, 1);
+    up(game, "escape");
+    expect(py(game, "game_paused()")).toBe(true);
+    const [x] = hero(game);
+    down(game, "right");
+    step(game, 30);
+    expect(hero(game)[0]).toBe(x);
+    up(game, "right");
+    down(game, "escape");
+    step(game, 1);
+    up(game, "escape");
+    down(game, "right");
+    step(game, 30);
+    up(game, "right");
+    expect(hero(game)[0]).toBeGreaterThan(x + 20);
+  });
+
+  it("Shellmaw can be beaten — rolling, dizzy, angry — and the last door leads to the ending", async () => {
+    const { game } = await start("DeepCave", 1, ["double_jump", "dash"]);
+    step(game, 5);
+    game.evalPython(`global_vars.max_hp = global_vars.hp = 99`);
+    game.evalPython(`p = player(); p.x, p.y = 116 * 16 + 8, 44 * 16; p.vx = p.vy = 0`);
+    step(game, 140);
+    expect(py(game, `instances("Boss")[0].state`)).not.toBe("sleep");
+    const held = new Set<string>();
+    const hold = (k: string, on: boolean) => {
+      if (on && !held.has(k)) { down(game, k); held.add(k); }
+      if (!on && held.has(k)) { up(game, k); held.delete(k); }
+    };
+    let dizzy = 0, last = "", angry = false;
+    for (let t = 0; t < 60 * 120 && py(game, `len(instances("Boss"))`) > 0; t++) {
+      const [state, bx, px, vx, isAngry] = py(game, `[instances("Boss")[0].state, instances("Boss")[0].x, player().x, instances("Boss")[0].vx, instances("Boss")[0].angry]`) as unknown as [string, number, number, number, boolean];
+      if (state === "dizzy" && last !== "dizzy") dizzy++;
+      last = state;
+      angry ||= isAngry;
+      const dist = bx - px;
+      hold("x", false);
+      if (state === "dizzy" || state === "crawl" || state === "dying") {
+        hold("left", dist < -40); hold("right", dist > 40);
+        if (Math.abs(dist) < 70 && t % 8 === 0) hold("x", true);
+        hold("space", false);
+      } else if (state === "roll" && Math.abs(dist) < 110 && Math.sign(vx) === Math.sign(dist) * -1) {
+        hold("space", true); // over the shell (the second jump is pressed again by the next tap)
+        if (t % 6 === 0) { up(game, "space"); held.delete("space"); }
+      } else {
+        hold("space", false);
+        const away = Math.abs(dist) < 140;
+        hold("left", away && dist > 0); hold("right", away && dist < 0);
+      }
+      step(game);
+    }
+    for (const k of [...held]) hold(k, false);
+    expect(dizzy).toBeGreaterThan(0);
+    expect(angry).toBe(true);
+    expect(py(game, `len(instances("Boss"))`)).toBe(0);
+    expect(py(game, `boss_beaten()`)).toBe(true);
+    game.evalPython(`e = instances("Exit")[0]; p = player(); p.x, p.y = e.x, e.y`);
+    step(game, 80);
+    expect(py(game, `global_vars.level`)).toBe(2);
+    expect(py(game, `instances("Ending") != []`)).toBe(true);
   });
 });

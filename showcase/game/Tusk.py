@@ -1,6 +1,6 @@
 # object: Tusk
 # sprite: tusk_idle
-# parent: Enemy
+# parent: Boss
 # depth: -5
 # The Thornwood's boss: a boar the size of a cart. It walks at you, digs
 # in, and charges until it hits a wall — which stuns it, and that is when
@@ -11,12 +11,6 @@
 super().on_create()
 self.max_hp = self.hp = 16
 self.name = "Tusk, the Thornback"
-self.state = "sleep"        # until the hero walks into the arena (BossTrigger)
-self.timer = 0
-self.angry = False
-place_key(self)
-if boss_beaten():
-    self.destroy()
 
 # === step
 p = player()
@@ -80,7 +74,7 @@ elif self.state == "dying":
         boss_defeated(self)
         self.destroy()
         return
-fall(self, half_width=36)
+fall(self)
 self.image_xscale = -self.facing
 
 # === collision Slash

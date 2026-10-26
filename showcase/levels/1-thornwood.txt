@@ -2,12 +2,13 @@
 #   # ground   % stone   = plank (land on it from above; Down drops through)
 #   . cave (back wall behind)   ~ water   M a wall the sword breaks
 #   P player  C checkpoint  s snail  b boar  e bee  h potion  c coin
-#   k key  D gate (opens with the key)  R relic (double jump)  H heart
+#   o hog  k key  D gate (opens with the key)  R relic (the level's gift)  H heart
 #   T boss trigger  G boss gate  B the boss  X exit   m w decoration
 room: Thornwood
-sky: #8fd9de
-title: The Thornwood
-music: music_forest
+theme: forest
+boss: Tusk
+relic: double_jump
+abilities:
 map:
 #                                                                                                         ############################################
 #                                                                                                         ############################################

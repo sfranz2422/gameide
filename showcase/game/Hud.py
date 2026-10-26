@@ -4,6 +4,9 @@
 # GUI: the camera never moves it). Also starts each level's music.
 
 # === create
+self.ignore_pause = True     # the pause menu is the HUD's: it keeps running while the game is paused
+# On a touchscreen: arrows, and jump, sword and dash buttons (hidden on a computer).
+touch_controls(True, ["space", "x", "c"])
 screen_fade(0, 30)
 level = LEVELS[global_vars.level]
 if global_vars.boss is None or not instance_exists(global_vars.boss):
@@ -12,6 +15,14 @@ if global_vars.boss is None or not instance_exists(global_vars.boss):
 self.banner = 200 if global_vars.checkpoint is None else 0   # the level's name, as it starts
 
 # === step
+if keyboard_check_pressed("escape") or keyboard_check_pressed("p") or gamepad_check_pressed("start"):
+    game_pause(not game_paused())
+    sound_play("jump", volume=0.3)
+if game_paused():
+    if keyboard_check_pressed("r"):
+        game_pause(False)
+        room_restart()          # back to the last checkpoint
+    return
 if global_vars.message_time > 0:
     global_vars.message_time -= 1
 if self.banner > 0:
@@ -62,3 +73,13 @@ if self.banner > 0:
         draw_words_centered(240, 102, "← → run  ·  Space jumps  ·  X swings the sword")
         draw_words_centered(240, 114, "Down on a plank drops through it")
     draw_set_alpha(1)
+
+# Paused: the game behind, dimmed, and what the keys do.
+if game_paused():
+    draw_set_color("#000000")
+    draw_set_alpha(0.55)
+    draw_rect(0, 0, 480, 270)
+    draw_set_alpha(1)
+    draw_words_centered(240, 100, "Paused", size=2, gold=True)
+    draw_words_centered(240, 132, "Esc or P carries on")
+    draw_words_centered(240, 146, "R goes back to the last stone")

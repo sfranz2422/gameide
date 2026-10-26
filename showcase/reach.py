@@ -20,9 +20,18 @@ TILE = 16
 HALF_W, HEIGHT = 6, 38        # the hero's box around the feet (build.py: MASK)
 
 
-def load_config(here):
+def load_config(here, human=True):
+    """
+    The hero's numbers, from game/_1config.py — a little weaker than they
+    are (`human`): a route that needs the dash from the very last pixel of
+    floor is one a person never finds. The Deep Cave's pool once passed
+    with 2 px to spare; with these, a route has room for real timing.
+    """
     cfg = {}
     exec((here / "game" / "_1config.py").read_text(), cfg)
+    if human:
+        for k, f in (("RUN_SPEED", 0.95), ("DASH_SPEED", 0.95), ("JUMP_SPEED", 0.98), ("AIR_JUMP_SPEED", 0.98)):
+            cfg[k] = cfg[k] * f
     return cfg
 
 
@@ -82,7 +91,7 @@ def move_x(lv, x, y, dx):
     return x, True
 
 
-def simulate(lv, cfg, x, y, steer, delay, hold, air_jump_at, drop=False, running=False):
+def simulate(lv, cfg, x, y, steer, delay, hold, air_jump_at, drop=False, running=False, dash_at=None):
     """
     One attempt from standing at (x, y): jump (unless hold == 0), steer
     `steer` (-1, 0, 1) from step `delay`, keep jump held for `hold` steps,
@@ -93,8 +102,19 @@ def simulate(lv, cfg, x, y, steer, delay, hold, air_jump_at, drop=False, running
     path = []
     drop_steps = 12 if drop else 0
     held_until = hold                     # jump is held until this step
+    dashing = 0
     for t in range(240):
         d = steer if t >= delay else 0
+        if dash_at is not None and t == dash_at:
+            dashing = cfg["DASH_STEPS"]          # the dash: straight across, gravity off (Player.py)
+        if dashing:
+            dashing -= 1
+            x, hit = move_x(lv, x, y, steer * cfg["DASH_SPEED"])
+            vx, vy = (steer * cfg["RUN_SPEED"] if not dashing else 0.0), 0.0
+            path.append((x, y))
+            if hit:
+                dashing = 0
+            continue
         target = d * cfg["RUN_SPEED"]
         vx = min(vx + cfg["ACCEL"], target) if vx < target else max(vx - (cfg["ACCEL"] if d else cfg["DECEL"]), target)
         if air_jump_at is not None and t == air_jump_at:
@@ -137,7 +157,7 @@ def runway(lv, x, y, back):
     return True
 
 
-def reachable(rows, start, cfg, double_jump=False, open_gate=False):
+def reachable(rows, start, cfg, double_jump=False, open_gate=False, dash=False):
     """Every (column, row) cell the hero's feet can be in, from `start` (feet x, y)."""
     lv = Level(rows, open_gate=open_gate)
     seen_states, cells = set(), set()
@@ -153,6 +173,14 @@ def reachable(rows, start, cfg, double_jump=False, open_gate=False):
     for steer in (-1, 1):
         for air in ((None, 10, 18, 26) if double_jump else (None,)):
             tries.append((steer, 0, 40, air, True))
+    # Dashes: off the ground, or at points of a jump (with the second jump before or after).
+    dashes = []
+    if dash:
+        for steer in (-1, 1):
+            dashes.append((steer, 0, 0, None, True, 0))
+            for at in (8, 16, 24, 32):
+                for air in ((None, 6, at + 12) if double_jump else (None,)):
+                    dashes.append((steer, 0, 40, air, True, at))
     while queue:
         x, y = queue.pop()
         key = (round(x / 6), round(y))
@@ -165,16 +193,16 @@ def reachable(rows, start, cfg, double_jump=False, open_gate=False):
             nx, hit = move_x(lv, x, y, d * 6)
             if not hit and lv.standing(nx, y):
                 queue.append((nx, y))
-        options = list(tries)
+        options = [o + (None,) for o in tries] + dashes
         if lv.plank_top(x, y, 1) is not None and not lv.blocked(x, y + 1):
-            options.append(("drop", 0, 0, None, False))
-        for steer, delay, hold, air, running in options:
+            options.append(("drop", 0, 0, None, False, None))
+        for steer, delay, hold, air, running, dash_at in options:
             if steer == "drop":
                 end, path = simulate(lv, cfg, x, y, 0, 0, 0, None, drop=True)
-            elif running and not runway(lv, x, y, -steer):
+            elif running and dash_at is None and not runway(lv, x, y, -steer):
                 continue
             else:
-                end, path = simulate(lv, cfg, x, y, steer, delay, hold, air, running=running)
+                end, path = simulate(lv, cfg, x, y, steer, delay, hold, air, running=running and dash_at is None, dash_at=dash_at)
             for px, py in path:
                 cells.add((int(px // TILE), int((py - 1) // TILE)))
                 cells.add((int(px // TILE), int((py - 20) // TILE)))   # the hero's middle touches things too
@@ -187,35 +215,40 @@ def find(rows, ch):
     return [(c, r) for r, row in enumerate(rows) for c, x in enumerate(row) if x == ch]
 
 
-def check(rows, cfg):
+def check(rows, cfg, have=(), relic="double_jump"):
     """
-    The questions that make a level work, asked in the order the level is
-    played: from the start without the relic; from the relic with its
-    double jump; from the key with the gate open. Returns problems, in words.
+    The questions that make a level work, asked in the order it is played:
+    from the start with what the hero already has (`have`, from earlier
+    levels); from the relic with its gift added; from the key with the gate
+    open. Returns problems, in words.
     """
     problems = []
     feet = lambda cell: (cell[0] * TILE + TILE // 2, (cell[1] + 1) * TILE)
     near = lambda cells, t: any((t[0] + dc, t[1] + dr) in cells for dc in (-1, 0, 1) for dr in (-2, -1, 0, 1))
+    reach = lambda start, abilities, gate=False: reachable(rows, start, cfg, double_jump="double_jump" in abilities,
+                                                           dash="dash" in abilities, open_gate=gate)
     (start,) = find(rows, "P")
     relics, keys, exits = find(rows, "R"), find(rows, "k"), find(rows, "X")
-    plain = reachable(rows, feet(start), cfg)
+    before = set(have)
+    after = before | ({relic} if relics else set())
+    plain = reach(feet(start), before)
     seen = set(plain)
     if relics and not near(plain, relics[0]):
         problems.append("the relic can't be reached from the start")
     if relics and keys and near(plain, keys[0]):
-        problems.append("the key can be reached without the double jump (the relic is skippable)")
+        problems.append(f"the key can be reached without the relic's {relic} (the relic is skippable)")
     if relics:
-        jumping = reachable(rows, feet(relics[0]), cfg, double_jump=True)
-        seen |= jumping
-        if not near(jumping, start):
+        gifted = reach(feet(relics[0]), after)
+        seen |= gifted
+        if not near(gifted, start):
             problems.append("from the relic there is no way back to the start")
     else:
-        jumping = plain
-    if keys and not near(jumping, keys[0]):
-        problems.append("the key can't be reached with the double jump")
-    if exits and keys and near(jumping, exits[0]):
+        gifted = plain
+    if keys and not near(gifted, keys[0]):
+        problems.append(f"the key can't be reached with the {relic}")
+    if exits and keys and near(gifted, exits[0]):
         problems.append("the exit can be reached without opening the gate")
-    full = reachable(rows, feet(keys[0]) if keys else feet(start), cfg, double_jump=bool(relics), open_gate=True)
+    full = reach(feet(keys[0]) if keys else feet(start), after, gate=True)
     seen |= full
     for ch, what in (("T", "the boss's trigger"), ("X", "the exit")):
         for t in find(rows, ch):

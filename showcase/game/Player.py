@@ -21,8 +21,10 @@ self.combo = 0             # 0: the first swing, 1: the second
 self.queued = False        # attack pressed during a swing: swing again straight after
 self.invincible = 0
 self.hurt_steps = 0
-self.drop = 0              # steps of falling through planks (Down while on one)
 self.safe = (self.x, self.y)   # last firm ground, for climbing out of water
+self.dash_left = 0         # steps left of a dash (the Deep Cave's relic)
+self.dash_ready = True     # one dash, then not again until standing
+self.dash_cool = 0
 self.dust = 0
 
 # === step
@@ -40,8 +42,6 @@ if self.state == "dead":
     return
 
 move = input_x()
-if self.drop > 0:
-    self.drop -= 1
 
 # ---- running
 if self.state == "hurt":
@@ -61,10 +61,10 @@ if jump_pressed():
     self.buffer = JUMP_BUFFER
 elif self.buffer > 0:
     self.buffer -= 1
-on_plank = self.on_ground and self.place_free(self.x, self.y + 1)
+plank = on_plank(self)
 if self.state in ("move", "attack") and self.buffer > 0:
-    if input_down() and on_plank:
-        self.drop = 12                            # Down + jump: through the plank
+    if input_down() and plank:
+        self.drop_through = 12                    # Down + jump: through the plank (it counts down by itself)
         self.buffer = 0
     elif self.on_ground or self.coyote > 0:
         self.vy = -JUMP_SPEED
@@ -79,8 +79,8 @@ if self.state in ("move", "attack") and self.buffer > 0:
         particles(self.x, self.y, count=10, color=["#bff6ff", "#ffffff"], speed=1.6, size=2, life=18, direction=270, spread=120)
 if self.vy < JUMP_CUT and not jump_held() and self.state != "hurt":
     self.vy = JUMP_CUT                            # a short tap is a short hop
-if on_plank and input_down() and self.state == "move" and keyboard_check_pressed("down"):
-    self.drop = 12
+if plank and self.state == "move" and (keyboard_check_pressed("down") or keyboard_check_pressed("s") or gamepad_check_pressed("down")):
+    self.drop_through = 12
 
 # ---- the sword
 if attack_pressed():
@@ -109,14 +109,31 @@ if self.state == "attack":
             self.state = "move"
             self.queued = False
 
-# ---- moving: sideways, then down (landing on ground or planks)
+# ---- the dash: straight across, fast, gravity off, once until you land
+if self.dash_cool > 0:
+    self.dash_cool -= 1
+if "dash" in global_vars.abilities and dash_pressed() and self.state == "move" and self.dash_ready and self.dash_cool == 0:
+    self.dash_left = DASH_STEPS
+    self.dash_ready = False
+    self.dash_cool = DASH_COOLDOWN
+    sound_play("swing", volume=0.8)
+if self.dash_left > 0:
+    self.dash_left -= 1
+    self.vx = self.facing * DASH_SPEED
+    self.vy = 0
+    particles(self.x - self.facing * 8, self.y - 18, count=2, color=["#bff6ff", "#ffffff"], speed=0.6, size=3, life=14, direction=180 if self.facing > 0 else 0, spread=30)
+    if self.dash_left == 0:
+        self.vx = self.facing * RUN_SPEED     # out of it at running speed, not sliding on
+
+# ---- moving: sideways, then down (landing on the ground, or on planks: one-way tiles)
 if self.vx != 0 and self.move_and_collide(self.vx, 0):
     self.vx = 0
 was_on_ground = self.on_ground
-landed = fall(self, through_planks=self.drop > 0)
-self.on_ground = standing(self) if self.drop == 0 else not self.place_free(self.x, self.y + 1)
+landed = fall(self) if self.dash_left == 0 else False   # a dash holds its height
+self.on_ground = standing(self)
 if self.on_ground:
     self.coyote = COYOTE
+    self.dash_ready = True
     self.air_jumps = 1 if "double_jump" in global_vars.abilities else 0
     if not self.place_free(self.x, self.y + 1):
         self.safe = (self.x, self.y)

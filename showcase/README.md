@@ -1,5 +1,10 @@
 # Thornwood: the showcase game
 
+Two levels so far: **the Thornwood** (forest; the relic is the double
+jump; the boss is Tusk, a giant boar) and **the Deep Cave** (its relic is
+the dash, across a pool under a ceiling too low to jump; the boss is
+Shellmaw, a giant snail that rolls).
+
 A sword-and-maze platformer in the style of the old Metroid and Castlevania
 games, made entirely with GameIDE's own features, to be featured on
 Explore. Everything here builds it; nothing here is the game's art.
@@ -27,7 +32,7 @@ optional; the title screen gives them anyway.
 |---|---|
 | `build.py` | which picture is which sprite, the sounds (made here; the packs have none), a level map → tile layers and instances, the zip |
 | `game/*.py` | every object's events, one file each, with a small header (`# sprite:`, `# parent:`…); `_1config.py` and `_2helpers.py` are the shared scripts |
-| `levels/*.txt` | each level as a text map, one character per 16 px tile — the key is at the top of each file |
+| `levels/*.txt` | each level as a text map, one character per 16 px tile — the key is at the top of each file. Its header names its `theme` (the tileset and backdrop, `THEMES` in build.py), its `boss`, its `relic`'s ability, and the `abilities` the hero brings from earlier levels |
 | `font.py` | a small pixel font drawn for the game (the text is sprites, crisp at any size) |
 | `reach.py` | the route checker: can the level be finished? |
 
@@ -36,10 +41,14 @@ optional; the title screen gives them anyway.
 Every build runs `reach.py` over every level and refuses to build one that
 can't be finished. It moves a box the size of the hero's with the hero's
 own physics — read from `game/_1config.py`, so changing the jump re-checks
-every level — through every run and jump it can find, in the order the
-level is played: from the start without the relic; from the relic with its
-double jump; from the key, with the gate open. It has caught a map whose
-deep cave erased two planks of the only way back up.
+every level, and made a little weaker than they really are, so a route
+that needs pixel-perfect play is refused (the Deep Cave's pool once passed
+with 2 px to spare) — through every run, jump and dash it can find, in the order the
+level is played: from the start with what the hero brings; from the relic
+with its gift (the double jump, the dash); from the key, with the gate
+open. It has caught a map whose deep cave erased two planks of the only
+way back up, and a shaft whose first plank only a perfect double jump
+could reach.
 
 ## The playtest
 

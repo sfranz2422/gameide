@@ -296,12 +296,29 @@ def event_key(name, project):
 # ---------------------------------------------------------------- levels
 
 class Theme:
-    """How one tileset's pictures make walls: which tile is a top edge, a corner, a fill."""
+    """
+    One look for a level: its tileset, which tile is a top edge, a corner, a
+    fill, a plank; the cave wall behind tunnels; grass over the ground; what
+    the background layers are; and where water comes from (a tileset of its
+    own, as a cave pack has no water).
+    """
 
-    def __init__(self, name, image, ground, stone=None, plank=None, back=None, water=None, tips=None, decor=None):
-        self.name, self.image = name, image
+    def __init__(self, name, tileset, ground, stone=None, plank=None, back=None, water=None, tips=None, decor=None,
+                 backdrop=(), sky="#8fd9de", music="music_forest"):
+        self.name, self.tileset = name, tileset
         self.ground, self.stone = ground, stone or ground
         self.plank, self.back, self.water, self.tips, self.decor = plank, back, water, tips, decor or {}
+        self.backdrop, self.sky, self.music = backdrop, sky, music
+
+    def solid_tiles(self):
+        out = set()
+        for s in (self.ground, self.stone):
+            for v in s.values():
+                out.update(v if isinstance(v, list) else [v])
+        return sorted(out)
+
+    def plank_tiles(self):
+        return [self.plank[k] for k in ("L", "M", "R")] if self.plank else []
 
 
 def pick(options, c, r):
@@ -351,14 +368,15 @@ def read_level(path):
     return meta, rows
 
 
-def build_level(project, theme_ts, theme, meta, rows, objects):
+def build_level(project, theme, meta, rows, objects):
     """
     Paints a map into tile layers and places its instances. Returns the room.
 
-    Layers, back to front: Back (cave walls behind tunnels, no collision),
-    Ground (the solid map), Front (grass tips and bushes over the hero's
-    feet). Planks are on their own layer, "Planks", which is NOT solid: the
-    Player lands on them from above in its own code (one-way platforms).
+    Layers, back to front: the backdrop's background layers (parallax),
+    Back (cave walls behind tunnels, no collision), Planks (one-way tiles: the
+    tileset marks them, so the engine lets the hero jump up through them and
+    stand on them), Water (its own tileset), Ground (the solid map), Front
+    (grass tips over the hero's feet).
     """
     H, W = len(rows), len(rows[0])
     at = lambda c, r: rows[r][c] if 0 <= r < H and 0 <= c < W else "#"
@@ -367,7 +385,7 @@ def build_level(project, theme_ts, theme, meta, rows, objects):
     # are inside the ground, not a grass top and a cliff edge with sky
     # showing through its see-through bits.
     walled = lambda ch: ch in SOLID or ch == "~"
-    back, ground, front, planks = {}, {}, {}, {}
+    back, ground, front, planks, water = {}, {}, {}, {}, {}
     instances = []
 
     def place(name, x, y, code=""):
@@ -398,10 +416,11 @@ def build_level(project, theme_ts, theme, meta, rows, objects):
                 left, right = at(c - 1, r) != "=", at(c + 1, r) != "="
                 p = theme.plank
                 planks[key] = p["L"] if left else p["R"] if right else p["M"]
-                if p.get("top"):
+                if p.get("top"):   # the plank's top edge, a tile above: drawn with it, not stood on (only L, M, R are one-way)
                     planks[f"{c},{r - 1}"] = p["top"][0] if left else p["top"][2] if right else p["top"][1]
-            elif ch == "~" and theme.water:
-                ground[key] = pick(theme.water["top"] if at(c, r - 1) not in "~" else theme.water["body"], c, r)
+            elif ch == "~":
+                w = theme.water["tiles"]
+                water[key] = pick(w["top"] if at(c, r - 1) not in "~" else w["body"], c, r)
             x, y = c * TILE + TILE // 2, (r + 1) * TILE      # standing in this cell, feet on its bottom
             if ch in objects:
                 name, code = objects[ch]
@@ -409,25 +428,28 @@ def build_level(project, theme_ts, theme, meta, rows, objects):
             elif ch in theme.decor:
                 front[key] = pick(theme.decor[ch], c, r)
 
-    # Water: an invisible hazard object over each pool row, for the Player to collide with.
-    width_px, height_px = W * TILE, H * TILE
+    ts = theme.tileset["id"]
     layers = [
         {"id": new_id(), "name": "Instances", "kind": "instances", "depth": 0, "visible": True, "locked": False},
-        {"id": new_id(), "name": "Front", "kind": "tiles", "depth": -20, "visible": True, "locked": False,
-         "tileset": theme_ts["id"], "tiles": front},
-        {"id": new_id(), "name": "Ground", "kind": "tiles", "depth": 100, "visible": True, "locked": False,
-         "tileset": theme_ts["id"], "tiles": ground},
-        {"id": new_id(), "name": "Planks", "kind": "tiles", "depth": 110, "visible": True, "locked": False,
-         "tileset": theme_ts["id"], "tiles": planks},
-        {"id": new_id(), "name": "Back", "kind": "tiles", "depth": 300, "visible": True, "locked": False,
-         "tileset": theme_ts["id"], "tiles": back},
-        {"id": new_id(), "name": "Background", "kind": "background", "depth": 1000, "visible": True, "locked": False,
-         "color": meta.get("sky", "#8fd9de"), "sprite": None, "mode": "tile", "hspeed": 0, "vspeed": 0, "parallax": 0},
+        {"id": new_id(), "name": "Front", "kind": "tiles", "depth": -20, "visible": True, "locked": False, "tileset": ts, "tiles": front},
+        {"id": new_id(), "name": "Ground", "kind": "tiles", "depth": 100, "visible": True, "locked": False, "tileset": ts, "tiles": ground},
+        {"id": new_id(), "name": "Water", "kind": "tiles", "depth": 105, "visible": True, "locked": False,
+         "tileset": theme.water["tileset"]["id"], "tiles": water},
+        {"id": new_id(), "name": "Planks", "kind": "tiles", "depth": 110, "visible": True, "locked": False, "tileset": ts, "tiles": planks},
+        {"id": new_id(), "name": "Back", "kind": "tiles", "depth": 300, "visible": True, "locked": False, "tileset": ts, "tiles": back},
     ]
+    # The backdrop, furthest first: background layers that slide sideways
+    # slower than the room (parallax) and, for strips, stay at one height
+    # on the screen (parallaxY 1) — what level 1 once drew by hand.
+    for i, b in enumerate(theme.backdrop):
+        layers.append({"id": new_id(), "name": b["sprite"], "kind": "background", "depth": 1000 - i, "visible": True, "locked": False,
+                       "color": None, "sprite": project.sprite_id(b["sprite"]), "mode": b.get("mode", "tile_x"),
+                       "hspeed": 0, "vspeed": 0, "parallax": b["parallax"], "parallaxY": b.get("parallaxY", 1),
+                       "offsetY": b.get("offsetY", 0)})
     for i in instances:
         i["layer"] = layers[0]["id"]
-    room = {"id": new_id(), "name": meta["room"], "width": width_px, "height": height_px,
-            "background": meta.get("sky", "#8fd9de"), "gridWidth": TILE, "gridHeight": TILE, "snap": True,
+    room = {"id": new_id(), "name": meta["room"], "width": W * TILE, "height": H * TILE,
+            "background": theme.sky, "gridWidth": TILE, "gridHeight": TILE, "snap": True,
             "layers": layers, "instances": instances,
             "camera": {"enabled": True, "width": VIEW_W, "height": VIEW_H, "follow": project.obj_id("Player"), "smoothing": 0.12}}
     return room
@@ -465,9 +487,9 @@ def build(assets_dir, out, check=True, strict=True):
         P.sprite(name, on_canvas(frames, HERO, at), (OX, OY), MASK, fps)
 
     # ---- enemies. Origin at the feet, under the middle of the body.
-    def mob_sprites(prefix, strips, box, fps=10, flying=False):
-        """strips: name -> (path, frame width). `box`: the hit box, (width, height) above the feet."""
-        cut = {n: sheet(p, w) for n, (p, w) in strips.items()}
+    def mob_sprites(prefix, strips, box, fps=10, flying=False, scale=1):
+        """strips: name -> (path, frame width). `box`: the hit box, (width, height) above the feet. `scale`: drawn bigger."""
+        cut = {n: scaled(sheet(p, w), scale) if scale > 1 else sheet(p, w) for n, (p, w) in strips.items()}
         W = max(f[0].width for f in cut.values())
         Hh = max(f[0].height for f in cut.values())
         for n, frames in cut.items():
@@ -508,6 +530,19 @@ def build(assets_dir, out, check=True, strict=True):
         cx = (union[0] + union[2]) // 2
         frames = on_canvas(frames, (BW, BH), (BW // 2 - cx, BH - frames[0].height))
         P.sprite(f"tusk_{n}", frames, (BW // 2, BH), (BW // 2 - 40, BH - 56, BW // 2 + 40, BH), 10)
+
+    # ---- the Deep Cave's hog: the Wild Boar pack's boar at its own size, brown, and it hits harder.
+    mob_sprites("hog", {"idle": wb("Idle", "Idle-Sheet - Color 1.png", 64), "walk": wb("Walk", "Walk-Sheet - Color 1.png", 96),
+                        "run": wb("Run", "Run-Sheet - Color 1.png", 96), "hit": wb("Die", "Die-Sheet - Color 1.png", 96)}, (40, 28), fps=10)
+    # ---- the second boss: the snail, three times the size.
+    mob_sprites("shellmaw", {"walk": (mob / "Snail/walk-Sheet.png", 48), "hide": (mob / "Snail/Hide-Sheet.png", 48),
+                             "dead": (mob / "Snail/Dead-Sheet.png", 48)}, (66, 54), fps=8, scale=3)
+
+    # Its shell alone, centred, for rolling: turned in its Draw event, while
+    # the instance itself stays upright (a turned box would sink into the floor).
+    shell = scaled(sheet(mob / "Snail/Hide-Sheet.png", 48), 3)[-1]
+    shell = shell.crop(shell.getchannel("A").getbbox())
+    P.sprite("shellmaw_shell", [shell], (shell.width // 2, shell.height // 2))
 
     # ---- the forest tileset, and things cut out of it.
     tiles = Image.open(HF / "Assets/Tiles.png").convert("RGBA")
@@ -567,36 +602,58 @@ def build(assets_dir, out, check=True, strict=True):
     P.sprite("water_box", [clear(16, 16)], (8, 16), (0, 4, 16, 16))
     P.sprite("trigger_box", [clear(16, 192)], (8, 192), (0, 0, 16, 192))
 
-    # ---- the pixel font (font.py): cream, gold and a dark shadow, at 1× and 2×.
+    # ---- the pixel font (font.py): white with its shadow drawn in, one sprite.
+    # draw_words colours it and sizes it with draw_sprite_ext's tint and scale.
     import font
-    for scale in (1, 2):
-        for tone_name, rgb in (("", (255, 246, 213)), ("_gold", (255, 209, 102))):
-            P.sprite(f"font{scale}{tone_name}", font.frames(rgb, Image, scale, shadow=(20, 16, 12)), (0, 0))
+    P.sprite("font", font.frames((255, 255, 255), Image, 1, shadow=(20, 16, 12)), (0, 0))
 
     # ---- an icon for My Games: the hero mid-swing.
     icon = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
     icon.alpha_composite(sheet(char / "Attack-01/Attack-01-Sheet.png", 96)[1].crop((16, 0, 96, 80)).resize((64, 64), Image.NEAREST))
     P.sprite("icon", [icon], (0, 0))
 
+    # ---- the cave's backdrop: three layers of rock that repeat every way.
+    DC = A / "Legacy Fantasy - Deep Cave"
+    for i in (1, 2, 3):
+        P.sprite(f"bg_cave{i}", [Image.open(DC / f"Background/Background-{i}.png").convert("RGBA")], (0, 0))
+
+    # ---- the levels' looks.
     forest_ts = P.tileset("forest", tiles, solid=[])
-    forest = Theme(
-        "forest", tiles,
-        ground={"TL": 25, "T": [26, 27, 28], "TR": 29, "L": [50, 75], "R": [54, 79], "M": [76, 77, 78, 76],
-                "BL": 100, "B": [101, 102, 103], "BR": 104},
-        stone={"TL": 150, "T": [151, 152, 153], "TR": 154, "L": [175, 200], "R": [179, 204], "M": [176, 177, 178, 201],
-               "BL": 225, "B": [226, 227, 228], "BR": 229},
-        plank={"L": 155, "M": 156, "R": 157, "top": [130, 131, 132]},
-        back=[254, 255, 279, 280],
-        water={"top": [481, 482, 483, 484], "body": [506, 507, 508, 509]},
-        tips={"L": 0, "T": [1, 2, 3], "R": 4},
-        decor={"m": [415, 420], "w": [447]},
-    )
-    # Solid: every ground and stone piece. (Water is a hazard object, not a wall.)
-    solid = set()
-    for s in (forest.ground, forest.stone):
-        for v in s.values():
-            solid.update(v if isinstance(v, list) else [v])
-    forest_ts["solid"] = sorted(solid)
+    forest_water = {"tileset": forest_ts, "tiles": {"top": [481, 482, 483, 484], "body": [506, 507, 508, 509]}}
+    THEMES = {
+        "forest": Theme(
+            "forest", forest_ts,
+            ground={"TL": 25, "T": [26, 27, 28], "TR": 29, "L": [50, 75], "R": [54, 79], "M": [76, 77, 78, 76],
+                    "BL": 100, "B": [101, 102, 103], "BR": 104},
+            stone={"TL": 150, "T": [151, 152, 153], "TR": 154, "L": [175, 200], "R": [179, 204], "M": [176, 177, 178, 201],
+                   "BL": 225, "B": [226, 227, 228], "BR": 229},
+            plank={"L": 155, "M": 156, "R": 157, "top": [130, 131, 132]},
+            back=[254, 255, 279, 280], water=forest_water,
+            tips={"L": 0, "T": [1, 2, 3], "R": 4},
+            decor={"m": [415, 420], "w": [447]},
+            backdrop=[{"sprite": "bg_sky", "mode": "once", "parallax": 1},
+                      {"sprite": "bg_ridge", "parallax": 0.06, "offsetY": 30},
+                      {"sprite": "bg_pines_far", "parallax": 0.15, "offsetY": 44},
+                      {"sprite": "bg_pines_near", "parallax": 0.35, "offsetY": 90}],
+            sky="#8fd9de", music="music_forest"),
+        "cave": Theme(
+            "cave", P.tileset("cave", Image.open(DC / "Assets/Tiles.png").convert("RGBA"), solid=[]),
+            ground={"TL": 25, "T": [26, 27, 28], "TR": 29, "L": [50, 75], "R": [54, 79], "M": [51, 52, 53, 76, 77, 78],
+                    "BL": 100, "B": [101, 102, 103], "BR": 104},
+            plank={"L": 350, "M": 351, "R": 352},
+            # No back wall: the cave's own rock layers (the backdrop) show behind its tunnels.
+            back=None, water=forest_water,
+            tips={"L": 0, "T": [1, 2, 3], "R": 4},
+            decor={"m": [126, 127, 128]},
+            backdrop=[{"sprite": "bg_cave3", "mode": "tile", "parallax": 0.15, "parallaxY": 0.15},
+                      {"sprite": "bg_cave2", "mode": "tile", "parallax": 0.3, "parallaxY": 0.3},
+                      {"sprite": "bg_cave1", "mode": "tile", "parallax": 0.5, "parallaxY": 0.5}],
+            sky="#0b0d16", music="music_cave"),
+    }
+    # Each tileset knows its walls (solid) and its planks (one-way: jumped up through, stood on).
+    for theme in THEMES.values():
+        theme.tileset["solid"] = theme.solid_tiles()
+        theme.tileset["oneWay"] = theme.plank_tiles()
 
     # ---- sounds, made here (no sound in the packs).
     P.sound("jump", tone(0.16, 260, 560, "square", 0.18))
@@ -614,6 +671,10 @@ def build(assets_dir, out, check=True, strict=True):
     A_ = [57, 0, 60, 64, 62, 0, 60, 59, 57, 0, 64, 0, 62, 60, 59, 0,
           57, 0, 60, 64, 67, 0, 65, 64, 62, 0, 60, 0, 59, 0, 0, 0]
     P.sound("music_forest", music_loop(A_ * 2, [45, 45, 52, 52, 41, 41, 48, 48, 43, 43, 50, 50, 40, 40, 47, 47], 104), volume=0.6)
+    # The cave: slow, low, with gaps for the drip of water.
+    C_ = [52, 0, 0, 55, 0, 53, 52, 0, 50, 0, 0, 48, 0, 50, 52, 0,
+          52, 0, 0, 55, 0, 57, 58, 0, 57, 0, 55, 0, 53, 0, 0, 0]
+    P.sound("music_cave", music_loop(C_ * 2, [40, 40, 40, 40, 36, 36, 38, 38, 40, 40, 43, 43, 41, 41, 38, 38], 84), volume=0.6)
     B_ = [57, 57, 60, 57, 63, 57, 62, 60, 57, 57, 60, 57, 64, 63, 62, 60]
     P.sound("music_boss", music_loop(B_ * 4, [33, 33, 45, 33, 36, 36, 48, 36], 150), volume=0.6)
 
@@ -649,26 +710,29 @@ def build(assets_dir, out, check=True, strict=True):
                                "angle": 0, "code": ""} for o, x, y in objs]}
 
     P.p["rooms"].append(plain_room("Title", "#0f1a17", [("Title", 0, 0)]))
-    level_objects = {
-        "P": ("Player", ""), "C": ("Checkpoint", ""), "s": ("Snail", ""), "b": ("Boar", ""), "e": ("Bee", ""),
-        "h": ("Potion", ""), "k": ("Key", ""), "D": ("Gate", ""), "R": ("Relic", ""), "H": ("HeartUp", ""),
-        "B": ("Tusk", ""), "T": ("BossTrigger", ""), "G": ("BossGate", ""), "X": ("Exit", ""), "c": ("Coin", ""),
-        "M": ("MossBlock", ""), "~": ("Water", ""),
-    }
     import reach
     cfg = reach.load_config(HERE)
     for f in sorted((HERE / "levels").glob("*.txt")):
         meta, rows = read_level(f)
+        # A level file names its look, its boss, the relic's gift, and what the hero has on arriving.
+        level_objects = {
+            "P": ("Player", ""), "C": ("Checkpoint", ""), "s": ("Snail", ""), "b": ("Boar", ""), "e": ("Bee", ""),
+            "o": ("Hog", ""), "h": ("Potion", ""), "k": ("Key", ""), "D": ("Gate", ""), "H": ("HeartUp", ""),
+            "R": ("Relic", f'self.ability = "{meta.get("relic", "double_jump")}"\n'),
+            "B": (meta.get("boss", "Tusk"), ""), "T": ("BossTrigger", ""), "G": ("BossGate", ""), "X": ("Exit", ""),
+            "c": ("Coin", ""), "M": ("MossBlock", ""), "~": ("Water", ""),
+        }
         if check:
-            problems = reach.check(rows, cfg)
+            have = [a for a in meta.get("abilities", "").replace(",", " ").split() if a]
+            problems = reach.check(rows, cfg, have=have, relic=meta.get("relic", "double_jump"))
             for problem in problems:
                 print(f"  {f.name}: {problem}")
             if problems and strict:
                 raise SystemExit(f"{f.name} can't be finished as drawn (--no-check to build anyway).")
-        room = build_level(P, forest_ts, forest, meta, rows, level_objects)
-        # Every level has its own Backdrop and HUD.
+        room = build_level(P, THEMES[meta.get("theme", "forest")], meta, rows, level_objects)
+        # Every level has its own HUD.
         lid = room["layers"][0]["id"]
-        for o in ("Backdrop", "Hud"):
+        for o in ("Hud",):
             room["instances"].insert(0, {"id": new_id(), "object": P.obj_id(o), "layer": lid, "x": 0, "y": 0,
                                          "scaleX": 1, "scaleY": 1, "angle": 0, "code": ""})
         P.p["rooms"].append(room)
