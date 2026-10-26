@@ -187,4 +187,5 @@ export const PROPERTIES: { name: string; description: string }[] = [
   { name: "depth", description: "Lower depth draws on top." },
   { name: "alarm", description: "Twelve countdowns: self.alarm[0] = 60 runs on_alarm_0 in 60 steps." },
   { name: "object_name", description: "The name of this instance's object." },
+  { name: "once", description: 'self.once("key", condition): True the first step the condition is true, then not until it has been false. Event sheets\' "Trigger once".' },
 ];

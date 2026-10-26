@@ -1,53 +1,78 @@
 /**
- * Python or blocks, the same way everywhere code lives: an object's events,
- * scripts, and an instance's creation code.
+ * Python, blocks or an event sheet, the same way everywhere code lives: an
+ * object's events, an instance's creation code, and (Python or blocks
+ * only) scripts.
  *
- * The rules: something with no Python in it yet (nothing, or only comments)
- * can switch either way freely. Blocks can become Python — once, after a
- * warning, because it can't be undone. Python never becomes blocks: that
- * would mean reading any code at all as blocks, and a student's typing
- * would come back changed.
+ * The rules: something with nothing in it yet — no Python but comments, no
+ * blocks, no rows — can switch to any of the three freely. Blocks or a sheet
+ * can become Python, once, after a warning, because it can't be undone.
+ * Python never becomes blocks or a sheet: that would mean reading any code
+ * at all as blocks or rows, and a student's typing would come back changed.
+ * Blocks and sheets don't turn into each other either; both go to Python.
  */
 import { lazy } from "react";
 import { emptyBlocks, hasBlocks, hasPython, scriptFunctions, type BlocksKind, type BlocksState } from "../blocks/blockState";
 import type { BlockNames } from "../blocks/catalogBlocks";
+import { emptySheet, hasRows, type Sheet } from "../eventsheets/sheet";
 import type { Project } from "../store/project";
 import type { ProjectNames } from "./code/pythonHelp";
 
 // Blockly is about 700 KB: fetched the first time a Blocks tab opens.
 export const BlocksEditor = lazy(() => import("../blocks/BlocksEditor"));
+// The sheet editor is small, but only sheet users need it.
+export const SheetEditor = lazy(() => import("../eventsheets/SheetEditor"));
 
-/** Anything that holds code that may be blocks. */
+export type CodeMode = "python" | "blocks" | "sheet";
+
+/** Anything that holds code that may be blocks or a sheet. */
 export interface CodeHolder {
   code: string;
-  mode?: "python" | "blocks";
+  mode?: CodeMode;
   blocks?: BlocksState;
+  sheet?: Sheet;
 }
 
+export const modeOf = (h: CodeHolder): CodeMode => h.mode ?? "python";
 export const isBlocks = (h: CodeHolder) => h.mode === "blocks";
-/** Can the Blocks tab be chosen? Yes for blocks, or for code with no Python in it yet. */
-export const canUseBlocks = (h: CodeHolder) => isBlocks(h) || !hasPython(h.code);
+export const isSheet = (h: CodeHolder) => h.mode === "sheet";
 
-export function toBlocks(h: CodeHolder, kind: BlocksKind) {
-  if (isBlocks(h) || hasPython(h.code)) return;
-  h.mode = "blocks";
-  h.blocks = emptyBlocks(kind);
+/** Nothing written yet, however it is written. */
+export function isEmpty(h: CodeHolder): boolean {
+  if (isBlocks(h)) return !hasBlocks(h.blocks);
+  if (isSheet(h)) return !hasRows(h.sheet);
+  return !hasPython(h.code);
+}
+
+/** Can this tab be chosen? Its own mode, or any when nothing is written yet. Never back from Python. */
+export const canUse = (h: CodeHolder, mode: CodeMode) => modeOf(h) === mode || isEmpty(h);
+export const canUseBlocks = (h: CodeHolder) => canUse(h, "blocks");
+
+/** Switches something empty to blocks or a sheet (Python is toPython, which may ask). */
+export function switchTo(h: CodeHolder, mode: "blocks" | "sheet", kind: BlocksKind) {
+  if (modeOf(h) === mode || !isEmpty(h)) return;
+  h.mode = mode;
+  delete h.blocks;
+  delete h.sheet;
+  if (mode === "blocks") h.blocks = emptyBlocks(kind);
+  else h.sheet = emptySheet();
   // A new script's "# Functions here…" comment is not code the blocks made.
   h.code = "";
 }
+export const toBlocks = (h: CodeHolder, kind: BlocksKind) => switchTo(h, "blocks", kind);
 
 /**
- * Asks first if there are blocks to lose the use of; empty blocks just go.
- * Returns whether to go ahead; `apply` then makes the change in the project.
+ * Asks first if there are blocks or rows to lose the use of; empty ones
+ * just go. Returns whether to go ahead; `toPython` then makes the change.
  */
 export function confirmToPython(h: CodeHolder, what: string): boolean {
-  if (!isBlocks(h)) return false;
-  return !hasBlocks(h.blocks) || confirm(`Turn ${what} into Python?\n\nYou'll edit the Python from now on. It can't be turned back into blocks.`);
+  if (modeOf(h) === "python") return false;
+  return isEmpty(h) || confirm(`Turn ${what} into Python?\n\nYou'll edit the Python from now on. It can't be turned back into ${isSheet(h) ? "a sheet" : "blocks"}.`);
 }
 
 export function toPython(h: CodeHolder) {
   h.mode = "python";
   delete h.blocks;
+  delete h.sheet;
 }
 
 /** Names for autocomplete and the blocks' pickers. */
@@ -62,6 +87,7 @@ export function projectNames(p: Project): ProjectNames {
 
 /** The names the blocks' pickers offer. A script's own functions are left out of its Functions category (they're under Make a function). */
 export function blockNamesFor(project: Project, exceptScript?: string): BlockNames {
+  // (Also what the sheet editor's pickers and boxes offer: the same names.)
   return {
     layers: [],
     ...projectNames(project),
@@ -69,25 +95,40 @@ export function blockNamesFor(project: Project, exceptScript?: string): BlockNam
   };
 }
 
-/** Python | Blocks tabs, for a script or creation code (the object editor has its own row, with more tabs). */
-export function ModeTabs({ holder, onPython, onBlocks, testPrefix }: { holder: CodeHolder; onPython: () => void; onBlocks: () => void; testPrefix: string }) {
-  const blocks = isBlocks(holder);
+/** Python | Blocks (| Event Sheet) tabs, for a script or creation code (the object editor has its own row, with more tabs). */
+export function ModeTabs({
+  holder,
+  onPython,
+  onBlocks,
+  onSheet,
+  testPrefix,
+}: {
+  holder: CodeHolder;
+  onPython: () => void;
+  onBlocks: () => void;
+  /** Absent for scripts, which can't be sheets. */
+  onSheet?: () => void;
+  testPrefix: string;
+}) {
+  const mode = modeOf(holder);
+  const tab = (m: CodeMode, label: string, run: () => void) => (
+    <button
+      role="tab"
+      aria-selected={mode === m}
+      className={mode === m ? "on" : ""}
+      disabled={m !== "python" && !canUse(holder, m)}
+      onClick={run}
+      data-testid={`${testPrefix}-tab-${m}`}
+      title={m === "python" || canUse(holder, m) ? undefined : "Something is already written here another way. Only empty code can switch."}
+    >
+      {label}
+    </button>
+  );
   return (
     <div className="code-tabs" role="tablist">
-      <button role="tab" aria-selected={!blocks} className={!blocks ? "on" : ""} onClick={onPython} data-testid={`${testPrefix}-tab-python`}>
-        Python
-      </button>
-      <button
-        role="tab"
-        aria-selected={blocks}
-        className={blocks ? "on" : ""}
-        disabled={!canUseBlocks(holder)}
-        onClick={onBlocks}
-        data-testid={`${testPrefix}-tab-blocks`}
-        title={canUseBlocks(holder) ? "Build this with code blocks" : "This is written in Python. Python can't be turned into blocks."}
-      >
-        Blocks
-      </button>
+      {tab("python", "Python", onPython)}
+      {tab("blocks", "Blocks", onBlocks)}
+      {onSheet && tab("sheet", "Event Sheet", onSheet)}
     </div>
   );
 }

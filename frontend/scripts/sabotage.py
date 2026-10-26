@@ -34,6 +34,7 @@ SP, TO = "src/engine/sprites.ts", "src/editor/tiles/tileOps.ts"
 HI = "src/editor/history.ts"
 CB, PB, TB = "src/blocks/catalogBlocks.ts", "src/blocks/python.ts", "src/blocks/toolbox.ts"
 BE, OE = "src/blocks/BlocksEditor.tsx", "src/editor/ObjectEditor.tsx"
+SH, SE, EB = "src/eventsheets/sheet.ts", "src/eventsheets/SheetEditor.tsx", "src/eventsheets/ExprBox.tsx"
 CM, BS = "src/editor/codeMode.tsx", "src/blocks/blockState.ts"
 CASES = [
  ("layout drift", RT, '"x": boxy(F.X)', '"x": boxy(F.Y)', "every built-in property"),
@@ -244,14 +245,14 @@ CASES = [
  ("undo restores converted blocks", HI, "    else delete h.blocks;", "    else h.blocks = h.blocks;", "never changes blocks either"),
  ("unlabelled merged", HI, "    const group = opts.group ?? (opts.label !== undefined ? `auto:${opts.label}` : null);", "    const group = opts.group ?? `auto:${opts.label ?? \"\"}`;", "never merged"),
  ("object changes share a label", OE, '  const set = (recipe: (o: ObjectResource) => void, label: string) => mutate((p) => recipe(find(p, "objects", objectId)!), { label });', '  const set = (recipe: (o: ObjectResource) => void, label: string) => mutate((p) => recipe(find(p, "objects", objectId)!), { label: label.slice(0, 0) });', "elsewhere it undoes the project", E2E),
- ("Python becomes blocks", CM, "export const canUseBlocks = (h: CodeHolder) => isBlocks(h) || !hasPython(h.code);", "export const canUseBlocks = (h: CodeHolder) => isBlocks(h) || !hasPython(h.code) || true;", "Python never becomes blocks", E2E,
-  ("  if (isBlocks(h) || hasPython(h.code)) return;", "  if (isBlocks(h) || (hasPython(h.code) && false)) return;")),
- ("converted without asking", CM, "  return !hasBlocks(h.blocks) || confirm(", "  return hasBlocks(h.blocks) || !hasBlocks(h.blocks) || confirm(", "Python never becomes blocks", E2E),
- ("Ctrl+Z in blocks undoes the project", "src/editor/EditorPage.tsx", '!!t.closest(".cm-editor, .blocks-editor, .blocklyWidgetDiv, .blocklyDropDownDiv")', '!!t.closest(".cm-editor")', "in the blocks undoes blocks", E2E),  # -g is a regex: no "+" in it
+ ("Python becomes blocks", CM, "export const canUse = (h: CodeHolder, mode: CodeMode) => modeOf(h) === mode || isEmpty(h);", "export const canUse = (h: CodeHolder, mode: CodeMode) => modeOf(h) === mode || isEmpty(h) || mode !== \"python\";", "Python never becomes blocks", E2E,
+  ("  if (modeOf(h) === mode || !isEmpty(h)) return;", "  if (modeOf(h) === mode) return;")),
+ ("converted without asking", CM, "  return isEmpty(h) || confirm(", "  return true || isEmpty(h) || confirm(", "Python never becomes blocks", E2E),
+ ("Ctrl+Z in blocks undoes the project", "src/editor/EditorPage.tsx", '".cm-editor, .blocks-editor, .blocklyWidgetDiv', '".cm-editor, .blocklyWidgetDiv', "in the blocks undoes blocks", E2E),  # -g is a regex: no "+" in it
  ("blocks not saved", BE, "        latest.current.onChange(state, py.code);", "        void state;", "the game runs it", E2E),
  ("media not built", "vite.config.ts", "      for (const f of readdirSync(blocklyMediaDir)) copyFileSync", "      for (const f of readdirSync(blocklyMediaDir).slice(0, 0)) copyFileSync", "the game runs it", E2E),
  ("media not served", APP, '    r = send_from_directory(DIST / "blockly-media", name)', '    r = send_from_directory(DIST / "blockly-medium", name)', "Blockly's media", PY),
- ("still version 4", PJ, "  if (p.schemaVersion < 6) p.schemaVersion = 6;", "", "version 1 rooms"),
+ ("still version 4", PJ, "  if (p.schemaVersion < 7) p.schemaVersion = 7;", "", "version 1 rooms"),
  # Blocks in scripts and creation code
  ("script globals kept", PB, '    return gen.finish("").replace(/^ +global [\\w, ]+\\n/gm, "")', '    return gen.finish("").replace(/^ +globalx [\\w, ]+\\n/gm, "")', "no `global` lines"),
  ("functions crowded", PB, '      .join("\\n\\n\\n");', '      .join("\\n");', "PEP 8 apart"),
@@ -265,10 +266,40 @@ CASES = [
  ("comments count as Python", BS, '  return code.split("\\n").some((l) => l.trim() !== "" && !l.trim().startsWith("#"));', '  return code.split("\\n").some((l) => l.trim() !== "");', "no Python in it yet"),
  ("scripts can't be blocks", "src/editor/OtherEditors.tsx", '        onBlocks={() => edit((s) => toBlocks(s, "script"))}', "        onBlocks={() => edit((s) => void (s.code.length < 0 && toBlocks(s, \"script\")))}", "script made with blocks", E2E),
  ("creation dialog never opens", RE, '          edit((i) => toBlocks(i, "creation"));\n          setOpen(true);', '          edit((i) => toBlocks(i, "creation"));', "built in a dialog", E2E),
- ("creation blocks not saved", RE, "                    i.code = code;\n", "                    void code;\n", "built in a dialog", E2E),
+ ("creation blocks not saved", RE, "                      i.blocks = blocks;\n                      i.code = code;\n", "                      i.blocks = blocks;\n                      void code;\n", "built in a dialog", E2E),
  ("undo reverts scripts and creation code", HI, "    ...p.scripts,\n    ...p.rooms.flatMap((r) => r.instances),\n", "", "in scripts and creation code too"),
  ("rename skips creation code", PJ, "      i.code = sub(i.code);\n", "", "instances' creation code"),
  ("function comment written", CB, 'Blockly.Msg["PROCEDURES_DEFNORETURN_COMMENT"] = "";\n', "", "script made with blocks", E2E),
+ # Phase 8: event sheets
+ ("and becomes or", SH, '  const all = parts.join(r.any ? " or " : " and ");', '  const all = parts.join(" or ");', "conditions joined with and"),
+ ("or never", SH, '  const all = parts.join(r.any ? " or " : " and ");', '  const all = parts.join(r.any ? " and " : " and ");', "OR row joins with or"),
+ ("no brackets", SH, "  return joined && LOOSE.test(code) ? `(${code})` : code;", "  return joined && LOOSE.test(code) ? code : code;", "OR row joins with or"),
+ ("not dropped", SH, '  if (c.type === "call") return `${not ? "not " : ""}${callCode(c.fn, c.args)}`;', '  if (c.type === "call") return `${not ? "" : ""}${callCode(c.fn, c.args)}`;', "negates a condition"),
+ ("always gets an if", SH, "        body(r.actions, r.children, depth, r.id, false);\n        return;", "        emit(depth, \"if True:\", r.id);\n        body(r.actions, r.children, depth + 1, r.id);\n        return;", "with no conditions"),
+ ("else never elif", SH, "      if (follows) emit(depth, t ? `elif ${t}:` : \"else:\", r.id);", "      if (follows) emit(depth, t ? \"else:\" : \"else:\", r.id);", "else/elif rows follow"),
+ ("empty body, no pass", SH, '    if (needed && !real) emit(depth, "pass", owner);', '    if (needed && !real && depth < 0) emit(depth, "pass", owner);', "for-each row"),
+ ("comments are a body", SH, '    const real = lines.slice(before).some((l) => !l.trim().startsWith("#"));', "    const real = lines.length > before;", "body of only comments"),
+ ("trigger once ignored", SH, '  if (r.conditions.some((c) => c.type === "once")) return', '  if (r.conditions.some((c) => c.type === "once") && r.id === "") return', "Trigger once wraps"),
+ ("once never resets", RT, "        memory[key] = now\n", "        memory[key] = now or before\n", "Trigger once included"),
+ ("line map off", SH, "    for (const a of actions) emit(depth, actionCode(a), a.id);", "    for (const a of actions) emit(depth, actionCode(a), owner);", "which row, condition or action"),
+ ("sheet defaults written", SH, "    while (out.length) {", "    while (out.length < 0) {", "with no conditions"),
+ ("any value passes", SH, '  if (error || names.length !== 1 || names[0] !== "ExpressionStatement") return "This isn\'t a Python value.";', '  if (error) return "This isn\'t a Python value.";', "one Python value in a value box"),
+ ("if allowed on a line", SH, '  if (COMPOUND.has(names[0]!)) return "Use rows for if, for and while.";\n', "", "one simple line in a line box"),
+ ("stray else allowed", SH, '          out.set(r.id, "An Else row goes straight after a row with conditions.");', "          void r;", "problems are found by the id"),
+ ("wrong conditions offered", SH, '(e): e is ApiFunction => e.kind === "function" && e.returns === "True or False");', '(e): e is ApiFunction => e.kind === "function" && e.returns !== "nothing");', "every function that answers True/False"),
+ ("for-each keeps old name", SH, "        if (r.object === from) r.object = to;\n", "", "a for-each's object"),
+ ("rename skips sheet creation code", PJ, "      if (i.sheet) renameInSheet(i.sheet, from, sub, to);\n", "", "renaming reaches its boxes", E2E),
+ ("undo reverts sheets", HI, "    if (n.sheet) h.sheet = structuredClone(n.sheet);\n    else delete h.sheet;\n", "", "and sheets"),
+ ("Python becomes a sheet", CM, "export const canUse = (h: CodeHolder, mode: CodeMode) => modeOf(h) === mode || isEmpty(h);", "export const canUse = (h: CodeHolder, mode: CodeMode) => modeOf(h) === mode || isEmpty(h) || mode !== \"python\";", "Python never becomes a sheet", E2E,
+  ("  if (modeOf(h) === mode || !isEmpty(h)) return;", "  if (modeOf(h) === mode) return;")),
+ ("sheet Ctrl+Z redoes", SE, "          if (k === \"y\" || e.shiftKey) redo();\n          else undo();", "          if (k === \"y\" || e.shiftKey) redo();\n          else redo();", "Ctrl.Z on the sheet", E2E),
+ ("typing is many undo steps", SE, "    if (!(group && last && last.group === group && now - last.at < UNDO_GROUP_MS)) {", "    if (!(group && last && last.group === group && now - last.at < -UNDO_GROUP_MS)) {", "Ctrl.Z on the sheet", E2E),
+ ("Ctrl+Z on a sheet undoes the project", "src/editor/EditorPage.tsx", '.blocklyDropDownDiv, .sheet-editor")', '.blocklyDropDownDiv")', "Ctrl.Z on the sheet", E2E),
+ ("sheet Python not updated", SE, "    latest.current.onChange(next, sheetToPython(next).code);\n  };\n  const undo", "    latest.current.onChange(next, latest.current.code);\n  };\n  const undo", "a sheet builds an event", E2E),
+ ("error not marked on the sheet", SE, '${ops.errorId === act.id ? " error" : ""}', '${ops.errorId === act.id ? "" : ""}', "lands on the row and the action", E2E),
+ ("no names in quotes", EB, '      if (ty && (before.match(/"/g) ?? []).length % 2 === 1) {', '      if (ty && (before.match(/"/g) ?? []).length % 2 === 3) {', "a sheet builds an event", E2E),
+ ("calls not refitted", SH, "    if (!f || f.params.length === item.args.length) return;", "    if (!f || item.args.length >= 0) return;", "fitted to the function's parameters"),
+ ("bad box not marked", EB, '<span ref={host} className={`expr-box${problem ? " bad" : ""}`}', '<span ref={host} className={`expr-box${problem ? "" : ""}`}', "a box that isn't Python is marked", E2E),
 ]
 only = sys.argv[1:]
 # A name that matches no case would otherwise run nothing and still say

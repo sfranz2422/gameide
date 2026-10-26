@@ -33,7 +33,8 @@ import {
 } from "../tiles/tileOps";
 import { tileRect } from "../tiles/TilesetEditor";
 import { CodeEditor } from "../code/CodeEditor";
-import { blockNamesFor, BlocksEditor, confirmToPython, isBlocks, ModeTabs, projectNames, toBlocks, toPython } from "../codeMode";
+import { emptySheet } from "../../eventsheets/sheet";
+import { blockNamesFor, BlocksEditor, confirmToPython, isBlocks, isSheet, ModeTabs, projectNames, SheetEditor, switchTo, toBlocks, toPython } from "../codeMode";
 import { Icon } from "../ui/icons";
 import { useProjectApi } from "../useProject";
 import { cameraPreview, copy, corners, drawOrder, hitTest, inBox, occupied, paste, shapeOf, snap, visibleLayers, type Clip } from "./roomOps";
@@ -1275,9 +1276,9 @@ function LayersPanel({
 }
 
 /**
- * One instance's creation code: Python, or blocks (codeMode.tsx's rules).
- * Blocks don't fit in this side panel, so they open in a large dialog; the
- * panel shows the Python they make.
+ * One instance's creation code: Python, blocks or a sheet (codeMode.tsx's
+ * rules). Blocks and sheets don't fit in this side panel, so they open in a
+ * large dialog; the panel shows the Python they make.
  */
 function CreationCode({ roomId, inst, focus }: { roomId: string; inst: RoomInstance; focus: { line: number; nonce: number } | null }) {
   const { project, mutate } = useProjectApi();
@@ -1295,9 +1296,9 @@ function CreationCode({ roomId, inst, focus }: { roomId: string; inst: RoomInsta
       { history: "skip" },
     );
   const convert = () => confirmToPython(inst, "this creation code") && (edit(toPython), setOpen(false));
-  // An error in blocks creation code: open them, with the block selected.
+  // An error in blocks or sheet creation code: open them, with the block (or row) marked.
   useEffect(() => {
-    if (focus && isBlocks(inst)) setOpen(true);
+    if (focus && (isBlocks(inst) || isSheet(inst))) setOpen(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focus?.nonce]);
 
@@ -1313,14 +1314,18 @@ function CreationCode({ roomId, inst, focus }: { roomId: string; inst: RoomInsta
           edit((i) => toBlocks(i, "creation"));
           setOpen(true);
         }}
+        onSheet={() => {
+          edit((i) => switchTo(i, "sheet", "creation"));
+          setOpen(true);
+        }}
         onPython={convert}
       />
-      {isBlocks(inst) ? (
+      {isBlocks(inst) || isSheet(inst) ? (
         <>
           <CodeEditor docKey={`inst-blocks:${inst.id}`} value={inst.code} readOnly testId="creation-code-python" errorLine={focus} />
           <div className="row">
             <button className="btn small" onClick={() => setOpen(true)} data-testid="edit-creation-blocks">
-              Edit blocks
+              {isSheet(inst) ? "Edit sheet" : "Edit blocks"}
             </button>
           </div>
         </>
@@ -1334,7 +1339,7 @@ function CreationCode({ roomId, inst, focus }: { roomId: string; inst: RoomInsta
           testId="creation-code"
         />
       )}
-      {open && isBlocks(inst) && (
+      {open && (isBlocks(inst) || isSheet(inst)) && (
         <div className="blocks-dialog" role="dialog" aria-label={`Creation code for ${objectName}`} onKeyDown={(e) => e.key === "Escape" && setOpen(false)}>
           <div className="blocks-dialog-head">
             <span>
@@ -1345,24 +1350,42 @@ function CreationCode({ roomId, inst, focus }: { roomId: string; inst: RoomInsta
             </button>
           </div>
           <div className="blocks-dialog-body">
-            <Suspense fallback={<div className="empty-pane">Loading blocks…</div>}>
-              <BlocksEditor
-                key={inst.id}
-                eventId={`inst:${inst.id}`}
-                kind="creation"
-                signature={`creation code: self is this ${objectName}`}
-                state={inst.blocks ?? emptyBlocks("creation")}
-                code={inst.code}
-                onChange={(blocks, code) =>
-                  edit((i) => {
-                    i.blocks = blocks;
-                    i.code = code;
-                  })
-                }
-                names={() => blockNamesFor(projectRef.current)}
-                onConvert={convert}
-                errorLine={focus}
-              />
+            <Suspense fallback={<div className="empty-pane">Loading…</div>}>
+              {isSheet(inst) ? (
+                <SheetEditor
+                  key={inst.id}
+                  id={`inst:${inst.id}`}
+                  sheet={inst.sheet ?? emptySheet()}
+                  code={inst.code}
+                  onChange={(sheet, code) =>
+                    edit((i) => {
+                      i.sheet = sheet;
+                      i.code = code;
+                    })
+                  }
+                  names={() => blockNamesFor(projectRef.current)}
+                  onConvert={convert}
+                  errorLine={focus}
+                />
+              ) : (
+                <BlocksEditor
+                  key={inst.id}
+                  eventId={`inst:${inst.id}`}
+                  kind="creation"
+                  signature={`creation code: self is this ${objectName}`}
+                  state={inst.blocks ?? emptyBlocks("creation")}
+                  code={inst.code}
+                  onChange={(blocks, code) =>
+                    edit((i) => {
+                      i.blocks = blocks;
+                      i.code = code;
+                    })
+                  }
+                  names={() => blockNamesFor(projectRef.current)}
+                  onConvert={convert}
+                  errorLine={focus}
+                />
+              )}
             </Suspense>
           </div>
         </div>

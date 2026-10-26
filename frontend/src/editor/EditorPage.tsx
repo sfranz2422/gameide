@@ -125,9 +125,9 @@ export function EditorPage({ store, id }: { store: ProjectStore; id: string }) {
       }
       // Ctrl+Z everywhere but where text is being typed: a code editor or a
       // box has its own undo, and taking the key there would undo the
-      // project instead of the typing. The blocks workspace has its own too.
+      // project instead of the typing. Blocks and sheets have their own too.
       const t = e.target as HTMLElement | null;
-      const typing = !!t && (!!t.closest(".cm-editor, .blocks-editor, .blocklyWidgetDiv, .blocklyDropDownDiv") || t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable);
+      const typing = !!t && (!!t.closest(".cm-editor, .blocks-editor, .blocklyWidgetDiv, .blocklyDropDownDiv, .sheet-editor") || t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable);
       if (!typing && (e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === "z" || e.key.toLowerCase() === "y")) {
         e.preventDefault();
         if (e.key.toLowerCase() === "y" || e.shiftKey) redo();

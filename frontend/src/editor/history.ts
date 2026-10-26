@@ -17,10 +17,11 @@
  * typing done since.
  */
 import type { BlocksState } from "../blocks/blockState";
+import type { Sheet } from "../eventsheets/sheet";
 import type { Project } from "../store/project";
 
 /** Anything with code in it: an event, a script, a room instance's creation code. Ids are unique across all. */
-type CodeHolder = { id: string; code: string; mode?: "python" | "blocks"; blocks?: BlocksState };
+type CodeHolder = { id: string; code: string; mode?: "python" | "blocks" | "sheet"; blocks?: BlocksState; sheet?: Sheet };
 
 export const GROUP_MS = 1000;
 export const MAX_STEPS = 200;
@@ -40,8 +41,8 @@ export interface RecordOptions {
 /** `snapshot`, with all code as it is in `current` wherever the same thing still exists. */
 export function keepCode(snapshot: Project, current: Project): Project {
   const out = structuredClone(snapshot);
-  // Events, scripts and creation code. Their blocks are code too, and so
-  // is whether they are blocks at all: undoing a sprite change must not
+  // Events, scripts and creation code. Their blocks and sheets are code
+  // too, and so is which of the three they are: undoing a sprite change must not
   // turn blocks back into Python, or Python (after Convert) back into blocks.
   const holders = (p: Project): CodeHolder[] => [
     ...p.objects.flatMap((o) => o.events),
@@ -57,6 +58,8 @@ export function keepCode(snapshot: Project, current: Project): Project {
     else delete h.mode;
     if (n.blocks) h.blocks = structuredClone(n.blocks);
     else delete h.blocks;
+    if (n.sheet) h.sheet = structuredClone(n.sheet);
+    else delete h.sheet;
   }
   return out;
 }

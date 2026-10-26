@@ -268,6 +268,19 @@ class GameObject:
         _call(self, "on_destroy")
         _call(self, "on_cleanup")
 
+    def once(self, key, condition):
+        """
+        True the first step `condition` is true, then not again until it has
+        been false — GDevelop's "Trigger once", which event sheets write as
+        `if self.once("a1b2c3", keyboard_check("space")):`. The key keeps one
+        row's memory apart from another's; each instance has its own.
+        """
+        memory = self.__dict__.setdefault("_once", {})
+        now = bool(condition)
+        before = memory.get(key, False)
+        memory[key] = now
+        return now and not before
+
     # The collision helpers as methods, for students who prefer
     # self.place_meeting(...) — the global forms use the running instance.
     def place_meeting(self, x, y, obj):

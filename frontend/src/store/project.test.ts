@@ -88,7 +88,7 @@ describe("loading an older project", () => {
     };
     const p = migrate(old);
     const room = p.rooms[0]!;
-    expect(p.schemaVersion).toBe(6);
+    expect(p.schemaVersion).toBe(7);
     expect(p.tilesets).toEqual([]); // 2 → 3 added tilesets
     expect(room.camera).toEqual({ enabled: false, width: 800, height: 600, follow: null, smoothing: 1 });
     expect([room.gridWidth, room.snap]).toEqual([32, true]);

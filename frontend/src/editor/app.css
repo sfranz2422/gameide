@@ -732,6 +732,255 @@ button:focus-visible {
   display: flex;
   flex-direction: column;
 }
+/* ---------------------------------------------------------------- event sheets */
+.sheet-editor {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--code-bg);
+  outline: none;
+}
+.sheet-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+}
+.sheet-toolbar .spacer {
+  flex: 1;
+}
+.sheet-rows {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 8px 10px 40px;
+}
+.sheet-empty {
+  max-width: 420px;
+}
+.sheet-row {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  margin: 4px 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  position: relative;
+}
+.sheet-row.event > .sheet-conds,
+.sheet-row.event > .sheet-acts {
+  flex: 1 1 50%;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 8px;
+}
+/* Conditions on the left, actions on the right, as in GDevelop. */
+.sheet-row.event > .sheet-conds {
+  border-right: 1px solid var(--border);
+  background: color-mix(in srgb, var(--panel) 85%, #5cb1d6);
+}
+.sheet-row.else > .sheet-conds {
+  background: color-mix(in srgb, var(--panel) 85%, #ffab19);
+}
+.sheet-row.foreach,
+.sheet-row.comment {
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+}
+.sheet-row.foreach {
+  background: color-mix(in srgb, var(--panel) 82%, #ffab19);
+}
+.sheet-row.comment {
+  background: transparent;
+  border-style: dashed;
+}
+.sheet-children {
+  margin-left: 22px;
+  padding-left: 8px;
+  border-left: 2px solid var(--border);
+}
+.sheet-block.error > .sheet-row,
+.sheet-row.error,
+.sheet-chip.error {
+  outline: 2px solid var(--danger, #ef4444);
+  outline-offset: 1px;
+}
+.sheet-kw {
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.sheet-fn {
+  font-family: var(--mono);
+  font-weight: 600;
+  color: var(--syn-function);
+}
+.sheet-chip {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 4px 3px 7px;
+  border-radius: 6px;
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  max-width: 100%;
+}
+.sheet-chip select,
+.sheet-row.foreach select {
+  font: inherit;
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: 1px 2px;
+  background: var(--code-bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+}
+.sheet-chip.bad {
+  border-color: var(--danger, #ef4444);
+}
+.sheet-arg {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.sheet-x,
+.sheet-not,
+.sheet-any,
+.sheet-plus {
+  border: 0;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  border-radius: 5px;
+  padding: 1px 5px;
+  font: inherit;
+  font-size: 12px;
+}
+.sheet-x:hover,
+.sheet-plus:hover {
+  color: var(--text);
+  background: var(--panel-2);
+}
+.sheet-not.on,
+.sheet-any.on {
+  color: #fff;
+  background: var(--accent);
+}
+.sheet-any {
+  border: 1px solid var(--border);
+}
+.sheet-problem {
+  color: var(--danger, #ef4444);
+  font-size: 12px;
+}
+.sheet-tools {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  padding: 3px;
+}
+.sheet-menu,
+.sheet-picker {
+  position: absolute;
+  z-index: 40;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 30px #0006;
+  padding: 4px;
+}
+.sheet-menu {
+  right: 0;
+  top: 100%;
+  width: 260px;
+}
+.sheet-add {
+  position: relative;
+}
+.sheet-picker {
+  left: 0;
+  top: 100%;
+  width: 300px;
+  max-height: 360px;
+  display: flex;
+  flex-direction: column;
+}
+.sheet-picker input {
+  margin: 4px;
+}
+.sheet-picker-list {
+  overflow: auto;
+}
+.sheet-picker h4 {
+  margin: 8px 6px 2px;
+  font-size: 11px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.sheet-comment,
+.sheet-as {
+  font: inherit;
+  background: var(--code-bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 2px 6px;
+}
+.sheet-comment {
+  flex: 1;
+  font-style: italic;
+}
+.sheet-as {
+  width: 6ch;
+  font-family: var(--mono);
+}
+.sheet-hash {
+  color: var(--syn-comment);
+  font-family: var(--mono);
+}
+.expr-box {
+  display: inline-block;
+  min-width: 3ch;
+  max-width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--code-bg);
+  vertical-align: middle;
+}
+.expr-box.bad {
+  border-color: var(--danger, #ef4444);
+  box-shadow: 0 0 0 1px var(--danger, #ef4444);
+}
+.expr-box .cm-editor {
+  font-size: 12.5px;
+}
+.expr-box .cm-editor.cm-focused {
+  outline: none;
+}
+.expr-box .cm-content {
+  padding: 1px 4px;
+  font-family: var(--mono);
+  color: var(--code-text);
+  caret-color: var(--accent);
+}
+.expr-box .cm-line {
+  padding: 0;
+}
+.expr-box .cm-scroller {
+  overflow: hidden;
+}
+
 /* Blockly in the page's colours, light or dark, without a theme reload. */
 .blocks-editor .blocklyMainBackground {
   fill: var(--code-bg) !important;

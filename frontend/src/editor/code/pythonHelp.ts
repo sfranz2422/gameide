@@ -101,7 +101,7 @@ function methodAsFunction(name: string): ApiFunction | undefined {
   return FUNCTIONS.get(name);
 }
 
-function valuesFor(type: ParamType, names: ProjectNames): string[] {
+export function valuesFor(type: ParamType, names: ProjectNames): string[] {
   switch (type) {
     case "object":
       return [...names.objects, ...(names.layers ?? [])];

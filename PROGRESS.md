@@ -1,6 +1,63 @@
 # Progress
 
-## Phase 7 — Code blocks ✅ (2026-10-26, waiting for review)
+## Phase 8 — Event sheets ✅ (2026-10-26, waiting for review)
+
+As agreed: per-event sheets, explicit for-each instead of GDevelop's hidden picking, typed Python boxes, and sheets for creation code but not scripts.
+
+### Done
+
+- **An Event Sheet tab for every event**, and for creation code (in the same dialog as its blocks). The sheet is one method's body, so its subject is `self`; objects, inheritance, collision events with `other`, alarms and scripts all stay as they are.
+- **Rows of conditions → actions.** Conditions are on the left, actions on the right, as in GDevelop.
+  - A row with no conditions just runs its actions.
+  - A row's conditions are all needed (`and`), or click **all (and)** to make any one enough (`or`).
+  - **not** turns a condition around.
+  - From a row's ⋯ menu: **sub-events** (nested `if`s), **Else** after a row (with conditions it's `elif`), **For each** inside, comments, move up/down, delete.
+- **For each Enemy as e** is how a sheet works on other instances. The rows under it say `e.x`, `e.hspeed`, `destroy e`: the loop students will write in Python, in the open.
+- **Pickers come from the catalog:**
+  - Every function that answers True or False is a condition.
+  - Every function called for what it does is an action.
+  - Your scripts' functions are listed too.
+  - Plus **Compare two values**, **Python condition**, **Set or change a value** (`=`, `+=`, `-=`), **Destroy an instance** (`other` to start with in a collision event), **Python line**, and **Trigger once**.
+- **Trigger once** is GDevelop's favourite: true the first step the rest of the row is true, then not again until it has been false. It compiles to `self.once("…", condition)`, a small new method on every instance, documented with the other properties.
+- **Every box is a small Python editor:**
+  - It has the editor's highlighting and autocomplete. Inside the quotes of a name parameter, it suggests the project's objects, sprites, rooms, layers, keys or colours.
+  - It's checked as you type (no Pyodide needed on the page): a red outline and a tooltip say "This isn't a Python value." A line box refuses `if`/`for`/`while`, since rows do those.
+  - An Else with no row above it, or a for-each with a bad name, is flagged on the row.
+- **The Python beside the sheet** is what a person would write: `if keyboard_check("right") and not place_free(self.x + 4, self.y):`, brackets only where `and`/`or` need them, `camera_shake()` while its arguments are the defaults, `pass` only where Python needs it.
+- **Errors land on the row:** clicking a game error outlines the action (or row) that made the line, and marks the line in the Python.
+- **Undo:**
+  - Each box has its own typing undo.
+  - Ctrl+Z anywhere else on the sheet (or ↶ ↷ in its toolbar) undoes the last change to the sheet. Typing in one box is one step.
+  - The project's undo leaves sheets alone, as it does code and blocks.
+- **The same rules as blocks:** empty code switches freely between Python, Blocks and Event Sheet. A sheet converts to Python once, after a warning. Python never becomes a sheet, and blocks and sheets don't turn into each other.
+- **Renaming** an object or sprite changes it in a sheet's boxes and for-each rows.
+- **Calls to your script functions follow them.** If a function gains or loses a parameter, its calls on a sheet get a box (starting at 0) or lose one when the sheet is next opened, as call blocks do.
+
+The project format is now **version 7**: events and creation code can be sheets. Older projects load unchanged. Sheets are plain JSON (`eventsheets/sheet.ts`), easy for tutorial step checks to read.
+
+### Tests
+
+```
+cd frontend
+npm test                      # Vitest: 174
+npm run e2e                   # Playwright: 48 editor tests + 7 account tests
+../backend/.venv/bin/python ../backend/tests/test_server.py   # 53 server checks
+python3 scripts/sabotage.py   # 242 deliberate bugs
+```
+
+New this phase:
+- `src/eventsheets/sheet.test.ts`: the exact Python for and/or/not, no-condition rows, sub-events, else/elif, for-each, comments and Trigger once; the line map; the checks on what's typed; every catalog condition and action compiling in real Python with the arguments its boxes start with; Trigger once firing once and again after resetting, in a real game; renaming.
+- `e2e/sheets.spec.ts`: building a sheet with the pickers and playing it with the keyboard; name suggestions inside quotes; nesting, else, for-each and comments; a bad box marked; the Python/Sheet rules and Convert; an error outlining its action; Ctrl+Z on and off the sheet; creation code as a sheet, renamed.
+
+### Known issues and gaps
+
+- **Scripts can't be sheets**, as agreed. A script is function definitions, which aren't conditions → actions.
+- **No drag-and-drop of rows.** They move with Move up/down in the row menu; sub-events are added from it rather than dragged under a row.
+- A for-each row's object is a dropdown of objects only, not tile layers (those aren't instances).
+
+---
+
+## Phase 7 — Code blocks ✅ (2026-10-26, reviewed)
 
 ### After review: blocks everywhere code lives
 
@@ -426,9 +483,9 @@ of its own after Phase 9.
 | 10 Classrooms | classes, assignments, dashboard | |
 | 11 Tutorials | tutorial panel, checks, library | |
 
-## Next: Phase 8 — Event sheets
+## Next: Phase 9 — Sounds, export, publishing
 
-GDevelop-style rows of conditions → actions, with sub-events, "or" groups and comments, the pickers built from the same API catalog, compiled to Python shown beside the sheet.
+Audio (sounds stored in Postgres like pictures), HTML5 export, the remaining microStudio exports (installable web app, desktop), publish links with all three visibility levels, the public Explore page, the class gallery, remixing and reporting — plus gamepad, save files and custom fonts.
 
 ---
 

@@ -11,8 +11,8 @@ tests and updating PROGRESS.md.
 Pyodide; runs headless in node), `src/engine/render/` (PixiJS), `src/python/`
 (the bridge, `runtime.py`, the game worker, `codegen.ts`), `src/catalog/`
 (the API catalog), `src/store/` (the project format, IndexedDB, templates),
-`src/editor/` (the React UI), `src/blocks/` (code blocks). `eventsheets/`
-waits for its phase. `backend/` is the Flask server.
+`src/editor/` (the React UI), `src/blocks/` (code blocks),
+`src/eventsheets/` (event sheets). `backend/` is the Flask server.
 
 ## The game runs in a worker
 
@@ -144,6 +144,25 @@ testing.
 - `blockly/core` has no words: `setLocale(En)` must run before a standard
   block is made, or it throws. A theme colour Blockly can't read (one with
   alpha) throws too, and the workspace never appears.
+
+## Event sheets
+
+- `src/eventsheets/`. A sheet is one method's body (`mode: "sheet"`, rows in
+  `sheet`), for events and creation code — not scripts. Like blocks it
+  writes its Python into `code`; `sheet.ts` (pure: tests and tutorial checks
+  read it) compiles it with a line map of row/condition/action ids.
+- Its subject is `self`. Other instances only through a "for each" row that
+  names them — no GDevelop-style hidden picking.
+- Boxes are typed Python, checked with Lezer (`checkExpr`, `checkLine`), not
+  Pyodide, which isn't on the page. Trigger once is `self.once(key, cond)`
+  in runtime.py.
+- Conditions/actions come from the catalog by `returns` ("True or False" /
+  "nothing" or `alsoStatement`), so new catalog functions appear by themselves.
+- A sheet has its own undo (SheetEditor), each box its own typing undo; the
+  global Ctrl+Z skips `.sheet-editor`. Edits change a structuredClone of the
+  sheet, found again by id — never the row objects on screen.
+- `codeMode.tsx` holds the rules for all three modes (`canUse`, `switchTo`,
+  `confirmToPython`).
 
 ## Projects and code generation
 

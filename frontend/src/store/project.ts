@@ -16,10 +16,11 @@
  * keystroke does not rewrite every picture.
  */
 import { renameInBlocks, type BlocksState } from "../blocks/blockState";
+import { renameInSheet, type Sheet } from "../eventsheets/sheet";
 import { KEY_NAMES, MOUSE_BUTTONS, type KeyName } from "../engine/layout";
 
 /** Bump when the format changes, and teach `migrate` the old shape. */
-export const SCHEMA_VERSION = 6; // 2: room layers, grid, camera, instance overrides. 3: tilesets and tile layers. 4: autotile sets. 5: blocks in events. 6: blocks in scripts and creation code
+export const SCHEMA_VERSION = 7; // 2: room layers, grid, camera, instance overrides. 3: tilesets and tile layers. 4: autotile sets. 5: blocks in events. 6: blocks in scripts and creation code. 7: event sheets
 
 export interface Project {
   format: "gameide-project";
@@ -143,15 +144,17 @@ export interface ObjectEvent {
   key: EventKey;
   /**
    * How the event is written. "python" is typed; "blocks" keeps its blocks
-   * in `blocks` and writes the Python they make into `code` on every change,
-   * so the game, error mapping and export only ever read `code`. "sheet"
-   * (Phase 8) will do the same. Python never turns back into blocks.
+   * in `blocks`, "sheet" its rows in `sheet`, and both write the Python they
+   * make into `code` on every change, so the game, error mapping and export
+   * only ever read `code`. Python never turns into blocks or a sheet.
    */
-  mode: "python" | "blocks";
+  mode: "python" | "blocks" | "sheet";
   /** The body of the method, without the def line: typed, or made by the blocks. */
   code: string;
   /** Blockly's saved workspace, when mode is "blocks" (blocks/blockState.ts). */
   blocks?: BlocksState;
+  /** The event sheet's rows, when mode is "sheet" (eventsheets/sheet.ts). */
+  sheet?: Sheet;
 }
 
 export interface RoomResource {
@@ -234,9 +237,10 @@ export interface RoomInstance {
   angle: number;
   /** Creation code: Python run for this one instance, after its Create event. */
   code: string;
-  /** Absent means "python". As for an event: blocks write their Python into `code`. */
-  mode?: "python" | "blocks";
+  /** Absent means "python". As for an event: blocks or a sheet write their Python into `code`. */
+  mode?: "python" | "blocks" | "sheet";
   blocks?: BlocksState;
+  sheet?: Sheet;
 }
 
 export interface ScriptResource {
@@ -525,6 +529,7 @@ export function replaceQuoted(project: Project, from: string, to: string) {
     for (const e of o.events) {
       e.code = sub(e.code);
       if (e.blocks) renameInBlocks(e.blocks, from, to);
+      if (e.sheet) renameInSheet(e.sheet, from, sub, to);
     }
   for (const s of project.scripts) {
     s.code = sub(s.code);
@@ -534,6 +539,7 @@ export function replaceQuoted(project: Project, from: string, to: string) {
     for (const i of r.instances) {
       i.code = sub(i.code);
       if (i.blocks) renameInBlocks(i.blocks, from, to);
+      if (i.sheet) renameInSheet(i.sheet, from, sub, to);
     }
 }
 
@@ -607,9 +613,10 @@ export function migrate(data: unknown): Project {
   if (p.schemaVersion < 2) upgradeTo2(p as Project);
   if (p.schemaVersion < 3) upgradeTo3(p as Project);
   if (p.schemaVersion < 4) upgradeTo4(p as Project);
-  // 4 → 5: events may be blocks; 5 → 6: scripts and creation code too.
-  // Everything older is Python, as it says (a missing mode means Python).
-  if (p.schemaVersion < 6) p.schemaVersion = 6;
+  // 4 → 5: events may be blocks; 5 → 6: scripts and creation code too;
+  // 6 → 7: events and creation code may be sheets. Everything older is
+  // Python, as it says (a missing mode means Python).
+  if (p.schemaVersion < 7) p.schemaVersion = 7;
   return p as Project;
 }
 

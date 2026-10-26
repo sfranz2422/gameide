@@ -307,9 +307,10 @@ for (const e of API) {
 
 // ---------------------------------------------------------------- properties
 
-/** Built-in properties a block can set: not object_name (read-only) or alarm (its own block). */
-const SETTABLE = PROPERTIES.filter((p) => p.name !== "object_name" && p.name !== "alarm").map((p) => p.name);
-const READABLE = PROPERTIES.filter((p) => p.name !== "alarm").map((p) => p.name);
+/** Built-in properties a block can set: not object_name (read-only). */
+// Not alarm (its own block) or once (a method, for event sheets).
+const SETTABLE = PROPERTIES.filter((p) => !["object_name", "alarm", "once"].includes(p.name)).map((p) => p.name);
+const READABLE = PROPERTIES.filter((p) => !["alarm", "once"].includes(p.name)).map((p) => p.name);
 const propField = (names: string[]) => new Blockly.FieldDropdown(names.map((n) => [n, n]));
 const propTip = (b: Blockly.Block) => () => PROPERTIES.find((p) => p.name === b.getFieldValue("PROP"))?.description ?? "";
 
