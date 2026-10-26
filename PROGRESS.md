@@ -25,7 +25,7 @@ As agreed: a build kit (one command on a computer with Node), achievements later
 cd frontend
 npm test                      # Vitest: 191
 npm run e2e                   # Playwright: 62 editor tests + 11 account tests (4 opt-in, skipped)
-../backend/.venv/bin/python ../backend/tests/test_server.py   # 123 server checks
+../backend/.venv/bin/python ../backend/tests/test_server.py   # 124 server checks
 python3 scripts/sabotage.py   # 310 deliberate bugs
 ```
 
