@@ -6,6 +6,7 @@
 import { describe, expect, it } from "vitest";
 import type { CameraDef, RoomInstance } from "../engine/game";
 import { F, G, STRIDE } from "../engine/layout";
+import { definitionForPython } from "./bridge";
 import { key, load, py, run } from "./testkit";
 
 const one = (cls: string, body: string) => `class ${cls}(GameObject):\n${body}`;
@@ -636,6 +637,40 @@ describe("instances", () => {
     run(game, 1);
     expect(game.engine.roomIndex).toBe(0);
     expect(py(game, "(global_vars.starts, instance_number('Keeper'), instance_number('Temp'))")).toEqual([1, 1, 1]);
+  });
+});
+
+describe("names a student chooses", () => {
+  // The bridge leaves pictures, sounds and fonts out of what Python is sent.
+  // It once did that by dropping every key called "font", "sound", "image"…
+  // anywhere — including a script called font, which then simply wasn't
+  // there: NameError on the first use of anything it defined.
+  it("a script called font or sound, and an object called image, all run", async () => {
+    const { game, error } = await load({
+      scripts: { font: "TITLE_SIZE = 24\n", sound: "def beep():\n    return 'beep'\n" },
+      code: { image: "class image(GameObject):\n    def on_create(self):\n        global_vars.made = True\n" },
+      instances: [{ object: "image", x: 0, y: 0 }],
+    });
+    expect(error).toBeNull();
+    run(game);
+    expect(py(game, "TITLE_SIZE")).toBe(24);
+    expect(py(game, "beep()")).toBe("beep");
+    expect(py(game, "global_vars.made")).toBe(true);
+  });
+
+  it("…while the pictures, tile grids, sounds and fonts still stay on this side", () => {
+    const blob = new Blob(["x"]);
+    const sent = definitionForPython({
+      sprites: [{ name: "s", width: 1, height: 1, originX: 0, originY: 0, frameCount: 1, images: [blob], pixelMasks: [new Uint8Array(1)] }],
+      tilesets: [{ name: "t", image: blob, tileWidth: 16, tileHeight: 16, offsetX: 0, offsetY: 0, spacingX: 0, spacingY: 0, columns: 1, count: 1, solid: [] }],
+      objects: [],
+      rooms: [{ name: "r", width: 16, height: 16, instances: [], tileLayers: [{ name: "L", depth: 0, visible: true, tileset: "t", columns: 1, rows: 1, cells: [0] }] }],
+      code: {},
+      sounds: [{ name: "boom", sound: blob }],
+      fonts: [{ name: "f", font: blob }],
+    });
+    for (const key of ["images", "pixelMasks", "image", "cells", "sound", "font"]) expect(sent).not.toContain(`"${key}"`);
+    expect(JSON.parse(sent).rooms[0].tileLayers[0].name).toBe("L");
   });
 });
 

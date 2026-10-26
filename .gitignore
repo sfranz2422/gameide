@@ -9,3 +9,6 @@ frontend/playwright-report/
 backend/.venv/
 backend/gameide.db
 backend/tests/*.db
+
+# The showcase game as built: it carries Anokolisa's art, which is not ours to put in the repository.
+showcase/out/

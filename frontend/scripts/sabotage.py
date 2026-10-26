@@ -55,6 +55,8 @@ CASES = [
  ("no parent walk", RT, "                p = objects[cur].get(\"parent\")\n                cur = _type_index.get(p) if p else None", "                cur = None", "parent's collision"),
  ("no solid revert", RT, "            if other.solid:\n                o.x = o.xprevious", "            if False:\n                o.x = o.xprevious", "solid instance puts"),
  ("outside every step", EN, "outside && !st[b + F.OUTSIDE])", "outside)", "outside room fires once"),
+ ("strip by key name", BRG, "  return JSON.stringify({\n    ...def,", "  if (def) return JSON.stringify(def, (k, v) => ([\"font\", \"sound\", \"image\"].includes(k) ? undefined : v));\n  return JSON.stringify({\n    ...def,", "a script called font"),
+ ("pictures sent to Python", BRG, "    sprites: def.sprites.map(({ images, pixelMasks, ...rest }) => rest),\n", "", "still stay on this side"),
  ("no anim end", EN, "this.pushEvent(events, EV.ANIMATION_END, s, 0);", ";", "animation end"),
  ("tap lost", IN, "keys[KEY_COUNT + i] = this.pressed[i]!;", "keys[KEY_COUNT + i] = this.held[i]!;", "tapped between"),
  ("no instance mouse", EN, "this.pushEvent(events, EV.MOUSE, c, edge.button * 2 + (edge.released ? 1 : 0));", ";", "clicking an instance"),

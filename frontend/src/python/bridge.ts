@@ -77,6 +77,25 @@ _fresh_module
 `;
 
 /** A running game: one Engine plus its Python side. */
+/**
+ * The game as Python is given it: without the pictures, pixel masks, tile
+ * grids, and sound and font files, which Python never needs (and a pixel
+ * mask stringified is a key per pixel). Taken out of the places they live,
+ * NOT by key name: a JSON replacer that dropped every key called "font" or
+ * "sound" also dropped a script called "font", an object called "sound"
+ * and save_set("image", …) — silently, so the game ran without them.
+ */
+export function definitionForPython(def: GameDefinition): string {
+  return JSON.stringify({
+    ...def,
+    sprites: def.sprites.map(({ images, pixelMasks, ...rest }) => rest),
+    tilesets: def.tilesets?.map(({ image, ...rest }) => rest),
+    rooms: def.rooms.map((r) => (r.tileLayers ? { ...r, tileLayers: r.tileLayers.map(({ cells, ...rest }) => rest) } : r)),
+    sounds: def.sounds?.map(({ sound, ...rest }) => rest),
+    fonts: def.fonts?.map(({ font, ...rest }) => rest),
+  });
+}
+
 export class PythonGame {
   readonly engine: Engine;
   readonly timing: StepTiming = { pythonMs: 0, motionMs: 0 };
@@ -150,10 +169,7 @@ export class PythonGame {
 
     // JSON both ways at load: one crossing each, and no proxies to leak.
     const setup = module._setup as ((a: string, b: string) => string | undefined) & PyProxy;
-    // Pictures and pixel masks stay on this side: Python never needs them,
-    // and a pixel mask stringified is a key per pixel.
-    const forPython = JSON.stringify(def, (k, v) => (["images", "pixelMasks", "image", "cells", "sound", "font"].includes(k) ? undefined : v));
-    const loadOut = setup(JSON.stringify(layoutForPython()), forPython);
+    const loadOut = setup(JSON.stringify(layoutForPython()), definitionForPython(def));
     setup.destroy();
     let error = game.handle(loadOut);
     if (!error) {
