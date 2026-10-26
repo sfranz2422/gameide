@@ -55,6 +55,17 @@ New:
   - a report, a take-down, and the note the student sees;
   - the install manifest.
 
+### After review: microStudio's look
+
+The dark theme now follows microStudio's own stylesheets, read from its source (github.com/pmgl/microstudio):
+- everything on one hue: a deep blue-teal gradient behind, steel blue for bars, tabs and whatever is selected;
+- green for Play and other actions;
+- a pastel colour for each kind of thing in the tree, with a matching bar beside what is open (scripts red, sprites yellow, tilesets green, objects cyan, rooms purple, sounds mint, fonts blue, settings pink);
+- Source Sans and Ubuntu, bundled with the app so a school filter can't block them;
+- code in Ubuntu Mono, in microStudio's Tomorrow Night Bright colours on black.
+
+The light theme is unchanged.
+
 ### Known issues and gaps
 
 - **GameIDE can't bring classes in yet.** That's Phase 10, done the way PyIDE does it. Until then there are no GameIDE classes, so "My class" is greyed out, there are no galleries, and teachers' Approvals lists are empty: only an admin can approve a student's game for Explore.

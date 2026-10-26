@@ -52,9 +52,21 @@ async function addUnderHat(page: Page, cat: string, text: string | RegExp, nth =
   const stack = hat(page);
   const before = (await stack.boundingBox())!;
   const at = await underHat(page);
-  // Under the last block already there: the hat's C grows by each block.
-  const filled = (await pythonPane(page).innerText()).trim() ? before.height * 0.48 - 26 : 0;
-  await dragTo(page, page.locator(".blocklyFlyout .blocklyDraggable").filter({ hasText: text }).nth(nth), at.x, at.y + filled);
+  // Under the last block already there: just below the lowest block inside
+  // the hat, measured (block sizes follow the fonts, so no guessing).
+  const inside = await stack.locator(".blocklyDraggable:not(.blocklyShadow)").evaluateAll((els) => els.map((e) => e.getBoundingClientRect().bottom));
+  const y = inside.length ? Math.max(...inside) + 2 : at.y;
+  // A block low in the palette may be under its edge (or scrollbar): scroll the palette first.
+  const block = page.locator(".blocklyFlyout .blocklyDraggable").filter({ hasText: text }).nth(nth);
+  const flyout = (await page.locator(".blocklyFlyout").first().boundingBox())!;
+  for (let tries = 0; tries < 10; tries++) {
+    const b = (await block.boundingBox())!;
+    if (b.y + b.height <= flyout.y + flyout.height - 24) break;
+    await page.mouse.move(flyout.x + flyout.width / 2, flyout.y + flyout.height / 2);
+    await page.mouse.wheel(0, 120);
+    await page.waitForTimeout(100);
+  }
+  await dragTo(page, block, at.x, y);
   await expect.poll(async () => (await stack.boundingBox())!.height).toBeGreaterThan(before.height);
 }
 

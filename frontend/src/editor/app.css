@@ -1,34 +1,46 @@
 /* GameIDE. Dark by default (game editors usually are, and the game pane
-   reads better against it); light from the sun/moon button. The dark greys
-   were lightened a step on 2026-10-26 at the teacher's request — the
-   stage behind the game stays dark on purpose, so games still stand out. */
+   reads better against it); light from the sun/moon button.
+
+   The dark theme is microStudio's (2026-10-26, at the teacher's request),
+   taken from its own stylesheets (github.com/pmgl/microstudio,
+   static/css): everything on one hue, 200 — a deep blue-teal gradient
+   behind, steel-blue hsl(200,30%,30%) for bars and what is selected,
+   green hsl(160,50%,40%) for doing things, a pastel colour per kind of
+   thing (code red, sprites yellow, maps green, sounds mint, docs blue…),
+   Source Sans and Ubuntu, and code in Tomorrow Night Bright on black. */
 :root {
-  --bg: #1b2433;
-  --panel: #232e41;
-  --panel-2: #2c3a51;
-  --border: #374862;
-  --text: #e3e9f3;
-  --muted: #9eabc2;
-  --accent: #4f8cff;
-  --accent-2: #3dd68c;
-  --danger: #ff6b6b;
-  --warn: #ffcc66;
-  --stage: #0b1019;
-  --code-bg: #161f2d;
-  --code-gutter: #161f2d;
-  --code-text: #dce4f0;
-  --code-active: #1f2a3c;
-  --code-selection: #2b4570;
-  --code-error-line: rgba(255, 90, 90, 0.18);
-  --syn-keyword: #c792ea;
-  --syn-string: #c3e88d;
-  --syn-number: #f78c6c;
-  --syn-comment: #74839f;
-  --syn-function: #82aaff;
-  --syn-self: #ff9cac;
-  --syn-property: #89ddff;
-  --syn-class: #ffcb6b;
-  --mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
+  --bg: hsl(200, 20%, 11%);
+  --bg-gradient: linear-gradient(135deg, hsl(200, 35%, 16%), hsl(200, 20%, 11%));
+  --panel: hsl(200, 20%, 16%);
+  --panel-2: hsl(200, 30%, 30%);
+  --panel-3: hsl(200, 30%, 38%);
+  --border: hsl(200, 25%, 24%);
+  --text: rgba(255, 255, 255, 0.9);
+  --muted: hsla(200, 10%, 85%, 0.62);
+  --accent: hsl(200, 50%, 50%);
+  --accent-2: hsl(160, 50%, 40%);
+  --go: hsl(160, 50%, 40%);
+  --go-hover: hsl(160, 50%, 50%);
+  --danger: hsl(0, 50%, 55%);
+  --warn: hsl(30, 100%, 70%);
+  --stage: #000;
+  --code-bg: #000;
+  --code-gutter: #0b0d0e;
+  --code-text: #dedede;
+  --code-active: #2a2a2a;
+  --code-selection: #424242;
+  --code-error-line: rgba(255, 90, 90, 0.22);
+  --syn-keyword: #c397d8;
+  --syn-string: #b9ca4a;
+  --syn-number: #e78c45;
+  --syn-comment: #969896;
+  --syn-function: #7aa6da;
+  --syn-self: #d54e53;
+  --syn-property: #70c0b1;
+  --syn-class: #e7c547;
+  --sans: "Source Sans 3", "Source Sans Pro", Verdana, sans-serif;
+  --heading: "Ubuntu", "Source Sans 3", Verdana, sans-serif;
+  --mono: "Ubuntu Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   color-scheme: dark;
 }
 
@@ -37,6 +49,8 @@
    same thing when the teacher says "the blue button". */
 :root[data-theme="light"] {
     --bg: #eef2f7;
+    --bg-gradient: #eef2f7;
+    --panel-3: #e4ebf4;
     --panel: #ffffff;
     --panel-2: #f4f7fb;
     --border: #d6deea;
@@ -70,10 +84,16 @@ body,
   margin: 0;
 }
 body {
-  background: var(--bg);
+  background: var(--bg-gradient, var(--bg));
   color: var(--text);
-  font: 14px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
+  font: 15px/1.4 var(--sans);
   overflow: hidden;
+}
+h1,
+h2,
+h3,
+.brand {
+  font-family: var(--heading);
 }
 body.resizing-x {
   cursor: col-resize;
@@ -120,12 +140,13 @@ a {
   align-items: center;
   gap: 6px;
   padding: 5px 11px;
-  border: 1px solid var(--border);
-  border-radius: 7px;
+  border: 1px solid transparent;
+  border-radius: 5px;
   background: var(--panel-2);
   cursor: pointer;
 }
 .btn:hover:not(:disabled) {
+  background: var(--panel-3, var(--panel-2));
   border-color: var(--accent);
 }
 .btn:disabled {
@@ -137,10 +158,13 @@ a {
   font-size: 12.5px;
 }
 .btn.play {
-  background: var(--accent-2);
-  border-color: var(--accent-2);
-  color: #062414;
+  background: var(--go, var(--accent-2));
+  border-color: transparent;
+  color: #fff;
   font-weight: 600;
+}
+.btn.play:hover:not(:disabled) {
+  background: var(--go-hover, var(--accent-2));
 }
 .icon-btn {
   display: inline-grid;
@@ -292,7 +316,27 @@ button:focus-visible {
 }
 .tree-item.active {
   background: var(--panel-2);
-  box-shadow: inset 3px 0 0 var(--accent);
+  box-shadow: inset 4px 0 0 var(--kind-bar, var(--accent));
+}
+/* Each kind of thing its own colour, as microStudio's side menu has: the
+   icon pastel, and the bar beside what is open a stronger shade. */
+[data-tutorial="folder-scripts"] { --kind: hsla(0, 100%, 80%, 0.85); --kind-bar: hsl(0, 100%, 70%); }
+[data-tutorial="folder-sprites"] { --kind: hsla(45, 100%, 80%, 0.85); --kind-bar: hsl(45, 50%, 50%); }
+[data-tutorial="folder-tilesets"] { --kind: hsla(90, 100%, 80%, 0.85); --kind-bar: hsl(90, 50%, 50%); }
+[data-tutorial="folder-objects"] { --kind: hsla(180, 100%, 80%, 0.85); --kind-bar: hsl(180, 50%, 50%); }
+[data-tutorial="folder-rooms"] { --kind: hsla(270, 100%, 80%, 0.85); --kind-bar: hsl(270, 50%, 50%); }
+[data-tutorial="folder-sounds"] { --kind: hsla(135, 100%, 80%, 0.85); --kind-bar: hsl(135, 50%, 50%); }
+[data-tutorial="folder-fonts"] { --kind: hsla(225, 100%, 80%, 0.85); --kind-bar: hsl(225, 50%, 50%); }
+.tree-folder .tree-toggle svg,
+.tree-folder .tree-item svg {
+  color: var(--kind, currentColor);
+}
+.tree-settings svg {
+  color: hsla(315, 100%, 80%, 0.85);
+}
+:root[data-theme="light"] .tree-folder .tree-toggle svg,
+:root[data-theme="light"] .tree-folder .tree-item svg {
+  color: inherit;
 }
 .tree-item-btn {
   flex: 1;
@@ -411,8 +455,8 @@ button:focus-visible {
   white-space: nowrap;
 }
 .tab.on {
-  background: var(--code-bg);
-  box-shadow: inset 0 2px 0 var(--accent);
+  background: var(--panel-2);
+  box-shadow: inset 0 3px 0 var(--accent);
 }
 .tab-btn {
   display: flex;
@@ -1190,9 +1234,12 @@ button:focus-visible {
   margin: 0;
 }
 .btn.primary {
-  background: var(--accent);
-  border-color: var(--accent);
+  background: var(--go, var(--accent));
+  border-color: transparent;
   color: #fff;
+}
+.btn.primary:hover:not(:disabled) {
+  background: var(--go-hover, var(--accent));
 }
 .modal.wide {
   width: min(900px, calc(100vw - 32px));

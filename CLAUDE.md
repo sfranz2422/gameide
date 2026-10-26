@@ -208,6 +208,14 @@ testing.
 - No service worker: the game's worker loads Python past it (checked in
   Chromium and Chrome), so it couldn't make games offline.
 
+## Look
+
+- The dark theme is microStudio's: hue 200 throughout, tokens at the top of
+  app.css (`--panel-2` hsl(200,30%,30%) for bars and selection, `--go` green
+  for actions), per-kind colours on `[data-tutorial="folder-…"]`, fonts
+  from @fontsource (bundled, not Google: school filters). Match new UI to
+  those tokens rather than adding colours.
+
 ## Projects and code generation
 
 - The project is plain JSON (`store/project.ts`), resources linked by id.
