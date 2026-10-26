@@ -16,7 +16,7 @@
   - **The picture:** with the game running, "use what the game shows now" makes the picture Explore shows.
 - **Who can play:**
   - **Anyone with the link:** signed out too.
-  - **My class:** members of the class, its teacher and admins, after signing in. It's in the class's **gallery**. Classes are the shared ones from PyIDE, so a student's classes there count here.
+  - **My class:** members of the class, its teacher and admins, after signing in. It's in the class's **gallery**. Only **GameIDE's own classes** count, the ones a teacher brings into GameIDE, as each editor has its own. A student's PyIDE or WebIDE class never shows up here (fixed after review: at first every editor's classes were listed).
   - **Everyone, on Explore:** a student's game waits for a teacher's approval first; the link works meanwhile. Publishing again puts it back in the queue, so an approved game can't be swapped for something else. A teacher's or admin's goes straight up, and a class can be set to approve by itself.
 - **The play page** `/play/<id>`: the game, its title and author, plays (counted once per visit), likes, **Remix** (copies it into your games, crediting the original, if its author allows), **Report**, full screen, and **Install**, which adds it as an app with its own window and icon.
 - **Explore** (on the front page): approved public games, Featured / Newest / Most played, search, and a filter by kind. Plus a gallery page for each of your classes.
@@ -37,7 +37,7 @@ cd frontend
 npm test                      # Vitest: 191
 npm run e2e                   # Playwright: 55 editor tests + 11 account tests
 ../backend/.venv/bin/python ../backend/tests/test_server.py   # 118 server checks
-python3 scripts/sabotage.py   # 300 deliberate bugs
+python3 scripts/sabotage.py   # 301 deliberate bugs
 ```
 
 New:
@@ -57,6 +57,7 @@ New:
 
 ### Known issues and gaps
 
+- **GameIDE can't bring classes in yet.** That's Phase 10, done the way PyIDE does it. Until then there are no GameIDE classes, so "My class" is greyed out, there are no galleries, and teachers' Approvals lists are empty: only an admin can approve a student's game for Explore.
 - **Installed games don't play offline.** I built offline play with a service worker, then found in tests (Chromium and real Chrome) that the game's worker loads Python past any service worker, so it was taken out rather than shipped half-working. Install gives an app window and icon; starting needs the internet. The Steam build (9c) packs everything locally, so it is offline by nature.
 - **The HTML5 export holds every built file**, the editor's too (about 1 MB more zipped than the player needs). The game's worker is bundled out of sight of the build's file graph, so trimming the list risked a blank exported game.
 - **The approval queue lives on its own page** for now; Phase 10's teacher dashboard will take it in.

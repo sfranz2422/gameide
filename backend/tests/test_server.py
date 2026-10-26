@@ -239,13 +239,19 @@ other_teacher = client("teacher2@example.com")
 os.environ["TEACHER_EMAILS"] = "teacher@example.com,teacher2@example.com"
 db = server.SessionLocal()
 tid = tme["user"]["id"]
-period4 = accounts.Course(teacher_id=tid, name="Period 4", app="pyide")
+period4 = accounts.Course(teacher_id=tid, name="Period 4", app="gameide")
 db.add(period4)
 db.flush()
 for email in ("alice@example.com", "carol@example.com"):
     db.add(accounts.Enrollment(class_id=period4.id, email=email, name=email.split("@")[0]))
-db.add(accounts.Course(teacher_id=tid, name="Period 7", app="pyide"))  # a class of the teacher's alice isn't in
+db.add(accounts.Course(teacher_id=tid, name="Period 7", app="gameide"))  # a class of the teacher's alice isn't in
+# Alice's programming class is PyIDE's: it must never show up in GameIDE.
+pyclass = accounts.Course(teacher_id=tid, name="Programming 1", app="pyide")
+db.add(pyclass)
+db.flush()
+db.add(accounts.Enrollment(class_id=pyclass.id, email="alice@example.com", name="alice"))
 db.commit()
+PYCLASS = pyclass.id
 P4 = period4.id
 db.close()
 
@@ -255,6 +261,9 @@ alice.put("/api/projects/pub1/assets/pic1", data=PNG)
 settings = alice.get("/api/projects/pub1/publish").get_json()
 check("publishing offers the student's own classes", [c["name"] for c in settings["classes"]] == ["Period 4"], settings["classes"])
 check("…and their first name as the author, never their email", settings["author"] and "@" not in settings["author"])
+check("another editor's classes are never offered (PyIDE's Programming 1)", "Programming 1" not in [c["name"] for c in alice.get("/api/my-classes").get_json()["classes"]])
+check("…nor can a game be published to one", alice.post("/api/projects/pub1/publish", json={"title": "x", "visibility": "class", "classId": PYCLASS}).status_code == 400)
+check("…nor its gallery be opened through GameIDE", alice.get(f"/api/gallery/{PYCLASS}").status_code == 403)
 
 r = alice.post("/api/projects/pub1/publish", json={"title": "Coin Run", "visibility": "unlisted", "author": "alice@example.com"})
 pub = r.get_json()["published"]

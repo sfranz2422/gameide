@@ -363,6 +363,7 @@ CASES = [
  ("play page without its base", APP, """    head = (f'<base href="/">\\n    <link rel="manifest\"""", """    head = (f'\\n    <link rel="manifest\"""", "plays from its link for anyone", E2E),
  ("no picture sent", PD, "        json: { ...form, classId: form.visibility === \"class\" ? form.classId : null, ...(thumbnail ? { thumbnail } : {}) },", "        json: { ...form, classId: form.visibility === \"class\" ? form.classId : null, ...(thumbnail ? {} : {}) },", "on Explore with its picture", E2E),
  ("no manifest", APP, '        "display": "standalone",\n', "", "it has a manifest", E2E),
+ ("other editors' classes count", PUB, "    return db.query(accounts.Course).filter(accounts.Course.app == APP_NAME)", "    return db.query(accounts.Course)", "another editor's classes are never offered", PY),
 ]
 only = sys.argv[1:]
 # A name that matches no case would otherwise run nothing and still say

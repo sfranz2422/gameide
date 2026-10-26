@@ -36,6 +36,16 @@ from gamestore import ClassSettings, GameAsset, GameProject, Like, Published, Pu
 
 bp = Blueprint("publishing", __name__)
 
+#: The classes table is shared by PyIDE, WebIDE, FlaskIDE and GameIDE, each
+#: class belonging to one (its `app`). A teacher brings the classes that use
+#: GameIDE into GameIDE; only those count here — never a student's PyIDE
+#: class, or a teacher's web design class.
+APP_NAME = "gameide"
+
+
+def _courses(db):
+    return db.query(accounts.Course).filter(accounts.Course.app == APP_NAME)
+
 # Set by init(): the app's database session factory and its signed-in user.
 _db = None
 _current_user = None
@@ -77,12 +87,12 @@ def _need_user(db):
 # ---------------------------------------------------------------- classes and moderators
 
 def classes_of(db, user):
-    """Classes a user is in (enrolled by email) or teaches, from the shared tables — any editor's."""
+    """GameIDE's classes a user is in (enrolled by email) or teaches."""
     if user is None:
         return []
-    enrolled = (db.query(accounts.Course).join(accounts.Enrollment, accounts.Enrollment.class_id == accounts.Course.id)
+    enrolled = (_courses(db).join(accounts.Enrollment, accounts.Enrollment.class_id == accounts.Course.id)
                 .filter(func.lower(accounts.Enrollment.email) == user.email.lower()).all())
-    taught = db.query(accounts.Course).filter_by(teacher_id=user.id).all()
+    taught = _courses(db).filter_by(teacher_id=user.id).all()
     return list({c.id: c for c in enrolled + taught}.values())
 
 
@@ -91,12 +101,12 @@ def _member(db, user, class_id) -> bool:
 
 
 def _teachers_of(db, owner_id):
-    """Ids of the teachers of every class the owner is enrolled in."""
+    """Ids of the teachers of every GameIDE class the owner is enrolled in."""
     owner = db.query(accounts.User).get(owner_id)
     if owner is None:
         return set()
     rows = (db.query(accounts.Course.teacher_id).join(accounts.Enrollment, accounts.Enrollment.class_id == accounts.Course.id)
-            .filter(func.lower(accounts.Enrollment.email) == owner.email.lower()).all())
+            .filter(func.lower(accounts.Enrollment.email) == owner.email.lower(), accounts.Course.app == APP_NAME).all())
     return {r.teacher_id for r in rows}
 
 
@@ -503,7 +513,7 @@ def gallery(class_id):
     db = _db()
     try:
         user = _need_user(db)
-        course = db.query(accounts.Course).get(class_id)
+        course = _courses(db).filter(accounts.Course.id == class_id).first()
         if course is None or not (_member(db, user, class_id) or is_admin(user)):
             return err("That isn't one of your classes.", 403)
         emails = [e.email.lower() for e in db.query(accounts.Enrollment).filter_by(class_id=class_id).all()]
@@ -524,7 +534,7 @@ def _scope(db, user):
     q = db.query(Published)
     if is_admin(user):
         return q
-    taught = [c.id for c in db.query(accounts.Course).filter_by(teacher_id=user.id).all()]
+    taught = [c.id for c in _courses(db).filter_by(teacher_id=user.id).all()]
     emails = [e.email.lower() for e in db.query(accounts.Enrollment).filter(accounts.Enrollment.class_id.in_(taught or [-1])).all()]
     ids = [u.id for u in db.query(accounts.User).filter(func.lower(accounts.User.email).in_(emails or [""])).all()]
     return q.filter(Published.owner_id.in_(ids or [-1]))
@@ -556,7 +566,7 @@ def moderation():
             return {**_card(g), "visibility": g.visibility, "status": g.status, "takenDown": bool(g.taken_down),
                     "owner": o.display_name() if o else "", "reports": by_game.get(g.id, []), "updated": g.updated_at.isoformat() + "Z"}
 
-        taught = db.query(accounts.Course).filter_by(teacher_id=user.id).all()
+        taught = _courses(db).filter_by(teacher_id=user.id).all()
         auto = {s.class_id for s in db.query(ClassSettings).filter(ClassSettings.class_id.in_([c.id for c in taught] or [-1]),
                                                                     ClassSettings.auto_approve == 1).all()}
         return jsonify(
@@ -609,7 +619,7 @@ def class_setting(class_id):
     db = _db()
     try:
         user = _need_moderator(db)
-        course = db.query(accounts.Course).get(class_id)
+        course = _courses(db).filter(accounts.Course.id == class_id).first()
         if course is None or course.teacher_id != user.id:
             return err("That isn't one of your classes.", 403)
         s = db.query(ClassSettings).filter_by(class_id=class_id).first()
