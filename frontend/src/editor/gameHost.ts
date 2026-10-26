@@ -117,7 +117,9 @@ export class GameHost {
       this.events.output([{ text: `The game engine failed: ${ev.message}`, kind: "err" }]);
       this.setState("crashed");
     });
-    const indexURL = new URL(`${import.meta.env.BASE_URL}pyodide/`, location.href).href;
+    // From the page's base, not its address: the play page at /play/<id>
+    // has <base href="/">, and an exported game may sit in any folder.
+    const indexURL = new URL("pyodide/", document.baseURI).href;
     this.send({ type: "init", indexURL, interrupt: sab });
   }
 
@@ -189,6 +191,10 @@ export class GameHost {
         break;
       case "sounds":
         this.sound.run(m.orders);
+        break;
+      case "snapshot":
+        this.evals.get(m.id)?.(m.png);
+        this.evals.delete(m.id);
         break;
       case "save":
         if (this.saveId)
@@ -338,6 +344,16 @@ export class GameHost {
   setDebug(on: boolean) {
     this.debug = on;
     this.send({ type: "debug", on });
+  }
+
+  /** The frame on screen as a PNG, or null with no game showing (a published game's picture). */
+  snapshot(): Promise<Blob | null> {
+    if (this.state !== "running") return Promise.resolve(null);
+    const id = this.nextEval++;
+    return new Promise((resolve) => {
+      this.evals.set(id, (v) => resolve((v as Blob | null) ?? null));
+      this.send({ type: "snapshot", id });
+    });
   }
 
   /** For tests: evaluate Python in the running game's namespace. */

@@ -161,6 +161,7 @@ test("a game exported as a .zip imports as a new game that plays", async ({ page
   const errors = watchErrors(page);
   await fromTemplate(page, "coins");
   const download = page.waitForEvent("download");
+  await page.getByTestId("export").click();
   await page.getByTestId("export-zip").click();
   const file = await download;
   expect(file.suggestedFilename()).toBe("Collect-the-coins.zip");

@@ -79,7 +79,7 @@ export async function api<T = unknown>(path: string, opts: ApiOptions = {}): Pro
 export interface Me {
   loginEnabled: boolean;
   devLogin: boolean;
-  user: { id: number; name: string; email: string; teacher: boolean } | null;
+  user: { id: number; name: string; email: string; teacher: boolean; admin?: boolean } | null;
   idleSeconds: number;
 }
 

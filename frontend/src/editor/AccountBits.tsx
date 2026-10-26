@@ -5,6 +5,7 @@
 import { useEffect, useState } from "react";
 import { signInUrl } from "../store/api";
 import type { VersionInfo } from "../store/store";
+import { exportHtml5 } from "../store/html5";
 import { download, exportZip, safeFileName } from "../store/zip";
 import { useSession } from "./session";
 import { Icon } from "./ui/icons";
@@ -68,27 +69,64 @@ export function AccountMenu() {
   );
 }
 
+/**
+ * Export: the project (a .zip GameIDE imports again), or the game as a web
+ * page that runs anywhere (store/html5.ts) — for itch.io, a school site, or
+ * Steam's web build.
+ */
 export function ExportButton() {
   const { project, store } = useProjectApi();
-  const [busy, setBusy] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [problem, setProblem] = useState<string | null>(null);
+  const run = async (what: string, make: () => Promise<Blob>, name: string) => {
+    setOpen(false);
+    setBusy(what);
+    setProblem(null);
+    try {
+      download(await make(), name);
+    } catch (e) {
+      setProblem((e as Error).message);
+    } finally {
+      setBusy(null);
+    }
+  };
+  const getAsset = (id: string) => store.getAsset(project.id, id);
   return (
-    <button
-      className="btn small"
-      disabled={busy}
-      title="Download this game as a .zip you can import again"
-      data-testid="export-zip"
-      onClick={async () => {
-        setBusy(true);
-        try {
-          const blob = await exportZip(project, (id) => store.getAsset(project.id, id));
-          download(blob, `${safeFileName(project.name)}.zip`);
-        } finally {
-          setBusy(false);
-        }
-      }}
-    >
-      {Icon.docs()} Export
-    </button>
+    <span className="menu-wrap">
+      <button className="btn small" disabled={!!busy} onClick={() => setOpen((o) => !o)} aria-expanded={open} data-testid="export">
+        {Icon.docs()} {busy ?? "Export"}
+      </button>
+      {problem && (
+        <span className="error-text small" role="alert">
+          {problem}
+        </span>
+      )}
+      {open && (
+        <div className="menu" role="menu">
+          <button
+            className="menu-item"
+            onClick={() => void run("Exporting…", () => exportZip(project, getAsset), `${safeFileName(project.name)}.zip`)}
+            data-testid="export-zip"
+          >
+            <b>Project</b> <span className="muted small">a .zip to import into GameIDE again</span>
+          </button>
+          <button
+            className="menu-item"
+            onClick={() =>
+              void run(
+                "Building…",
+                () => exportHtml5(project, getAsset, (done, of) => setBusy(`Building… ${Math.round((100 * done) / of)}%`)),
+                `${safeFileName(project.name)}-html5.zip`,
+              )
+            }
+            data-testid="export-html5"
+          >
+            <b>HTML5 game</b> <span className="muted small">a .zip that plays on itch.io or any website</span>
+          </button>
+        </div>
+      )}
+    </span>
   );
 }
 

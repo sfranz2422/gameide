@@ -1924,3 +1924,193 @@ a.btn {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* A menu that drops down from its button (Export, Publish). */
+.menu-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.menu-wrap > .menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  width: 300px;
+}
+.menu-wrap > .menu .menu-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  text-align: left;
+}
+
+/* ---------------------------------------------------------------- publishing */
+.publish-dialog {
+  width: min(560px, 94vw);
+  max-height: 90vh;
+  overflow: auto;
+}
+.publish-dialog fieldset {
+  border: 0;
+  padding: 0;
+  margin: 10px 0;
+}
+.publish-dialog legend {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.publish-status {
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--panel) 80%, var(--accent-2));
+  margin-bottom: 10px;
+}
+.publish-status.down {
+  background: color-mix(in srgb, var(--panel) 75%, var(--danger));
+}
+.publish-status p {
+  margin: 0 0 6px;
+}
+.publish-status .row {
+  display: flex;
+  gap: 6px;
+}
+.publish-status input {
+  flex: 1;
+  font: inherit;
+  padding: 3px 6px;
+  background: var(--code-bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+}
+.tag-picks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+}
+
+.page-head {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  margin-bottom: 12px;
+}
+.page-head h1 {
+  margin: 0;
+}
+.explore-page {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 16px;
+  height: 100%;
+  overflow: auto;
+}
+.explore-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.explore-controls input,
+.explore-controls select {
+  font: inherit;
+  padding: 4px 8px;
+  background: var(--code-bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.btn.on {
+  background: var(--accent);
+  color: #fff;
+}
+.game-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 14px;
+  margin-bottom: 16px;
+}
+.game-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px;
+  border-radius: 10px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+}
+.game-card-link {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--text);
+  text-decoration: none;
+}
+.game-card img,
+.game-card-blank {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 6px;
+  background: #000;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+.game-card-blank {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+  color: var(--muted);
+}
+.game-card .row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.reports {
+  margin: 4px 0;
+  padding-left: 18px;
+  font-size: 13px;
+}
+.mod-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.mod-table td {
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--border);
+}
+.published-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+/* In the Publish dialog: wide boxes, in the editor's colours; a tick box on its own line keeps its words beside it. */
+.publish-dialog .field {
+  max-width: none;
+}
+.publish-dialog .field > input,
+.publish-dialog .field > textarea {
+  font: inherit;
+  padding: 5px 8px;
+  background: var(--code-bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.publish-dialog label.check.field {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.publish-dialog fieldset .check {
+  display: flex;
+  margin: 3px 0;
+}
+.publish-dialog .tag-picks .check {
+  display: inline-flex;
+}

@@ -1,4 +1,4 @@
-import { createReadStream, copyFileSync, existsSync, mkdirSync, readdirSync, statSync } from "node:fs";
+import { createReadStream, copyFileSync, existsSync, mkdirSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { createRequire } from "node:module";
 import type { Plugin } from "vite";
@@ -66,6 +66,15 @@ function servePyodide(): Plugin {
       const media = join(options.dir ?? resolve("dist"), "blockly-media");
       if (!existsSync(media)) mkdirSync(media, { recursive: true });
       for (const f of readdirSync(blocklyMediaDir)) copyFileSync(join(blocklyMediaDir, f), join(media, f));
+      // What an exported game (store/html5.ts) copies besides itself: the
+      // player page and every built script and style, and Pyodide. Every
+      // file in assets/ rather than only the player's: the game's worker is
+      // bundled on its own, out of sight of the main build's chunk graph,
+      // and a file missed here would be a blank exported game.
+      const dir = options.dir ?? resolve("dist");
+      const built = readdirSync(join(dir, "assets")).filter((f) => !f.endsWith(".map")).map((f) => `assets/${f}`);
+      const files = ["play.html", ...built, ...PYODIDE_FILES.map((f) => `pyodide/${f}`)];
+      writeFileSync(join(dir, "player-files.json"), JSON.stringify(files));
     },
   };
 }
@@ -82,6 +91,17 @@ const ISOLATION = {
 
 export default defineConfig({
   plugins: [react(), servePyodide()],
+  // Relative paths throughout, so an exported game (the player page and
+  // its files, store/html5.ts) works from any folder of any web host —
+  // itch.io serves each game under a path of its own. The play page on our
+  // own server sets <base href="/"> to keep them right at /play/<id>.
+  base: "./",
+  build: {
+    rollupOptions: {
+      // The editor, and the player that published and exported games run in.
+      input: { main: resolve("index.html"), play: resolve("play.html") },
+    },
+  },
   // In development the editor is served by Vite and the API by Flask
   // (backend/app.py on 5001); these go through to Flask so both share one
   // origin, as they do in production where Flask serves everything.

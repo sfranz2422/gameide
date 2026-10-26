@@ -11,6 +11,7 @@ import { addStarterSprite } from "../store/templates";
 import { GameHost } from "./gameHost";
 import { ObjectEditor, type EventFocus } from "./ObjectEditor";
 import { FontEditor, SoundEditor } from "./MediaEditors";
+import { PublishButton } from "./PublishDialog";
 import { ScriptEditor, SettingsEditor, SpritePicker } from "./OtherEditors";
 import { RoomEditor } from "./rooms/RoomEditor";
 import { TilesetEditor } from "./tiles/TilesetEditor";
@@ -313,6 +314,7 @@ export function EditorPage({ store, id }: { store: ProjectStore; id: string }) {
           </button>
           <span className="spacer" />
           <HistoryButton />
+          <PublishButton host={host} />
           <ExportButton />
           <AccountMenu />
           <ThemeToggle />

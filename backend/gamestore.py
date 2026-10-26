@@ -160,6 +160,109 @@ class GameVersion(Base):
     created_at = Column(DateTime, nullable=False, default=now)
 
 
+# ---------------------------------------------------------------- publishing
+
+TAGS = ["platformer", "puzzle", "shooter", "adventure", "racing", "arcade", "story", "sport", "music", "other"]
+MAX_PUBLISHED_PER_USER = 50
+MAX_THUMBNAIL_BYTES = 300_000
+
+
+class Published(Base):
+    """A game published for others to play, at /play/<slug>.
+
+    A snapshot: the project's JSON and copies of its files as they were when
+    published, so a student can keep working without the version people are
+    playing changing under them (Publish again updates it). One per project.
+
+    visibility: "unlisted" (anyone with the link), "class" (members of
+    class_id, its teacher, admins) or "public" (on Explore, once `status` is
+    "approved"; until then it plays like unlisted). `taken_down` is a teacher
+    or admin removing it: then only its owner and moderators can open it.
+    """
+    __tablename__ = "gameide_published"
+
+    id = Column(Integer, primary_key=True)
+    slug = Column(String(16), unique=True, index=True, nullable=False)
+    project_id = Column(Integer, ForeignKey("gameide_projects.id"), unique=True, nullable=True)
+    owner_id = Column(Integer, ForeignKey("users.id"), index=True, nullable=False)
+    title = Column(String(80), nullable=False)
+    description = Column(Text, nullable=False, default="")
+    #: What the page shows as the author: a first name or a name they chose — never an email.
+    author = Column(String(30), nullable=False)
+    tags = Column(String(200), nullable=False, default="")
+    allow_remix = Column(Integer, nullable=False, default=1)
+    visibility = Column(String(12), nullable=False, default="unlisted")
+    class_id = Column(Integer, nullable=True, index=True)
+    #: For public games: "pending", "approved" or "rejected". "" otherwise.
+    status = Column(String(12), nullable=False, default="")
+    featured = Column(Integer, nullable=False, default=0)
+    taken_down = Column(Integer, nullable=False, default=0)
+    takedown_note = Column(String(300), nullable=False, default="")
+    plays = Column(Integer, nullable=False, default=0)
+    likes = Column(Integer, nullable=False, default=0)
+    data = Column(Text, nullable=False)
+    thumbnail = Column(LargeBinary, nullable=True)
+    #: The published game this was remixed from (its slug, title and author, kept even if it goes).
+    remix_of = Column(Text, nullable=False, default="")
+    created_at = Column(DateTime, nullable=False, default=now)
+    updated_at = Column(DateTime, nullable=False, default=now)
+
+
+class PublishedAsset(Base):
+    """A copy of one of a published game's files (see Published)."""
+    __tablename__ = "gameide_published_assets"
+    __table_args__ = (UniqueConstraint("published_id", "asset_id", name="uq_gameide_published_asset"),)
+
+    id = Column(Integer, primary_key=True)
+    published_id = Column(Integer, ForeignKey("gameide_published.id"), index=True, nullable=False)
+    asset_id = Column(String(32), nullable=False)
+    content_type = Column(String(40), nullable=False)
+    data = Column(LargeBinary, nullable=False)
+    size = Column(Integer, nullable=False, default=0)
+
+
+class Like(Base):
+    __tablename__ = "gameide_likes"
+    __table_args__ = (UniqueConstraint("published_id", "user_id", name="uq_gameide_like"),)
+
+    id = Column(Integer, primary_key=True)
+    published_id = Column(Integer, ForeignKey("gameide_published.id"), index=True, nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+
+
+class Report(Base):
+    """Someone's "Report" on a game. Its owner's teachers and the admins see it until handled."""
+    __tablename__ = "gameide_reports"
+
+    id = Column(Integer, primary_key=True)
+    published_id = Column(Integer, ForeignKey("gameide_published.id"), index=True, nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    reason = Column(String(500), nullable=False)
+    handled = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime, nullable=False, default=now)
+
+
+class ClassSettings(Base):
+    """GameIDE's own settings for a class (the classes table is shared with
+    PyIDE and the other editors, so nothing GameIDE-only goes on it)."""
+    __tablename__ = "gameide_class_settings"
+
+    id = Column(Integer, primary_key=True)
+    class_id = Column(Integer, unique=True, nullable=False)
+    #: Students' public games go up without waiting for approval.
+    auto_approve = Column(Integer, nullable=False, default=0)
+
+
+def project_asset_ids(data: dict) -> list:
+    """Every file a project uses — the same list as project.ts assetIds."""
+    ids = []
+    for s in data.get("sprites") or []:
+        ids += [f for f in s.get("frames") or [] if isinstance(f, str)]
+    for key, field in (("tilesets", "image"), ("sounds", "asset"), ("fonts", "asset")):
+        ids += [r[field] for r in data.get(key) or [] if isinstance(r.get(field), str)]
+    return list(dict.fromkeys(ids))
+
+
 def create_all(engine):
     """accounts.create_all, which now also makes the tables above."""
     accounts.create_all(engine)

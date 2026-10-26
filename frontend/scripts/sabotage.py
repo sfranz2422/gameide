@@ -37,6 +37,7 @@ BE, OE = "src/blocks/BlocksEditor.tsx", "src/editor/ObjectEditor.tsx"
 SH, SE, EB = "src/eventsheets/sheet.ts", "src/eventsheets/SheetEditor.tsx", "src/eventsheets/ExprBox.tsx"
 GH, SND, AT = "src/editor/gameHost.ts", "src/editor/sound.ts", "src/store/assetTypes.ts"
 GS = "../backend/gamestore.py"
+PUB, PA, PD = "../backend/publishing.py", "src/player/PlayerApp.tsx", "src/editor/PublishDialog.tsx"
 CM, BS = "src/editor/codeMode.tsx", "src/blocks/blockState.ts"
 CASES = [
  ("layout drift", RT, '"x": boxy(F.X)', '"x": boxy(F.Y)', "every built-in property"),
@@ -338,6 +339,30 @@ CASES = [
  ("WAV says the wrong length", "src/store/starterSounds.ts", "  v.setUint32(40, samples.length * 2, true);", "  v.setUint32(40, samples.length, true);", "real WAV files"),
  ("MP3 without a tag refused", AT, "  if (ascii(b, 0, \"ID3\") || (b[0] === 0xff && ((b[1] ?? 0) & 0xe0) === 0xe0)) return \"audio/mpeg\";", "  if (ascii(b, 0, \"ID3\")) return \"audio/mpeg\";", "known by their first bytes"),
  ("no hint for a name without quotes", RT, '        message = "".join(traceback.format_exception_only(type(e), e)).strip() + _quotes_hint(e)', '        message = "".join(traceback.format_exception_only(type(e), e)).strip() + _quotes_hint(None)', "gets a hint saying how to write it"),
+ # Phase 9b: export and publishing
+ ("class games open to all", PUB, '    if pub.visibility == "class" and not owner:', '    if pub.visibility == "classy" and not owner:', "is closed to someone outside the class", PY),
+ ("any teacher moderates", PUB, "    return bool(user) and (is_admin(user) or user.id in _teachers_of(db, pub.owner_id))", "    return bool(user) and (is_admin(user) or is_teacher(user) or user.id in _teachers_of(db, pub.owner_id))", "another class's teacher can't approve it", PY),
+ ("public skips the queue", PUB, '            status = "approved" if (is_teacher(user) or is_admin(user) or auto) else "pending"', '            status = "approved"', "waits for approval", PY),
+ ("approval survives a republish", PUB, "        pub.status = status\n", "        pub.status = pub.status or status\n", "puts it back in the queue", PY),
+ ("Explore lists pending games", PUB, '        q = db.query(Published).filter(Published.visibility == "public", Published.status == "approved", Published.taken_down == 0)', '        q = db.query(Published).filter(Published.visibility == "public", Published.taken_down == 0)', "isn't on Explore yet", PY),
+ ("taken down still plays", PUB, "    if pub.taken_down and not (owner or moderates(db, user, pub)):", "    if pub.taken_down and owner and not owner:", "taken down is gone for players", PY),
+ ("an email as the author", PUB, '    if not text or "@" in text or "/" in text:', "    if not text:", "email as the author name", PY),
+ ("players see the live project", PUB, "        return jsonify(info=_info(db, pub, user), project=json.loads(pub.data))", "        return jsonify(info=_info(db, pub, user), project=json.loads(db.query(GameProject).get(pub.project_id).data))", "players see the published version", PY),
+ ("plays counted every visit", PUB, "        if pub.slug not in seen:", "        if True:", "counted once per visit", PY),
+ ("remix ignores the author", PUB, "        if not pub.allow_remix and pub.owner_id != user.id:", "        if not pub.allow_remix and pub.owner_id == -1:", "won't let be remixed", PY),
+ ("remix without credit", PUB, '        data["remixOf"] = {"id": pub.slug, "title": pub.title, "author": pub.author}\n', "", "crediting where it came from", PY),
+ ("gallery open to anyone", PUB, "        if course is None or not (_member(db, user, class_id) or is_admin(user)):", "        if course is None:", "gallery is only for its class", PY),
+ ("auto-approve ignored", PUB, "                                                  ClassSettings.auto_approve == 1).first()", "                                                  ClassSettings.auto_approve == 2).first()", "approve by itself", PY),
+ ("students moderate", PUB, "    if not (is_teacher(user) or is_admin(user)):\n        fail(\"Only teachers can see this.\", 403)", "    if False:\n        fail(\"Only teachers can see this.\", 403)", "can't open the approval queue", PY),
+ ("reports never shown", PUB, "            reported=[row(g) for g in games if g.id in by_game],", "            reported=[],", "its teacher sees the report", PY),
+ ("take-down leaves reports open", PUB, '            pub.takedown_note = str(body.get("note") or "")[:300]\n            db.query(Report).filter_by(published_id=pub.id).update({"handled": 1})', '            pub.takedown_note = str(body.get("note") or "")[:300]', "its reports are handled", PY),
+ ("export without Pyodide", "vite.config.ts", '      const files = ["play.html", ...built, ...PYODIDE_FILES.map((f) => `pyodide/${f}`)];', '      const files = ["play.html", ...built];', "plays from another site", E2E),
+ ("Pyodide from the site's root", GH, '    const indexURL = new URL("pyodide/", document.baseURI).href;', '    const indexURL = new URL("/pyodide/", document.baseURI).href;', "plays from another site", E2E),
+ ("export without the game's files", "src/store/html5.ts", "    index.assets[id] = name;\n", "", "plays from another site", E2E),
+ ("play page titled by project", PA, "        document.title = info ? `${info.title} — GameIDE` : p.project.name;", "        document.title = info ? `${p.project.name} — GameIDE` : p.project.name;", "plays from its link for anyone", E2E),
+ ("play page without its base", APP, """    head = (f'<base href="/">\\n    <link rel="manifest\"""", """    head = (f'\\n    <link rel="manifest\"""", "plays from its link for anyone", E2E),
+ ("no picture sent", PD, "        json: { ...form, classId: form.visibility === \"class\" ? form.classId : null, ...(thumbnail ? { thumbnail } : {}) },", "        json: { ...form, classId: form.visibility === \"class\" ? form.classId : null, ...(thumbnail ? {} : {}) },", "on Explore with its picture", E2E),
+ ("no manifest", APP, '        "display": "standalone",\n', "", "it has a manifest", E2E),
 ]
 only = sys.argv[1:]
 # A name that matches no case would otherwise run nothing and still say

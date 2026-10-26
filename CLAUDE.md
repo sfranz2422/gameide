@@ -190,6 +190,24 @@ testing.
 - Every catalog category must be in `CATEGORIES` (docs), the blocks
   toolbox and `PICKER_ORDER` (sheets); catalog.test.ts checks.
 
+## Exporting and publishing
+
+- `play.html` + `src/player/` is the one player: exported games (their own
+  folder: `game/index.json`, `game/project.json`, `game/assets/`) and
+  published ones (`/play/<id>`, from `/api/play/<id>`). It builds the game
+  from the project with codegen.ts, as the editor does.
+- The build uses `base: "./"` so an export works in any folder; Flask's
+  `/play/<id>` adds `<base href="/">`. Find our own files from
+  `document.baseURI`, never `location` or an absolute path.
+- `player-files.json` (written by the build) lists what an export copies.
+- Publishing is `backend/publishing.py` (a blueprint) on `gamestore`'s
+  Published tables. `_viewable` is the one rule for who may play; every
+  route that hands out a published game or its files must call it.
+- Published games are snapshots (JSON + copied assets): never read the live
+  project for a player.
+- No service worker: the game's worker loads Python past it (checked in
+  Chromium and Chrome), so it couldn't make games offline.
+
 ## Projects and code generation
 
 - The project is plain JSON (`store/project.ts`), resources linked by id.

@@ -1,6 +1,70 @@
 # Progress
 
-## Phase 9a — Sounds, gamepads, save files, fonts ✅ (2026-10-26, waiting for review)
+## Phase 9b — HTML5 export and publishing ✅ (2026-10-26, waiting for review)
+
+### Done
+
+- **Export → HTML5 game:** a .zip that plays on its own, on itch.io (upload it as an HTML project) or in any folder of any website.
+  - Inside: the player page, its files, Pyodide, and the game: `game/project.json` plus its pictures, sounds and fonts.
+  - The README says how to put it online, and how to try it on your own computer (`python3 -m http.server`; double-clicking index.html can't work).
+  - **Export → Project** is the old .zip, for importing into GameIDE again.
+- **One small player**, used by both the export and published games. A game starts on a click: browsers only allow sound after one, and it gives the game the keyboard. The editor's build now uses relative paths, so the player works from any folder.
+- **Publish**, in the editor's top bar:
+  - Choose a title, a description, the name shown (your first name by default, or one you choose; never an email), up to three kinds (platformer, puzzle…), whether others may remix it, and who can play it.
+  - It saves to your account first, then publishes that as a **snapshot**: you keep working, and players see the new version only when you **Publish again**.
+  - **Unpublish** takes the link down.
+  - **The picture:** with the game running, "use what the game shows now" makes the picture Explore shows.
+- **Who can play:**
+  - **Anyone with the link:** signed out too.
+  - **My class:** members of the class, its teacher and admins, after signing in. It's in the class's **gallery**. Classes are the shared ones from PyIDE, so a student's classes there count here.
+  - **Everyone, on Explore:** a student's game waits for a teacher's approval first; the link works meanwhile. Publishing again puts it back in the queue, so an approved game can't be swapped for something else. A teacher's or admin's goes straight up, and a class can be set to approve by itself.
+- **The play page** `/play/<id>`: the game, its title and author, plays (counted once per visit), likes, **Remix** (copies it into your games, crediting the original, if its author allows), **Report**, full screen, and **Install**, which adds it as an app with its own window and icon.
+- **Explore** (on the front page): approved public games, Featured / Newest / Most played, search, and a filter by kind. Plus a gallery page for each of your classes.
+- **Approvals** (teachers and admins, on the front page):
+  - games waiting for Explore (Approve / Not for Explore);
+  - reported games with their reasons (Take down, with a note the student sees, or Nothing wrong);
+  - every game your students have published (take down or restore);
+  - and each of your classes' auto-approve switch.
+  - Admins see every game and can **Feature** games for Explore.
+- **Admins** are `ADMIN_EMAILS`, an environment variable like `TEACHER_EMAILS`, so nobody can make themselves one.
+
+**To do on Render:** add `ADMIN_EMAILS` (your email, comma-separated for more) to the service's environment. Until then nobody is an admin; teachers still approve their own students' games. The new tables are made on first start.
+
+### Tests
+
+```
+cd frontend
+npm test                      # Vitest: 191
+npm run e2e                   # Playwright: 55 editor tests + 11 account tests
+../backend/.venv/bin/python ../backend/tests/test_server.py   # 118 server checks
+python3 scripts/sabotage.py   # 300 deliberate bugs
+```
+
+New:
+- **Server checks (56 new)** for every publishing rule:
+  - who may play unlisted, class and public games;
+  - the gallery, the approval queue and who may approve;
+  - republishing going back into the queue, auto-approve, and teachers skipping the queue;
+  - snapshots, plays, likes, remixes with credit, and remixing refused;
+  - reports, take-downs and restoring, featuring, unpublishing;
+  - and no email anywhere on a play page.
+- `e2e/publish.spec.ts`: the HTML5 export downloaded, unzipped and played from **another site, in a folder of its own**, with all of its own files loaded.
+- `e2e/published.spec.ts`, against the real server:
+  - a link played signed out, with its title and play count and no email;
+  - a public game approved by an admin, then on Explore with its picture, then remixed;
+  - a report, a take-down, and the note the student sees;
+  - the install manifest.
+
+### Known issues and gaps
+
+- **Installed games don't play offline.** I built offline play with a service worker, then found in tests (Chromium and real Chrome) that the game's worker loads Python past any service worker, so it was taken out rather than shipped half-working. Install gives an app window and icon; starting needs the internet. The Steam build (9c) packs everything locally, so it is offline by nature.
+- **The HTML5 export holds every built file**, the editor's too (about 1 MB more zipped than the player needs). The game's worker is bundled out of sight of the build's file graph, so trimming the list risked a blank exported game.
+- **The approval queue lives on its own page** for now; Phase 10's teacher dashboard will take it in.
+- No comments on games, as the spec says for v1.
+
+---
+
+## Phase 9a — Sounds, gamepads, save files, fonts ✅ (2026-10-26, reviewed)
 
 Phase 9 is in three parts, as agreed:
 - **9a** (this): sounds, gamepads, save files and custom fonts.
@@ -555,7 +619,11 @@ of its own after Phase 9.
 | 10 Classrooms | classes, assignments, dashboard | |
 | 11 Tutorials | tutorial panel, checks, library | |
 
-## Next: Phase 9 — Sounds, export, publishing
+## Next: Phase 9c — Steam-ready desktop export, then Phase 10
+
+(Phase 9's first two parts are above; the old plan for all of Phase 9 follows.)
+
+## Phase 9 — Sounds, export, publishing (the plan)
 
 Audio (sounds stored in Postgres like pictures), HTML5 export, the remaining microStudio exports (installable web app, desktop), publish links with all three visibility levels, the public Explore page, the class gallery, remixing and reporting — plus gamepad, save files and custom fonts.
 

@@ -6,6 +6,7 @@
  * same idea as PyIDE's rescue: signing in must never make earlier work
  * vanish from view, and moving it is one click.
  */
+import { PublishedLinks } from "./ExplorePages";
 import { useEffect, useRef, useState } from "react";
 import { signInUrl } from "../store/api";
 import { newId, type Project } from "../store/project";
@@ -107,6 +108,7 @@ export function ProjectsPage() {
         <ThemeToggle />
       </header>
       <main className="projects-main">
+        <PublishedLinks />
         {error && (
           <p className="banner error" role="alert">
             {error}

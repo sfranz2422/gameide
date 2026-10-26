@@ -29,7 +29,8 @@ export type ToWorker =
   | { type: "stop" }
   | { type: "input"; events: InputMessage[] }
   | { type: "debug"; on: boolean }
-  | { type: "eval"; id: number; code: string };
+  | { type: "eval"; id: number; code: string }
+  | { type: "snapshot"; id: number };
 
 export interface WorkerStats {
   fps: number;
@@ -53,4 +54,5 @@ export type FromWorker =
   | { type: "eval"; id: number; value?: unknown; error?: string }
   | { type: "fatal"; message: string }
   | { type: "sounds"; orders: SoundOrder[] }
+  | { type: "snapshot"; id: number; png: Blob | null }
   | { type: "save"; data: Record<string, unknown> };

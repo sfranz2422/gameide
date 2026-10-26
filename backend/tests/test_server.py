@@ -29,6 +29,7 @@ sys.path.insert(0, str(BACKEND))
 
 import app as server  # noqa: E402
 import gamestore  # noqa: E402
+import accounts  # noqa: E402
 
 failures = []
 
@@ -229,6 +230,120 @@ for path in ("/api/me", "/", "/healthz"):
     check(f"{path} is sent cross-origin isolated",
           r.headers.get("Cross-Origin-Opener-Policy") == "same-origin"
           and r.headers.get("Cross-Origin-Embedder-Policy") == "credentialless")
+
+# ---------------------------------------------------------------- publishing
+os.environ["ADMIN_EMAILS"] = "admin@example.com"
+admin = client("admin@example.com")
+carol = client("carol@example.com")
+other_teacher = client("teacher2@example.com")
+os.environ["TEACHER_EMAILS"] = "teacher@example.com,teacher2@example.com"
+db = server.SessionLocal()
+tid = tme["user"]["id"]
+period4 = accounts.Course(teacher_id=tid, name="Period 4", app="pyide")
+db.add(period4)
+db.flush()
+for email in ("alice@example.com", "carol@example.com"):
+    db.add(accounts.Enrollment(class_id=period4.id, email=email, name=email.split("@")[0]))
+db.add(accounts.Course(teacher_id=tid, name="Period 7", app="pyide"))  # a class of the teacher's alice isn't in
+db.commit()
+P4 = period4.id
+db.close()
+
+GAME = project("pub1", "Coin Run", sprites=[{"frames": ["pic1"]}])
+check("a game to publish is saved", put(alice, "pub1", GAME, 0).status_code == 200)
+alice.put("/api/projects/pub1/assets/pic1", data=PNG)
+settings = alice.get("/api/projects/pub1/publish").get_json()
+check("publishing offers the student's own classes", [c["name"] for c in settings["classes"]] == ["Period 4"], settings["classes"])
+check("…and their first name as the author, never their email", settings["author"] and "@" not in settings["author"])
+
+r = alice.post("/api/projects/pub1/publish", json={"title": "Coin Run", "visibility": "unlisted", "author": "alice@example.com"})
+pub = r.get_json()["published"]
+SLUG = pub["id"]
+check("publishing gives a play link", r.status_code == 200 and pub["url"] == f"/play/{SLUG}", r.get_json())
+check("an email as the author name is replaced by a first name", "@" not in pub["author"])
+r = anon.get(f"/api/play/{SLUG}")
+check("an unlisted game plays for anyone with the link, signed out too", r.status_code == 200 and r.get_json()["project"]["name"] == "Coin Run")
+check("…and its page holds no email address", "@example.com" not in r.get_data(as_text=True))
+check("its files come with it", anon.get(f"/api/play/{SLUG}/assets/pic1").data == PNG)
+check("…and only its own", anon.get(f"/api/play/{SLUG}/assets/nope").status_code == 404)
+check("someone else can't publish your project", bob.post("/api/projects/pub1/publish", json={"title": "x", "visibility": "unlisted"}).status_code == 403)
+
+# A snapshot: the student keeps working; players see the published version until it's published again.
+put(alice, "pub1", project("pub1", "Coin Run 2", sprites=[{"frames": ["pic1"]}]), 1)
+check("players see the published version, not the one being edited", anon.get(f"/api/play/{SLUG}").get_json()["project"]["name"] == "Coin Run")
+alice.post("/api/projects/pub1/publish", json={"title": "Coin Run", "visibility": "unlisted"})
+check("…until it is published again", anon.get(f"/api/play/{SLUG}").get_json()["project"]["name"] == "Coin Run 2")
+
+# Class games: members, its teacher and admins only.
+r = alice.post("/api/projects/pub1/publish", json={"title": "Coin Run", "visibility": "class", "classId": P4 + 1})
+check("a game can't go to a class its author isn't in", r.status_code == 400)
+alice.post("/api/projects/pub1/publish", json={"title": "Coin Run", "visibility": "class", "classId": P4})
+check("a class game needs signing in", anon.get(f"/api/play/{SLUG}").status_code == 401)
+check("…is closed to someone outside the class", bob.get(f"/api/play/{SLUG}").status_code == 403)
+check("…open to a classmate", carol.get(f"/api/play/{SLUG}").status_code == 200)
+check("…to its teacher", teacher.get(f"/api/play/{SLUG}").status_code == 200)
+check("…and to an admin", admin.get(f"/api/play/{SLUG}").status_code == 200)
+check("…and its files are closed the same way", bob.get(f"/api/play/{SLUG}/assets/pic1").status_code == 403)
+g = carol.get(f"/api/gallery/{P4}").get_json()
+check("it is in the class's gallery", [x["id"] for x in g["games"]] == [SLUG], g)
+check("the gallery is only for its class", bob.get(f"/api/gallery/{P4}").status_code == 403)
+
+# Public: waits for a teacher, then is on Explore.
+r = alice.post("/api/projects/pub1/publish", json={"title": "Coin Run", "visibility": "public", "tags": ["arcade", "nonsense"]})
+check("a student's public game waits for approval", r.get_json()["published"]["status"] == "pending")
+check("…with only real tags kept", r.get_json()["published"]["tags"] == ["arcade"])
+check("…and isn't on Explore yet", SLUG not in [x["id"] for x in anon.get("/api/explore").get_json()["games"]])
+check("…though its link plays", anon.get(f"/api/play/{SLUG}").status_code == 200)
+mod = teacher.get("/api/moderation").get_json()
+check("its teacher sees it waiting", [x["id"] for x in mod["pending"]] == [SLUG], mod["pending"])
+check("students can't open the approval queue", alice.get("/api/moderation").status_code == 403)
+check("another class's teacher can't approve it", other_teacher.post(f"/api/moderation/{SLUG}", json={"action": "approve"}).status_code == 403)
+check("its teacher approves it", teacher.post(f"/api/moderation/{SLUG}", json={"action": "approve"}).status_code == 200)
+listed = anon.get("/api/explore?sort=new").get_json()["games"]
+check("…and then it is on Explore, for anyone", [x["id"] for x in listed] == [SLUG] and listed[0]["author"] != "alice@example.com", listed)
+check("Explore searches titles", [x["id"] for x in anon.get("/api/explore?q=coin").get_json()["games"]] == [SLUG])
+check("…and filters by tag", anon.get("/api/explore?tag=puzzle").get_json()["games"] == [])
+r = alice.post("/api/projects/pub1/publish", json={"title": "Coin Run", "visibility": "public"})
+check("publishing again puts it back in the queue (an approved game can't be swapped)", r.get_json()["published"]["status"] == "pending")
+teacher.post(f"/api/moderation/classes/{P4}", json={"autoApprove": True})
+r = alice.post("/api/projects/pub1/publish", json={"title": "Coin Run", "visibility": "public", "allowRemix": True})
+check("a class set to approve by itself lets it straight onto Explore", r.get_json()["published"]["status"] == "approved")
+check("only a class's own teacher can change that", other_teacher.post(f"/api/moderation/classes/{P4}", json={"autoApprove": False}).status_code == 403)
+put(teacher, "tch1", project("tch1", "Demo"), 0)
+r = teacher.post("/api/projects/tch1/publish", json={"title": "Demo", "visibility": "public"})
+check("a teacher's public game needs no approval", r.get_json()["published"]["status"] == "approved")
+
+# Playing: plays, likes, remixes, reports.
+p1 = anon.post(f"/api/play/{SLUG}/played").get_json()["plays"]
+p2 = anon.post(f"/api/play/{SLUG}/played").get_json()["plays"]
+check("a play is counted once per visit", p2 == p1 == 1, (p1, p2))
+check("liking needs signing in", anon.post(f"/api/play/{SLUG}/like").status_code == 401)
+check("a like counts", bob.post(f"/api/play/{SLUG}/like").get_json() == {"liked": True, "likes": 1})
+check("…and a second press takes it back", bob.post(f"/api/play/{SLUG}/like").get_json() == {"liked": False, "likes": 0})
+r = bob.post(f"/api/play/{SLUG}/remix")
+new = r.get_json().get("slug")
+check("a remix copies the game into the remixer's games", r.status_code == 200 and new in [x["id"] for x in bob.get("/api/projects").get_json()["projects"]], r.get_json())
+data = bob.get(f"/api/projects/{new}").get_json()["data"]
+check("…crediting where it came from", data.get("remixOf") == {"id": SLUG, "title": "Coin Run", "author": pub["author"]} and data["id"] == new)
+check("…with its files", bob.get(f"/api/projects/{new}/assets/pic1").data == PNG)
+alice.post("/api/projects/pub1/publish", json={"title": "Coin Run", "visibility": "public", "allowRemix": False})
+check("a game its author won't let be remixed can't be", bob.post(f"/api/play/{SLUG}/remix").status_code == 403)
+check("reporting needs a reason", bob.post(f"/api/play/{SLUG}/report", json={"reason": " "}).status_code == 400)
+check("a report is taken", bob.post(f"/api/play/{SLUG}/report", json={"reason": "bad words in it"}).status_code == 200)
+mod = teacher.get("/api/moderation").get_json()
+check("its teacher sees the report", [x["reports"] for x in mod["reported"]] == [["bad words in it"]], mod["reported"])
+check("…and so does an admin", [x["id"] for x in admin.get("/api/moderation").get_json()["reported"]] == [SLUG])
+teacher.post(f"/api/moderation/{SLUG}", json={"action": "takedown", "note": "language"})
+check("a game taken down is gone for players", anon.get(f"/api/play/{SLUG}").status_code == 404)
+check("…and from Explore", SLUG not in [x["id"] for x in anon.get("/api/explore").get_json()["games"]])
+check("…but its author can still open it", alice.get(f"/api/play/{SLUG}").status_code == 200)
+check("…and its reports are handled", teacher.get("/api/moderation").get_json()["reported"] == [])
+teacher.post(f"/api/moderation/{SLUG}", json={"action": "restore"})
+check("restoring brings it back", anon.get(f"/api/play/{SLUG}").status_code == 200)
+check("only admins feature games", teacher.post(f"/api/moderation/{SLUG}", json={"action": "feature"}).status_code == 400)
+admin.post(f"/api/moderation/{SLUG}", json={"action": "feature"})
+check("…and featured games are on Explore's Featured", [x["id"] for x in anon.get("/api/explore?sort=featured").get_json()["games"]] == [SLUG])
+check("unpublishing takes the link down", alice.delete("/api/projects/pub1/publish").status_code == 200 and anon.get(f"/api/play/{SLUG}").status_code == 404)
 
 # ---------------------------------------------------------------- the built editor's files
 # The blocks editor's media come from our own origin (vite.config.ts copies

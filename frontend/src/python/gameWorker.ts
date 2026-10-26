@@ -205,6 +205,17 @@ self.onmessage = async (ev: MessageEvent<ToWorker>) => {
         debug = msg.on;
         if (renderer) renderer.showDebug = msg.on;
         break;
+      case "snapshot": {
+        // The frame on screen, for a published game's picture. Drawn again
+        // first: a WebGL canvas keeps nothing between frames to read back.
+        let png: Blob | null = null;
+        if (renderer) {
+          renderer.render();
+          png = await (renderer.app.canvas as unknown as OffscreenCanvas).convertToBlob({ type: "image/png" }).catch(() => null);
+        }
+        post({ type: "snapshot", id: msg.id, png });
+        break;
+      }
       case "eval": {
         try {
           post({ type: "eval", id: msg.id, value: game ? game.evalPython(msg.code) : undefined });

@@ -13,8 +13,10 @@ in the browser.
 import base64
 import json
 import os
+import re
 import secrets
 import time
+from html import escape
 from datetime import timedelta
 from pathlib import Path
 
@@ -25,6 +27,7 @@ from werkzeug.exceptions import BadRequest
 
 import accounts
 import gamestore
+import publishing
 from gamestore import GameAsset, GameProject, GameVersion
 
 APP_NAME = "gameide"
@@ -348,6 +351,7 @@ def me():
                 "name": user.display_name(),
                 "email": user.email,
                 "teacher": accounts.is_teacher(user.email),
+                "admin": publishing.is_admin(user),
             },
             idle_seconds=0 if (not user or accounts.is_teacher(user.email)) else STUDENT_IDLE_SECONDS,
         )
@@ -674,6 +678,81 @@ def pyodide_files(name):
     return r
 
 
+@app.get("/play/<slug>")
+def play_page(slug):
+    """A published game's page: the player (play.html), with <base href="/">
+    so its relative paths (built for exported games, which may sit in any
+    folder) resolve from the site's root here, and the game's title for
+    links shared in chats. Whether this viewer may play it is the API's to
+    say (publishing._viewable); the page itself gives nothing away."""
+    if not re.fullmatch(r"[\w-]{1,16}", slug):
+        abort(404)
+    path = DIST / "play.html"
+    if not path.exists():
+        return Response("The player hasn't been built. Run `npm run build` in frontend/.", 503, mimetype="text/plain")
+    html = path.read_text()
+    title = "A GameIDE game"
+    db = _db()
+    try:
+        pub = db.query(gamestore.Published).filter_by(slug=slug).first()
+        if pub and pub.visibility != "class" and not pub.taken_down:
+            title = f"{pub.title} — GameIDE"
+    finally:
+        db.close()
+    head = (f'<base href="/">\n    <link rel="manifest" href="/play/{slug}/manifest.webmanifest">\n'
+            f'    <meta property="og:title" content="{escape(title)}">')
+    html = html.replace("<head>", "<head>\n    " + head, 1).replace("<title>GameIDE game</title>", f"<title>{escape(title)}</title>", 1)
+    r = Response(html, mimetype="text/html")
+    r.headers["Cache-Control"] = "no-cache"
+    return r
+
+
+@app.get("/play/<slug>/manifest.webmanifest")
+def play_manifest(slug):
+    """What makes a published game installable as an app (Install on its
+    page): its own window and icon. Not offline: the game's worker loads
+    Python past any service worker (tried in Chrome; its requests never
+    reach one), so it needs the network to start — see PROGRESS.md."""
+    db = _db()
+    try:
+        pub = db.query(gamestore.Published).filter_by(slug=slug).first()
+        if pub is None or publishing._viewable(db, pub, current_user(db)):
+            abort(404)
+        title = pub.title
+    finally:
+        db.close()
+    manifest = {
+        "name": title,
+        "short_name": title[:12],
+        "start_url": f"/play/{slug}",
+        "scope": f"/play/{slug}",
+        "display": "standalone",
+        "background_color": "#000000",
+        "theme_color": "#1b2433",
+        "icons": [{"src": f"/icons/icon-{n}.png", "sizes": f"{n}x{n}", "type": "image/png"} for n in (192, 512)],
+    }
+    r = jsonify(manifest)
+    r.mimetype = "application/manifest+json"
+    return r
+
+
+@app.get("/icons/<path:name>")
+def icons(name):
+    r = send_from_directory(DIST / "icons", name)
+    r.headers["Cache-Control"] = "public, max-age=86400"
+    return r
+
+
+@app.get("/play.html")
+@app.get("/player-files.json")
+def player_files():
+    """What the HTML5 export copies (store/html5.ts): the player page and its file list."""
+    name = request.path.lstrip("/")
+    r = send_from_directory(DIST, name)
+    r.headers["Cache-Control"] = "no-cache"
+    return r
+
+
 @app.get("/blockly-media/<path:name>")
 def blockly_media(name):
     # The blocks editor's cursors, icons and sounds (copied in by the build);
@@ -681,6 +760,10 @@ def blockly_media(name):
     r = send_from_directory(DIST / "blockly-media", name)
     r.headers["Cache-Control"] = "public, max-age=86400"
     return r
+
+
+# Publishing, playing, Explore and moderation (publishing.py).
+publishing.init(app, _db, current_user)
 
 
 if __name__ == "__main__":

@@ -13,8 +13,8 @@ export default defineConfig({
   timeout: 90_000,
   use: { viewport: { width: 1366, height: 768 } },
   projects: [
-    { name: "editor", testMatch: /(editor|sprites|rooms|tiles|blocks|sheets|media)\.spec\.ts/, use: { baseURL: "http://localhost:4173" } },
-    { name: "account", testMatch: "account.spec.ts", use: { baseURL: "http://127.0.0.1:5055" } },
+    { name: "editor", testMatch: /(editor|sprites|rooms|tiles|blocks|sheets|media|publish)\.spec\.ts/, use: { baseURL: "http://localhost:4173" } },
+    { name: "account", testMatch: /(account|published)\.spec\.ts/, use: { baseURL: "http://127.0.0.1:5055" } },
   ],
   webServer: [
     {
@@ -24,7 +24,7 @@ export default defineConfig({
       timeout: 180_000,
     },
     {
-      command: `rm -f ${DB} && cd ../backend && GAMEIDE_DEV_LOGIN=1 GAMEIDE_TEST_DATABASE_URL=sqlite:///${DB} PORT=5055 .venv/bin/python -c "import app; app.app.run(port=5055)"`,
+      command: `rm -f ${DB} && cd ../backend && GAMEIDE_DEV_LOGIN=1 ADMIN_EMAILS=admin@example.com GAMEIDE_TEST_DATABASE_URL=sqlite:///${DB} PORT=5055 .venv/bin/python -c "import app; app.app.run(port=5055)"`,
       url: "http://127.0.0.1:5055/healthz",
       reuseExistingServer: false,
       timeout: 60_000,
