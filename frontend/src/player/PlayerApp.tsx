@@ -74,6 +74,15 @@ export function PlayerApp() {
     if (id) void fetch(`/api/play/${encodeURIComponent(id)}/played`, { method: "POST" }).catch(() => undefined);
   };
 
+  // ?autostart (the Steam build's desktop app): no Play button. A web page
+  // must wait for a click before it may make sound; the desktop app is
+  // allowed sound from the start, so the game simply begins.
+  const autostart = new URLSearchParams(location.search).has("autostart");
+  useEffect(() => {
+    if (autostart && pythonReady && phase.kind === "ready") start();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autostart, pythonReady, phase.kind]);
+
   const title = info?.title ?? pkg?.project.name ?? "";
   return (
     <div className={`player-page${info ? " published" : ""}`}>

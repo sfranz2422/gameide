@@ -205,6 +205,10 @@ testing.
   route that hands out a published game or its files must call it.
 - Published games are snapshots (JSON + copied assets): never read the live
   project for a player.
+- Export → Steam (`store/steamKit.ts`) is a build kit: web/ (the HTML5
+  files) + an Electron main.js serving them on app:// with COOP/COEP, a
+  build.js for @electron/packager, pinned versions. Its real run is opt-in:
+  `RUN_STEAM_KIT=1 [RUN_STEAM_BUILD=1] npx playwright test steam`.
 - No service worker: the game's worker loads Python past it (checked in
   Chromium and Chrome), so it couldn't make games offline.
 

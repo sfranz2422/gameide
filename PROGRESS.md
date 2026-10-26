@@ -1,6 +1,39 @@
 # Progress
 
-## Phase 9b — HTML5 export and publishing ✅ (2026-10-26, waiting for review)
+## Phase 9c — Steam build kit ✅ (2026-10-26, waiting for review)
+
+As agreed: a build kit (one command on a computer with Node), achievements later.
+
+### Done
+
+- **Export → Steam (desktop)** downloads a kit: the game as an Electron desktop app, the way GDevelop makes Steam builds.
+  - `npm install`, then `npm run steam`, makes `steam/windows`, `steam/mac` (on a Mac: one app for Intel and Apple silicon) and `steam/linux` (Steam Deck too). Each folder is what one Steam depot uploads.
+  - `npm start` plays it right away, without building.
+- **The app:**
+  - It's the HTML5 player and the game, fully offline, in a window titled with the game's name.
+  - It starts **full screen**; F11 switches. There's no menu bar, but Cmd+Q still quits on a Mac.
+  - The game **starts by itself**: no Play button, since a desktop app may make sound from the start.
+  - Save files stay on the player's computer between launches.
+  - The game is served on its own `app://` scheme with the cross-origin isolation headers, so a stuck loop can still be stopped at its line, as in the editor. (file:// pages can't run the game's worker.)
+- **The README** walks through building, then Steamworks: depots, launch options (the executable names are in a table), uploading with the web uploader or SteamCMD, and updating.
+- Electron 44.7.0 and @electron/packager 20.3.0 are pinned, so a kit builds the same way later.
+- The player learned `?autostart` (for the app); the HTML5 export and the kit share one list of the game's files.
+
+### Tests
+
+- `e2e/steam.editor.spec.ts`: the kit's contents (the game, `main.js`, the pinned versions, the README), on every run.
+- With `RUN_STEAM_KIT=1`, the same file installs the kit's Electron and **plays the exported game in the real desktop app**: it starts with no click, is cross-origin isolated, and is titled with the game's name. With `RUN_STEAM_BUILD=1` as well, it also runs `npm run steam` and checks the folders. Run both for this phase: the kit built Windows, Linux and a universal Mac app, and the **packaged** Mac app played the game.
+
+### Known issues and gaps
+
+- **Steam achievements** aren't in it yet (agreed: later, once a game is on Steam).
+- The apps carry Electron's icon (Steam shows your store and library art). The README says how to set your own.
+- The Mac app isn't signed by Apple. It runs from Steam; a downloaded copy needs right-click → Open.
+- The apps are 300–400 MB on disk per platform (about 100 MB to download: Steam compresses). That's Electron, as for every Electron game on Steam. The game itself is about 20 MB of it.
+
+---
+
+## Phase 9b — HTML5 export and publishing ✅ (2026-10-26, reviewed)
 
 ### Done
 

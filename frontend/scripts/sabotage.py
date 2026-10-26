@@ -370,6 +370,11 @@ CASES = [
  ("published not shown on My Games", APP, '        return jsonify(projects=[_summary(p, pubs.get(p.id)) for p in rows], used=_user_bytes(db, user.id),', '        return jsonify(projects=[_summary(p, None) for p in rows], used=_user_bytes(db, user.id),', "shows that a game is published", PY),
  ("clone shares the original", "src/editor/ProjectsPage.tsx", "      const copy: Project = { ...structuredClone(project), id: newId(),", "      const copy: Project = { ...structuredClone(project), id: project.id,", "clones a game", E2E),
  ("search does nothing", "src/editor/ProjectsPage.tsx", "  const shown = (list ?? []).filter((p) => p.name.toLowerCase().includes(search.trim().toLowerCase()));", "  const shown = (list ?? []).filter((p) => p.name.length >= 0 || search === \"\");", "clones a game", E2E),
+ # Phase 9c: the Steam kit
+ ("player ignores autostart", PA, "    if (autostart && pythonReady && phase.kind === \"ready\") start();", "    if (autostart && pythonReady && phase.kind === \"loading\") start();", "plays from another site", E2E),
+ ("kit opens without autostart", "src/store/steamKit.ts", '  win.loadURL("app://game/index.html?autostart");', '  win.loadURL("app://game/index.html");', "gives a build kit", E2E),
+ ("kit without isolation", "src/store/steamKit.ts", '          "Cross-Origin-Embedder-Policy": "require-corp",\n', "", "gives a build kit", E2E),
+ ("kit versions unpinned", "src/store/steamKit.ts", 'export const ELECTRON_VERSION = "44.7.0";', 'export const ELECTRON_VERSION = "^44.7.0";', "gives a build kit", E2E),
 ]
 only = sys.argv[1:]
 # A name that matches no case would otherwise run nothing and still say

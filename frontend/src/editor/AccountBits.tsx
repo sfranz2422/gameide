@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { signInUrl } from "../store/api";
 import type { VersionInfo } from "../store/store";
 import { exportHtml5 } from "../store/html5";
+import { exportSteamKit } from "../store/steamKit";
 import { download, exportZip, safeFileName } from "../store/zip";
 import { useSession } from "./session";
 import { Icon } from "./ui/icons";
@@ -70,9 +71,9 @@ export function AccountMenu() {
 }
 
 /**
- * Export: the project (a .zip GameIDE imports again), or the game as a web
- * page that runs anywhere (store/html5.ts) — for itch.io, a school site, or
- * Steam's web build.
+ * Export: the project (a .zip GameIDE imports again), the game as a web
+ * page that runs anywhere (store/html5.ts) — itch.io, a school site — or a
+ * kit that builds it as desktop apps for Steam (store/steamKit.ts).
  */
 export function ExportButton() {
   const { project, store } = useProjectApi();
@@ -123,6 +124,19 @@ export function ExportButton() {
             data-testid="export-html5"
           >
             <b>HTML5 game</b> <span className="muted small">a .zip that plays on itch.io or any website</span>
+          </button>
+          <button
+            className="menu-item"
+            onClick={() =>
+              void run(
+                "Building…",
+                () => exportSteamKit(project, getAsset, (done, of) => setBusy(`Building… ${Math.round((100 * done) / of)}%`)),
+                `${safeFileName(project.name)}-steam-kit.zip`,
+              )
+            }
+            data-testid="export-steam"
+          >
+            <b>Steam (desktop)</b> <span className="muted small">a build kit: one command makes Windows, Mac and Linux apps for Steam</span>
           </button>
         </div>
       )}

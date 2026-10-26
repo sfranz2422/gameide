@@ -49,6 +49,13 @@ test("an HTML5 export plays from another site, in a folder of its own", async ({
   await expect
     .poll(() => game.evaluate(() => (window as any).__gameide.host.evalPython("global_vars.total")), { timeout: 30_000 })
     .toBe(15);
+  // ?autostart (as the Steam app opens it): playing with no click at all.
+  const auto = await context.newPage();
+  await auto.goto("http://elsewhere.test/my-games/coins/?autostart");
+  await expect
+    .poll(() => auto.evaluate(() => (window as any).__gameide?.host?.evalPython("global_vars.total")), { timeout: 30_000 })
+    .toBe(15);
+  await expect(auto.getByTestId("player-start")).toHaveCount(0);
   expect(fetched.length).toBeGreaterThan(3);
   expect(fetched.filter(([, status]) => status !== 200)).toEqual([]);
   expect(gameErrors).toEqual([]);

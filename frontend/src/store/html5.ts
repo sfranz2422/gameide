@@ -24,7 +24,12 @@ async function bytes(url: URL): Promise<Uint8Array> {
   return new Uint8Array(await r.arrayBuffer());
 }
 
-export async function exportHtml5(project: Project, getAsset: (id: string) => Promise<Blob | null>, progress: (done: number, of: number) => void = () => {}): Promise<Blob> {
+/**
+ * Every file of the game as a web page, by its path in the folder: the
+ * HTML5 export is these zipped; the Steam kit (steamKit.ts) puts them in
+ * its web/ folder.
+ */
+export async function html5Files(project: Project, getAsset: (id: string) => Promise<Blob | null>, progress: (done: number, of: number) => void = () => {}): Promise<Zippable> {
   const base = new URL(".", document.baseURI);
   const listing = await fetch(new URL("player-files.json", base));
   if (!listing.ok) throw new Error("This copy of GameIDE can't export games (player-files.json is missing).");
@@ -48,6 +53,11 @@ export async function exportHtml5(project: Project, getAsset: (id: string) => Pr
   }
   zip["game/project.json"] = strToU8(JSON.stringify(project));
   zip["game/index.json"] = strToU8(JSON.stringify(index, null, 2));
+  return zip;
+}
+
+export async function exportHtml5(project: Project, getAsset: (id: string) => Promise<Blob | null>, progress: (done: number, of: number) => void = () => {}): Promise<Blob> {
+  const zip = await html5Files(project, getAsset, progress);
   zip["README.txt"] = strToU8(
     `${project.name}\n\nMade with GameIDE. This folder is the whole game, ready to put on the web.\n\n` +
       "On itch.io: make a new project, set Kind of project to HTML, upload this .zip, and tick\n" +
