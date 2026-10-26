@@ -24,7 +24,7 @@ export type Category =
   | "Camera"
   | "Debug";
 
-export type ParamType = "number" | "string" | "object" | "sprite" | "key" | "button" | "color" | "boolean" | "room" | "instance" | "any";
+export type ParamType = "number" | "string" | "object" | "sprite" | "key" | "button" | "color" | "boolean" | "room" | "instance" | "layer" | "any";
 
 export interface Param {
   name: string;
@@ -77,13 +77,17 @@ export const API: ApiEntry[] = [
 
   // Collision
   fn("Collision", "place_meeting", [p("x", "number"), p("y", "number"), p("obj", "object")], "True or False",
-    "Would this instance touch that object if it were at (x, y)?"),
+    "Would this instance touch that object — or that tile layer's solid tiles — if it were at (x, y)?"),
   fn("Collision", "place_free", [p("x", "number"), p("y", "number")], "True or False",
-    "Is (x, y) free of every solid instance?"),
+    "Is (x, y) free of every solid instance and solid tile?"),
   fn("Collision", "instance_place", [p("x", "number"), p("y", "number"), p("obj", "object")], "an instance or None",
     "Which instance of that object this one would touch at (x, y)."),
   fn("Collision", "collision_point", [p("x", "number"), p("y", "number"), p("obj", "object")], "an instance or None",
     "The instance of that object covering the point (x, y)."),
+  fn("Collision", "tile_at", [p("x", "number"), p("y", "number"), p("layer", "layer", "None")], "a tile number or None",
+    "Which tile is at (x, y) on a tile layer (or the top one). Tiles are numbered from 0, across then down the tileset."),
+  fn("Collision", "tile_set", [p("x", "number"), p("y", "number"), p("tile", "number"), p("layer", "layer", "None")], "nothing",
+    "Changes the tile at (x, y) — None removes it. Breakable blocks, doors that open."),
 
   // Input
   fn("Input", "keyboard_check", [p("key", "key")], "True or False", "Is this key held down?"),
@@ -106,7 +110,7 @@ export const API: ApiEntry[] = [
     "a number", "The distance between two points, in pixels."),
   fn("Motion", "move_and_collide", [p("dx", "number"), p("dy", "number"), p("obj", "object", "None")],
     "a list of the instances it bumped into",
-    "Moves by (dx, dy), stopping flush against the object (or, with no object, anything solid)."),
+    "Moves by (dx, dy), stopping flush against the object or tile layer — or, with none named, anything solid, solid tiles included."),
 
   // Drawing
   fn("Drawing", "draw_self", [], "nothing", "Draws this instance's sprite as it would be drawn without a Draw event."),

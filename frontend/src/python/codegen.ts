@@ -24,8 +24,8 @@
  *     no events, so a child always has its parent to inherit from.
  */
 import type { PythonGameError } from "../engine/engine";
-import type { BackgroundDef, GameDefinition, MaskShape, RoomDef, SpriteDef } from "../engine/game";
-import { eventLabel, find, type EventKey, type ObjectResource, type Project, type RoomResource, type SpriteResource } from "../store/project";
+import type { BackgroundDef, GameDefinition, MaskShape, RoomDef, SpriteDef, TileLayerDef } from "../engine/game";
+import { eventLabel, find, tilesetGrid, type EventKey, type ObjectResource, type Project, type RoomResource, type SpriteResource } from "../store/project";
 
 /** One event's lines in the generated source. Lines are 1-based. */
 export interface EventSpan {
@@ -168,6 +168,25 @@ export function buildGame(project: Project, images: Map<string, Blob>): BuiltGam
       depth: o.depth,
       ...(find(project, "objects", o.parent) ? { parent: find(project, "objects", o.parent)!.name } : {}),
     })),
+    tilesets: project.tilesets
+      .filter((t) => t.image)
+      .map((t) => {
+        const { columns, rows } = tilesetGrid(t);
+        const image = images.get(t.image!);
+        return {
+          name: t.name,
+          ...(image ? { image } : {}),
+          tileWidth: t.tileWidth,
+          tileHeight: t.tileHeight,
+          offsetX: t.offsetX,
+          offsetY: t.offsetY,
+          spacingX: t.spacingX,
+          spacingY: t.spacingY,
+          columns,
+          count: columns * rows,
+          solid: t.solid,
+        };
+      }),
     rooms: project.rooms.map((r) => buildRoom(project, r, hex)),
     code,
     stepsPerSecond: project.settings.stepsPerSecond,
@@ -212,6 +231,22 @@ function buildRoom(project: Project, r: RoomResource, hex: (c: string) => number
       parallax: l.parallax,
     });
   }
+  // Tile layers as dense grids (what the engine reads fastest), from the
+  // sparse "column,row" map the editor keeps. Tiles beyond the room's edge
+  // (it was made smaller) are left out, not lost from the project.
+  const tileLayers: TileLayerDef[] = [];
+  for (const l of r.layers) {
+    if (l.kind !== "tiles") continue;
+    const ts = find(project, "tilesets", l.tileset);
+    if (!ts || !ts.image) continue;
+    const columns = Math.ceil(r.width / ts.tileWidth), rows = Math.ceil(r.height / ts.tileHeight);
+    const cells = new Array<number>(columns * rows).fill(-1);
+    for (const [key, tile] of Object.entries(l.tiles)) {
+      const [c, row] = key.split(",").map(Number) as [number, number];
+      if (c >= 0 && row >= 0 && c < columns && row < rows) cells[row * columns + c] = tile;
+    }
+    tileLayers.push({ name: l.name, depth: l.depth, visible: l.visible, tileset: ts.name, columns, rows, cells });
+  }
   const follow = find(project, "objects", r.camera.follow)?.name;
   return {
     name: r.name,
@@ -220,6 +255,7 @@ function buildRoom(project: Project, r: RoomResource, hex: (c: string) => number
     background: hex(r.background),
     instances,
     ...(backgrounds.length ? { backgrounds } : {}),
+    ...(tileLayers.length ? { tileLayers } : {}),
     ...(r.camera.enabled
       ? { camera: { width: r.camera.width, height: r.camera.height, smoothing: r.camera.smoothing, ...(follow ? { follow } : {}) } }
       : {}),

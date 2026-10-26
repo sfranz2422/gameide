@@ -18,7 +18,7 @@
 import { KEY_NAMES, MOUSE_BUTTONS, type KeyName } from "../engine/layout";
 
 /** Bump when the format changes, and teach `migrate` the old shape. */
-export const SCHEMA_VERSION = 2; // 2: rooms have layers, a grid, a camera; instances have scale, angle, code
+export const SCHEMA_VERSION = 3; // 2: room layers, grid, camera, instance overrides. 3: tilesets and tile layers
 
 export interface Project {
   format: "gameide-project";
@@ -29,6 +29,7 @@ export interface Project {
   modified: string;
   settings: ProjectSettings;
   sprites: SpriteResource[];
+  tilesets: TilesetResource[];
   objects: ObjectResource[];
   /** The first room is where the game starts. */
   rooms: RoomResource[];
@@ -70,6 +71,27 @@ export interface SpriteResource {
 export type SpriteMask =
   | { kind: "auto" | "rect" | "precise"; left: number; top: number; right: number; bottom: number }
   | { kind: "circle"; cx: number; cy: number; r: number };
+
+/**
+ * A picture cut into equal tiles for painting levels. Tiles are numbered
+ * from 0, left to right then down — the number tile_at() gives back.
+ */
+export interface TilesetResource {
+  id: string;
+  name: string;
+  /** Asset id of the picture. */
+  image: string | null;
+  imageWidth: number;
+  imageHeight: number;
+  tileWidth: number;
+  tileHeight: number;
+  offsetX: number;
+  offsetY: number;
+  spacingX: number;
+  spacingY: number;
+  /** Tile numbers that are solid: walls and floors, for collisions. */
+  solid: number[];
+}
 
 export interface ObjectResource {
   id: string;
@@ -148,6 +170,21 @@ export type RoomLayer =
   | {
       id: string;
       name: string;
+      kind: "tiles";
+      depth: number;
+      visible: boolean;
+      locked: boolean;
+      tileset: string | null; // tileset id
+      /**
+       * Painted tiles, "column,row" → tile number, on the tileset's own
+       * grid from the room's top-left. Sparse, so an empty level is small,
+       * resizing the room loses nothing, and a check can ask for one cell.
+       */
+      tiles: Record<string, number>;
+    }
+  | {
+      id: string;
+      name: string;
       kind: "background";
       depth: number;
       visible: boolean;
@@ -194,8 +231,8 @@ export interface ScriptResource {
   code: string;
 }
 
-export type ResourceKind = "sprites" | "objects" | "rooms" | "scripts";
-export type Resource = SpriteResource | ObjectResource | RoomResource | ScriptResource;
+export type ResourceKind = "sprites" | "tilesets" | "objects" | "rooms" | "scripts";
+export type Resource = SpriteResource | TilesetResource | ObjectResource | RoomResource | ScriptResource;
 
 // ---------------------------------------------------------------- ids
 
@@ -220,6 +257,7 @@ export function blankProject(name: string): Project {
     modified: now,
     settings: { stepsPerSecond: 60 },
     sprites: [],
+    tilesets: [],
     objects: [],
     rooms: [newRoom("Room1")],
     scripts: [],
@@ -258,6 +296,17 @@ export function defaultLayers(): RoomLayer[] {
 export function newInstance(room: RoomResource, object: string, x: number, y: number, layer?: string): RoomInstance {
   const target = layer ?? room.layers.find((l) => l.kind === "instances")?.id ?? "";
   return { id: newId(), object, layer: target, x, y, scaleX: 1, scaleY: 1, angle: 0, code: "" };
+}
+
+export function newTileset(name: string): TilesetResource {
+  return { id: newId(), name, image: null, imageWidth: 0, imageHeight: 0, tileWidth: 32, tileHeight: 32, offsetX: 0, offsetY: 0, spacingX: 0, spacingY: 0, solid: [] };
+}
+
+/** How many tiles across and down a tileset's picture holds. */
+export function tilesetGrid(t: TilesetResource): { columns: number; rows: number } {
+  const across = (t.imageWidth - t.offsetX + t.spacingX) / (t.tileWidth + t.spacingX);
+  const down = (t.imageHeight - t.offsetY + t.spacingY) / (t.tileHeight + t.spacingY);
+  return { columns: Math.max(0, Math.floor(across)), rows: Math.max(0, Math.floor(down)) };
 }
 
 export function newScript(name: string): ScriptResource {
@@ -357,6 +406,18 @@ export function deleteResource(project: Project, kind: ResourceKind, id: string)
       const before = o.events.length;
       o.events = o.events.filter((e) => !(e.key.type === "collision" && e.key.object === id));
       if (o.events.length < before) effects.push(`${o.name}'s collision event with it`);
+    }
+  }
+  if (kind === "tilesets") {
+    for (const room of project.rooms) {
+      for (const l of room.layers) {
+        if (l.kind === "tiles" && l.tileset === id) {
+          const n = Object.keys(l.tiles).length;
+          l.tileset = null;
+          l.tiles = {};
+          effects.push(`the ${n} tile${n === 1 ? "" : "s"} painted on ${room.name}'s ${l.name}`);
+        }
+      }
     }
   }
   if (kind === "sprites") {
@@ -471,7 +532,14 @@ export function migrate(data: unknown): Project {
   if (typeof p.schemaVersion !== "number" || p.schemaVersion > SCHEMA_VERSION)
     throw new Error("This project was made by a newer GameIDE. Reload the page to update.");
   if (p.schemaVersion < 2) upgradeTo2(p as Project);
+  if (p.schemaVersion < 3) upgradeTo3(p as Project);
   return p as Project;
+}
+
+/** 2 → 3: tilesets arrived; a project from before has none, and no tile layers. */
+function upgradeTo3(p: Project) {
+  p.tilesets ??= [];
+  p.schemaVersion = 3;
 }
 
 /**

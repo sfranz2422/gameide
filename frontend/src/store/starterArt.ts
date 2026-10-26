@@ -209,3 +209,78 @@ export async function paintStarter(s: StarterSprite): Promise<Blob[]> {
   }
   return out;
 }
+
+/**
+ * A starter tileset, drawn in code like the starter sprites: 32 px tiles,
+ * four across and two down.
+ *   0 grass top   1 dirt     2 brick    3 stone
+ *   4 platform ◀  5 platform  6 platform ▶  7 bush (not solid: scenery)
+ */
+export const STARTER_TILESET = {
+  name: "terrain",
+  tileWidth: 32,
+  tileHeight: 32,
+  columns: 4,
+  rows: 2,
+  solid: [0, 1, 2, 3, 4, 5, 6],
+  paint(ctx: OffscreenCanvasRenderingContext2D) {
+    const T = 32;
+    const at = (n: number) => [(n % 4) * T, Math.floor(n / 4) * T] as const;
+    // 0 grass on dirt
+    let [x, y] = at(0);
+    ctx.fillStyle = "#8b5a2b";
+    ctx.fillRect(x, y, T, T);
+    ctx.fillStyle = "#4caf50";
+    ctx.fillRect(x, y, T, 10);
+    ctx.fillStyle = "#66bb6a";
+    for (let i = 0; i < T; i += 6) ctx.fillRect(x + i, y + 8, 3, 4);
+    // 1 dirt
+    [x, y] = at(1);
+    ctx.fillStyle = "#8b5a2b";
+    ctx.fillRect(x, y, T, T);
+    ctx.fillStyle = "#6d4421";
+    for (const [dx, dy] of [[5, 6], [20, 12], [12, 22], [26, 26]]) ctx.fillRect(x + dx!, y + dy!, 3, 3);
+    // 2 brick
+    [x, y] = at(2);
+    ctx.fillStyle = "#b5523b";
+    ctx.fillRect(x, y, T, T);
+    ctx.fillStyle = "#7f3626";
+    for (let r = 0; r < 4; r++) {
+      ctx.fillRect(x, y + r * 8 + 7, T, 1);
+      const off = r % 2 ? 8 : 0;
+      for (let c = off; c < T; c += 16) ctx.fillRect(x + c, y + r * 8, 1, 8);
+    }
+    // 3 stone
+    [x, y] = at(3);
+    ctx.fillStyle = "#78828f";
+    ctx.fillRect(x, y, T, T);
+    ctx.fillStyle = "#5c6470";
+    ctx.fillRect(x, y + T - 4, T, 4);
+    ctx.fillRect(x + T - 4, y, 4, T);
+    ctx.fillStyle = "#98a2ad";
+    ctx.fillRect(x, y, T, 3);
+    // 4–6 a wooden platform: left end, middle, right end
+    for (const n of [4, 5, 6]) {
+      [x, y] = at(n);
+      ctx.fillStyle = "#c58b4a";
+      ctx.fillRect(x + (n === 4 ? 4 : 0), y, T - (n === 4 || n === 6 ? 4 : 0), 12);
+      ctx.fillStyle = "#9a6631";
+      ctx.fillRect(x + (n === 4 ? 4 : 0), y + 10, T - (n === 4 || n === 6 ? 4 : 0), 2);
+    }
+    // 7 a bush
+    [x, y] = at(7);
+    ctx.fillStyle = "#2e7d32";
+    ctx.beginPath();
+    ctx.arc(x + 10, y + 22, 9, 0, Math.PI * 2);
+    ctx.arc(x + 22, y + 22, 9, 0, Math.PI * 2);
+    ctx.arc(x + 16, y + 15, 9, 0, Math.PI * 2);
+    ctx.fill();
+  },
+};
+
+export async function paintStarterTileset(): Promise<Blob> {
+  const t = STARTER_TILESET;
+  const canvas = new OffscreenCanvas(t.columns * t.tileWidth, t.rows * t.tileHeight);
+  t.paint(canvas.getContext("2d")!);
+  return canvas.convertToBlob({ type: "image/png" });
+}

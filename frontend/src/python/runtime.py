@@ -54,7 +54,7 @@ __all__ = [
     # instances
     "instance_create", "instance_exists", "instance_number", "instance_nearest", "instances",
     # collision
-    "place_meeting", "place_free", "instance_place", "collision_point",
+    "place_meeting", "place_free", "instance_place", "collision_point", "tile_at", "tile_set",
     # input
     "keyboard_check", "keyboard_check_pressed", "keyboard_check_released",
     "mouse_check", "mouse_check_pressed", "mouse_check_released", "mouse_x", "mouse_y",
@@ -271,17 +271,19 @@ class GameObject:
     # The collision helpers as methods, for students who prefer
     # self.place_meeting(...) — the global forms use the running instance.
     def place_meeting(self, x, y, obj):
-        return _js_place_meeting(self._slot, x, y, _type_of(obj))
+        return _js_place_meeting(self._slot, x, y, _target_of(obj))
 
     def place_free(self, x, y):
         return _js_place_free(self._slot, x, y)
 
     def instance_place(self, x, y, obj):
-        return _inst(_js_instance_place(self._slot, x, y, _type_of(obj)))
+        return _inst(_js_instance_place(self._slot, x, y, _target_of(obj)))
 
     def move_and_collide(self, dx, dy, obj=None):
-        n = _js_move_and_collide(self._slot, dx, dy, -1 if obj is None else _type_of(obj))
-        return [_objs[_res[i]] for i in range(1, n + 1)]
+        n = _js_move_and_collide(self._slot, dx, dy, -1 if obj is None else _target_of(obj))
+        # Instances it bumped into, and the name of any tile layer — so
+        # `if move_and_collide(0, self.vy):` is true when the floor stops it.
+        return [_objs[c] if c >= 0 else _tile_layer_names()[-2 - c] for c in (_res[i] for i in range(1, n + 1))]
 
     def move_towards(self, x, y, speed):
         self.direction = point_direction(self.x, self.y, x, y)
@@ -461,6 +463,28 @@ _COLORS = {
     "orange": 0xFFA040, "purple": 0x800080, "red": 0xFF0000, "silver": 0xC0C0C0,
     "teal": 0x008080, "white": 0xFFFFFF, "yellow": 0xFFFF00,
 }
+
+
+def _tile_layer_names():
+    """This room's tile layers, by name, in the order the engine numbers them."""
+    if _room_now < 0:
+        return []
+    return [l["name"] for l in _rooms[_room_now].get("tileLayers", [])]
+
+
+def _target_of(obj):
+    """
+    What a collision check is aimed at: an object (its type index), or a
+    tile layer of this room by name (as -2 - its number, the engine's code
+    for "that layer's solid tiles"). Objects win if a name is both.
+    """
+    if isinstance(obj, str) and obj not in _type_index:
+        layers = _tile_layer_names()
+        if obj in layers:
+            return -2 - layers.index(obj)
+        raise NameError(f'There is no object or tile layer called "{obj}".'
+                        + _suggest(obj, list(_type_index) + layers))
+    return _type_of(obj)
 
 
 def _type_of(obj):
@@ -696,6 +720,32 @@ def camera_set(x, y):
 def camera_shake(strength=4, steps=15):
     """Shakes the view by up to `strength` pixels, fading out over `steps` steps."""
     _js.camera_shake(strength, steps)
+
+
+def _layer_number(layer):
+    layers = _tile_layer_names()
+    if layer is None:
+        return -1
+    if layer not in layers:
+        raise NameError(f'This room has no tile layer called "{layer}".' + _suggest(str(layer), layers)
+                        + ("" if layers else " It has no tile layers at all."))
+    return layers.index(layer)
+
+
+def tile_at(x, y, layer=None):
+    """The tile number at (x, y) on a tile layer (or the topmost one), or None if empty."""
+    t = _js.tile_at(x, y, _layer_number(layer))
+    return None if t < 0 else t
+
+
+def tile_set(x, y, tile, layer=None):
+    """Puts tile number `tile` at (x, y) (None clears it), on a tile layer or the room's first."""
+    n = _layer_number(layer)
+    if n < 0:
+        if not _tile_layer_names():
+            raise NameError("This room has no tile layers to change.")
+        n = 0
+    _js.tile_set(x, y, -1 if tile is None else int(tile), n)
 
 
 def show_debug(text):

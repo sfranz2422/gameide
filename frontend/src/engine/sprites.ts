@@ -193,6 +193,39 @@ export function containsPoint(st: Float64Array, slot: number, x: number, y: numb
   return frames[f]![iy * s.width + ix] === 1;
 }
 
+/**
+ * Does the instance's mask (at x, y, its bounding box `boxA`) overlap an
+ * axis-aligned box — a tile? An unrotated box mask is exactly its bounding
+ * box, so that case is the box test; anything else samples the overlap.
+ */
+export function maskOverlapsBox(st: Float64Array, slot: number, x: number, y: number, sprites: SpriteInfo[], boxA: Box, tile: Box): boolean {
+  if (!overlaps(boxA, tile)) return false;
+  const b = slot * STRIDE;
+  const s = sprites[st[b + F.SPRITE]!]!;
+  if (s.kind === SHAPE.RECT && st[b + F.ANGLE]! % 360 === 0) return true;
+  return sampleOverlap(boxA, tile, (px, py) => containsPoint(st, slot, x, y, sprites, px, py));
+}
+
+/**
+ * Looks for a point inside both shapes, in the area where their bounding
+ * boxes overlap: one point per pixel, coarser for huge overlaps (never more
+ * than MAX_SAMPLES), and at least one each way so a sliver of overlap
+ * thinner than a pixel is still looked at. One copy, used by every test
+ * that samples — two copies of this once drifted apart unnoticed.
+ */
+function sampleOverlap(a: Box, b: Box, inBoth: (x: number, y: number) => boolean): boolean {
+  const left = Math.max(a.left, b.left), right = Math.min(a.right, b.right);
+  const top = Math.max(a.top, b.top), bottom = Math.min(a.bottom, b.bottom);
+  const w = right - left, h = bottom - top;
+  const step = Math.max(1, Math.sqrt((w * h) / MAX_SAMPLES));
+  const nx = Math.max(1, Math.ceil(w / step)), ny = Math.max(1, Math.ceil(h / step));
+  for (let j = 0; j < ny; j++) {
+    const y = top + ((j + 0.5) * h) / ny;
+    for (let i = 0; i < nx; i++) if (inBoth(left + ((i + 0.5) * w) / nx, y)) return true;
+  }
+  return false;
+}
+
 /** The four corners of a box mask in the world, for the separating-axis test. */
 function corners(st: Float64Array, slot: number, x: number, y: number, s: SpriteInfo, out: number[]) {
   const b = slot * STRIDE;
@@ -257,19 +290,5 @@ export function masksOverlap(
   }
 
   // Circles, and anything with pixels: sample where the boxes overlap.
-  const left = Math.max(boxA.left, boxB.left), right = Math.min(boxA.right, boxB.right);
-  const top = Math.max(boxA.top, boxB.top), bottom = Math.min(boxA.bottom, boxB.bottom);
-  const w = right - left, h = bottom - top;
-  const step = Math.max(1, Math.sqrt((w * h) / MAX_SAMPLES));
-  // At least one sample each way, so a sliver of overlap thinner than a
-  // pixel is still looked at rather than skipped.
-  const nx = Math.max(1, Math.ceil(w / step)), ny = Math.max(1, Math.ceil(h / step));
-  for (let j = 0; j < ny; j++) {
-    const y = top + ((j + 0.5) * h) / ny;
-    for (let i = 0; i < nx; i++) {
-      const x = left + ((i + 0.5) * w) / nx;
-      if (containsPoint(st, a, ax, ay, sprites, x, y) && containsPoint(st, b, bx, by, sprites, x, y)) return true;
-    }
-  }
-  return false;
+  return sampleOverlap(boxA, boxB, (px, py) => containsPoint(st, a, ax, ay, sprites, px, py) && containsPoint(st, b, bx, by, sprites, px, py));
 }

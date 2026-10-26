@@ -21,7 +21,7 @@ export async function exportZip(project: Project, getAsset: (id: string) => Prom
     "project.json": strToU8(JSON.stringify(project, null, 2)),
   };
   const index: Record<string, string> = {};
-  for (const id of new Set(project.sprites.flatMap((s) => s.frames))) {
+  for (const id of new Set([...project.sprites.flatMap((s) => s.frames), ...(project.tilesets ?? []).flatMap((t) => (t.image ? [t.image] : []))])) {
     const blob = await getAsset(id);
     if (!blob) continue;
     const name = `assets/${id}.${extensionFor(blob.type)}`;

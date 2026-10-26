@@ -30,7 +30,12 @@ export interface EventFocus {
 }
 
 export function projectNames(p: Project): ProjectNames {
-  return { objects: p.objects.map((o) => o.name), sprites: p.sprites.map((s) => s.name), rooms: p.rooms.map((r) => r.name) };
+  return {
+    objects: p.objects.map((o) => o.name),
+    sprites: p.sprites.map((s) => s.name),
+    rooms: p.rooms.map((r) => r.name),
+    layers: [...new Set(p.rooms.flatMap((r) => r.layers.filter((l) => l.kind === "tiles").map((l) => l.name)))],
+  };
 }
 
 export function ObjectEditor({

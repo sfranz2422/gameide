@@ -131,6 +131,8 @@ export class PythonGame {
       camera_follow: (s: number, smooth: number) => e().camera_follow(s, smooth),
       camera_set: (x: number, y: number) => e().camera_set(x, y),
       camera_shake: (strength: number, steps: number) => e().camera_shake(strength, steps),
+      tile_at: (x: number, y: number, layer: number) => e().tile_at(x, y, layer),
+      tile_set: (x: number, y: number, tile: number, layer: number) => e().tile_set(x, y, tile, layer),
     };
     py.registerJsModule("_engine", api);
     const fresh = py.runPython(FRESH_MODULE) as PyProxy & ((src: string) => PyProxy);
@@ -145,7 +147,7 @@ export class PythonGame {
     const setup = module._setup as ((a: string, b: string) => string | undefined) & PyProxy;
     // Pictures and pixel masks stay on this side: Python never needs them,
     // and a pixel mask stringified is a key per pixel.
-    const forPython = JSON.stringify(def, (k, v) => (k === "images" || k === "pixelMasks" ? undefined : v));
+    const forPython = JSON.stringify(def, (k, v) => (k === "images" || k === "pixelMasks" || k === "image" || k === "cells" ? undefined : v));
     const loadOut = setup(JSON.stringify(layoutForPython()), forPython);
     setup.destroy();
     let error = game.handle(loadOut);

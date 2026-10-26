@@ -1,6 +1,76 @@
 # Progress
 
-## Phase 5 — Room editor ✅ (2026-10-25, waiting for review)
+## Phase 6 — Tilesets and tile maps ✅ (2026-10-26, waiting for review)
+
+**The spec's acceptance demo passes**, as an automated browser test that does it the way a student would, from an empty project:
+- import a character sprite sheet and slice it;
+- make a tileset with solid ground and paint a level with it;
+- create Player, Coin and Enemy;
+- write a Step event with gravity and jumping in Python;
+- drag instances into the room and play.
+
+The player falls, lands exactly on the ground, jumps and comes back down, at 60 fps.
+
+### Done
+
+- **Tilesets** are their own folder in the resource tree (no longer "soon").
+  - Choose a picture, then set the tile width and height, offset and spacing; the tile count updates as you type.
+  - **Click a tile to make it solid** (red). Solid tiles are what players stand on and bump into; others are scenery.
+- **Tile layers** in the room editor (Layers → + Tile layer, named "Ground" by default) have their own tools:
+  - **Paint** (drag paints; right-click erases);
+  - **Rectangle** (repeats the brush to fill);
+  - **Fill** (bucket: everything joined and alike, inside the room, capped so a huge room can't hang the page);
+  - **Pick** (eyedropper);
+  - **Erase**.
+- **The Tiles panel** shows the layer's tileset. Click a tile for the brush, or **drag across several for a multi-tile stamp** (a whole platform, a tree).
+- **Layers can be reordered** (↑ ↓), shown, hidden and locked. A hidden tile layer isn't drawn but still collides: the usual way to make invisible walls.
+- **Undo and redo** for every room edit (Ctrl+Z, Ctrl+Shift+Z, Ctrl+Y, or the buttons). A painted stroke, a rectangle or a move is one step. Up to 100 steps per room while its tab is open.
+- **Solid tiles in collisions**, as the spec asks:
+  - `place_meeting(x, y, "Ground")`: a tile layer by name, wherever an object name goes;
+  - `place_free` and `move_and_collide` with no object named: solid tiles and solid instances alike;
+  - `move_and_collide` also reports the layer it hit by name, so `if move_and_collide(0, self.vy):` is true when the floor stops you.
+
+  Tiles collide by the instance's real shape: turned, scaled, circles.
+- **`tile_at(x, y, layer=None)`** gives the tile number there (or None). **`tile_set(x, y, tile, layer=None)`** changes the level while the game runs: breakable blocks, doors. Restarting the room puts the tiles back.
+- **A Platformer template:**
+  - a scrolling level painted with the starter tileset;
+  - running and jumping in 15 lines of plain Python;
+  - coins and enemies that patrol and can be stomped;
+  - a camera that glides, a shake on a hit, and a HUD in Draw GUI.
+- **A starter tileset** (grass, dirt, brick, stone, platform pieces, a bush), drawn in code like the starter sprites.
+- **Lighter dark theme:** the editor's greys are a step lighter, as you asked. The stage behind the game stays dark.
+- **The project format is at version 3** (tilesets, tile layers). Older projects upgrade on load, unchanged.
+
+### Tests
+
+```
+cd frontend
+npm test                      # Vitest: 120
+npm run e2e                   # Playwright: 28 editor tests + 7 account tests
+../backend/.venv/bin/python ../backend/tests/test_server.py   # 50 server checks
+python3 scripts/sabotage.py   # 150 deliberate bugs
+```
+
+**Found along the way:**
+- **A real engine bug: `move_and_collide` from a fractional position stopped short.** After a jump, the player landed 0.4 px above the ground (415.6, not 416). Blocked, it stepped whole pixels from 402.6. It now steps to the next whole pixel first. The acceptance test caught it, and a test pins it.
+- **Weak tests the sabotage run exposed:**
+  - The tile-shape test never set up a case where box and shape disagree. It now has a ball beside a tile's corner.
+  - The tileset-count numbers gave the same answer with or without spacing.
+  - The delete test used a partial match where `{}` matches anything.
+
+  All fixed. One redundant case was removed, because a second guard in Python already covers it.
+
+### Known issues and gaps
+
+1. **No autotiling.** The spec lists it as nice to have later.
+2. Undo history is per room and lasts while the room's tab is open. There's no undo for other resources yet (code has its own).
+3. Every tile is its own sprite in the game. That's fine for levels of a few thousand tiles; a huge map (hundreds of thousands) would want chunked drawing.
+4. Tiles don't send collision *events* (GameMaker's don't either). Use `place_meeting`, `place_free` or `move_and_collide`.
+5. A tileset's picture can be replaced, but tiles already painted keep their numbers. A picture with a different layout reshuffles them.
+
+---
+
+## Phase 5 — Room editor ✅ (2026-10-25, reviewed)
 
 ### Done
 
@@ -235,9 +305,9 @@ of its own after Phase 9.
 | 10 Classrooms | classes, assignments, dashboard | |
 | 11 Tutorials | tutorial panel, checks, library | |
 
-## Next: Phase 6 — Tilesets and tile maps
+## Next: Phase 7 — Code blocks
 
-Tilesets from pictures (tile size, offset, spacing); tile layers in the room editor with paint, erase, rectangle, bucket fill, eyedropper and multi-tile stamps; show, hide, lock and reorder; per-tile **solid** flags wired into place_meeting and move_and_collide; tile_at().
+Blockly, driven by the API catalog: custom block categories (Motion, Instances, Collision, Input, Variables, Logic, Loops, Math, Drawing, Rooms, Sound) in Scratch/MakeCode colours; blocks generate clean, readable Python shown beside them; "Convert to Python" (one way, with a warning).
 
 ---
 

@@ -292,6 +292,16 @@ describe("collisions", () => {
     expect(py(game, "instances('P')[0].x")).toBe(24);
   });
 
+  it("move_and_collide from a fractional position still ends flush", async () => {
+    const { game } = await load({
+      objects: [{ name: "Wall", sprite: "big", solid: true }, { name: "P", sprite: "box" }],
+      code: { P: one("P", "    def on_step(self):\n        move_and_collide(0, 8.4)\n") },
+      instances: [{ object: "P", x: 0, y: 2.6 }, { object: "Wall", x: 0, y: 40 }],
+    });
+    run(game, 5);
+    expect(py(game, "instances('P')[0].y")).toBe(24); // its 16 px box on the wall's top at 40
+  });
+
   it("place_free, instance_place, collision_point and instance_nearest", async () => {
     const { game } = await load({
       objects: [{ name: "Wall", sprite: "big", solid: true }, { name: "P", sprite: "box" }],
@@ -453,6 +463,86 @@ describe("rooms and the camera", () => {
   });
 });
 
+describe("tiles", () => {
+  // A 10 × 4 grid of 16 px tiles: a floor of tile 0 (solid) along row 3, a
+  // bush (tile 1, not solid) at column 2 of row 2, and a solid block (tile 0)
+  // at column 6 of row 2. Plus a hidden layer with one solid tile.
+  const ts = { name: "terrain", tileWidth: 16, tileHeight: 16, offsetX: 0, offsetY: 0, spacingX: 0, spacingY: 0, columns: 2, count: 2, solid: [0] };
+  const floor = new Array(40).fill(-1);
+  for (let c = 0; c < 10; c++) floor[30 + c] = 0;
+  floor[22] = 1;
+  floor[26] = 0;
+  const hidden = new Array(40).fill(-1);
+  hidden[9] = 0; // column 9, row 0
+  const level = (code: string) => ({
+    tilesets: [ts],
+    code: { P: one("P", code) },
+    rooms: [{
+      name: "R", width: 160, height: 64, instances: [{ object: "P", x: 0, y: 0 }],
+      tileLayers: [
+        { name: "Ground", depth: 0, visible: true, tileset: "terrain", columns: 10, rows: 4, cells: floor },
+        { name: "Walls", depth: 50, visible: false, tileset: "terrain", columns: 10, rows: 4, cells: hidden },
+      ],
+    }],
+  });
+
+  it("solid tiles collide by layer name, and with place_free; scenery doesn't", async () => {
+    const { game } = await load(level("    pass\n"));
+    const q = (e: string) => py(game, `p = instances('P')[0]; ${e}`);
+    expect(q("p.place_meeting(16, 40, 'Ground')")).toBe(true); // overlaps the floor
+    expect(q("p.place_meeting(16, 30, 'Ground')")).toBe(false); // standing just above it
+    expect(q("p.place_free(32, 32)")).toBe(true); // on the bush: not solid
+    expect(q("p.place_free(96, 32)")).toBe(false); // on the block
+    expect(q("p.place_free(144, 0)")).toBe(false); // a hidden layer still collides
+    expect(q("p.instance_place(16, 40, 'Ground')")).toBeUndefined(); // a tile is not an instance
+  });
+
+  it("move_and_collide stops on the floor and says which layer stopped it", async () => {
+    const { game } = await load(level("    def on_step(self):\n        global_vars.hit = move_and_collide(0, 50)\n"));
+    run(game, 1);
+    expect(py(game, "(instances('P')[0].y, global_vars.hit)")).toEqual([32, ["Ground"]]); // 16 px box on a floor at 48
+  });
+
+  it("tile_at reads the topmost tile, or a named layer; tile_set changes the level", async () => {
+    const { game } = await load(level("    pass\n"));
+    expect(py(game, "(tile_at(40, 40), tile_at(40, 40, 'Ground'), tile_at(40, 5), tile_at(150, 5), tile_at(150, 5, 'Walls'))")).toEqual([1, 1, undefined, 0, 0]);
+    py(game, "tile_set(96, 32, None, 'Ground')"); // knock out the block
+    expect(py(game, "instances('P')[0].place_free(96, 32)")).toBe(true);
+    py(game, "tile_set(0, 0, 0)"); // the first layer, by default
+    expect(py(game, "tile_at(0, 0)")).toBe(0);
+  });
+
+  it("restarting the room puts the tiles back", async () => {
+    const { game } = await load(level("    pass\n"));
+    py(game, "tile_set(96, 32, None, 'Ground')");
+    py(game, "room_restart()");
+    run(game, 1);
+    expect(py(game, "tile_at(96, 32, 'Ground')")).toBe(0);
+  });
+
+  it("a turned instance meets a tile by its shape", async () => {
+    const { game } = await load({ ...level("    pass\n"), sprites: [{ name: "bar", width: 40, height: 4, originX: 0, originY: 2, frameCount: 1 }], objects: [{ name: "P", sprite: "bar" }] });
+    // A bar at (88, 20) pointing right doesn't reach the block's top (32); turned to point down, it does.
+    expect(py(game, "instances('P')[0].place_meeting(88, 20, 'Ground')")).toBe(false);
+    py(game, "instances('P')[0].image_angle = 270");
+    expect(py(game, "instances('P')[0].place_meeting(100, 20, 'Ground')")).toBe(true);
+  });
+
+  it("a round instance misses a tile's corner its box would have hit", async () => {
+    const ball = { name: "o12", width: 12, height: 12, originX: 6, originY: 6, frameCount: 1, mask: { kind: "circle" as const, cx: 6, cy: 6, r: 6 } };
+    const { game } = await load({ ...level("    pass\n"), sprites: [ball], objects: [{ name: "P", sprite: "o12" }] });
+    // The block's top-left corner is (96, 32). 5 px up-left of it on both axes,
+    // the ball's box overlaps the block; the ball (7.1 px from the corner) doesn't.
+    expect(py(game, "instances('P')[0].place_meeting(91, 27, 'Ground')")).toBe(false);
+    expect(py(game, "instances('P')[0].place_meeting(93, 29, 'Ground')")).toBe(true);
+  });
+
+  it("naming a tile layer that isn't there says what is", async () => {
+    const { game } = await load(level("    pass\n"));
+    expect(() => py(game, "tile_at(0, 0, 'Gruond')")).toThrow(/no tile layer called "Gruond". Did you mean "Ground"/);
+  });
+});
+
 describe("instances", () => {
   it("a destroyed instance keeps reading its own values after its slot is reused", async () => {
     const { game } = await load({
@@ -608,7 +698,7 @@ describe("errors and warnings", () => {
       code: { P: one("P", "    def on_step(self):\n        place_meeting(0, 0, 'Wal')\n") },
       instances: [{ object: "P", x: 0, y: 0 }],
     });
-    expect(game.step()!.message).toBe('NameError: There is no object called "Wal". Did you mean "Wall"?');
+    expect(game.step()!.message).toBe('NameError: There is no object or tile layer called "Wal". Did you mean "Wall"?');
     expect(() => py(game, "keyboard_check('lefft')")).toThrow(/Did you mean "left"/);
     expect(() => py(game, "instances('P')[0].__setattr__('sprite', 'boxx')")).toThrow(/no sprite called "boxx". Did you mean "box"/);
   });

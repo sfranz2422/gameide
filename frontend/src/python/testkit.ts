@@ -3,7 +3,7 @@
  * and helpers to step them and read Python values back.
  */
 import type { PythonGameError } from "../engine/engine";
-import type { GameDefinition, ObjectDef, RoomInstance, SpriteDef } from "../engine/game";
+import type { GameDefinition, ObjectDef, RoomInstance, SpriteDef, TilesetDef } from "../engine/game";
 import { KEY_CODE } from "../engine/input";
 import { PythonGame } from "./bridge";
 
@@ -15,6 +15,7 @@ export const SPRITES: SpriteDef[] = [
 
 export interface MiniGame {
   sprites?: SpriteDef[];
+  tilesets?: TilesetDef[];
   objects?: ObjectDef[];
   code?: Record<string, string>;
   instances?: RoomInstance[];
@@ -38,6 +39,7 @@ export async function load(m: MiniGame): Promise<Loaded> {
     sprites: [...SPRITES, ...(m.sprites ?? [])],
     objects,
     rooms: m.rooms ?? [{ name: "Room1", width: 320, height: 240, instances: m.instances ?? [] }],
+    ...(m.tilesets ? { tilesets: m.tilesets } : {}),
     code,
     ...(m.scripts ? { scripts: m.scripts } : {}),
   };

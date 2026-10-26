@@ -13,6 +13,7 @@ import {
   newObject,
   newRoom,
   newScript,
+  newTileset,
   quotedUses,
   replaceQuoted,
   type Project,
@@ -30,6 +31,7 @@ export interface TabRef {
 
 const FOLDERS: { kind: ResourceKind; label: string; icon: () => React.ReactNode; base: string }[] = [
   { kind: "sprites", label: "Sprites", icon: Icon.sprite, base: "sprite" },
+  { kind: "tilesets", label: "Tilesets", icon: Icon.tileset, base: "tileset" },
   { kind: "objects", label: "Objects", icon: Icon.object, base: "Object" },
   { kind: "rooms", label: "Rooms", icon: Icon.room, base: "Room" },
   { kind: "scripts", label: "Scripts", icon: Icon.script, base: "script" },
@@ -37,7 +39,6 @@ const FOLDERS: { kind: ResourceKind; label: string; icon: () => React.ReactNode;
 
 // Shown so students can see what is coming, and greyed out until then.
 const LATER: { label: string; icon: () => React.ReactNode; phase: string }[] = [
-  { label: "Tilesets", icon: Icon.tileset, phase: "Tilesets arrive with the tile map editor." },
   { label: "Sounds", icon: Icon.sound, phase: "Sounds arrive with audio support." },
 ];
 
@@ -80,7 +81,7 @@ export function ResourceTree({
   const create = (kind: ResourceKind) => {
     if (kind === "sprites") return addSprite();
     const name = freeName(project, kind, FOLDERS.find((f) => f.kind === kind)!.base);
-    const r = kind === "objects" ? newObject(name) : kind === "rooms" ? newRoom(name) : newScript(name);
+    const r = kind === "objects" ? newObject(name) : kind === "rooms" ? newRoom(name) : kind === "tilesets" ? newTileset(name) : newScript(name);
     mutate((p) => void (p[kind] as Resource[]).push(r));
     open({ kind, id: r.id });
     setRenaming(r.id);

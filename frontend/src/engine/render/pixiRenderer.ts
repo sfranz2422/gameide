@@ -14,9 +14,9 @@
  * same. A slot handed to a new instance (GEN changed) gets its sprite reset,
  * so a bullet never briefly appears with the last bullet's frame.
  */
-import { Application, Container, Graphics, Sprite, Text, Texture, TilingSprite } from "pixi.js";
+import { Application, Container, Graphics, Rectangle, Sprite, Text, Texture, TilingSprite } from "pixi.js";
 import type { DrawCommand, Engine } from "../engine";
-import type { BackgroundDef, GameDefinition, SpriteDef } from "../game";
+import type { BackgroundDef, GameDefinition, SpriteDef, TilesetDef } from "../game";
 import { F, G, HANDLES, STRIDE } from "../layout";
 import { boxOf, type Box } from "../sprites";
 
@@ -133,6 +133,26 @@ class DrawLayer {
   }
 }
 
+/** Every tile of a tileset as its own texture, cut from the one picture. */
+function cutTiles(t: TilesetDef): Texture[] {
+  if (!t.image || t.image instanceof Blob) return [];
+  const base = Texture.from(t.image);
+  base.source.scaleMode = "nearest";
+  const out: Texture[] = [];
+  for (let n = 0; n < t.count; n++) {
+    const c = n % t.columns, r = Math.floor(n / t.columns);
+    const x = t.offsetX + c * (t.tileWidth + t.spacingX), y = t.offsetY + r * (t.tileHeight + t.spacingY);
+    out.push(new Texture({ source: base.source, frame: new Rectangle(x, y, t.tileWidth, t.tileHeight) }));
+  }
+  return out;
+}
+
+/** A tile layer on screen: its container, and the sprite in each painted cell. */
+interface TileView {
+  container: Container;
+  cells: (Sprite | null)[];
+}
+
 /** One background layer's display objects. */
 interface Backdrop {
   def: BackgroundDef;
@@ -156,6 +176,8 @@ export class PixiRenderer {
   private sprites: (Sprite | null)[] = [];
   private gens: number[] = [];
   private backdrops: Backdrop[] = [];
+  private tileTextures = new Map<string, Texture[]>();
+  private tileViews: TileView[] = [];
   private roomShown = -1;
   private viewShown = "";
   showDebug = false;
@@ -173,6 +195,7 @@ export class PixiRenderer {
       x: s.width ? s.originX / s.width : 0,
       y: s.height ? s.originY / s.height : 0,
     }));
+    for (const t of def.tilesets ?? []) this.tileTextures.set(t.name, cutTiles(t));
     this.worldDraw = new DrawLayer(this.world, this.frames, this.anchors);
     this.guiDraw = new DrawLayer(this.gui, this.frames, this.anchors);
     app.stage.addChild(this.world, this.gui, this.overlay);
@@ -239,6 +262,34 @@ export class PixiRenderer {
       }
       return { def: bg, color, picture };
     });
+    for (const v of this.tileViews) v.container.destroy({ children: true });
+    this.tileViews = this.engine.tiles.map((t) => {
+      const container = new Container();
+      container.zIndex = -t.def.depth;
+      container.visible = t.def.visible;
+      this.world.addChild(container);
+      const view: TileView = { container, cells: new Array(t.cells.length).fill(null) };
+      for (let cell = 0; cell < t.cells.length; cell++) this.drawTile(view, t, cell);
+      return view;
+    });
+  }
+
+  private drawTile(view: TileView, t: Engine["tiles"][number], cell: number) {
+    const tile = t.cells[cell]!;
+    const tex = tile >= 0 ? this.tileTextures.get(t.tileset.name)?.[tile] : undefined;
+    let sp = view.cells[cell] ?? null;
+    if (!tex) {
+      if (sp) sp.visible = false;
+      return;
+    }
+    if (!sp) {
+      sp = new Sprite(tex);
+      sp.position.set((cell % t.def.columns) * t.tileset.tileWidth, Math.floor(cell / t.def.columns) * t.tileset.tileHeight);
+      view.container.addChild(sp);
+      view.cells[cell] = sp;
+    }
+    sp.texture = tex;
+    sp.visible = true;
   }
 
   /** Background layers follow the view: a colour and a repeating picture always fill the window. */
@@ -280,6 +331,12 @@ export class PixiRenderer {
     const vx = Math.round(cam.x + cam.offX), vy = Math.round(cam.y + cam.offY);
     this.world.position.set(-vx, -vy);
     this.placeBackdrops(vx, vy, g[G.FRAME]!);
+    // Tiles tile_set() changed since the last frame.
+    for (const [layer, cell] of this.engine.tileChanges) {
+      const view = this.tileViews[layer], t = this.engine.tiles[layer];
+      if (view && t) this.drawTile(view, t, cell);
+    }
+    this.engine.tileChanges.length = 0;
 
     for (let s = 0; s < n; s++) {
       const b = s * STRIDE;

@@ -7,6 +7,7 @@ import {
   newEvent,
   newId,
   newInstance,
+  newTileset,
   newObject,
   newScript,
   type EventKey,
@@ -15,7 +16,7 @@ import {
   type SpriteResource,
 } from "./project";
 import { boundsOfBlobs } from "./imageTools";
-import { paintStarter, STARTER_SPRITES } from "./starterArt";
+import { paintStarter, paintStarterTileset, STARTER_SPRITES, STARTER_TILESET } from "./starterArt";
 
 export interface Built {
   project: Project;
@@ -173,6 +174,136 @@ draw_text(8, 8, f"{instance_number('Ball')} balls — Space adds 100, Backspace 
   return { project: p, assets };
 }
 
+/** The starter tileset, added to a project (picture painted, solid tiles set). */
+export async function addStarterTileset(project: Project, assets: Map<string, Blob>) {
+  const t = STARTER_TILESET;
+  const image = newId();
+  assets.set(image, await paintStarterTileset());
+  const ts = {
+    ...newTileset(t.name),
+    image,
+    imageWidth: t.columns * t.tileWidth,
+    imageHeight: t.rows * t.tileHeight,
+    tileWidth: t.tileWidth,
+    tileHeight: t.tileHeight,
+    solid: [...t.solid],
+  };
+  project.tilesets.push(ts);
+  return ts;
+}
+
+// The platformer's level, 40 × 15 tiles of 32 px: G grass, D dirt,
+// = a platform (ends drawn by themselves), B brick, * bush, c coin, P the
+// player, E an enemy.
+const LEVEL = [
+  "                                        ",
+  "                                        ",
+  "                                        ",
+  "                                        ",
+  "                              c c c     ",
+  "                             =====      ",
+  "             c c                        ",
+  "            ====        c          c    ",
+  "                       BBB        BBB   ",
+  "     c                                  ",
+  "    ====         E           E          ",
+  " P                      *               ",
+  "GGGGGGGGGGGG   GGGGGGGGGGGGGGGGG  GGGGGG",
+  "DDDDDDDDDDDD   DDDDDDDDDDDDDDDDD  DDDDDD",
+  "DDDDDDDDDDDD   DDDDDDDDDDDDDDDDD  DDDDDD",
+];
+
+async function platformer(): Promise<Built> {
+  const p = blankProject("Platformer");
+  const assets = new Map<string, Blob>();
+  const terrain = await addStarterTileset(p, assets);
+  const sHero = await addStarterSprite(p, assets, "player", "hero");
+  // Origin at the feet, in the middle: flipping to face left turns about the
+  // centre, and the hero stands on the ground at its y.
+  sHero.originX = 12;
+  sHero.originY = 24;
+  const sCoin = await addStarterSprite(p, assets, "coin");
+  const sEnemy = await addStarterSprite(p, assets, "enemy");
+
+  const player = obj(p, "Player", sHero, { depth: -10 });
+  const coin = obj(p, "Coin", sCoin);
+  const enemy = obj(p, "Enemy", sEnemy);
+  const hud = obj(p, "Hud", null, { depth: -1000 });
+
+  ev(player, { type: "create" }, "self.vx = 0\nself.vy = 0\n");
+  ev(player, { type: "step" }, `# Left and right
+move = keyboard_check("right") - keyboard_check("left")
+self.vx = move * 4
+if move != 0:
+    self.image_xscale = move   # face the way we're going
+
+# Gravity pulls a little more every step, up to a top speed
+self.vy = min(self.vy + 0.6, 12)
+
+# Jump, only when standing on something solid
+on_ground = not place_free(self.x, self.y + 1)
+if on_ground and keyboard_check_pressed("space"):
+    self.vy = -11
+
+# Move, stopping against walls, floors and solid tiles
+if move_and_collide(self.vx, 0):
+    self.vx = 0
+if move_and_collide(0, self.vy):
+    self.vy = 0
+
+# Fell off the world
+if self.y > room_height + 64:
+    room_restart()
+`);
+  ev(player, { type: "collision", object: coin.id }, "other.destroy()\nglobal_vars.score += 1\n");
+  ev(player, { type: "collision", object: enemy.id }, `# Landing on top squashes it; walking into it doesn't end well
+if self.vy > 0 and self.y < other.y:
+    other.destroy()
+    self.vy = -8
+    global_vars.score += 5
+else:
+    camera_shake(6, 20)
+    room_restart()
+`);
+  ev(coin, { type: "create" }, "self.image_speed = 1\n");
+  ev(enemy, { type: "create" }, "self.hspeed = 1.5\n");
+  ev(enemy, { type: "step" }, `# Turn round at a wall, or at the edge of a drop
+ahead = self.x + self.hspeed * 10
+if not place_free(ahead, self.y) or place_free(ahead, self.y + 14):
+    self.hspeed = -self.hspeed
+`);
+  ev(hud, { type: "game_start" }, "global_vars.score = 0\n");
+  ev(hud, { type: "draw_gui" }, `draw_set_color("white")
+draw_text(10, 10, f"Score: {global_vars.score}")
+draw_text(10, 30, "Arrows to move, Space to jump")
+`);
+
+  const room = p.rooms[0]!;
+  room.name = "Level1";
+  room.width = 1280;
+  room.height = 480;
+  room.background = "#7ec8f2";
+  room.camera = { enabled: true, width: 640, height: 480, follow: player.id, smoothing: 0.15 };
+  const ground = { id: newId(), name: "Ground", kind: "tiles" as const, depth: 100, visible: true, locked: false, tileset: terrain.id, tiles: {} as Record<string, number> };
+  room.layers.unshift(ground);
+  const T = 32;
+  LEVEL.forEach((row, r) =>
+    [...row].forEach((ch, c) => {
+      const x = c * T, y = r * T;
+      if (ch === "G") ground.tiles[`${c},${r}`] = 0;
+      if (ch === "D") ground.tiles[`${c},${r}`] = 1;
+      if (ch === "B") ground.tiles[`${c},${r}`] = 2;
+      if (ch === "*") ground.tiles[`${c},${r}`] = 7;
+      if (ch === "=") ground.tiles[`${c},${r}`] = row[c - 1] !== "=" ? 4 : row[c + 1] !== "=" ? 6 : 5;
+      if (ch === "c") room.instances.push(newInstance(room, coin.id, x + 16, y + 16));
+      if (ch === "P") room.instances.push(newInstance(room, player.id, x + 16, y + T));
+      if (ch === "E") room.instances.push(newInstance(room, enemy.id, x + 16, y + 20));
+    }),
+  );
+  room.instances.push(newInstance(room, hud.id, 0, 0));
+  return { project: p, assets };
+}
+
 async function empty(): Promise<Built> {
   return { project: blankProject("My game"), assets: new Map() };
 }
@@ -180,5 +311,6 @@ async function empty(): Promise<Built> {
 export const TEMPLATES: { key: string; label: string; description: string; build: () => Promise<Built> }[] = [
   { key: "empty", label: "Empty game", description: "One empty room. Start from nothing.", build: empty },
   { key: "coins", label: "Collect the coins", description: "A maze, arrow keys, walls and coins.", build: coins },
+  { key: "platformer", label: "Platformer", description: "Run, jump and stomp, on a tile map, with a camera.", build: platformer },
   { key: "stress", label: "Stress test", description: "300 bouncing balls, to see how fast it runs.", build: stress },
 ];

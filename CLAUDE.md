@@ -64,6 +64,25 @@ testing.
   and instance overrides. A new field needs the same: a version bump and an
   upgrade that leaves old projects looking exactly as they did.
 
+## Tiles
+
+- Tilesets are a resource (`TilesetResource`); tiles are numbered across
+  then down. A tile layer keeps a sparse `"column,row" → tile` map in the
+  project; codegen turns it into a dense grid for the engine
+  (`TileLayerDef.cells`), dropping (not deleting) tiles past the room edge.
+- In the engine, a query's target `t` is: ≥ 0 an object type, -1 anything
+  solid (instances and tiles), ≤ -2 tile layer -2 - t. Answers use the same
+  code (`tileCode`), and Python turns a tile code into the layer's name —
+  so `move_and_collide` returns `["Ground"]` when the floor stops it.
+- Hidden tile layers still collide (invisible walls). Live tiles are copied
+  from the definition every time the room starts, so `tile_set` changes
+  don't survive a restart.
+- `move_and_collide` steps to the next whole pixel before stepping whole
+  pixels: from 402.6 it used to stop at 415.6, hovering over a floor at 416.
+- Painting goes through `editor/tiles/tileOps.ts` (pure, tested). Room undo
+  keeps whole-room snapshots; a drag records only its first change
+  (`stroke`), so one stroke is one undo step.
+
 ## Projects and code generation
 
 - The project is plain JSON (`store/project.ts`), resources linked by id.

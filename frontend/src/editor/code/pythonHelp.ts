@@ -21,6 +21,8 @@ export interface ProjectNames {
   objects: string[];
   sprites: string[];
   rooms: string[];
+  /** Tile layer names, from every room (a collision check can name one). */
+  layers?: string[];
 }
 
 const COLORS = ["white", "black", "red", "green", "blue", "yellow", "orange", "purple", "aqua", "lime", "gray", "silver", "navy", "teal", "maroon", "olive", "fuchsia", "dkgray", "ltgray"];
@@ -102,7 +104,9 @@ function methodAsFunction(name: string): ApiFunction | undefined {
 function valuesFor(type: ParamType, names: ProjectNames): string[] {
   switch (type) {
     case "object":
-      return names.objects;
+      return [...names.objects, ...(names.layers ?? [])];
+    case "layer":
+      return names.layers ?? [];
     case "sprite":
       return names.sprites;
     case "room":

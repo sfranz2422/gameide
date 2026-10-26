@@ -166,7 +166,7 @@ export class LocalStore implements ProjectStore {
 /** Every asset a project uses, fetched. Missing ones are left out (and the sprite draws blank). */
 export async function loadAssets(store: ProjectStore, project: Project): Promise<Map<string, Blob>> {
   const out = new Map<string, Blob>();
-  const ids = project.sprites.flatMap((s) => s.frames);
+  const ids = [...project.sprites.flatMap((s) => s.frames), ...project.tilesets.flatMap((t) => (t.image ? [t.image] : []))];
   await Promise.all(
     ids.map(async (id) => {
       const b = await store.getAsset(project.id, id);

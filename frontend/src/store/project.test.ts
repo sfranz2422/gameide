@@ -66,10 +66,32 @@ describe("loading an older project", () => {
     };
     const p = migrate(old);
     const room = p.rooms[0]!;
-    expect(p.schemaVersion).toBe(2);
+    expect(p.schemaVersion).toBe(3);
+    expect(p.tilesets).toEqual([]); // 2 → 3 added tilesets
     expect(room.camera).toEqual({ enabled: false, width: 800, height: 600, follow: null, smoothing: 1 });
     expect([room.gridWidth, room.snap]).toEqual([32, true]);
     const layer = room.layers.find((l) => l.kind === "instances")!;
     expect(room.instances[0]).toEqual({ id: "i", object: "o", x: 5, y: 6, layer: layer.id, scaleX: 1, scaleY: 1, angle: 0, code: "" });
+  });
+});
+
+describe("tilesets", () => {
+  it("count their tiles allowing for offset and spacing", async () => {
+    const { tilesetGrid, newTileset } = await import("./project");
+    // 2 px margin, 4 px gaps, 16 px tiles: 2 + 16 + 4 + 16 = 38 fits in 56; a third needs 58.
+    // (Without the gaps, 56 would wrongly hold three.)
+    expect(tilesetGrid({ ...newTileset("t"), imageWidth: 56, imageHeight: 40, tileWidth: 16, tileHeight: 16, offsetX: 2, offsetY: 2, spacingX: 4, spacingY: 1 })).toEqual({ columns: 2, rows: 2 });
+  });
+
+  it("deleting one clears the tile layers painted with it, and says so", async () => {
+    const { deleteResource, newTileset } = await import("./project");
+    const p = blankProject("t");
+    p.tilesets.push({ ...newTileset("terrain"), id: "ts" });
+    p.rooms[0]!.layers.push({ id: "L", name: "Ground", kind: "tiles", depth: 0, visible: true, locked: false, tileset: "ts", tiles: { "0,0": 1, "1,0": 1 } });
+    expect(deleteResource(p, "tilesets", "ts")).toEqual(["the 2 tiles painted on Room1's Ground"]);
+    // toEqual, not toMatchObject: `tiles: {}` in a partial match matches any tiles at all.
+    const layer = p.rooms[0]!.layers.find((l) => l.id === "L") as { tileset: string | null; tiles: object };
+    expect(layer.tileset).toBeNull();
+    expect(layer.tiles).toEqual({});
   });
 });

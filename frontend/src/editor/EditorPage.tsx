@@ -12,6 +12,7 @@ import { GameHost } from "./gameHost";
 import { ObjectEditor, type EventFocus } from "./ObjectEditor";
 import { ScriptEditor, SettingsEditor, SpritePicker } from "./OtherEditors";
 import { RoomEditor } from "./rooms/RoomEditor";
+import { TilesetEditor } from "./tiles/TilesetEditor";
 import { SpriteEditor } from "./sprites/SpriteEditor";
 import { SpriteImport, type ImportResult } from "./sprites/SpriteImport";
 import { decodeImage, type Decoded } from "../store/imageTools";
@@ -32,7 +33,7 @@ function tabLabel(p: Project, t: TabRef): string | null {
   return find(p, t.kind, t.id)?.name ?? null;
 }
 
-const TAB_ICON = { sprites: Icon.sprite, objects: Icon.object, rooms: Icon.room, scripts: Icon.script, settings: Icon.settings };
+const TAB_ICON = { sprites: Icon.sprite, tilesets: Icon.tileset, objects: Icon.object, rooms: Icon.room, scripts: Icon.script, settings: Icon.settings };
 
 export function EditorPage({ store, id }: { store: ProjectStore; id: string }) {
   const state = useProjectState(store, id);
@@ -322,6 +323,7 @@ export function EditorPage({ store, id }: { store: ProjectStore; id: string }) {
               {current?.kind === "scripts" && (
                 <ScriptEditor key={current.id} scriptId={current.id} focus={scriptFocus?.id === current.id ? scriptFocus : null} />
               )}
+              {current?.kind === "tilesets" && <TilesetEditor key={current.id} tilesetId={current.id} />}
               {current?.kind === "settings" && <SettingsEditor />}
             </div>
           </main>

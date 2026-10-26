@@ -30,6 +30,7 @@ E2E = "e2e"  # a sixth item: run the Playwright test of that name instead of Vit
 PY = "py"    # …or the server's checks (backend/tests/test_server.py); caught = that check prints FAIL
 APP = "../backend/app.py"
 RO, RE = "src/editor/rooms/roomOps.ts", "src/editor/rooms/RoomEditor.tsx"
+SP, TO = "src/engine/sprites.ts", "src/editor/tiles/tileOps.ts"
 CASES = [
  ("layout drift", RT, '"x": boxy(F.X)', '"x": boxy(F.Y)', "every built-in property"),
  ("no polar sync", RT, "            _st[b + i] = v\n            set_polar(b)", "            _st[b + i] = v", "two views of one motion"),
@@ -172,6 +173,28 @@ CASES = [
  ("move not saved", RE, "        for (const i of r.instances) if (selected.has(i.id)) (i.x += dx), (i.y += dy);", "        for (const i of r.instances) if (selected.has(i.id) && dx > 1e9) (i.x += dx), (i.y += dy);", "move with the keys", E2E),
  ("creation code not saved", RE, "                  onChange={(code) => eachSelected((i) => void (i.code = code))}", "                  onChange={(code) => eachSelected((i) => void (i.code = code.slice(0, 0)))}", "creation code runs for that one", E2E),
  ("scaling not whole", "src/editor/gameHost.ts", "    const scale = this.pixelScaling && fit >= 1 ? Math.floor(fit) : fit;", "    const scale = this.pixelScaling && fit >= 1e9 ? Math.floor(fit) : fit;", "scales by whole numbers", E2E),
+ # Phase 6: tiles
+ ("scenery collides", EN, "          if (tile < 0 || !solid[tile]) continue;", "          if (tile < 0) continue;", "scenery doesn't"),
+ ("hidden layers skipped", EN, "    this.tiles = (room.tileLayers ?? []).flatMap((l) => {", "    this.tiles = (room.tileLayers ?? []).filter((l) => l.visible).flatMap((l) => {", "scenery doesn't"),
+ ("tile rows short", EN, "r1 = Math.min(def.rows - 1, Math.ceil(scratch.bottom / th) - 1);", "r1 = Math.min(def.rows - 1, Math.ceil(scratch.bottom / th) - 2);", "stops on the floor"),
+ ("tiles by box only", SP, "  if (s.kind === SHAPE.RECT && st[b + F.ANGLE]! % 360 === 0) return true;", "  if (s.kind === SHAPE.RECT || s.kind !== SHAPE.RECT) return true;", "misses a tile's corner"),
+ ("tile hits unreported", EN, "          record(c); // an instance, or a tile layer's code", "          if (c >= 0) record(c); // an instance, or a tile layer's code", "says which layer stopped it"),
+ ("tile_set ignored", EN, "    t.cells[cell] = tile >= 0 && tile < t.tileset.count ? tile : -1;", "    void cell;", "tile_set changes the level"),
+ ("tiles persist", EN, "      return [{ def: l, tileset, cells: Int32Array.from(l.cells), solid }];", "      const keep = l as unknown as { live?: Int32Array };\n      return [{ def: l, tileset, cells: (keep.live ??= Int32Array.from(l.cells)), solid }];", "puts the tiles back"),
+ ("short of the floor", EN, "        const stepSize = Math.min(toWhole > 1e-9 ? toWhole : 1, remaining);", "        const stepSize = Math.min(toWhole > 1e9 ? toWhole : 1, remaining);", "still ends flush"),
+ ("no layer suggestion", RT, "        raise NameError(f'This room has no tile layer called \"{layer}\".' + _suggest(str(layer), layers)", "        raise NameError(f'This room has no tile layer called \"{layer}\".' + \"\"", "says what is"),
+ ("tiles past the edge kept", CG, "      if (c >= 0 && row >= 0 && c < columns && row < rows) cells[row * columns + c] = tile;", "      if (c >= 0 && row >= 0) cells[row * columns + c] = tile;", "left out, not lost"),
+ ("spacing uncounted", "src/store/project.ts", "  const across = (t.imageWidth - t.offsetX + t.spacingX) / (t.tileWidth + t.spacingX);", "  const across = (t.imageWidth - t.offsetX) / t.tileWidth;", "allowing for offset and spacing"),
+ ("tileset delete leaves tiles", "src/store/project.ts", "          l.tileset = null;\n          l.tiles = {};", "          l.tileset = null;", "clears the tile layers"),
+ ("no upgrade to 3", "src/store/project.ts", "  if (p.schemaVersion < 3) upgradeTo3(p as Project);", "  if (p.schemaVersion < 0) upgradeTo3(p as Project);", "look exactly as they did"),
+ ("stamp unclipped", TO, "    for (let x = 0; x < stamp.columns; x++) if (inside(c + x, r + y, b)) out[key(c + x, r + y)] = stamp.tiles[y * stamp.columns + x]!;", "    for (let x = 0; x < stamp.columns; x++) out[key(c + x, r + y)] = stamp.tiles[y * stamp.columns + x]!;", "clipped to the room"),
+ ("pattern from the drag start", TO, "      if (stamp) out[key(c, r)] = patternAt(stamp, c, r, left, top);", "      if (stamp) out[key(c, r)] = patternAt(stamp, c, r, c0, r0);", "either way it was dragged"),
+ ("bucket floods everything", TO, "    if (seen.has(k) || !inside(x, y, b) || tiles[k] !== target) continue;", "    if (seen.has(k) || !inside(x, y, b)) continue;", "joined and alike"),
+ ("bucket unbounded", TO, "  while (stack.length && seen.size < limit) {", "  while (stack.length && seen.size < limit * 1000) {", "stops at its limit"),
+ ("palette one way", TO, "  const left = Math.min(ca, cb), right = Math.max(ca, cb), top = Math.min(ra, rb), bottom = Math.max(ra, rb);\n  const tiles: number[] = [];", "  const left = ca, right = cb, top = ra, bottom = rb;\n  const tiles: number[] = [];", "dragged either way"),
+ ("solid click ignored", "src/editor/tiles/TilesetEditor.tsx", "        set((t) => void (t.solid = t.solid.includes(n) ? t.solid.filter((s) => s !== n) : [...t.solid, n].sort((a, b) => a - b)));", "        set((t) => void (t.solid = t.solid.filter((s) => s !== n)));", "solid tiles chosen", E2E),
+ ("undo per tile", RE, "    stroke.current = \"open\";\n    if (tool === \"pick\") {", "    stroke.current = \"none\";\n    if (tool === \"pick\") {", "painting a level", E2E),
+ ("palette single only", RE, "            if (n !== null) setStamp(stampFromPalette(anchor, n, grid.columns));", "            if (n !== null) setStamp(stampFromPalette(n, n, grid.columns));", "painting a level", E2E),
  ("no isolation", "vite.config.ts", '  "Cross-Origin-Embedder-Policy": "credentialless",', "", "stopped at its line", E2E),
 ]
 only = sys.argv[1:]

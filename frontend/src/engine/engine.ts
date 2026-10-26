@@ -26,7 +26,25 @@ import { EV, EVENTS_HEADER, F, G, HANDLES, STRIDE } from "./layout";
 import type { GameDefinition } from "./game";
 import { InputState } from "./input";
 import { SpatialHash } from "./spatialHash";
-import { boxOf, containsPoint, masksOverlap, overlaps, spriteInfo, type Box, type SpriteInfo } from "./sprites";
+import { boxOf, containsPoint, maskOverlapsBox, masksOverlap, overlaps, spriteInfo, type Box, type SpriteInfo } from "./sprites";
+import type { TileLayerDef, TilesetDef } from "./game";
+
+/**
+ * A tile layer as it is now — tile_set() changes it — rebuilt from the room's
+ * definition each time the room starts, as GameMaker's rooms are.
+ */
+export interface LiveTiles {
+  def: TileLayerDef;
+  tileset: TilesetDef;
+  cells: Int32Array;
+  solid: Uint8Array;
+}
+
+/**
+ * The answer from a query that can hit a tile: a slot (≥ 0), nothing (-1),
+ * or tile layer L as -2 - L. Python turns the last into the layer's name.
+ */
+export const tileCode = (layer: number) => -2 - layer;
 
 /** The shared arrays, as JavaScript sees them. See layout.ts. */
 export interface SharedViews {
@@ -99,6 +117,7 @@ export interface CameraState {
 
 const scratch: Box = { left: 0, top: 0, right: 0, bottom: 0 };
 const scratch2: Box = { left: 0, top: 0, right: 0, bottom: 0 };
+const tileBox: Box = { left: 0, top: 0, right: 0, bottom: 0 };
 
 export class Engine {
   readonly sprites: SpriteInfo[];
@@ -119,6 +138,9 @@ export class Engine {
   /** Last frame's drawing, for the renderer. */
   drawList: DrawCommand[] = [];
   guiList: DrawCommand[] = [];
+  tiles: LiveTiles[] = [];
+  /** Cells tile_set() changed since the renderer last looked: [layer, cell]. */
+  tileChanges: [number, number][] = [];
   debugText: string | null = null;
   camera: CameraState = {
     enabled: false, x: 0, y: 0, w: 0, h: 0, followType: -1, followSlot: -1, followGen: 0, smoothing: 1,
@@ -214,10 +236,45 @@ export class Engine {
    * The first instance of type t (other than `self`) overlapping self's box
    * placed at (x, y), or -1. `solidOnly` restricts it to solid instances.
    */
+  /**
+   * The first tile layer (or just layer `only`) with a solid tile under
+   * self's mask at (x, y), or -1. `scratch` must already be self's box there.
+   */
+  private tileHit(st: Float64Array, self: number, x: number, y: number, only: number): number {
+    for (let L = 0; L < this.tiles.length; L++) {
+      if (only >= 0 && L !== only) continue;
+      const { def, tileset, cells, solid } = this.tiles[L]!;
+      const tw = tileset.tileWidth, th = tileset.tileHeight;
+      const c0 = Math.max(0, Math.floor(scratch.left / tw)), c1 = Math.min(def.columns - 1, Math.ceil(scratch.right / tw) - 1);
+      const r0 = Math.max(0, Math.floor(scratch.top / th)), r1 = Math.min(def.rows - 1, Math.ceil(scratch.bottom / th) - 1);
+      for (let r = r0; r <= r1; r++) {
+        for (let c = c0; c <= c1; c++) {
+          const tile = cells[r * def.columns + c]!;
+          if (tile < 0 || !solid[tile]) continue;
+          tileBox.left = c * tw;
+          tileBox.top = r * th;
+          tileBox.right = tileBox.left + tw;
+          tileBox.bottom = tileBox.top + th;
+          if (maskOverlapsBox(st, self, x, y, this.sprites, scratch, tileBox)) return L;
+        }
+      }
+    }
+    return -1;
+  }
+
+  /**
+   * What self would touch at (x, y): t ≥ 0 an object type (and its
+   * children); t = -1 anything (with solidOnly: solid instances and solid
+   * tiles); t ≤ -2 the solid tiles of tile layer -2 - t. Answers as tileCode.
+   */
   private firstHit(self: number, x: number, y: number, t: number, solidOnly: boolean): number {
     const { st } = this.fresh();
     this.flushDirty();
     if (!boxOf(st, self, x, y, this.sprites, scratch)) return -1;
+    if (t <= -2) {
+      const L = this.tileHit(st, self, x, y, -2 - t);
+      return L >= 0 ? tileCode(L) : -1;
+    }
     let found = -1;
     this.hash.query(scratch.left, scratch.top, scratch.right, scratch.bottom, (c) => {
       if (c === self || !this.matches(st, c, t)) return false;
@@ -230,22 +287,54 @@ export class Engine {
       found = c;
       return true;
     });
+    if (found < 0 && t === -1 && solidOnly) {
+      const L = this.tileHit(st, self, x, y, -1);
+      if (L >= 0) return tileCode(L);
+    }
     return found;
   }
 
   // ---------------------------------------------------------------- queries Python calls
 
   place_meeting(self: number, x: number, y: number, t: number): boolean {
-    return this.firstHit(self, x, y, t, false) >= 0;
+    return this.firstHit(self, x, y, t, false) !== -1;
   }
 
+  /** An instance (a tile is not an instance, so a tile layer answers -1). */
   instance_place(self: number, x: number, y: number, t: number): number {
-    return this.firstHit(self, x, y, t, false);
+    const hit = this.firstHit(self, x, y, t, false);
+    return hit >= 0 ? hit : -1;
   }
 
-  /** No solid instance of any type overlaps self at (x, y). */
+  /** No solid instance and no solid tile overlaps self at (x, y). */
   place_free(self: number, x: number, y: number): boolean {
-    return this.firstHit(self, x, y, -1, true) < 0;
+    return this.firstHit(self, x, y, -1, true) === -1;
+  }
+
+  /** The tile number at a room point on layer L (or the topmost layer with one there), or -1. */
+  tile_at(x: number, y: number, layer: number): number {
+    const order = layer >= 0 ? [layer] : this.tiles.map((_, i) => i).sort((a, b) => this.tiles[a]!.def.depth - this.tiles[b]!.def.depth);
+    for (const L of order) {
+      const t = this.tiles[L];
+      if (!t) continue;
+      const c = Math.floor(x / t.tileset.tileWidth), r = Math.floor(y / t.tileset.tileHeight);
+      if (c < 0 || r < 0 || c >= t.def.columns || r >= t.def.rows) continue;
+      const tile = t.cells[r * t.def.columns + c]!;
+      if (tile >= 0) return tile;
+    }
+    return -1;
+  }
+
+  /** Changes one tile (-1 clears it). False when the point is outside the layer. */
+  tile_set(x: number, y: number, tile: number, layer: number): boolean {
+    const t = this.tiles[layer];
+    if (!t) return false;
+    const c = Math.floor(x / t.tileset.tileWidth), r = Math.floor(y / t.tileset.tileHeight);
+    if (c < 0 || r < 0 || c >= t.def.columns || r >= t.def.rows) return false;
+    const cell = r * t.def.columns + c;
+    t.cells[cell] = tile >= 0 && tile < t.tileset.count ? tile : -1;
+    this.tileChanges.push([layer, cell]);
+    return true;
   }
 
   collision_point(x: number, y: number, t: number): number {
@@ -310,7 +399,7 @@ export class Engine {
           : this.firstHit(self, st[b + F.X]!, pos, t, solidOnly);
       const start = st[b + axis]!;
       const whole = at(start + d);
-      if (whole < 0) {
+      if (whole === -1) {
         st[b + axis] = start + d;
         continue;
       }
@@ -318,10 +407,15 @@ export class Engine {
       let remaining = Math.abs(d);
       let pos = start;
       while (remaining > 0) {
-        const stepSize = Math.min(1, remaining);
+        // Whole pixels — but from a fractional position (402.6, after a
+        // jump), first the step to the next whole one. Stepping a full pixel
+        // from 402.6 stopped at 415.6, short of a floor at 416, and the
+        // player hovered 0.4 px over the ground it was meant to stand on.
+        const toWhole = sign > 0 ? Math.ceil(pos) - pos : pos - Math.floor(pos);
+        const stepSize = Math.min(toWhole > 1e-9 ? toWhole : 1, remaining);
         const c = at(pos + sign * stepSize);
-        if (c >= 0) {
-          record(c);
+        if (c !== -1) {
+          record(c); // an instance, or a tile layer's code
           break;
         }
         pos += sign * stepSize;
@@ -357,6 +451,14 @@ export class Engine {
     this.roomIndex = index;
     const room = this.def.rooms[index];
     if (!room) return;
+    this.tiles = (room.tileLayers ?? []).flatMap((l) => {
+      const tileset = this.def.tilesets?.find((t) => t.name === l.tileset);
+      if (!tileset) return [];
+      const solid = new Uint8Array(tileset.count);
+      for (const n of tileset.solid) if (n >= 0 && n < tileset.count) solid[n] = 1;
+      return [{ def: l, tileset, cells: Int32Array.from(l.cells), solid }];
+    });
+    this.tileChanges = [];
     const cam = room.camera;
     const c = this.camera;
     c.enabled = !!cam;

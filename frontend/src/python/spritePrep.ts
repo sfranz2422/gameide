@@ -11,6 +11,13 @@ import type { GameDefinition } from "../engine/game";
 import { pixelsOf, solidPixels } from "../store/imageTools";
 
 export async function prepareSprites(def: GameDefinition): Promise<void> {
+  for (const t of def.tilesets ?? []) {
+    if (t.image instanceof Blob) {
+      const bmp = await createImageBitmap(t.image).catch(() => null);
+      if (bmp) t.image = bmp;
+      else delete t.image;
+    }
+  }
   for (const s of def.sprites) {
     if (!s.images?.length) continue;
     const bitmaps = await Promise.all(

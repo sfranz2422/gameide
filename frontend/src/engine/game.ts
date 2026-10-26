@@ -73,6 +73,39 @@ export interface RoomInstance {
   code?: string;
 }
 
+/** A tileset as the engine needs it. Tiles are numbered from 0, across then down. */
+export interface TilesetDef {
+  name: string;
+  /** The picture; only the renderer reads it. */
+  image?: Blob | ImageBitmap;
+  tileWidth: number;
+  tileHeight: number;
+  offsetX: number;
+  offsetY: number;
+  spacingX: number;
+  spacingY: number;
+  columns: number;
+  count: number;
+  /** Tile numbers that collide. */
+  solid: number[];
+}
+
+/**
+ * A room's painted tiles on one layer: `cells[row * columns + column]` is a
+ * tile number, or -1 for empty. The grid is the tileset's, from the room's
+ * top-left. A hidden layer isn't drawn, but its solid tiles still collide —
+ * the usual way to make invisible walls.
+ */
+export interface TileLayerDef {
+  name: string;
+  depth: number;
+  visible: boolean;
+  tileset: string;
+  columns: number;
+  rows: number;
+  cells: number[];
+}
+
 /** What the game window shows. Absent: the whole room. */
 export interface CameraDef {
   width: number;
@@ -102,10 +135,12 @@ export interface RoomDef {
   instances: RoomInstance[];
   camera?: CameraDef;
   backgrounds?: BackgroundDef[];
+  tileLayers?: TileLayerDef[];
 }
 
 export interface GameDefinition {
   sprites: SpriteDef[];
+  tilesets?: TilesetDef[];
   objects: ObjectDef[];
   /** The first room is the start room. */
   rooms: RoomDef[];

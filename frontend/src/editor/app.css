@@ -1,27 +1,29 @@
 /* GameIDE. Dark by default (game editors usually are, and the game pane
-   reads better against it); light when the student's system asks for it. */
+   reads better against it); light from the sun/moon button. The dark greys
+   were lightened a step on 2026-10-26 at the teacher's request — the
+   stage behind the game stays dark on purpose, so games still stand out. */
 :root {
-  --bg: #0f1724;
-  --panel: #162133;
-  --panel-2: #1c2a40;
-  --border: #26364f;
+  --bg: #1b2433;
+  --panel: #232e41;
+  --panel-2: #2c3a51;
+  --border: #374862;
   --text: #e3e9f3;
-  --muted: #8b9ab3;
+  --muted: #9eabc2;
   --accent: #4f8cff;
   --accent-2: #3dd68c;
   --danger: #ff6b6b;
   --warn: #ffcc66;
-  --stage: #070b12;
-  --code-bg: #0b111c;
-  --code-gutter: #0b111c;
+  --stage: #0b1019;
+  --code-bg: #161f2d;
+  --code-gutter: #161f2d;
   --code-text: #dce4f0;
-  --code-active: #131c2c;
+  --code-active: #1f2a3c;
   --code-selection: #2b4570;
   --code-error-line: rgba(255, 90, 90, 0.18);
   --syn-keyword: #c792ea;
   --syn-string: #c3e88d;
   --syn-number: #f78c6c;
-  --syn-comment: #637290;
+  --syn-comment: #74839f;
   --syn-function: #82aaff;
   --syn-self: #ff9cac;
   --syn-property: #89ddff;
@@ -663,7 +665,7 @@ button:focus-visible {
 
 /* sprite, room, settings */
 .checker-bg {
-  background: repeating-conic-gradient(#2a3446 0% 25%, #222b3a 0% 50%) 50% / 16px 16px;
+  background: repeating-conic-gradient(#37425a 0% 25%, #2d374b 0% 50%) 50% / 16px 16px;
 }
 .sprite-editor {
   display: flex;
@@ -1288,7 +1290,7 @@ a.btn {
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  background: #0a0f18;
+  background: #121a26;
 }
 .room-canvas canvas {
   position: absolute;
@@ -1371,4 +1373,45 @@ a.btn {
   display: grid;
   gap: 4px;
   padding: 4px 8px 10px 12px;
+}
+
+/* ---------------------------------------------------------------- tilesets */
+.tileset-editor {
+  display: flex;
+  gap: 18px;
+  padding: 16px 18px;
+  overflow: auto;
+  flex-wrap: wrap;
+  align-content: flex-start;
+}
+.tileset-props {
+  width: 280px;
+  display: grid;
+  gap: 10px;
+  align-content: start;
+}
+.tileset-props input[type="number"] {
+  width: 60px;
+}
+.tileset-sheet {
+  max-width: 100%;
+  overflow: auto;
+  border-radius: 6px;
+}
+.tileset-sheet canvas {
+  display: block;
+  image-rendering: pixelated;
+  cursor: pointer;
+}
+.palette {
+  max-width: 100%;
+  max-height: 340px;
+  overflow: auto;
+  border-radius: 6px;
+}
+.palette canvas {
+  display: block;
+  image-rendering: pixelated;
+  cursor: pointer;
+  touch-action: none;
 }
