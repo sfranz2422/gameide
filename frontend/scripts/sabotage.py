@@ -402,6 +402,8 @@ CASES = [
  ("no due date posted", CL, '            "maxPoints": a.out_of,\n            **due,', '            "maxPoints": a.out_of,', "points and due date", PY),
  ("wrong grade sent", CL, 'body={"draftGrade": sub.score}', 'body={"draftGrade": sub.score_synced}', "Sync sends each score", PY),
  ("view shows a backup", UPJ, "        const backup = store.kind === \"view\" ? null : readBackup(id);", "        const backup = readBackup(id);", "a class:", E2E),
+ ("badge not mirrored", "src/store/gameBadge.ts", "    const right = left.slice(0, BADGE_SIZE - half).reverse();", "    const right = left.slice(0, BADGE_SIZE - half);", "mirrored left to right"),
+ ("badge changes each visit", "src/store/gameBadge.ts", "  const rnd = random(hash(id));", "  const rnd = random(Math.floor(Math.random() * 1e9));", "same every time"),
  ("turn in does nothing", "src/editor/AssignmentBits.tsx", "            await api(`/api/projects/${encodeURIComponent(projectId)}/turn-in`, { json: {} });", "            void 0;", "a class:", E2E),
  ("no read-only bar", EP, '          {store.kind === "view" ? (', "          {store.kind !== store.kind ? (", "a class:", E2E),
 ]

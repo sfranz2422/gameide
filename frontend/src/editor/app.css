@@ -2276,87 +2276,162 @@ a.btn {
   display: flex;
   align-items: center;
   gap: 6px;
-  background: rgba(255, 255, 255, 0.9);
-  color: #444;
-  border-radius: 20px;
-  padding: 6px 12px;
+  background: var(--code-bg);
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 10px;
 }
 .games-search input {
   border: 0;
   outline: none;
   background: transparent;
-  color: #222;
+  color: var(--text);
   width: 180px;
 }
 .games-where {
   margin: 4px 0 16px;
 }
+/* A shelf of cartridges: the picture on the label, the name under it, the actions along the bottom. */
 .game-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
-  gap: 22px;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 20px;
+}
+.project-card,
+.new-game-slot {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  border-radius: 14px 14px 6px 6px;
+  overflow: hidden;
+  transition: transform 0.12s, box-shadow 0.12s;
 }
 .project-card {
-  background: hsl(200, 20%, 18%);
-  border-radius: 4px;
-  padding: 12px 14px 14px;
-  box-shadow: 0 0 6px rgba(0, 0, 0, 0.35);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.35);
 }
-:root[data-theme="light"] .project-card {
-  background: #fff;
+/* The cartridge's grip: two ridges across its top edge. */
+.project-card::before {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  top: 6px;
+  left: 50%;
+  width: 46px;
+  height: 7px;
+  transform: translateX(-50%);
+  border-top: 2px solid rgba(255, 255, 255, 0.28);
+  border-bottom: 2px solid rgba(255, 255, 255, 0.28);
+  pointer-events: none;
 }
-.project-card-title {
-  display: block;
-  font-size: 26px;
-  font-family: var(--sans);
-  color: var(--text);
-  text-decoration: none;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  margin-bottom: 12px;
-}
-.project-card-body {
-  display: flex;
-  gap: 14px;
+.project-card:hover,
+.new-game-slot:hover:not(:disabled) {
+  transform: translateY(-3px);
+  box-shadow: 0 7px 0 rgba(0, 0, 0, 0.3);
 }
 .project-card-icon {
-  flex: 0 0 auto;
-  width: 160px;
-  height: 160px;
-  border-radius: 8px;
-  background: hsl(25, 65%, 60%);
   display: grid;
   place-items: center;
-  overflow: hidden;
+  aspect-ratio: 4 / 3;
+  background: hsl(200, 25%, 24%);
 }
 .project-card-icon.has-icon {
-  background: hsl(200, 25%, 30%);
+  background: repeating-conic-gradient(hsl(200, 18%, 20%) 0 25%, hsl(200, 18%, 24%) 0 50%) 0 0 / 16px 16px;
 }
 .project-card-icon img {
-  width: 100%;
-  height: 100%;
+  width: 70%;
+  height: 70%;
   object-fit: contain;
   image-rendering: pixelated;
 }
-.controller-icon {
-  width: 80%;
+.badge-icon {
+  width: 52%;
 }
-.project-card-side {
+.project-card-label {
+  display: grid;
+  gap: 2px;
+  padding: 10px 12px 6px;
   flex: 1;
-  min-width: 0;
+}
+.project-card-title {
+  font-family: var(--sans);
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--text);
+  text-decoration: none;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.project-card-title:hover {
+  color: var(--accent);
+}
+.project-card-actions {
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  justify-content: flex-end;
-  gap: 8px;
+  border-top: 1px solid var(--border);
+}
+.card-act {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 8px 4px;
+  background: none;
+  border: 0;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.card-act + .card-act {
+  border-left: 1px solid var(--border);
+}
+.card-act.danger {
+  flex: 0 0 44px;
+}
+.card-act:hover:not(:disabled) {
+  background: var(--panel-2);
+  color: var(--text);
+}
+.card-act.danger:hover:not(:disabled) {
+  color: #f08080;
+}
+.new-game-slot {
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 250px;
+  padding: 16px;
+  background: transparent;
+  border: 2px dashed var(--border);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+.new-game-slot:hover:not(:disabled) {
+  border-color: var(--go);
+}
+.new-game-plus {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--go);
+  color: #fff;
+}
+.new-game-plus svg {
+  width: 28px;
+  height: 28px;
 }
 .pills {
   display: flex;
   flex-wrap: wrap;
-  justify-content: flex-end;
   gap: 4px;
-  margin-bottom: auto;
 }
 .pill {
   border-radius: 20px;
@@ -2372,12 +2447,6 @@ a.btn {
 .pill.warn {
   background: hsl(0, 40%, 45%);
 }
-.btn.card-btn {
-  width: 110px;
-  justify-content: flex-start;
-  border-radius: 3px;
-  padding: 5px 10px;
-}
 
 /* -------- the home page */
 .home main {
@@ -2385,12 +2454,86 @@ a.btn {
   margin: 0 auto;
   padding: 0 24px;
 }
+/* The hero is a little level of its own: a pixel grid behind, a strip of
+   ground tiles along the bottom, the editor's screenshot tilted and lit. */
 .hero {
+  position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
   gap: 40px;
   align-items: center;
-  padding: 50px 0 60px;
+  padding: 44px 0 78px;
+}
+.hero::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 0 calc(50% - 50vw);
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px) 0 0 / 24px 24px,
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px) 0 0 / 24px 24px;
+  mask-image: linear-gradient(to bottom, transparent, #000 25%, #000 75%, transparent);
+}
+.hero-ground {
+  position: absolute;
+  left: calc(50% - 50vw);
+  right: calc(50% - 50vw);
+  bottom: 0;
+  height: 24px;
+  background:
+    linear-gradient(hsl(110, 45%, 45%) 0 6px, transparent 6px),
+    repeating-linear-gradient(90deg, hsl(28, 40%, 34%) 0 22px, hsl(28, 40%, 28%) 22px 24px),
+    hsl(28, 40%, 34%);
+  box-shadow: inset 0 -6px 0 rgba(0, 0, 0, 0.25);
+  opacity: 0.85;
+}
+.hero-crew {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+.hero-crew-one {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 9px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  animation: hero-hop 2.4s ease-in-out infinite;
+}
+.hero-crew-one:nth-child(2n) {
+  animation-delay: 0.4s;
+}
+.hero-crew-one:nth-child(3n) {
+  animation-delay: 0.8s;
+}
+.hero-crew-one .badge-icon {
+  width: 30px;
+}
+@keyframes hero-hop {
+  0%, 70%, 100% {
+    transform: translateY(0);
+  }
+  80% {
+    transform: translateY(-6px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-crew-one {
+    animation: none;
+  }
+}
+.hero-art {
+  position: relative;
+  perspective: 1400px;
+}
+.hero-glow {
+  position: absolute;
+  inset: 8% 4%;
+  z-index: -1;
+  background: radial-gradient(closest-side, hsla(30, 90%, 60%, 0.35), hsla(160, 60%, 50%, 0.18), transparent);
+  filter: blur(30px);
 }
 .hero h1 {
   font-size: clamp(36px, 5vw, 58px);
@@ -2416,6 +2559,11 @@ a.btn {
   border-radius: 10px;
   box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55);
   border: 1px solid var(--border);
+  transform: rotateY(-9deg) rotateX(3deg);
+  transition: transform 0.4s;
+}
+.hero-art:hover img {
+  transform: none;
 }
 .home-section {
   padding: 34px 0;
@@ -2703,4 +2851,7 @@ a.btn {
 }
 .modal-foot {
   gap: 8px;
+}
+.site-page.home {
+  overflow-x: clip;
 }

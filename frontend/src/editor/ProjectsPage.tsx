@@ -1,8 +1,10 @@
 /**
- * "My Games": a grid of cards, as microStudio's My Projects is — each game's
- * name, its picture, its size and whether it's published, and Export,
- * Clone and Delete. Create New Game (from a template) and Import Game above,
- * with a search box.
+ * "My Games": a shelf of cartridges — each game's picture on its label (its
+ * "icon" sprite, or a badge made from its id), its name, size, when it was
+ * last changed and whether it's published, with Export, Clone and Delete
+ * along the bottom. The first slot is New game (from a template); Import
+ * and the search box are above. Inspired by microStudio's project list, but
+ * deliberately not a copy of it.
  *
  * Signed in, these are the account's games, and anything made in this
  * browser before signing in is listed apart, with Move to my account — the
@@ -15,6 +17,7 @@ import { newId, type Project } from "../store/project";
 import { loadAssets, type ProjectStore, type ProjectSummary } from "../store/store";
 import { TEMPLATES } from "../store/templates";
 import { download, exportZip, importZip, safeFileName } from "../store/zip";
+import { gameBadge } from "../store/gameBadge";
 import { useSession } from "./session";
 import { SiteNav } from "./SiteNav";
 import { Icon } from "./ui/icons";
@@ -135,11 +138,8 @@ export function ProjectsPage() {
       <main className="games-main">
         <div className="games-head">
           <h1>My Games</h1>
-          <button className="btn big go" disabled={busy} onClick={() => setCreating(true)} data-testid="create-game">
-            {Icon.plus()} Create New Game
-          </button>
-          <button className="btn big blue" disabled={busy} onClick={() => fileInput.current?.click()} data-testid="import-zip">
-            {Icon.upload()} Import Game
+          <button className="btn" disabled={busy} onClick={() => fileInput.current?.click()} data-testid="import-zip" title="A game exported from GameIDE as a .zip">
+            {Icon.upload()} Import a game
           </button>
           <input
             ref={fileInput}
@@ -178,10 +178,13 @@ export function ProjectsPage() {
 
         {list === null ? (
           <p className="muted">Loading…</p>
-        ) : list.length === 0 ? (
-          <p className="muted">No games yet. Press Create New Game to start one.</p>
         ) : (
           <div className="game-cards">
+            <button className="new-game-slot" disabled={busy} onClick={() => setCreating(true)} data-testid="create-game">
+              <span className="new-game-plus">{Icon.plus()}</span>
+              <b>New game</b>
+              <span className="muted small">{list.length ? "From a template, or from nothing" : "Make your first one"}</span>
+            </button>
             {shown.map((p) => (
               <GameCard key={p.id} p={p} store={store} busy={busy} exportGame={exportGame} clone={clone} remove={remove} />
             ))}
@@ -253,27 +256,23 @@ function useIcon(store: ProjectStore, p: ProjectSummary): string | null {
   return url;
 }
 
-/** A pixel-art game controller, for games with no "icon" sprite. */
-export function ControllerIcon() {
-  // 16 × 10 cells: # body, + d-pad, a/b buttons, . empty.
-  const rows = [
-    "................",
-    "..############..",
-    ".##############.",
-    "##+#########a###",
-    "#+++########b###",
-    "##+#############",
-    "################",
-    "####..####..####",
-    "###....##....###",
-    "................",
-  ];
-  const fill: Record<string, string> = { "#": "#2a3d4d", "+": "#e8eef2", a: "#e05a5a", b: "#5cc46b" };
+/** A game's badge (gameBadge.ts), for games with no "icon" sprite. */
+export function BadgeIcon({ id }: { id: string }) {
+  const b = gameBadge(id);
   return (
-    <svg viewBox="0 0 16 10" className="controller-icon" aria-hidden="true" shapeRendering="crispEdges">
-      {rows.flatMap((r, y) => [...r].map((c, x) => (fill[c] ? <rect key={`${x},${y}`} x={x} y={y} width="1" height="1" fill={fill[c]} /> : null)))}
+    <svg viewBox={`-1 -1 ${b.cells.length + 2} ${b.cells.length + 2}`} className="badge-icon" aria-hidden="true" shapeRendering="crispEdges">
+      {b.cells.flatMap((row, y) => row.map((c, x) => (c ? <rect key={`${x},${y}`} x={x} y={y} width="1" height="1" fill={c === 2 ? b.light : b.body} /> : null)))}
     </svg>
   );
+}
+
+function changedText(iso: string) {
+  const d = new Date(iso);
+  const days = Math.floor((Date.now() - d.getTime()) / 86_400_000);
+  if (days < 1 && d.getDate() === new Date().getDate()) return "today";
+  if (days < 2) return "yesterday";
+  if (days < 7) return `${days} days ago`;
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
 function GameCard({
@@ -292,31 +291,40 @@ function GameCard({
   remove: (p: ProjectSummary) => void;
 }) {
   const icon = useIcon(store, p);
+  const badge = gameBadge(p.id);
   return (
     <div className="project-card" data-testid="project-card">
-      <a href={`#/p/${p.id}`} className="project-card-title" data-testid="project-link">
-        {p.name}
+      <a
+        href={`#/p/${p.id}`}
+        className={`project-card-icon${icon ? " has-icon" : ""}`}
+        style={icon ? undefined : { background: badge.back }}
+        tabIndex={-1}
+        title={icon ? undefined : 'Name a sprite "icon" to make it this game\'s picture'}
+      >
+        {icon ? <img src={icon} alt="" /> : <BadgeIcon id={p.id} />}
       </a>
-      <div className="project-card-body">
-        <a href={`#/p/${p.id}`} className={`project-card-icon${icon ? " has-icon" : ""}`} tabIndex={-1} title={icon ? undefined : 'Name a sprite "icon" to make it this game\'s picture'}>
-          {icon ? <img src={icon} alt="" /> : <ControllerIcon />}
+      <div className="project-card-label">
+        <a href={`#/p/${p.id}`} className="project-card-title" data-testid="project-link">
+          {p.name}
         </a>
-        <div className="project-card-side">
-          <div className="pills">
-            {sizeText(p.size) && <span className="pill">{sizeText(p.size)}</span>}
-            {p.published && <span className={`pill published ${p.published.replace(" ", "-")}`}>{p.published}</span>}
-            {p.unsynced && <span className="pill warn">not yet in your account</span>}
-          </div>
-          <button className="btn card-btn blue" disabled={busy} onClick={() => exportGame(p)}>
-            {Icon.download()} Export
-          </button>
-          <button className="btn card-btn go" disabled={busy} onClick={() => clone(p)} data-testid="clone-game">
-            {Icon.copy()} Clone
-          </button>
-          <button className="btn card-btn red" disabled={busy} onClick={() => remove(p)} aria-label={`Delete ${p.name}`}>
-            {Icon.trash()} Delete
-          </button>
+        <span className="muted small">
+          {[sizeText(p.size), p.modified && `changed ${changedText(p.modified)}`].filter(Boolean).join(" · ")}
+        </span>
+        <div className="pills">
+          {p.published && <span className={`pill published ${p.published.replace(" ", "-")}`}>{p.published}</span>}
+          {p.unsynced && <span className="pill warn">not yet in your account</span>}
         </div>
+      </div>
+      <div className="project-card-actions">
+        <button className="card-act" disabled={busy} onClick={() => exportGame(p)} title="Download it as a .zip">
+          {Icon.download()} Export
+        </button>
+        <button className="card-act" disabled={busy} onClick={() => clone(p)} data-testid="clone-game">
+          {Icon.copy()} Clone
+        </button>
+        <button className="card-act danger" disabled={busy} onClick={() => remove(p)} aria-label={`Delete ${p.name}`} title="Delete">
+          {Icon.trash()}
+        </button>
       </div>
     </div>
   );

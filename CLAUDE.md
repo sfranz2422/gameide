@@ -219,6 +219,13 @@ testing.
   for actions), per-kind colours on `[data-tutorial="folder-…"]`, fonts
   from @fontsource (bundled, not Google: school filters). Match new UI to
   those tokens rather than adding colours.
+- **Inspired by microStudio, never a copy of it** (the user's words: "I love
+  that engine, I don't want to make it look exactly like it"). My Games is
+  GameIDE's own cartridge shelf — picture on the label, actions along the
+  bottom, New game as the first slot — and a game with no "icon" sprite
+  gets a pixel badge made from its id (`store/gameBadge.ts`), not one
+  shared gamepad. The home page's hero is a little level: pixel grid,
+  ground tiles, a row of badges. Check new pages against that rule.
 
 ## Projects and code generation
 

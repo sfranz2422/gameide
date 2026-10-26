@@ -38,3 +38,11 @@ npm run e2e                                      # the editor, and signed in aga
 ../backend/.venv/bin/python ../backend/tests/test_server.py
 python3 scripts/sabotage.py                      # confirms every check can fail
 ```
+
+## License
+
+GameIDE is under the [MIT License](LICENSE). The libraries it uses, and ships
+inside exported games, keep their own licences: Pyodide (MPL 2.0), Blockly
+(Apache 2.0), PixiJS, CodeMirror and fflate (MIT), Electron in the Steam kit
+(MIT), and the Source Sans 3 and Ubuntu fonts (SIL Open Font License and the
+Ubuntu Font Licence).

@@ -11,6 +11,10 @@ import { useEffect, useState } from "react";
 import { api } from "../store/api";
 import { useSession } from "./session";
 import { SiteNav } from "./SiteNav";
+import { BadgeIcon } from "./ProjectsPage";
+
+/** A few of the faces My Games gives games without a picture (gameBadge.ts), lining up over the headline. */
+const CREW = ["pip", "zorb", "kit", "momo", "blip", "rex"];
 
 interface Card {
   id: string;
@@ -54,6 +58,13 @@ export function HomePage() {
       <main>
         <section className="hero">
           <div className="hero-text">
+            <div className="hero-crew" aria-hidden="true">
+              {CREW.map((id) => (
+                <span key={id} className="hero-crew-one">
+                  <BadgeIcon id={id} />
+                </span>
+              ))}
+            </div>
             <h1>
               Make your own game.
               <br />
@@ -73,8 +84,10 @@ export function HomePage() {
             </div>
           </div>
           <div className="hero-art">
+            <span className="hero-glow" aria-hidden="true" />
             <img src="home/hero.jpg" alt="The GameIDE editor, with a platformer game running beside its Python code" />
           </div>
+          <div className="hero-ground" aria-hidden="true" />
         </section>
 
         {games.length > 0 && (

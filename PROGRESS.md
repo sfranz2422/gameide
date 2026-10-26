@@ -56,6 +56,18 @@ python3 scripts/sabotage.py   # 337 deliberate bugs
   It also checks that an outsider can't open the class or start a hidden assignment.
 - 27 new sabotage cases, each run and caught. Two found checks that **crashed instead of failing**; both were fixed.
 
+### After review: GameIDE's own look, and a licence
+
+- You confirmed that classes stay under **Classes** in the top bar and that Approvals stays its own page.
+- **My Games** is GameIDE's own design now, not microStudio's:
+  - games are cartridges on a shelf: the picture on the label, the name and "changed today" under it, and Export, Clone and Delete along the bottom
+  - **New game** is the first slot
+  - Import is a small button beside the title.
+- **Each game gets its own picture**: a game with no "icon" sprite shows a pixel badge made from its id. It's mirrored like a sprite and has its own colour, and it's the same every visit. This replaces the one gamepad every card carried. `store/gameBadge.ts`, with 3 tests and 2 sabotage cases.
+- **The home page's hero** is a little level: a pixel grid behind it, ground tiles along the bottom, the editor's screenshot tilted and lit, and a row of hopping badges over the headline (still for reduced motion).
+- **MIT License** (`LICENSE`, `package.json`). README says the bundled libraries keep their own licences: Pyodide MPL 2.0, Blockly Apache 2.0, the fonts OFL / Ubuntu Font Licence.
+- Tests now: Vitest 194, Playwright 71 (+4 opt-in), server 220, sabotage 339.
+
 ### Known issues and gaps
 
 - **Your step:** add `https://gameide.onrender.com/classroom/callback` to the shared OAuth client's redirect addresses in Google Cloud, as PyIDE's, WebIDE's and FlaskIDE's are. Until then Connect Google Classroom fails at Google, and classes work with students added by email.
