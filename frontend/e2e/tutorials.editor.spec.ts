@@ -103,3 +103,36 @@ test("a tutorial's code can't be selected, and its later steps are locked until 
   await page.goto("/#/tutorials");
   await expect(page.getByTestId("tutorial-card").filter({ hasText: "Collect the Coins" }).getByTestId("tutorial-resume")).toBeVisible();
 });
+
+test("Python Basics: lesson 1 checks what the program printed, in the game pane", async ({ page }) => {
+  test.setTimeout(180_000);
+  await page.goto("/#/tutorials");
+  await expect(page.getByRole("heading", { name: "Python Basics" })).toBeVisible();
+  await page.getByTestId("tutorial-card").filter({ hasText: "1. Hello, Python" }).getByTestId("tutorial-start").click();
+  await page.waitForURL(/#\/p\//);
+  const next = page.getByTestId("tutorial-next");
+  const check = page.getByTestId("check-my-work");
+  const pane = page.getByTestId("tutorial-pane");
+  await next.click();
+  // 2: Main and its Create event are already there.
+  await check.click();
+  await expect(next).toBeEnabled();
+  await next.click();
+
+  // 3: print — first a typo, which the check names, then the real thing.
+  await treeItem(page, "Main").click();
+  await page.getByTestId("event-Create").click();
+  await setCode(page, 'print("Helo, world!")\n');
+  await page.getByTestId("notes-tab").click();
+  await check.click();
+  await expect(pane.getByTestId("test-line").filter({ hasText: 'It printed "Helo, world!"' })).toBeVisible({ timeout: 90_000 });
+  await expect(next).toBeDisabled();
+  await page.getByTestId("event-Create").click();
+  await setCode(page, 'print("Hello, world!")\n');
+  await page.getByTestId("notes-tab").click();
+  await check.click();
+  await expect(next).toBeEnabled({ timeout: 90_000 });
+  // What it printed shows under the step, without leaving the lesson for the Console tab.
+  await expect(page.getByTestId("tutorial-console")).toContainText("Hello, world!");
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/python-basics-1.png` });
+});

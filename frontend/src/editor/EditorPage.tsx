@@ -482,6 +482,7 @@ export function EditorPage({ store, id }: { store: ProjectStore; id: string }) {
                     project={project}
                     runner={runner}
                     earns={store.kind === "cloud" && !!me.user && !me.user.teacher}
+                    output={lines}
                   />
                 </div>
               ) : notes && assignment ? (

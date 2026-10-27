@@ -11,6 +11,7 @@
  *   game runs 2 seconds without errors
  *   after 1 second holding right, Player.x increased     (decreased, changed, stayed the same)
  *   after 2 seconds, instance_number("Coin") < 15        any Python that should come out true
+ *   prints Hello, world!                    the console shows it, a second in (any case and spacing)
  *
  * "(2 points)" at the end of a line makes it worth 2; every line is 1 otherwise.
  *
@@ -104,6 +105,7 @@ export type Check =
   | { kind: "runs"; seconds: number }
   | { kind: "after"; seconds: number; hold: string[]; object: string; prop: string; change: Change }
   | { kind: "after-expr"; seconds: number; hold: string[]; expr: string }
+  | { kind: "prints"; text: string }
   | { kind: "unknown"; why: string };
 
 const NAME = String.raw`([A-Za-z_][A-Za-z0-9_]*)`;
@@ -128,6 +130,7 @@ export function readCheck(line: string): Check {
   if ((m = /^(uses|avoids)\s+(\S+)$/i.exec(s))) return { kind: "uses", avoid: m[1]!.toLowerCase() === "avoids", word: m[2]!, object: null, event: null };
   if ((m = new RegExp(String.raw`^room\s+${NAME}\s+has\s+(at least\s+)?(\d+)\s+${NAME}$`, "i").exec(s)))
     return { kind: "count", room: m[1]!, atLeast: !!m[2], n: Number(m[3]), object: m[4]! };
+  if ((m = /^prints?\s+(.+)$/i.exec(s))) return { kind: "prints", text: m[1]!.trim() };
   if ((m = new RegExp(String.raw`^game\s+runs\s+${SECONDS}\s+without\s+errors?$`, "i").exec(s))) return { kind: "runs", seconds: Number(m[1]) };
   if ((m = new RegExp(String.raw`^after\s+${SECONDS}(?:\s+holding\s+(.+?))?\s*,\s*(.+)$`, "i").exec(s))) {
     const seconds = Number(m[1]);
@@ -143,7 +146,7 @@ export function readCheck(line: string): Check {
   return { kind: "unknown", why: "GameIDE doesn't know this kind of check." };
 }
 
-export const needsGame = (c: Check) => c.kind === "runs" || c.kind === "after" || c.kind === "after-expr";
+export const needsGame = (c: Check) => c.kind === "runs" || c.kind === "after" || c.kind === "after-expr" || c.kind === "prints";
 
 // ---------------------------------------------------------------- checks of the project
 
@@ -268,7 +271,7 @@ function failedEval(v: unknown): string | null {
 }
 
 export async function checkGame(run: GameRunner, c: Check): Promise<{ ok: boolean; detail: string }> {
-  if (c.kind !== "runs" && c.kind !== "after" && c.kind !== "after-expr") return { ok: false, detail: "Not a check of the running game." };
+  if (!needsGame(c)) return { ok: false, detail: "Not a check of the running game." };
   try {
     await run.start();
   } catch (e) {
@@ -280,6 +283,17 @@ export async function checkGame(run: GameRunner, c: Check): Promise<{ ok: boolea
       const errs = run.errors();
       if (!errs.length && !ran) return { ok: false, detail: "The game didn't keep running long enough to check." };
       return errs.length ? { ok: false, detail: `The game stopped with an error: ${errs[0]}` } : { ok: true, detail: "" };
+    }
+    if (c.kind === "prints") {
+      // A second in: long enough for the Create events and a few steps.
+      const ran = await runFor(run, 1);
+      const errs = run.errors();
+      if (errs.length) return { ok: false, detail: `The game stopped with an error: ${errs[0]}` };
+      if (!ran) return { ok: false, detail: "The game didn't keep running long enough to check." };
+      const out = await run.py("__import__('gameide')._printed()");
+      const bad = failedEval(out);
+      if (bad) return { ok: false, detail: bad };
+      return printedOk(String(out ?? ""), c.text);
     }
     const before = c.kind === "after" ? await run.py(propExpr(c.object, c.prop)) : null;
     for (const k of c.hold) run.hold(k, true);
@@ -313,6 +327,20 @@ export async function checkGame(run: GameRunner, c: Check): Promise<{ ok: boolea
 }
 
 const round = (n: number) => Math.round(n * 100) / 100;
+
+/**
+ * Did the console show `want`? Capitals and spacing don't count — a
+ * beginner's "hello,  World" is the lesson learned, not a mistake to be
+ * failed on. Otherwise the detail says what it did print, which is what
+ * shows a student their typo.
+ */
+export function printedOk(printed: string, want: string): { ok: boolean; detail: string } {
+  const squash = (t: string) => t.toLowerCase().replace(/\s+/g, " ").trim();
+  if (squash(printed).includes(squash(want))) return { ok: true, detail: "" };
+  const shown = printed.trim().split("\n").slice(0, 3).join(" / ");
+  if (!shown) return { ok: false, detail: `Nothing was printed yet. It should print "${want}".` };
+  return { ok: false, detail: `It printed "${shown.length > 80 ? shown.slice(0, 80) + "…" : shown}", not "${want}".` };
+}
 
 /**
  * Every test in a block, run: the project's checks first (instant), then

@@ -39,11 +39,54 @@ import json
 import linecache
 import re
 import math
+import sys
 import traceback
 from array import array
 from types import SimpleNamespace
 
 import _engine as _js  # the Engine's query functions, registered by bridge.ts
+
+
+# ---------------------------------------------------------------- what was printed
+
+# Everything the game printed this run, for the tutorials' `prints` check
+# (checks/checks.ts): "your program printed Hello, world!" is the first thing
+# a beginner's lesson can ask. The first and the last 10 000 characters are
+# kept — a print in a Step event writes sixty lines a second, and keeping
+# only the latest would lose the Create event's "Hello" a few seconds in.
+# sys.stdout is wrapped rather than print(), so a print anywhere counts; each
+# run's fresh module unwraps the last one's first, or every Play would wrap
+# the wrapper again.
+_PRINTED_KEEP = 10_000
+_printed_head = ""
+_printed_tail = ""
+
+
+class _Tee:
+    def __init__(self, real):
+        self._real = real
+
+    def write(self, text):
+        global _printed_head, _printed_tail
+        rest = str(text)
+        room = _PRINTED_KEEP - len(_printed_head)
+        if room > 0:
+            _printed_head += rest[:room]
+            rest = rest[room:]
+        if rest:
+            _printed_tail = (_printed_tail + rest)[-_PRINTED_KEEP:]
+        return self._real.write(text)
+
+    def __getattr__(self, name):
+        return getattr(self._real, name)
+
+
+sys.stdout = _Tee(getattr(sys.stdout, "_real", sys.stdout))
+
+
+def _printed():
+    """What the game has printed this run (both ends of it, when it's long)."""
+    return _printed_head + _printed_tail
 
 # Every name a student's code can use without importing anything. The test
 # suite checks this list against the API catalog (src/catalog/api.ts) both

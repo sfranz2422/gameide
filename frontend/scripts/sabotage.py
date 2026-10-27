@@ -585,6 +585,15 @@ CASES = [
  ("turn in does nothing", "src/editor/AssignmentBits.tsx", "            await api(`/api/projects/${encodeURIComponent(projectId)}/turn-in`, { json: {} });", "            void 0;", "a class:", E2E),
  ("no read-only bar", EP, '          {store.kind === "view" ? (', "          {store.kind !== store.kind ? (", "a class:", E2E),
  ("no art library route", APP, '@app.get("/library/<path:name>")\n', "", "the free art library's pictures are served", PY),
+ # The Python Basics lessons (public/tutorials/py-*.md; src/tutorials/pythonBasics.test.ts)
+ ("prints not kept", RT, "            _printed_head += rest[:room]\n", "            pass\n", "py-hello"),
+ ("stdout not wrapped", RT, "sys.stdout = _Tee(getattr(sys.stdout, \"_real\", sys.stdout))", "_Tee(getattr(sys.stdout, \"_real\", sys.stdout))", "py-variables"),
+ ("prints case-sensitive", "src/checks/checks.ts", "const squash = (t: string) => t.toLowerCase().replace(", "const squash = (t: string) => t.replace(", "ignores capitals and spacing"),
+ ("prints unread", "src/checks/checks.ts", "if ((m = /^prints?\\s+(.+)$/i.exec(s)))", "if ((m = /^printz\\s+(.+)$/i.exec(s)))", "py-maths"),
+ ("Main not in the room", "src/store/templates.ts", "  p.rooms[0]!.instances.push(newInstance(p.rooms[0]!, main.id, 0, 0));\n", "  void newInstance;\n", "py-loops"),
+ ("lesson check typo", "public/tutorials/py-maths.md", "prints 1024", "prints 1025", "py-maths"),
+ ("lesson console empty", "src/editor/EditorPage.tsx", "                    output={lines}\n", "", "Python Basics: lesson 1", E2E),
+ ("lesson code typo", "public/tutorials/py-functions.md", "    return n * 2", "    return n * 3", "py-functions"),
  # Physics (engine/physics.ts; src/python/physics.test.ts, e2e/physics.editor.spec.ts)
  ("physics moved twice", EN, "if (!phys && (h !== 0 || v !== 0)) {", "if (h !== 0 || v !== 0) {", "takes push"),
  ("physics teleport ignored", PH, "if (x !== e.x || y !== e.y || angle !== e.angle) {", "if (x !== e.x && y !== e.y && angle !== e.angle) {", "is moved by its own code"),

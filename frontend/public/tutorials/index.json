@@ -24,6 +24,78 @@
   "description": "Build an event from blocks, read the Python they make, then turn it into Python."
  },
  {
+  "key": "py-hello",
+  "title": "1. Hello, Python",
+  "level": "Python Basics",
+  "time": "10 min",
+  "starter": "python-start",
+  "description": "Your first lines of Python: print messages to the Console, and leave notes in your code."
+ },
+ {
+  "key": "py-variables",
+  "title": "2. Variables",
+  "level": "Python Basics",
+  "time": "10 min",
+  "starter": "python-start",
+  "description": "Give a value a name, change it, and print it — how a program remembers a score, a name or a number of lives."
+ },
+ {
+  "key": "py-maths",
+  "title": "3. Numbers and Maths",
+  "level": "Python Basics",
+  "time": "10 min",
+  "starter": "python-start",
+  "description": "Add, take away, times and divide, and the sums games need: how many whole times something fits, and what's left over."
+ },
+ {
+  "key": "py-text",
+  "title": "4. Working with Text",
+  "level": "Python Basics",
+  "time": "12 min",
+  "starter": "python-start",
+  "description": "Strings: join them, measure them, shout them, and put numbers inside them with f-strings."
+ },
+ {
+  "key": "py-decisions",
+  "title": "5. Making Decisions",
+  "level": "Python Basics",
+  "time": "15 min",
+  "starter": "python-start",
+  "description": "if, elif and else — code that runs only sometimes, which is what makes a game react."
+ },
+ {
+  "key": "py-loops",
+  "title": "6. Loops",
+  "level": "Python Basics",
+  "time": "15 min",
+  "starter": "python-start",
+  "description": "for and while — doing something again and again without typing it again and again."
+ },
+ {
+  "key": "py-lists",
+  "title": "7. Lists",
+  "level": "Python Basics",
+  "time": "15 min",
+  "starter": "python-start",
+  "description": "Lots of values in one variable — an inventory, a high-score table — and how to loop through them."
+ },
+ {
+  "key": "py-functions",
+  "title": "8. Functions",
+  "level": "Python Basics",
+  "time": "15 min",
+  "starter": "python-start",
+  "description": "Make your own commands with def: give them inputs, and get answers back with return."
+ },
+ {
+  "key": "py-game",
+  "title": "9. Python in a Game",
+  "level": "Python Basics",
+  "time": "15 min",
+  "starter": "python-start",
+  "description": "Variables, if and loops on the screen: draw with a loop, and grow a circle with the arrow keys."
+ },
+ {
   "key": "simple-platformer",
   "title": "Simple Platformer",
   "level": "Platformers",

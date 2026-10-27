@@ -11,11 +11,17 @@
  * A step can spotlight part of the editor (`highlight: folder-sprites`):
  * a ring around it, and the rest of the page dimmed a little, gone at the
  * first click anywhere — it points, it never blocks.
+ *
+ * A lesson that checks what was printed (Python Basics) shows the Console's
+ * last lines under each step. The Console is a tab beside this one, so
+ * without it a beginner reading "look in the Console" had to leave the
+ * lesson to see their output, and find the way back, after every Play.
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { api } from "../store/api";
-import { runTests, type GameRunner, type TestResult } from "../checks/checks";
+import { readCheck, runTests, type GameRunner, type TestResult } from "../checks/checks";
+import type { ConsoleLine } from "../editor/RunPanes";
 import type { Project, TutorialProgress } from "../store/project";
 import { pieces } from "../notes/quiz";
 import { renderMarkdown } from "../notes/NotesPane";
@@ -31,10 +37,16 @@ export interface TutorialPaneProps {
   runner: GameRunner | null;
   /** Signed in as a student: steps passed earn XP (backend/tutorials.py). */
   earns: boolean;
+  /** The Console's lines, shown under the step in a lesson with `prints` checks. */
+  output?: ConsoleLine[];
 }
 
-export function TutorialPane({ md, progress, onProgress, project, runner, earns }: TutorialPaneProps) {
+/** How many of the Console's last lines the lesson shows. */
+const OUTPUT_LINES = 8;
+
+export function TutorialPane({ md, progress, onProgress, project, runner, earns, output }: TutorialPaneProps) {
   const t = useMemo(() => parseTutorial(md), [md]);
+  const printing = useMemo(() => t.steps.some((s) => s.checks.some((c) => readCheck(c.label).kind === "prints")), [t]);
   const last = Math.max(0, t.steps.length - 1);
   const [at, setAt] = useState(() => Math.min(progress.step, last));
   const [results, setResults] = useState<TestResult[] | null>(null);
@@ -103,6 +115,19 @@ export function TutorialPane({ md, progress, onProgress, project, runner, earns 
           p.type === "md" ? <div key={i} className="notes-md" dangerouslySetInnerHTML={{ __html: renderMarkdown(p.text) }} /> : null,
         )}
       </div>
+      {printing && output && (
+        <div className="console tutorial-console" data-testid="tutorial-console" aria-label="Console">
+          <span className="muted small">Console</span>
+          {output.length === 0 && <pre className="line info">Press Play to run your code.</pre>}
+          {output.slice(-OUTPUT_LINES).map((l, i) =>
+            l.kind === "error" ? (
+              <pre key={i} className="line err">{l.error.message}</pre>
+            ) : (
+              <pre key={i} className={`line ${l.kind}`}>{l.text}</pre>
+            ),
+          )}
+        </div>
+      )}
       {step.checks.length > 0 && (
         <div className="tests-card" data-testid="tutorial-checks">
           <ul className="tests-list">

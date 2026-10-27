@@ -368,6 +368,17 @@ async function playerStart(): Promise<Built> {
   return { project: p, assets };
 }
 
+async function pythonStart(): Promise<Built> {
+  // The Python Basics lessons: one object, Main, in the room, with a Create
+  // event to type in. No sprite — nothing to look at but the Console, which
+  // is the point: the lessons are about Python, not the game around it.
+  const p = blankProject("Python practice");
+  const main = obj(p, "Main", null);
+  ev(main, { type: "create" }, "# Your code goes here. Press Play to run it.\n");
+  p.rooms[0]!.instances.push(newInstance(p.rooms[0]!, main.id, 0, 0));
+  return { project: p, assets: new Map() };
+}
+
 /** Templates for tutorials only, by their `starter:` name. */
 export const TUTORIAL_STARTERS: Record<string, () => Promise<Built>> = {
   empty,
@@ -376,6 +387,7 @@ export const TUTORIAL_STARTERS: Record<string, () => Promise<Built>> = {
   "coins-start": coinsStart,
   "platformer-start": platformerStart,
   "player-start": playerStart,
+  "python-start": pythonStart,
 };
 
 export const TEMPLATES: { key: string; label: string; description: string; build: () => Promise<Built> }[] = [

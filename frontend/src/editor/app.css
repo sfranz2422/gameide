@@ -3421,6 +3421,12 @@ a.btn {
 .tutorial-bar span.here {
   background: hsl(45, 90%, 60%);
 }
+.tutorial-console {
+  margin: 12px 0 0;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  max-height: 180px;
+}
 .tutorial-nav {
   display: flex;
   align-items: center;
