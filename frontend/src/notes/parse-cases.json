@@ -244,6 +244,34 @@
     "options": [],
     "points": 1.0
    }
+  },
+  {
+   "body": "type: predict\nWhat prints?\n~~~python\nprint(1)\nprint(2)\n~~~\nanswer: 1 2\n- [x] not a choice here",
+   "expect": {
+    "id": "",
+    "kind": "predict",
+    "prompt": "What prints?\n~~~python\nprint(1)\nprint(2)\n~~~",
+    "choices": [],
+    "correct": [],
+    "answers": [
+     "1 2"
+    ],
+    "options": [],
+    "points": 1.0
+   }
+  },
+  {
+   "body": "id: 0123456789ab\npoints: 2\ntype: predict\nWhat prints?\n~~~python\nprint(1)\n~~~",
+   "expect": {
+    "id": "0123456789ab",
+    "kind": "predict",
+    "prompt": "What prints?\n~~~python\nprint(1)\n~~~",
+    "choices": [],
+    "correct": [],
+    "answers": [],
+    "options": [],
+    "points": 2.0
+   }
   }
  ],
  "tests": [

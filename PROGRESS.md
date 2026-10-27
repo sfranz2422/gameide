@@ -1,12 +1,13 @@
 # Progress
 
-## More in notes: three question kinds, checklists, flip cards ✅ (2026-10-27, waiting for review; not pushed)
+## More in notes: four question kinds, checklists, flip cards ✅ (2026-10-27, waiting for review)
 Asked for across all four editors (code that runs in the notes and a notes column were for PyIDE, WebIDE and FlaskIDE only — GameIDE's three columns stay as they are).
 - **`type: order`** (put the lines in order), **`type: bug`** (click the wrong line) and **`type: sort`** (sort items into groups) — `backend/quiz.py`, the same file as PyIDE's, now with the three kinds. Order and sort give part marks (order by the longest run of lines kept in order, so one line out of place costs one line); bug is right or wrong. Shuffled lines and items come out in the same order everywhere, by an FNV-1a hash both quiz.py and quiz.ts work out (`scramble`), because that order is part of the question and what an answer is marked against. Redacted like the rest: the order, the groups and the `bug:` line never reach a student.
 - In the Notes tab (`NotesPane.tsx`): ▲ ▼ to move a line; a button per line of the bug's code; a tray and a box per group — click an item, then a group (or an item already in that group: a click aimed at a crowded box landed on an item and only changed which was picked, found by the e2e test).
+- **`type: predict`**: what does the code in its `~~~` fence print? `answer:` is the output, marked like a short answer (line breaks don't count). GameIDE's notes have no Python to run the code in, as the other editors' do, so once a student has answered, the reply carries the key as `output` and the Notes tab shows "It prints:" — never before an answer.
 - **Checklists**: `- [ ] item` is a box to tick, kept in the browser per assignment (`- [x]` starts ticked). **Flip cards**: a ```` ```cards ```` block, `front -> back` a line.
 - The help page has them all; `notes.py` refuses an order that isn't the question's lines, a sort with an item left out, and a bug answer that isn't a line number.
-- Tests: the shared parse cases (`parse-cases.json`) gain the three kinds, read the same by quiz.ts and quiz.py; Vitest for the shuffle, cards and the cards block; server checks for the keys staying home and the marking; `e2e/notes.spec.ts` ticks a box and reloads, flips a card and solves all three. 8 sabotage cases, all caught.
+- Tests: the shared parse cases (`parse-cases.json`) gain the three kinds, read the same by quiz.ts and quiz.py; Vitest for the shuffle, cards and the cards block; server checks for the keys staying home and the marking; `e2e/notes.spec.ts` ticks a box and reloads, flips a card and solves all three. 11 sabotage cases, all caught.
 
 ## Game Elements on Learn ✅ (2026-10-27, waiting for review)
 Asked for: the concepts of the video series further down microStudio's tutorials page (mrLman's *Game Elements*, 24 videos in three levels), as our own step-by-step tutorials — no videos. Their code is only in pictures, so the lessons are written fresh for GameIDE, an element each.

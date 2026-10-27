@@ -619,6 +619,9 @@ CASES = [
  ("ticks forgotten", "src/notes/NotesPane.tsx", '    box.checked = stored === null ? spot.dataset.done === "1" : stored === "1";', '    box.checked = spot.dataset.done === "1" && stored !== "x";', "a checklist that stays ticked", E2E),
  ("cards don't turn", "src/notes/NotesPane.tsx", 'dangerouslySetInnerHTML={{ __html: renderMarkdown(on ? c.back : c.front) }}', 'dangerouslySetInnerHTML={{ __html: renderMarkdown(on ? c.front : c.front) }}', "a checklist that stays ticked", E2E),
  ("a click on a group's item only picks it", "src/notes/NotesPane.tsx", "if (picked >= 0 && picked !== i && shownPlaced[picked] !== shownPlaced[i]) put(shownPlaced[i]!);", "if (picked >= 0 && picked !== i && shownPlaced[picked] !== shownPlaced[i] && i < 0) put(shownPlaced[i]!);", "a checklist that stays ticked", E2E),
+ ("predict read as text", "src/notes/quiz.ts", '    q.kind = "predict";\n', '    q.kind = "text";\n', "every question case reads the same"),
+ ("predict output never sent", "../backend/notes.py", '            out["output"] = (json.loads(key.answers or "[]") or [""])[0]', '            out["outputs"] = (json.loads(key.answers or "[]") or [""])[0]', "marked kindly, and the real output", PY),
+ ("predict output shown before answering", "src/notes/NotesPane.tsx", '{q.kind === "predict" && reply?.output !== undefined && (', '{q.kind === "predict" && (reply?.output !== undefined || !!q.id) && (', "a checklist that stays ticked", E2E),
  # Physics (engine/physics.ts; src/python/physics.test.ts, e2e/physics.editor.spec.ts)
  ("physics moved twice", EN, "if (!phys && (h !== 0 || v !== 0)) {", "if (h !== 0 || v !== 0) {", "takes push"),
  ("physics teleport ignored", PH, "if (x !== e.x || y !== e.y || angle !== e.angle) {", "if (x !== e.x && y !== e.y && angle !== e.angle) {", "is moved by its own code"),

@@ -73,6 +73,17 @@ bug: 1
 \`\`\`
 
 \`\`\`quiz
+type: predict
+What does x end up as?
+~~~python
+x = 3
+x += 2
+print(x * 2)
+~~~
+answer: 10
+\`\`\`
+
+\`\`\`quiz
 type: sort
 Sort each into events and functions.
 group: Event
@@ -113,6 +124,8 @@ export function HelpPage() {
           marked by you on the assignment's page. <code>type: order</code> gives lines (each after <code>- </code>, in the right order) shuffled, to put back
           in order; <code>type: bug</code> asks which line of the code in a <code>~~~</code> fence is wrong (<code>bug: 2</code>);{" "}
           <code>type: sort</code> has a <code>group:</code> line for each group with its items under it. Order and sort give part marks.{" "}
+          <code>type: predict</code> asks what the code in its <code>~~~</code> fence prints: <code>answer:</code> is the output, compared like a short
+          answer (line breaks don't count), and once a student has answered they're shown what it prints.{" "}
           <code>points:</code> is 1 if left out.
         </p>
         <pre className="help-example">{QUESTIONS}</pre>

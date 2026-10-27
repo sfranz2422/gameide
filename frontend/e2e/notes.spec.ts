@@ -155,9 +155,19 @@ group: Function
 - instance_create
 - keyboard_check
 \`\`\`
+
+\`\`\`quiz
+type: predict
+What will this print?
+~~~python
+for i in range(3):
+    print(i * 2)
+~~~
+answer: 0 2 4
+\`\`\`
 `;
 
-test("notes: a checklist that stays ticked, flip cards, and order, bug and sort questions", async ({ browser }) => {
+test("notes: a checklist that stays ticked, flip cards, and order, bug, sort and predict questions", async ({ browser }) => {
   test.setTimeout(180_000);
   const { ctx: tctx, page: teacher } = await signedIn(browser, "teach3@example.com");
   await teacher.goto("/#/games");
@@ -228,6 +238,13 @@ test("notes: a checklist that stays ticked, flip cards, and order, bug and sort 
   }
   await questions.nth(2).getByTestId("question-answer").click();
   await expect(questions.nth(2).getByTestId("question-result")).toContainText("✓ Right");
+
+  // Predict the output: what it really prints is shown only once it's answered.
+  await expect(questions.nth(3).getByTestId("predict-output")).toHaveCount(0);
+  await questions.nth(3).getByRole("textbox", { name: "What it will print" }).fill("0\n2\n4");
+  await questions.nth(3).getByTestId("question-answer").click();
+  await expect(questions.nth(3).getByTestId("question-result")).toContainText("✓ Right");
+  await expect(questions.nth(3).getByTestId("predict-output")).toContainText("0 2 4");
   if (SHOTS) await pia.screenshot({ path: `${SHOTS}/notes-puzzles.png` });
   await sctx.close();
   await tctx.close();

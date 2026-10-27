@@ -908,6 +908,20 @@ st = xa.post("/api/quiz/answer", json={"assignment": N3, "question": sort_q["qid
 check("a sort with an item left out is refused, not marked", st == 400, st)
 r = xa.post("/api/quiz/answer", json={"assignment": N3, "question": sort_q["qid"], "response": json.dumps(sort_q["correct"])}).get_json()
 check("…and every item in its group is all of it", r.get("correct") is True and r.get("earned") == 4, r)
+
+# Predict the output: marked like a short answer; the real output comes back only with an answer.
+PREDICT = "```quiz\ntype: predict\nWhat prints?\n~~~python\nprint(1)\nprint(2)\n~~~\nanswer: 1 PREDICTKEY\npoints: 2\n```\n"
+put(teacher, "nq4", project("nq4", "Predict game"), 0)
+N4 = teacher.post(f"/api/classes/{XC}/assignments", json={"title": "Predict", "project": "nq4"}).get_json()["slug"]
+teacher.post(f"/api/assignments/{N4}/notes", json={"notes": PREDICT})
+P4 = xa.post(f"/api/assignments/{N4}/start").get_json()["project"]
+seen4 = json.dumps(xa.get(f"/api/projects/{P4}/assignment").get_json()) + json.dumps(xa.get(f"/api/quiz/{N4}/mine").get_json())
+check("a predict question's output doesn't reach a student before they answer", "PREDICTKEY" not in seen4 and "print(2)" in seen4)
+pq4 = quizmod.keys(PREDICT)[0]
+r = xa.post("/api/quiz/answer", json={"assignment": N4, "question": pq4["qid"], "response": "1\npredictkey\n"}).get_json()
+check("a prediction over several lines is marked kindly, and the real output comes back with it",
+      r.get("correct") is True and r.get("earned") == 2 and r.get("output") == "1 PREDICTKEY", r)
+check("…and with the answer when the page asks again", xa.get(f"/api/quiz/{N4}/mine").get_json()["answers"][pq4["qid"]].get("output") == "1 PREDICTKEY")
 r = teacher.post("/api/quiz/grade", json={"assignment": N, "student": ids["xa"], "question": long_q["qid"], "score": 3}).get_json()
 check("its teacher marks it, and it counts", r.get("total") == 4.5, r)
 

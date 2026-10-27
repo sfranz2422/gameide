@@ -3505,6 +3505,19 @@ a.btn {
 .flip-card .notes-md p {
   margin: 0;
 }
+
+/* Predict the output (type: predict): a box for a few lines, then what it really prints. */
+.quiz-predict {
+  font-family: var(--mono);
+}
+.quiz-predict-output pre {
+  margin: 4px 0 8px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--code-bg);
+  color: var(--code-text);
+  white-space: pre-wrap;
+}
 .tests-list {
   list-style: none;
   margin: 8px 0;

@@ -145,7 +145,12 @@ def _ensure_submission(db, a, student_id):
 
 def _answer_reply(key, answer, **more):
     """What the student's page is told about an answer: right or wrong and
-    the points, never what the right answer was."""
+    the points, never what the right answer was — except a predict
+    question's output (`output`), which is what the code really prints:
+    seeing it once they've answered is the lesson. GameIDE's notes have no
+    Python to run it in, as the other editors' do, so the key is what they
+    see. Every reply here is for an answer already given (or the teacher's
+    practice), so it is never sent before one."""
     if key is not None and key.kind == "long":
         out = {"kind": "long", "response": quiz.clean_html(answer.response), "graded": answer.score is not None,
                "correct": None, "points": key.points, "earned": answer.score or 0}
@@ -153,6 +158,8 @@ def _answer_reply(key, answer, **more):
         part = grades.mark(key, answer.response) if key is not None else 0.0
         points = key.points if key is not None else 0
         out = {"response": answer.response, "correct": part == 1.0, "points": points, "earned": round(points * part, 2)}
+        if key is not None and key.kind == "predict":
+            out["output"] = (json.loads(key.answers or "[]") or [""])[0]
     out.update(more)
     return out
 

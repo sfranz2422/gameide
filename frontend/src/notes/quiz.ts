@@ -16,7 +16,7 @@ const ANSWER = /^answer\s*:\s*(.*)$/i;
 const POINTS = /^points?\s*:\s*(\d{1,4}(?:\.\d{1,2})?)\s*$/i;
 const QID = /^id\s*:\s*([0-9a-f]{12})\s*$/;
 const LONG = /^type\s*:\s*(long|essay)\s*$/i;
-const TYPE = /^type\s*:\s*(blanks?|fill|match|matching|order|parsons|bug|sort|groups?)\s*$/i;
+const TYPE = /^type\s*:\s*(blanks?|fill|match|matching|order|parsons|bug|sort|groups?|predict)\s*$/i;
 const PAIR = /^[-*+]\s+(.+?)\s+->\s+(.+)$/;
 const MATCHL = /^match\s*:\s*(.+)$/i;
 const OPTION = /^option\s*:\s*(.+)$/i;
@@ -28,6 +28,7 @@ const BUGQ = /^bugs?\s*:\s*([\d,\s]+)$/i;
 const KINDS: Record<string, string> = {
   blank: "blank", blanks: "blank", fill: "blank", match: "match", matching: "match",
   order: "order", parsons: "order", bug: "bug", sort: "sort", group: "sort", groups: "sort",
+  predict: "predict",
 };
 
 /**
@@ -68,7 +69,7 @@ export function codeLines(prompt: string): string[] {
 
 export interface Question {
   id: string;
-  kind: "choice" | "text" | "long" | "blank" | "match" | "order" | "bug" | "sort";
+  kind: "choice" | "text" | "long" | "blank" | "match" | "order" | "bug" | "sort" | "predict";
   prompt: string;
   choices: string[];
   correct: string[];
@@ -185,6 +186,11 @@ export function parseQuiz(body: string): Question {
       q.correct = [];
     }
     q.kind = "sort";
+  } else if (typed === "predict") {
+    // A short answer about the question's code (quiz.parse): answer: is what it prints.
+    q.choices = [];
+    q.correct = [];
+    q.kind = "predict";
   } else if (typed === "bug") {
     q.choices = [];
     q.answers = [];

@@ -128,6 +128,8 @@ function FlipCards({ body }: { body: string }) {
 
 interface Reply {
   kind?: string;
+  /** A predict question's real output, once it's answered (notes.py, _answer_reply). */
+  output?: string;
   response: string;
   correct: boolean | null;
   points: number;
@@ -247,6 +249,7 @@ function QuestionCard({ q, assignment, reply, onAnswer, practice }: { q: Questio
   const send = async () => {
     if (q.kind === "sort" && placed.some((g) => !g)) return setProblem("Put every item in a group first.");
     if (q.kind === "bug" && !bugLine) return setProblem("Click the line with the bug first.");
+    if (q.kind === "predict" && !text.trim()) return setProblem("Type what you think it will print first.");
     setBusy(true);
     setProblem(null);
     try {
@@ -308,6 +311,23 @@ function QuestionCard({ q, assignment, reply, onAnswer, practice }: { q: Questio
         </div>
       )}
       {q.kind === "text" && <input className="quiz-text" value={done ? reply!.response : text} disabled={done} onChange={(e) => setText(e.target.value)} aria-label="Your answer" />}
+      {q.kind === "predict" && (
+        <textarea
+          className="quiz-long quiz-predict"
+          rows={3}
+          value={done ? reply!.response : text}
+          disabled={done}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="What will it print?"
+          aria-label="What it will print"
+        />
+      )}
+      {q.kind === "predict" && reply?.output !== undefined && (
+        <div className="quiz-predict-output" data-testid="predict-output">
+          <span className="muted small">It prints:</span>
+          <pre>{reply?.output}</pre>
+        </div>
+      )}
       {q.kind === "long" &&
         (done ? (
           <div className="quiz-long-done" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(reply!.response, { ALLOWED_TAGS: ["p", "br", "b", "i", "em", "strong", "ul", "ol", "li", "div", "u"], ALLOWED_ATTR: [] }) }} />
