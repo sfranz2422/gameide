@@ -288,7 +288,7 @@ export function TilesetEditor({ tilesetId }: { tilesetId: string }) {
             + New animation
           </button>
         </fieldset>
-        <fieldset>
+        <fieldset data-tutorial="tileset-solid">
           <legend>Solid tiles</legend>
           <div className="seg" role="radiogroup" aria-label="What a click marks">
             <button className={marking === "solid" ? "on" : ""} role="radio" aria-checked={marking === "solid"} onClick={() => setMarking("solid")} data-testid="mark-solid">

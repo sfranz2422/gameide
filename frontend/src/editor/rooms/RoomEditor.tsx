@@ -670,7 +670,7 @@ export function RoomEditor({ roomId, focus }: { roomId: string; focus: { instanc
   return (
     <div className="room-editor2" data-tutorial="room-editor">
       <div className="room-toolbar">
-        <div className="seg small" role="radiogroup" aria-label="Tool">
+        <div className="seg small" role="radiogroup" aria-label="Tool" data-tutorial="room-tools">
           {(tileLayer
             ? ([["paint", "Paint"], ["rect", "Rectangle"], ["fill", "Fill"], ["pick", "Pick"], ["erase", "Erase"]] as const)
             : ([["select", "Select"], ["place", "Place"]] as const)
@@ -842,7 +842,7 @@ function RoomPanel({
     <aside className="room-panel">
       <div className="seg small panel-tabs" role="tablist">
         {(["room", "layers", tileLayer ? "tiles" : "instance"] as const).map((p) => (
-          <button key={p} role="tab" aria-selected={panel === p} className={panel === p ? "on" : ""} onClick={() => setPanel(p)} data-testid={`room-panel-${p}`}>
+          <button key={p} role="tab" aria-selected={panel === p} className={panel === p ? "on" : ""} onClick={() => setPanel(p)} data-testid={`room-panel-${p}`} data-tutorial={`room-tab-${p}`}>
             {p === "room" ? "Room" : p === "layers" ? "Layers" : p === "tiles" ? "Tiles" : selected.length > 1 ? `${selected.length} selected` : "Instance"}
           </button>
         ))}
@@ -854,7 +854,7 @@ function RoomPanel({
 
       {panel === "room" && (
         <div className="panel-body">
-          <fieldset>
+          <fieldset data-tutorial="room-size">
             <legend>Size</legend>
             {num("Width", room.width, (v) => setRoom((r) => void (r.width = Math.max(16, v))), "room-width", 16)}
             {num("Height", room.height, (v) => setRoom((r) => void (r.height = Math.max(16, v))), "room-height", 16)}
@@ -1325,7 +1325,7 @@ function LayersPanel({
         <button className="btn small" onClick={() => add("instances")} data-testid="add-instance-layer">
           {Icon.plus()} Instance layer
         </button>
-        <button className="btn small" onClick={() => add("tiles")} data-testid="add-tile-layer">
+        <button className="btn small" onClick={() => add("tiles")} data-testid="add-tile-layer" data-tutorial="add-tile-layer">
           {Icon.plus()} Tile layer
         </button>
         <button className="btn small" onClick={() => add("background")} data-testid="add-background-layer">

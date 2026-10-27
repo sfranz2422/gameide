@@ -1,5 +1,18 @@
 # Progress
 
+## Building Levels: five lessons on the editor itself; Python Basics first ✅ (2026-10-27, waiting for review)
+- **The shelves start with Python Basics**, then Getting Started: every game lesson is written in Python (the teacher's call). A tutorial that names no shelf still goes on Getting Started.
+- **Five new Getting Started lessons** (`public/tutorials/lv-*.md`), each opening with the ones before it done (`levelsStart` in store/templates.ts, built from the library's Kenney art as a student builds it):
+  1. **Art from the Library**: two frames of a Pixel Platformer character as a sprite, renamed hero, on a Player.
+  2. **A Tileset**: the whole Tiles sheet, renamed ground, its grass and dirt marked solid.
+  3. **Painting a Room**: a tile layer, the palette, Rectangle, a floor and a platform, and a Decor layer of plants.
+  4. **Walking on Tiles**: gravity, `move_and_collide` against the solid tiles, running, jumping.
+  5. **A Bigger World**: a 1920-wide room, more ground, a gap that restarts the room, a camera that follows the Player.
+- **New checks** for what the editor makes: `sprite hero has at least 2 frames`, `tileset ground has at least 4 solid tiles`, `room Room1 has at least 30 tiles`, `… has a tile layer using ground`, `… has at least 2 tile layers`, `… is at least 1600 wide`, `room Room1 camera follows Player`. On the help page.
+- **Spotlight names** for the library button, a tileset's Solid tiles, the room's tools, + Tile layer, its Size and its tabs (`room-tab-*`).
+- `e2e/levels.editor.spec.ts` does all five lessons the way a student does — library clicks, renames, solid tiles, painting by dragging, the camera — pressing Check my work at every step. It found two things a student would have hit: Next can't be pressed while the library window is open (the two steps either side of it are one step now), and a spotlight on something not yet on screen never shows.
+- `cutCells` moved from LibraryBrowser.tsx to library.ts, for the starters.
+
 ## Fixes: `uses +`, events for the whole class, photos everywhere ✅ (2026-10-27, waiting for review)
 - **`uses +` failed on `print(3+4)`** (a Python Basics lesson): a check's word had to have no letter or digit beside it, which is right for `for` but meant the 3 beside the + hid it. The edge rule now applies only where the word itself starts or ends with a letter or digit (`checks.ts`, `wordIn`). PyIDE's and FlaskIDE's `uses` couldn't see an operator at all; they read it from the code's tree now.
 - **A random event reaches the whole class**: `/api/me/xp/news` sends the class's events (`events_after`) to every student, hit or not, and the popup names who it hit — "⭐ Glowing code review · Ana +10 XP", "You" for themselves. First names only, there and on the class page's banner, which now lists them. The popup is filled green, as in the other editors; red for a student it took XP from.

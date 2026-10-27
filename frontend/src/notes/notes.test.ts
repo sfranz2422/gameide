@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import cases from "./parse-cases.json";
 import { parseCards, parseQuiz, pauseLines, pieces, popBoxes, popMarks, scramble, sections, slides, takeAnimate } from "./quiz";
 import { checkGame, checkProject, parseTests, readCheck, runTests, allTests, type GameRunner } from "../checks/checks";
-import { blankProject, newEvent, newObject, newRoom, newInstance } from "../store/project";
+import { blankProject, newEvent, newObject, newRoom, newInstance, newTileset } from "../store/project";
 import { ANIMATED, CHECK_EXAMPLES } from "./HelpPage";
 import { SPEEDS } from "./reveal";
 
@@ -86,6 +86,38 @@ describe("checks of the project", () => {
     expect(run("room Level1 has 3 Coin")).toEqual({ ok: false, detail: "Level1 has 2 Coins, not 3." });
     expect(run("room Level1 has at least 1 Coin")?.ok).toBe(true);
     expect(run("Player has sprite")).toEqual({ ok: false, detail: "Player doesn't have a sprite yet." });
+  });
+  it("what the editor makes: frames, solid tiles, painted tiles, layers, room size, camera", () => {
+    const q = game();
+    q.sprites.push({ id: "s1", name: "hero", width: 24, height: 24, originX: 12, originY: 12, frames: ["a", "b"] });
+    const ground = { ...newTileset("ground"), solid: [0, 1, 2, 3] };
+    q.tilesets.push(ground);
+    const room = q.rooms.find((r) => r.name === "Level1")!;
+    const run = (line: string) => checkProject(q, readCheck(line));
+    expect(run("sprite hero has at least 2 frames")?.ok).toBe(true);
+    expect(run("sprite hero has 3 frames")).toEqual({ ok: false, detail: "hero has 2 frames, not 3." });
+    expect(run("tileset ground has at least 4 solid tiles")?.ok).toBe(true);
+    expect(run("tileset ground has at least 5 solid tiles")?.ok).toBe(false);
+    expect(run("room Level1 has a tile layer using ground")?.ok).toBe(false);
+    expect(run("room Level1 has at least 1 tiles")?.ok).toBe(false);
+    room.layers.push({ id: "t1", name: "Ground", kind: "tiles", depth: 100, visible: true, locked: false, tileset: ground.id, tiles: { "0,5": 2, "1,5": 2 } });
+    room.layers.push({ id: "t2", name: "Decor", kind: "tiles", depth: 50, visible: true, locked: false, tileset: ground.id, tiles: { "0,4": 124 } });
+    expect(run("room Level1 has a tile layer using ground")?.ok).toBe(true);
+    expect(run("room Level1 has at least 3 tiles")?.ok).toBe(true);
+    expect(run("room Level1 has 4 tiles")?.ok).toBe(false);
+    expect(run("room Level1 has at least 2 tile layers")?.ok).toBe(true);
+    // "tiles" is painted tiles, never an object called tiles.
+    expect(readCheck("room Level1 has 3 tiles").kind).toBe("tiles");
+    expect(readCheck("room Level1 has 3 Coin").kind).toBe("count");
+    expect(run("room Level1 is at least 640 wide")?.ok).toBe(true);
+    expect(run("room Level1 is at least 1600 wide")?.ok).toBe(false);
+    expect(run("room Level1 is at least 480 tall")?.ok).toBe(true);
+    expect(run("room Level1 camera follows Player")?.detail).toMatch(/camera is off/);
+    room.camera.enabled = true;
+    expect(run("room Level1 camera follows Player")?.ok).toBe(false);
+    room.camera.follow = q.objects.find((o) => o.name === "Player")!.id;
+    expect(run("room Level1 camera follows Player")?.ok).toBe(true);
+    expect(run("room Level1's camera follows Player")?.ok).toBe(true);
   });
   it("a line it can't read fails, saying so", () => {
     expect(run("make it fun")).toEqual({ ok: false, detail: "GameIDE doesn't know this kind of check." });

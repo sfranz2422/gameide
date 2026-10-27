@@ -22,6 +22,8 @@ import { autotilePaint } from "../editor/tiles/tileOps";
 import { boundsOfBlobs } from "./imageTools";
 import { paintStarter, paintStarterTileset, STARTER_SPRITES, STARTER_TILESET } from "./starterArt";
 import { starterSoundBlob } from "./starterSounds";
+import { cutCells, LIBRARY } from "../library/library";
+import { spriteFromFrames } from "./spriteOps";
 
 export interface Built {
   project: Project;
@@ -391,6 +393,106 @@ function seriesStart(series: Series, n: number) {
   };
 }
 
+// ------------------------------------------------- Building Levels lessons
+
+/*
+ * The Getting Started lessons that teach the editor itself (public/tutorials/
+ * lv-*.md): art from the library, a tileset, painting a room, walking on it,
+ * a bigger world. Each opens with the lessons before it done, made from the
+ * library's Kenney art the way a student makes it — so these starters fetch
+ * pictures, and run in a browser only (e2e/levels.spec.ts starts every one).
+ * The numbers are what each lesson tells the student to choose.
+ */
+export const LEVELS_ART = {
+  pack: "pixel-platformer",
+  /** The green astronaut, its two frames: Characters, cells 0 and 1. */
+  hero: [0, 1],
+  /** Grass tops (0–3) and plain dirt (4, 5, 24, 25) in Tiles: what's solid. */
+  solid: [0, 1, 2, 3, 4, 5, 24, 25],
+  grass: 2,
+  dirt: 4,
+  plants: [124, 125, 126],
+};
+
+/** Lesson 4's code, as the lesson has the student type it (levels.test.ts holds the two together). */
+export const LEVELS_CREATE = "self.vy = 0\n";
+export const LEVELS_STEP = [
+  'move = keyboard_check("right") - keyboard_check("left")',
+  "move_and_collide(move * 3, 0)",
+  "",
+  "self.vy = min(self.vy + 0.5, 10)",
+  "on_ground = not place_free(self.x, self.y + 1)",
+  'if on_ground and keyboard_check_pressed("space"):',
+  "    self.vy = -9",
+  "if move_and_collide(0, self.vy):",
+  "    self.vy = 0",
+  "",
+].join("\n");
+
+function levelsStart(n: number) {
+  return async (): Promise<Built> => {
+    const p = blankProject("My level");
+    const assets = new Map<string, Blob>();
+    const room = p.rooms[0]!;
+    const pack = LIBRARY.find((x) => x.id === LEVELS_ART.pack)!;
+    // 1. Art from the library: the hero sprite, and a Player wearing it.
+    if (n >= 1) {
+      const sheet = pack.sheets.find((x) => x.name === "Characters")!;
+      const frames = await cutCells(sheet, LEVELS_ART.hero);
+      const { sprite, assets: made } = await spriteFromFrames(
+        { name: "hero", width: sheet.tileWidth, height: sheet.tileHeight, frames, fps: 8, origin: "center" },
+        [],
+      );
+      made.forEach((blob, id) => assets.set(id, blob));
+      p.sprites.push(sprite);
+      const player = obj(p, "Player", sprite);
+      room.instances.push(newInstance(room, player.id, 96, 352));
+    }
+    // 2. A tileset: the Tiles sheet, named ground, its grass and dirt solid.
+    if (n >= 2) {
+      const sheet = pack.sheets.find((x) => x.name === "Tiles")!;
+      const blob = await (await fetch(sheet.file)).blob();
+      const bmp = await createImageBitmap(blob);
+      const id = newId();
+      assets.set(id, blob);
+      p.tilesets.push({
+        ...newTileset("ground"),
+        image: id,
+        imageWidth: bmp.width,
+        imageHeight: bmp.height,
+        tileWidth: sheet.tileWidth,
+        tileHeight: sheet.tileHeight,
+        solid: [...LEVELS_ART.solid],
+      });
+    }
+    // 3. Painting: a Ground layer — grass along the bottom with dirt under
+    //    it, and a platform — and a Decor layer of plants in front.
+    if (n >= 3) {
+      const ts = p.tilesets[0]!;
+      const rows = Math.floor(room.height / ts.tileHeight), cols = Math.ceil(room.width / ts.tileWidth);
+      const ground: Record<string, number> = {};
+      for (let c = 0; c < cols; c++) {
+        ground[`${c},${rows - 2}`] = LEVELS_ART.grass;
+        ground[`${c},${rows - 1}`] = LEVELS_ART.dirt;
+      }
+      for (let c = 12; c < 17; c++) ground[`${c},${rows - 7}`] = LEVELS_ART.grass;
+      const decor: Record<string, number> = {};
+      [3, 8, 22].forEach((c, i) => (decor[`${c},${rows - 3}`] = LEVELS_ART.plants[i % LEVELS_ART.plants.length]!));
+      room.layers.push(
+        { id: newId(), name: "Ground", kind: "tiles", depth: 100, visible: true, locked: false, tileset: ts.id, tiles: ground },
+        { id: newId(), name: "Decor", kind: "tiles", depth: 90, visible: true, locked: false, tileset: ts.id, tiles: decor },
+      );
+    }
+    // 4. Walking on it: the Player falls, runs and jumps.
+    if (n >= 4) {
+      const player = p.objects.find((o) => o.name === "Player")!;
+      ev(player, { type: "create" }, LEVELS_CREATE);
+      ev(player, { type: "step" }, LEVELS_STEP);
+    }
+    return { project: p, assets };
+  };
+}
+
 /** Templates for tutorials only, by their `starter:` name. */
 export const TUTORIAL_STARTERS: Record<string, () => Promise<Built>> = {
   ...Object.fromEntries(SERIES.flatMap((s) => s.lessons.map((_, n) => [`${s.name}-${n}`, seriesStart(s, n)]))),
@@ -401,6 +503,7 @@ export const TUTORIAL_STARTERS: Record<string, () => Promise<Built>> = {
   "platformer-start": platformerStart,
   "player-start": playerStart,
   "python-start": pythonStart,
+  ...Object.fromEntries([0, 1, 2, 3, 4].map((n) => [`levels-${n}`, levelsStart(n)])),
 };
 
 export const TEMPLATES: { key: string; label: string; description: string; build: () => Promise<Built> }[] = [

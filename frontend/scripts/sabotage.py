@@ -677,6 +677,15 @@ CASES = [
  ("event names with initials", "../backend/rewards.py", '            hits.append({"name": xp.first_name(u) if u is not None and not u.board_hidden else "A classmate",', '            hits.append({"name": xp.board_name(u) if u is not None and not u.board_hidden else "A classmate",', "by first name only", PY),
  ("class page names with initials", "../backend/rewards.py", "        name = ((xp.board_name(u) if show_hidden else xp.first_name(u))", "        name = ((xp.board_name(u) if show_hidden else xp.board_name(u))", "on the class page too", PY),
  ("toast not green", "src/editor/app.css", "  border-radius: 12px;\n  background: var(--go);", "  border-radius: 12px;\n  background: var(--panel);", "random events", E2E),
+# Building Levels lessons and the editor checks they use (src/tutorials/levels.test.ts, notes.test.ts, e2e/levels.editor.spec.ts)
+ ("Python Basics not first", "src/tutorials/tutorial.ts", 'export const LEVELS = ["Python Basics", "Getting Started", ', 'export const LEVELS = ["Getting Started", "Python Basics", ', "start with Python Basics"),
+ ("no shelf means Python Basics", "src/tutorials/tutorial.ts", '      level: fields.level || "Getting Started",', '      level: fields.level || LEVELS[0]!,', "names no shelf"),
+ ("painted tiles read as an object", "src/checks/checks.ts", "has\\s+(at least\\s+)?(\\d+)\\s+tiles?$`", "has\\s+(at least\\s+)?(\\d+)\\s+tilez$`", "what the editor makes"),
+ ("camera on not needed", "src/checks/checks.ts", "      if (!room.camera.enabled) return", "      if (room.camera.enabled === null) return", "what the editor makes"),
+ ("solid tiles never counted", "src/checks/checks.ts", "      const n = ts.solid.length;", "      const n = 0 * ts.solid.length;", "what the editor makes"),
+ ("lesson 5 opens with other code", "src/store/templates.ts", '  "move_and_collide(move * 3, 0)",', '  "move_and_collide(move * 4, 0)",', "lesson 4 ends with exactly"),
+ ("lesson 3 opens without the tileset", "src/store/templates.ts", "    if (n >= 2) {\n      const sheet = pack.sheets.find((x) => x.name === \"Tiles\")!;", "    if (n >= 3) {\n      const sheet = pack.sheets.find((x) => x.name === \"Tiles\")!;", "Painting a Room", E2E),
+ ("library sprite with one frame", "src/library/LibraryBrowser.tsx", "frames: await cutCells(sheet, chosen),", "frames: await cutCells(sheet, chosen.slice(0, 1)),", "Art from the Library", E2E),
  ("physics not stepped in the worker", PH, "    this.world!.step(1 / host.stepsPerSecond);", "    if (typeof window !== \"undefined\") this.world!.step(1 / host.stepsPerSecond);", "a physics coin falls", E2E),
 ]
 only = sys.argv[1:]

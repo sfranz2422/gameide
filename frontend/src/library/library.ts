@@ -83,3 +83,34 @@ export const LIBRARY: LibraryPack[] = [
     ],
   },
 ];
+
+// ---------------------------------------------------------------- cutting
+// Here, not in LibraryBrowser.tsx: the tutorial starters (store/templates.ts)
+// make a lesson's sprites from the library the same way a student does.
+
+const loaded = new Map<string, Promise<ImageBitmap>>();
+/** A sheet as a picture, fetched once a page. */
+export function picture(file: string): Promise<ImageBitmap> {
+  let p = loaded.get(file);
+  if (!p) {
+    p = fetch(file).then((r) => {
+      if (!r.ok) throw new Error(`The library picture ${file} didn't load.`);
+      return r.blob().then((b) => createImageBitmap(b));
+    });
+    loaded.set(file, p);
+  }
+  return p;
+}
+
+/** Cells of a sheet as separate pictures, in the order given. */
+export async function cutCells(sheet: LibrarySheet, cells: number[]): Promise<Blob[]> {
+  const img = await picture(sheet.file);
+  const columns = Math.floor(img.width / sheet.tileWidth);
+  return Promise.all(
+    cells.map((n) => {
+      const c = new OffscreenCanvas(sheet.tileWidth, sheet.tileHeight);
+      c.getContext("2d")!.drawImage(img, (n % columns) * sheet.tileWidth, Math.floor(n / columns) * sheet.tileHeight, sheet.tileWidth, sheet.tileHeight, 0, 0, sheet.tileWidth, sheet.tileHeight);
+      return c.convertToBlob({ type: "image/png" });
+    }),
+  );
+}

@@ -24,6 +24,46 @@
   "description": "Build an event from blocks, read the Python they make, then turn it into Python."
  },
  {
+  "key": "lv-library",
+  "title": "Art from the Library",
+  "level": "Getting Started",
+  "time": "10 min",
+  "starter": "levels-0",
+  "description": "A walking hero from the free art library: two frames of a Kenney character, as a sprite."
+ },
+ {
+  "key": "lv-tileset",
+  "title": "A Tileset",
+  "level": "Getting Started",
+  "time": "10 min",
+  "starter": "levels-1",
+  "description": "A whole sheet of tiles from the library, and which of them are solid ground."
+ },
+ {
+  "key": "lv-painting",
+  "title": "Painting a Room",
+  "level": "Getting Started",
+  "time": "15 min",
+  "starter": "levels-2",
+  "description": "A tile layer, a brush, a floor and a platform — and a second layer for the scenery."
+ },
+ {
+  "key": "lv-walking",
+  "title": "Walking on Tiles",
+  "level": "Getting Started",
+  "time": "15 min",
+  "starter": "levels-3",
+  "description": "Gravity, solid ground, running and jumping, on the level you painted."
+ },
+ {
+  "key": "lv-bigger-world",
+  "title": "A Bigger World",
+  "level": "Getting Started",
+  "time": "15 min",
+  "starter": "levels-4",
+  "description": "A room wider than the screen, more ground to run on, a gap to fall through, and a camera that follows the hero."
+ },
+ {
   "key": "py-hello",
   "title": "1. Hello, Python",
   "level": "Python Basics",

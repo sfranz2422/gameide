@@ -7,6 +7,9 @@ steps (```check): one test per line, in GameIDE's check language —
     Player has event step                    the event's name as the editor shows it
     Player.step uses keyboard_check          or "Player uses …", or "uses …" anywhere; "avoids …"
     room Level1 has 3 Coin                   or "has at least 3 Coin"
+    sprite hero has at least 2 frames        tileset ground has at least 4 solid tiles
+    room Level1 has at least 30 tiles        room Level1 has a tile layer using ground
+    room Level1 is at least 1600 wide        room Level1 camera follows Player
     game runs 2 seconds without errors
     after 1 second holding right, Player.x increased
     after 2 seconds, instance_number("Coin") < 15

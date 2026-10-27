@@ -4,7 +4,7 @@
  * they should play — and add them as one sprite's frames.
  */
 import { useEffect, useRef, useState } from "react";
-import { LIBRARY, type LibraryPack, type LibrarySheet } from "./library";
+import { cutCells, LIBRARY, picture, type LibraryPack, type LibrarySheet } from "./library";
 
 export interface LibrarySprite {
   name: string;
@@ -18,32 +18,6 @@ export interface LibraryTileset {
   image: Blob;
   tileWidth: number;
   tileHeight: number;
-}
-
-const loaded = new Map<string, Promise<ImageBitmap>>();
-function picture(file: string): Promise<ImageBitmap> {
-  let p = loaded.get(file);
-  if (!p) {
-    p = fetch(file).then((r) => {
-      if (!r.ok) throw new Error(`The library picture ${file} didn't load.`);
-      return r.blob().then((b) => createImageBitmap(b));
-    });
-    loaded.set(file, p);
-  }
-  return p;
-}
-
-/** Cells of a sheet as separate pictures, in the order given. */
-export async function cutCells(sheet: LibrarySheet, cells: number[]): Promise<Blob[]> {
-  const img = await picture(sheet.file);
-  const columns = Math.floor(img.width / sheet.tileWidth);
-  return Promise.all(
-    cells.map((n) => {
-      const c = new OffscreenCanvas(sheet.tileWidth, sheet.tileHeight);
-      c.getContext("2d")!.drawImage(img, (n % columns) * sheet.tileWidth, Math.floor(n / columns) * sheet.tileHeight, sheet.tileWidth, sheet.tileHeight, 0, 0, sheet.tileWidth, sheet.tileHeight);
-      return c.convertToBlob({ type: "image/png" });
-    }),
-  );
 }
 
 export function LibraryBrowser({

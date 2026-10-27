@@ -55,7 +55,12 @@ export interface Tutorial {
 }
 
 /** The levels the library is shelved by, in order (the spec's). */
-export const LEVELS = ["Getting Started", "Python Basics", "Game Elements 1: The Basics", "Game Elements 2: Adding to the Fun", "Game Elements 3: Advanced Techniques", "Platformers", "Top-Down", "Shooters", "Advanced Python"];
+/**
+ * The shelves, in order. Python Basics comes first: every game lesson is
+ * written in Python, so a student starts with the language and then the
+ * editor (2026-10-27, the teacher's call).
+ */
+export const LEVELS = ["Python Basics", "Getting Started", "Game Elements 1: The Basics", "Game Elements 2: Adding to the Fun", "Game Elements 3: Advanced Techniques", "Platformers", "Top-Down", "Shooters", "Advanced Python"];
 
 const HEADER = /^\s*---[ \t]*\n([\s\S]*?)\n---[ \t]*(?:\n|$)/;
 const HIGHLIGHT = /^highlight\s*:\s*([\w-]+)\s*$/i;
@@ -78,7 +83,8 @@ export function splitHeader(md: string): { meta: TutorialMeta; body: string } {
   return {
     meta: {
       title: fields.title || "Untitled tutorial",
-      level: fields.level || LEVELS[0]!,
+      // Not LEVELS[0]: a tutorial that names no shelf is a game lesson, not Python Basics.
+      level: fields.level || "Getting Started",
       time: fields.time || "",
       starter: fields.starter || "empty",
       description: fields.description || "",
@@ -162,11 +168,11 @@ export function tutorialProblems(t: Tutorial, targets: readonly string[]): strin
  */
 export const TARGETS = [
   "resource-tree", "folder-sprites", "folder-objects", "folder-rooms", "folder-scripts", "folder-sounds", "folder-fonts", "folder-tilesets",
-  "add-*", "resource-*", "object-*",
+  "add-*", "resource-*", "object-*", "room-tab-*",
   "object-editor", "object-sprite", "object-properties", "object-parent", "object-depth", "event-list", "add-event", "code-editor",
   "tab-blocks", "tab-sheet", "blocks-workspace", "blocks-python", "event-sheet", "sheet-python", "generated-class",
   "sprite-editor", "sprite-origin-tool", "sprite-mask", "sprite-mask-tool", "room-editor", "room-canvas", "room-layers", "room-camera",
-  "tileset-editor", "tile-palette", "autotile-sets", "autotile-brushes", "sound-editor", "font-editor",
+  "tileset-editor", "tileset-solid", "tile-palette", "room-tools", "add-tile-layer", "room-size", "open-library", "autotile-sets", "autotile-brushes", "sound-editor", "font-editor",
   "play", "stop", "game-pane", "game-canvas", "fullscreen", "debug-toggle", "console", "docs", "docs-tab", "notes-tab",
   "project-name", "publish", "game-settings", "editor-tabs",
 ] as const;

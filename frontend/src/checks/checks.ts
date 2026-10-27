@@ -8,6 +8,12 @@
  *   Player.step uses keyboard_check         or "Player uses …", or "uses …" anywhere; "avoids …"
  *   Player.step is written in blocks        or in python, or in an event sheet
  *   room Level1 has 3 Coin                  or "has at least 3 Coin"
+ *   sprite hero has at least 2 frames       or "has 2 frames"
+ *   tileset ground has at least 4 solid tiles
+ *   room Level1 has at least 30 tiles       painted, on any tile layer ("tiles" isn't an object here)
+ *   room Level1 has at least 2 tile layers  or "has a tile layer using ground"
+ *   room Level1 is at least 1600 wide       or "tall"
+ *   room Level1 camera follows Player
  *   game runs 2 seconds without errors
  *   after 1 second holding right, Player.x increased     (decreased, changed, stayed the same)
  *   after 2 seconds, instance_number("Coin") < 15        any Python that should come out true
@@ -102,6 +108,13 @@ export type Check =
   | { kind: "mode"; object: string; event: string; mode: "python" | "blocks" | "sheet" }
   | { kind: "uses"; avoid: boolean; word: string; object: string | null; event: string | null }
   | { kind: "count"; room: string; atLeast: boolean; n: number; object: string }
+  | { kind: "frames"; sprite: string; atLeast: boolean; n: number }
+  | { kind: "solid"; tileset: string; atLeast: boolean; n: number }
+  | { kind: "tiles"; room: string; atLeast: boolean; n: number }
+  | { kind: "tile-layers"; room: string; atLeast: boolean; n: number }
+  | { kind: "tile-layer-using"; room: string; tileset: string }
+  | { kind: "room-size"; room: string; side: "wide" | "tall"; n: number }
+  | { kind: "camera-follows"; room: string; object: string }
   | { kind: "runs"; seconds: number }
   | { kind: "after"; seconds: number; hold: string[]; object: string; prop: string; change: Change }
   | { kind: "after-expr"; seconds: number; hold: string[]; expr: string }
@@ -128,6 +141,21 @@ export function readCheck(line: string): Check {
   if ((m = new RegExp(String.raw`^${NAME}\s+(uses|avoids)\s+(\S+)$`, "i").exec(s)) && !/^(uses|avoids)$/i.test(m[1]!))
     return { kind: "uses", avoid: m[2]!.toLowerCase() === "avoids", word: m[3]!, object: m[1]!, event: null };
   if ((m = /^(uses|avoids)\s+(\S+)$/i.exec(s))) return { kind: "uses", avoid: m[1]!.toLowerCase() === "avoids", word: m[2]!, object: null, event: null };
+  // What the editor makes, not code: frames, solid tiles, painted tiles, layers, the room and its camera.
+  if ((m = new RegExp(String.raw`^sprite\s+${NAME}\s+has\s+(at least\s+)?(\d+)\s+frames?$`, "i").exec(s)))
+    return { kind: "frames", sprite: m[1]!, atLeast: !!m[2], n: Number(m[3]) };
+  if ((m = new RegExp(String.raw`^tileset\s+${NAME}\s+has\s+(at least\s+)?(\d+)\s+solid\s+tiles?$`, "i").exec(s)))
+    return { kind: "solid", tileset: m[1]!, atLeast: !!m[2], n: Number(m[3]) };
+  if ((m = new RegExp(String.raw`^room\s+${NAME}\s+has\s+(at least\s+)?(\d+)\s+tiles?$`, "i").exec(s)))
+    return { kind: "tiles", room: m[1]!, atLeast: !!m[2], n: Number(m[3]) };
+  if ((m = new RegExp(String.raw`^room\s+${NAME}\s+has\s+(at least\s+)?(\d+)\s+tile\s+layers?$`, "i").exec(s)))
+    return { kind: "tile-layers", room: m[1]!, atLeast: !!m[2], n: Number(m[3]) };
+  if ((m = new RegExp(String.raw`^room\s+${NAME}\s+has\s+a\s+tile\s+layer\s+using\s+${NAME}$`, "i").exec(s)))
+    return { kind: "tile-layer-using", room: m[1]!, tileset: m[2]! };
+  if ((m = new RegExp(String.raw`^room\s+${NAME}\s+is\s+at least\s+(\d+)\s+(wide|tall)$`, "i").exec(s)))
+    return { kind: "room-size", room: m[1]!, n: Number(m[2]), side: m[3]!.toLowerCase() as "wide" };
+  if ((m = new RegExp(String.raw`^room\s+${NAME}(?:'s)?\s+camera\s+follows\s+${NAME}$`, "i").exec(s)))
+    return { kind: "camera-follows", room: m[1]!, object: m[2]! };
   if ((m = new RegExp(String.raw`^room\s+${NAME}\s+has\s+(at least\s+)?(\d+)\s+${NAME}$`, "i").exec(s)))
     return { kind: "count", room: m[1]!, atLeast: !!m[2], n: Number(m[3]), object: m[4]! };
   if ((m = /^prints?\s+(.+)$/i.exec(s))) return { kind: "prints", text: m[1]!.trim() };
@@ -225,6 +253,54 @@ export function checkProject(p: Project, c: Check): { ok: boolean; detail: strin
       const n = room.instances.filter((i) => i.object === o.id).length;
       const ok = c.atLeast ? n >= c.n : n === c.n;
       return ok ? { ok: true, detail: "" } : { ok: false, detail: `${room.name} has ${n} ${o.name}${n === 1 ? "" : "s"}, not ${c.atLeast ? "at least " : ""}${c.n}.` };
+    }
+    case "frames": {
+      const sp = p.sprites.find((x) => same(x.name, c.sprite));
+      if (!sp) return { ok: false, detail: `There's no sprite called ${c.sprite} yet.` };
+      const n = sp.frames.length;
+      return (c.atLeast ? n >= c.n : n === c.n)
+        ? { ok: true, detail: "" }
+        : { ok: false, detail: `${sp.name} has ${n} frame${n === 1 ? "" : "s"}, not ${c.atLeast ? "at least " : ""}${c.n}.` };
+    }
+    case "solid": {
+      const ts = p.tilesets.find((x) => same(x.name, c.tileset));
+      if (!ts) return { ok: false, detail: `There's no tileset called ${c.tileset} yet.` };
+      const n = ts.solid.length;
+      return (c.atLeast ? n >= c.n : n === c.n)
+        ? { ok: true, detail: "" }
+        : { ok: false, detail: `${ts.name} has ${n} solid tile${n === 1 ? "" : "s"}, not ${c.atLeast ? "at least " : ""}${c.n}. Click tiles in its picture to make them solid (red).` };
+    }
+    case "tiles":
+    case "tile-layers":
+    case "tile-layer-using":
+    case "room-size":
+    case "camera-follows": {
+      const room = p.rooms.find((r) => same(r.name, c.room));
+      if (!room) return { ok: false, detail: `There's no room called ${c.room}.` };
+      const layers = room.layers.flatMap((l) => (l.kind === "tiles" ? [l] : []));
+      const yes = { ok: true, detail: "" };
+      if (c.kind === "tiles") {
+        const n = layers.reduce((sum, l) => sum + Object.keys(l.tiles).length, 0);
+        return (c.atLeast ? n >= c.n : n === c.n) ? yes : { ok: false, detail: `${room.name} has ${n} tile${n === 1 ? "" : "s"} painted, not ${c.atLeast ? "at least " : ""}${c.n}.` };
+      }
+      if (c.kind === "tile-layers") {
+        const n = layers.length;
+        return (c.atLeast ? n >= c.n : n === c.n) ? yes : { ok: false, detail: `${room.name} has ${n} tile layer${n === 1 ? "" : "s"}, not ${c.atLeast ? "at least " : ""}${c.n}.` };
+      }
+      if (c.kind === "tile-layer-using") {
+        const ts = p.tilesets.find((x) => same(x.name, c.tileset));
+        if (!ts) return { ok: false, detail: `There's no tileset called ${c.tileset} yet.` };
+        if (!layers.length) return { ok: false, detail: `${room.name} has no tile layer yet. Add one in Layers.` };
+        return layers.some((l) => l.tileset === ts.id) ? yes : { ok: false, detail: `No tile layer in ${room.name} uses ${ts.name}. Choose it in the layer's settings (⚙).` };
+      }
+      if (c.kind === "room-size") {
+        const n = c.side === "wide" ? room.width : room.height;
+        return n >= c.n ? yes : { ok: false, detail: `${room.name} is ${n} ${c.side}, not at least ${c.n}.` };
+      }
+      const o = p.objects.find((x) => same(x.name, c.object));
+      if (!o) return { ok: false, detail: `There's no object called ${c.object}.` };
+      if (!room.camera.enabled) return { ok: false, detail: `${room.name}'s camera is off. Turn on "Show part of the room" under Camera.` };
+      return room.camera.follow === o.id ? yes : { ok: false, detail: `${room.name}'s camera doesn't follow ${o.name} yet.` };
     }
     default:
       return null;
