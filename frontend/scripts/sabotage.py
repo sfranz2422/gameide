@@ -584,6 +584,7 @@ CASES = [
  ("no tint", PXR, "      sp.tint = st[b + F.TINT]!;", "", "game feel is drawn", E2E),
  ("turn in does nothing", "src/editor/AssignmentBits.tsx", "            await api(`/api/projects/${encodeURIComponent(projectId)}/turn-in`, { json: {} });", "            void 0;", "a class:", E2E),
  ("no read-only bar", EP, '          {store.kind === "view" ? (', "          {store.kind !== store.kind ? (", "a class:", E2E),
+ ("no art library route", APP, '@app.get("/library/<path:name>")\n', "", "the free art library's pictures are served", PY),
  # Physics (engine/physics.ts; src/python/physics.test.ts, e2e/physics.editor.spec.ts)
  ("physics moved twice", EN, "if (!phys && (h !== 0 || v !== 0)) {", "if (h !== 0 || v !== 0) {", "takes push"),
  ("physics teleport ignored", PH, "if (x !== e.x || y !== e.y || angle !== e.angle) {", "if (x !== e.x && y !== e.y && angle !== e.angle) {", "is moved by its own code"),

@@ -804,6 +804,17 @@ def tutorial_files(name):
     return r
 
 
+@app.get("/library/<path:name>")
+def art_library(name):
+    """The free art library's pictures (public/library/kenney/, CC0; src/library/library.ts).
+    Without this route the editor's Free art library found none of its
+    pictures on the real site — only the test server, which serves every
+    public/ file itself, ever showed them."""
+    r = send_from_directory(DIST / "library", name)
+    r.headers["Cache-Control"] = "public, max-age=86400"
+    return r
+
+
 @app.get("/avatars/<path:name>")
 def avatar_pictures(name):
     """The avatars a student picks from (xp.AVATARS; public/avatars/, the same pictures as PyIDE's)."""

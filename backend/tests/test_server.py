@@ -990,6 +990,10 @@ check("the favicon is served", r.status_code == 200 and b"mark" in r.data)
 r = anon.get("/tutorials/index.json")
 check("the built-in tutorials are served", r.status_code == 200 and b"first-game" in r.data)
 check("…and nothing beside them", anon.get("/tutorials/../favicon.svg").status_code == 404)
+(fake_dist / "library" / "kenney" / "tiny-town").mkdir(parents=True)
+(fake_dist / "library" / "kenney" / "tiny-town" / "tiles.png").write_bytes(b"PNGTILES")
+r = anon.get("/library/kenney/tiny-town/tiles.png")
+check("the free art library's pictures are served", r.status_code == 200 and r.data == b"PNGTILES", r.status_code)
 server.DIST = real_dist
 
 print()
