@@ -3215,6 +3215,53 @@ a.btn {
   padding: 6px 0;
   background: var(--panel);
 }
+/* Notes played a section at a time (`animate:`; NotesPane, reveal.ts). */
+.reveal-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0 8px;
+}
+.reveal-play:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.reveal-hidden {
+  visibility: hidden;
+}
+.reveal-pop {
+  animation: reveal-pop 0.5s ease-out;
+}
+@keyframes reveal-pop {
+  0% {
+    transform: scale(0.96);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 55%, transparent);
+  }
+  45% {
+    transform: scale(1.02);
+    box-shadow: 0 0 0 8px color-mix(in srgb, var(--accent) 25%, transparent);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .reveal-pop {
+    animation: none;
+  }
+}
+/* What the teacher wrapped in :::pop … ::: — the only thing that pops. */
+.notes-md .pop-box {
+  border-left: 4px solid var(--accent);
+  padding: 8px 12px;
+  margin: 0 0 1em;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+.notes-md .pop-box > :last-child {
+  margin-bottom: 0;
+}
 .notes-md h1 {
   font-size: 22px;
 }
@@ -3581,7 +3628,7 @@ a.btn {
   margin: 6px 0;
   padding: 8px 10px;
   border-radius: 8px;
-  background: var(--panel-2);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
 }
 @media (max-width: 860px) {
   .notes-editor-cols {

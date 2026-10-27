@@ -16,8 +16,8 @@ import { loadAssets } from "../store/store";
 import { allTests, readCheck, runTests } from "../checks/checks";
 import { hostRunner, type HostWatch } from "../checks/hostRunner";
 import type { GameState } from "../python/protocol";
-import { pieces, parseQuiz, slides } from "./quiz";
-import { renderMarkdown } from "./NotesPane";
+import { pieces, parseQuiz, slides, takeAnimate } from "./quiz";
+import { FlipCards, renderMarkdown } from "./NotesPane";
 import { takeHighlight, unknownHighlights } from "../tutorials/tutorial";
 
 const EXAMPLE = `# Collect the coins
@@ -57,7 +57,8 @@ export function NotesEditor({ slug, notes, onSaved }: { slug: string; notes: str
     setSaved(notes);
   }, [notes]);
   const deck = useMemo(() => slides(text), [text]);
-  const parts = useMemo(() => pieces(takeHighlight(text).md), [text]);
+  // The whole notes at once, as written: an `animate:` line is how they play, not something to show.
+  const parts = useMemo(() => pieces(takeHighlight(takeAnimate(text).body).md), [text]);
   const badSpots = useMemo(() => unknownHighlights(text), [text]);
   const questions = parts.filter((p) => p.type === "quiz").length;
   const unknown = useMemo(() => allTests(text).filter((t) => readCheck(t.label).kind === "unknown"), [text]);
@@ -80,7 +81,8 @@ export function NotesEditor({ slug, notes, onSaved }: { slug: string; notes: str
       <p className="muted small">
         What students see in their editor's Notes tab. Markdown; a line of <code>---</code> starts a new slide. A <code>```quiz</code> block is a question (one try,
         marked at once); a <code>```tests</code> block is checks their game must pass; a line <code>highlight: add-event</code> spotlights that part of the
-        editor while the slide is open (<a href="#/help/checks">the names</a>). The answers never leave the server.
+        editor while the slide is open (<a href="#/help/checks">the names</a>). <code>animate: words</code> as the first line plays each slide a part at a time,
+        a line of <code>...</code> between parts, and <code>:::pop</code> … <code>:::</code> makes what's between stand out (<a href="#/help/animate">how</a>). The answers never leave the server.
       </p>
       <div className="notes-editor-cols">
         <div>
@@ -121,6 +123,8 @@ export function NotesEditor({ slug, notes, onSaved }: { slug: string; notes: str
                 <span className="muted small">Question · {parseQuiz(p.body).points} point(s) · {parseQuiz(p.body).kind}</span>
                 <div className="notes-md" dangerouslySetInnerHTML={{ __html: renderMarkdown(parseQuiz(p.body).prompt) }} />
               </div>
+            ) : p.type === "cards" ? (
+              <FlipCards key={i} body={p.body} />
             ) : (
               <div key={i} className="tests-card">
                 <b>Tests</b>

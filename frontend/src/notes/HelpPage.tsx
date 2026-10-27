@@ -104,6 +104,24 @@ object -> a thing in the game, with code
 room -> where the game happens
 \`\`\``;
 
+export const ANIMATED = `animate: words
+
+## Step 1
+An object can move itself.
+
+...
+
+Put this in its step event:
+\`\`\`python
+x += 2
+\`\`\`
+
+...
+
+:::pop
+Press Check my work in the Notes tab.
+:::`;
+
 export function HelpPage() {
   return (
     <div className="site-page">
@@ -135,6 +153,18 @@ export function HelpPage() {
           (<code>- [x]</code> starts ticked). A <code>```cards</code> block is a card a line, <code>front {"->"} back</code>; a click turns one over.
         </p>
         <pre className="help-example">{EXTRAS}</pre>
+        <h2 id="animate">Playing a slide a part at a time</h2>
+        <p>
+          Put <code>animate: words</code> as the notes' first line, and students get <b>▶ Play</b> above them. Each press plays the next part of the slide, word
+          by word — <code>animate: type</code> types it out letter by letter instead. A line with only <code>...</code> on it divides a slide into the parts it's
+          played in; a slide with none plays in one go. Wrap anything that should stand out in <code>:::pop</code> and <code>:::</code> lines: it arrives with a
+          little pop, and stays in a highlighted box. Nothing else pops.
+        </p>
+        <p>
+          The next slide's arrow waits until the slide has been played. Slides already played show whole, so going back replays nothing, and the notes reopen
+          where the student got to. When you open the assignment yourself they play too, with <b>⏭ Skip</b> — students don't get that.
+        </p>
+        <pre className="help-example">{ANIMATED}</pre>
         <h2 id="checks">Checks</h2>
         <p>
           A <code>```tests</code> block holds checks, one per line, that the student's game must pass. Students press <b>Check my work</b> in the Notes tab — the

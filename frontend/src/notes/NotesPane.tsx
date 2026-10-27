@@ -17,12 +17,13 @@
  */
 import DOMPurify from "dompurify";
 import { marked } from "marked";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { api } from "../store/api";
 import { allTests, runTests, type GameRunner, type TestResult } from "../checks/checks";
 import type { Project } from "../store/project";
 import { announceXp } from "../xp/runXp";
-import { BLANK, codeLines, fnv, parseCards, parseQuiz, pieces, slides, type Question } from "./quiz";
+import { BLANK, codeLines, fnv, parseCards, parseQuiz, pieces, popBoxes, popMarks, sections, slides, takeAnimate, type Piece, type Question } from "./quiz";
+import { animateIn, type Finish } from "./reveal";
 import { Spotlight } from "../tutorials/TutorialPane";
 import { takeHighlight } from "../tutorials/tutorial";
 
@@ -36,11 +37,12 @@ export function renderMarkdown(md: string): string {
   // A checklist's boxes as placeholders: the sanitiser takes every <input>
   // out, so a task list arrived as bare items. A span with a data- attribute
   // survives, and enhanceTasks makes it a real checkbox, in the DOM.
-  const raw = (marked.parse(md ?? "", { breaks: true, async: false }) as string).replace(
+  // `...` (a section divider) is never shown, and `:::pop` … `:::` becomes a box (quiz.ts, popMarks).
+  const raw = (marked.parse(popMarks(sections(md ?? "").join("\n\n")), { breaks: true, async: false }) as string).replace(
     /<input\b[^>]*type="checkbox"[^>]*>/g,
     (tag) => `<span class="task-box" data-done="${/\bchecked\b/.test(tag) ? "1" : "0"}"></span>`,
   );
-  const html = DOMPurify.sanitize(raw, SANITIZE) as string;
+  const html = popBoxes(DOMPurify.sanitize(raw, SANITIZE) as string);
   // Links open in a new tab, and can't reach back into this one.
   return html.replace(/<a /g, '<a target="_blank" rel="noopener noreferrer" ');
 }
@@ -96,7 +98,7 @@ function Markdown({ md, className = "", tasks }: { md: string; className?: strin
 }
 
 /** A ```cards block: each card shows its front, and a click turns it over. For practising — nothing is marked. */
-function FlipCards({ body }: { body: string }) {
+export function FlipCards({ body }: { body: string }) {
   const cards = useMemo(() => parseCards(body), [body]);
   const [flipped, setFlipped] = useState<Set<number>>(new Set());
   if (!cards.length) return null;
@@ -153,16 +155,57 @@ export interface NotesProps {
 
 export function NotesPane({ notes, assignment, project, runner, practice }: NotesProps) {
   const deck = useMemo(() => slides(notes), [notes]);
+  const head = useMemo(() => takeAnimate(notes), [notes]);
+  // What's turned through: the slides, or the notes whole when they have none.
+  const pages = deck.length ? deck : [head.body];
+  const mode = head.animate;
   const key = `gameide-slide:${assignment}`;
+
+  /* PLAYED A SECTION AT A TIME (`animate:` at the top of the notes; notes.js
+     slideView does the same in the other editors). The slide starts empty
+     with ▶ Play above it; each press plays the next section (`...` divides
+     them), and the next slide's arrow waits until all of this one has been
+     played. Slides already played show whole and never replay: how far
+     they've got (`reached`) is kept in this browser. The teacher's copy is
+     kept apart and has ⏭ Skip, to see the slide without sitting through it;
+     a student has no Skip. */
+  const revealKey = `gameide-reveal:${practice ? "author:" : ""}${assignment}`;
+  const [reached, setReached] = useState<{ slide: number; played: number }>(() => {
+    try {
+      const got = JSON.parse(localStorage.getItem(revealKey) ?? "null");
+      if (got && got.slide >= 0 && got.played >= 0) return { slide: Number(got.slide), played: Number(got.played) };
+    } catch {
+      /* none kept */
+    }
+    return { slide: 0, played: 0 };
+  });
+  const reach = (r: { slide: number; played: number }) => {
+    setReached(r);
+    try {
+      localStorage.setItem(revealKey, JSON.stringify(r));
+    } catch {
+      /* this visit only */
+    }
+  };
+  const [busy, setBusy] = useState(false);
+  const finish = useRef<Finish | null>(null);
+  // Notes changed under a section that was playing: it's gone, and Play must come back.
+  useEffect(() => setBusy(false), [notes]);
+
   const [at, setAt] = useState(() => {
+    // Opened where they got to, when the notes play.
+    if (takeAnimate(notes).animate) return reached.slide;
     try {
       return Number(localStorage.getItem(key) ?? 0) || 0;
     } catch {
       return 0;
     }
   });
+  const here = Math.max(0, Math.min(at, pages.length - 1));
   const go = (n: number) => {
     const to = Math.max(0, Math.min(deck.length - 1, n));
+    // Onto the slide after the furthest one reached: it's the new furthest, unplayed.
+    if (mode && to > here && here === reached.slide) reach({ slide: to, played: 0 });
     setAt(to);
     try {
       localStorage.setItem(key, String(to));
@@ -179,39 +222,126 @@ export function NotesPane({ notes, assignment, project, runner, practice }: Note
 
   // A slide's `highlight:` line spotlights part of the editor while the slide
   // is open, as a tutorial step's does; the line itself isn't shown.
-  const { md: shown, highlight } = takeHighlight(deck.length ? deck[Math.min(at, deck.length - 1)]! : notes);
+  const { md: shown, highlight } = takeHighlight(pages[here]!);
   const [spot, setSpot] = useState(true);
   useEffect(() => setSpot(true), [at, highlight]);
   const hideSpot = useCallback(() => setSpot(false), []);
+
+  const parts = useMemo(() => sections(shown), [shown]);
+  const played = !mode ? parts.length : here < reached.slide ? parts.length : here === reached.slide ? Math.min(reached.played, parts.length) : 0;
+  const more = !!mode && here === reached.slide && played < parts.length;
+  // This slide still has sections to play: the way on waits.
+  const unfinished = !!mode && here >= reached.slide && played < parts.length;
+  const playNext = () => {
+    if (busy || !more) return;
+    setBusy(true);
+    reach({ slide: here, played: played + 1 });
+  };
+  const skip = () => {
+    if (busy) finish.current?.();
+    else if (more) reach({ slide: here, played: parts.length });
+  };
+  const piece = (p: Piece, i: number) =>
+    p.type === "md" ? (
+      <Markdown key={i} md={p.text} tasks={assignment} />
+    ) : p.type === "cards" ? (
+      <FlipCards key={i} body={p.body} />
+    ) : p.type === "quiz" ? (
+      <QuestionCard key={i} q={parseQuiz(p.body)} assignment={assignment} reply={mine[parseQuiz(p.body).id]} onAnswer={answered} practice={practice} />
+    ) : (
+      <TestsCard key={i} notes={notes} assignment={assignment} project={project} runner={runner} practice={practice} />
+    );
   return (
     <div className="notes-pane" data-testid="notes-pane">
       {deck.length > 0 && (
         <div className="notes-slides-bar">
-          <button className="btn small" disabled={at <= 0} onClick={() => go(at - 1)} aria-label="Previous slide">
+          <button className="btn small" disabled={here <= 0 || busy} onClick={() => go(here - 1)} aria-label="Previous slide">
             ←
           </button>
           <span className="muted small" data-testid="slide-count">
-            {Math.min(at, deck.length - 1) + 1} / {deck.length}
+            {here + 1} / {deck.length}
           </span>
-          <button className="btn small" disabled={at >= deck.length - 1} onClick={() => go(at + 1)} aria-label="Next slide" data-testid="slide-next">
+          <button
+            className="btn small"
+            disabled={here >= deck.length - 1 || unfinished || busy}
+            onClick={() => go(here + 1)}
+            aria-label="Next slide"
+            title={unfinished ? "Play the rest of this slide first" : "Next slide"}
+            data-testid="slide-next"
+          >
             →
           </button>
         </div>
       )}
+      {mode && (
+        <div className="reveal-bar" data-testid="reveal-bar">
+          {more && (
+            <button className="btn primary reveal-play" disabled={busy} onClick={playNext} data-testid="reveal-play">
+              {played ? "▶ Play more" : "▶ Play"}
+            </button>
+          )}
+          {practice && (busy || more) && (
+            <button className="btn reveal-skip" onClick={skip} title="Show it now — students don't get this button" data-testid="reveal-skip">
+              ⏭ Skip
+            </button>
+          )}
+          <span className="muted small reveal-hint">
+            {busy ? "" : more ? (parts.length > 1 ? `Part ${played + 1} of ${parts.length}` : "") : deck.length && here < deck.length - 1 ? "Done — on to the next slide →" : "Done"}
+          </span>
+        </div>
+      )}
       {highlight && spot && <Spotlight target={highlight} onDone={hideSpot} />}
       <div className="notes-body">
-        {pieces(shown).map((p, i) =>
-          p.type === "md" ? (
-            <Markdown key={i} md={p.text} tasks={assignment} />
-          ) : p.type === "cards" ? (
-            <FlipCards key={i} body={p.body} />
-          ) : p.type === "quiz" ? (
-            <QuestionCard key={i} q={parseQuiz(p.body)} assignment={assignment} reply={mine[parseQuiz(p.body).id]} onAnswer={answered} practice={practice} />
-          ) : (
-            <TestsCard key={i} notes={notes} assignment={assignment} project={project} runner={runner} practice={practice} />
-          ),
+        {!mode ? (
+          pieces(shown).map(piece)
+        ) : played === 0 ? (
+          <p className="reveal-start muted">Press ▶ Play to start this slide.</p>
+        ) : (
+          parts.slice(0, played).map((sec, i) => (
+            <Section
+              key={`${here}:${i}`}
+              how={busy && i === played - 1 ? mode : ""}
+              onFinish={(f) => (finish.current = f)}
+              onPlayed={() => setBusy(false)}
+            >
+              {pieces(sec).map(piece)}
+            </Section>
+          ))
         )}
       </div>
+    </div>
+  );
+}
+
+/**
+ * One section of played notes. The one just played animates in (reveal.ts)
+ * as it first appears — before the browser paints it, so it's never seen
+ * whole and then hidden; the rest are simply there.
+ */
+function Section({ how, onFinish, onPlayed, children }: { how: "" | "words" | "type"; onFinish: (f: Finish) => void; onPlayed: () => void; children: React.ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const first = useRef({ how, onFinish, onPlayed });
+  useLayoutEffect(() => {
+    const { how, onFinish, onPlayed } = first.current;
+    if (!how || !ref.current) return;
+    let gone = false;
+    let stop: Finish | null = null;
+    void animateIn(ref.current, how, (f) => {
+      stop = f;
+      onFinish(f);
+    }).then(() => {
+      if (!gone) onPlayed();
+    });
+    // Taken away mid-play (or React's development double run): show it all,
+    // and leave Play to whoever is drawn next.
+    return () => {
+      gone = true;
+      stop?.();
+    };
+  }, []);
+  return (
+    <div ref={ref} className="reveal-part">
+      {children}
     </div>
   );
 }

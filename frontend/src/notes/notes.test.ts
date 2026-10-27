@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import cases from "./parse-cases.json";
-import { parseCards, parseQuiz, pieces, scramble, slides } from "./quiz";
+import { parseCards, parseQuiz, pieces, popBoxes, popMarks, scramble, sections, slides, takeAnimate } from "./quiz";
 import { checkGame, checkProject, parseTests, readCheck, runTests, allTests, type GameRunner } from "../checks/checks";
 import { blankProject, newEvent, newObject, newRoom, newInstance } from "../store/project";
-import { CHECK_EXAMPLES } from "./HelpPage";
+import { ANIMATED, CHECK_EXAMPLES } from "./HelpPage";
 
 describe("questions and tests are read as the server reads them", () => {
   it("every question case reads the same as quiz.py", () => {
@@ -177,3 +177,44 @@ describe("order, sort and flip cards", () => {
   });
 });
 
+
+// Notes played a part at a time (`animate:`; NotesPane, reveal.ts) — the
+// same rules as notes.js's takeHeader/sections/popMarks in the other editors.
+describe("animate: notes", () => {
+  it("takes the animate line off the top, and names how", () => {
+    expect(takeAnimate("animate: words\n# Hi")).toEqual({ animate: "words", body: "# Hi" });
+    expect(takeAnimate("animate: type\n# Hi").animate).toBe("type");
+    expect(takeAnimate("animate: on\n# Hi").animate).toBe("words");
+  });
+  it("leaves a name it doesn't know in, as text, and only the top line counts", () => {
+    expect(takeAnimate("animate: fast\n# Hi")).toEqual({ animate: "", body: "animate: fast\n# Hi" });
+    expect(takeAnimate("# Hi\nanimate: words").animate).toBe("");
+  });
+  it("never changes how many slides there are", () => {
+    const deck = "# One\n...\nmore\n---\n# Two";
+    expect(slides("animate: words\n" + deck)).toHaveLength(2);
+    expect(slides("animate: words\n" + deck)[0]).not.toContain("animate");
+    expect(slides(deck)).toHaveLength(2);
+  });
+  it("cuts a slide into sections at ... lines, never inside fenced code", () => {
+    expect(sections("A\n...\nB\n\n...\nC")).toEqual(["A", "B\n", "C"]);
+    expect(sections("A\n```text\n...\n```\nB")).toEqual(["A\n```text\n...\n```\nB"]);
+    expect(sections("Just one")).toEqual(["Just one"]);
+    expect(sections("...\nA\n...")).toEqual(["A"]);
+  });
+  it(":::pop … ::: marks a box, never inside fenced code; nothing pops by itself", () => {
+    const marked = popMarks(":::pop\nLook!\n:::\n```\n:::pop\n```\n::: pop\nx");
+    expect(marked.split("%%POPSTART%%")).toHaveLength(3);
+    expect(marked).toContain("```\n:::pop\n```");
+    expect(marked).toContain("%%POPEND%%");
+    expect(popMarks("Check my work\n```python\nx = 1\n```")).toBe("Check my work\n```python\nx = 1\n```");
+    expect(popBoxes("<p>%%POPSTART%%</p><p>Look!</p><p>%%POPEND%%</p>")).toBe('<div class="pop-box"><p>Look!</p></div>');
+  });
+  it("the help page's example plays in three parts, the last a pop", () => {
+    const { animate, body } = takeAnimate(ANIMATED);
+    expect(animate).toBe("words");
+    const parts = sections(body);
+    expect(parts).toHaveLength(3);
+    expect(popMarks(parts[2]!)).toContain("%%POPSTART%%");
+  });
+});

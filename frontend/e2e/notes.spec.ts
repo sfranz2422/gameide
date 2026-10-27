@@ -249,3 +249,94 @@ test("notes: a checklist that stays ticked, flip cards, and order, bug, sort and
   await sctx.close();
   await tctx.close();
 });
+
+const PLAYED = `animate: words
+# Moving
+An object can move itself: each step it adds a little to its x, and the game draws it there, so it slides along the screen.
+
+...
+
+:::pop
+Press Check my work.
+:::
+---
+# Next
+The second slide.`;
+
+test("notes: animate plays a part at a time, the arrow waits, and only the teacher can Skip", async ({ browser }) => {
+  test.setTimeout(120_000);
+  const { ctx: tctx, page: teacher } = await signedIn(browser, "teach3@example.com");
+  await teacher.goto("/#/games");
+  await chooseTemplate(teacher, "platformer");
+  await expect(teacher.getByTestId("save-status")).toHaveText("Saved");
+  await teacher.goto("/#/classes");
+  await teacher.getByTestId("new-class-name").fill("Played P7");
+  await teacher.getByTestId("new-class-go").click();
+  await teacher.getByTestId("roster-emails").fill("ravi@example.com");
+  await teacher.getByTestId("roster-add").click();
+  await expect(teacher.getByText("ravi@example.com")).toBeVisible();
+  await teacher.getByTestId("new-assignment").click();
+  await teacher.getByTestId("assignment-game").selectOption({ label: "Platformer" });
+  await teacher.getByTestId("assignment-title").fill("Played");
+  await teacher.getByTestId("assignment-go").click();
+  await teacher.getByTestId("assignment-link").filter({ hasText: "Played" }).click();
+  await teacher.getByTestId("notes-source").fill(PLAYED);
+  await teacher.getByTestId("notes-save").click();
+  await expect(teacher.getByTestId("notes-save")).toHaveText("Saved");
+  // The page's preview shows it all at once, without the animate line.
+  await expect(teacher.locator(".notes-preview")).toContainText("Press Check my work.");
+  await expect(teacher.locator(".notes-preview")).not.toContainText("animate:");
+  await expect(teacher.locator(".notes-preview .pop-box")).toHaveCount(1);
+  const slug = teacher.url().split("/").pop()!;
+
+  const { ctx: sctx, page: ravi } = await signedIn(browser, "ravi@example.com");
+  await ravi.goto(`/a/${slug}`);
+  await ravi.waitForURL(/#\/p\//);
+  const pane = ravi.getByTestId("notes-pane");
+  await expect(pane.getByTestId("reveal-play")).toHaveText("▶ Play");
+  await expect(pane).not.toContainText("An object can move itself");
+  await expect(pane.getByTestId("slide-next")).toBeDisabled();
+  await expect(pane.getByTestId("reveal-skip")).toHaveCount(0);
+
+  // Part 1, word by word: Play waits while it plays.
+  await pane.getByTestId("reveal-play").click();
+  await expect(pane.locator(".reveal-hidden").first()).toBeAttached();
+  await expect(pane.getByTestId("reveal-play")).toBeDisabled();
+  await expect(pane.getByTestId("reveal-play")).toHaveText("▶ Play more");
+  await expect(pane.getByTestId("reveal-play")).toBeEnabled();
+  await expect(pane.locator(".reveal-hidden")).toHaveCount(0);
+  await expect(pane).toContainText("An object can move itself:");
+  await expect(pane.getByTestId("slide-next")).toBeDisabled();
+  // Part 2, the pop.
+  await pane.getByTestId("reveal-play").click();
+  await expect(pane.locator(".pop-box.reveal-pop")).toBeVisible();
+  await expect(pane.getByTestId("reveal-play")).toHaveCount(0);
+  await expect(pane.getByTestId("slide-next")).toBeEnabled();
+  // Played, the slide stays whole: back from the next one replays nothing.
+  await pane.getByTestId("slide-next").click();
+  await expect(pane).toContainText("Press ▶ Play to start this slide.");
+  await pane.getByRole("button", { name: "Previous slide" }).click();
+  await expect(pane).toContainText("Press Check my work.");
+  await expect(pane.getByTestId("reveal-play")).toHaveCount(0);
+  // And they come back to the slide they got to.
+  await ravi.reload();
+  await expect(ravi.getByTestId("notes-pane").getByTestId("slide-count")).toHaveText("2 / 2");
+  await sctx.close();
+
+  // The teacher opens it too: it plays, Skip finishes the part playing,
+  // and between parts it shows the rest of the slide.
+  await teacher.goto(`/a/${slug}`);
+  await teacher.waitForURL(/#\/p\//);
+  const mine = teacher.getByTestId("notes-pane");
+  await mine.getByTestId("reveal-play").click();
+  await expect(mine.getByTestId("reveal-play")).toBeDisabled();
+  await mine.getByTestId("reveal-skip").click();
+  // At once: the part takes well over a second to play by itself.
+  await expect(mine.locator(".reveal-hidden")).toHaveCount(0, { timeout: 400 });
+  await expect(mine.getByTestId("reveal-play")).toHaveText("▶ Play more");
+  await expect(mine).not.toContainText("Press Check my work.");
+  await mine.getByTestId("reveal-skip").click();
+  await expect(mine).toContainText("Press Check my work.");
+  await expect(mine.getByTestId("slide-next")).toBeEnabled();
+  await tctx.close();
+});

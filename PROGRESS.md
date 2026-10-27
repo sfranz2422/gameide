@@ -1,5 +1,13 @@
 # Progress
 
+## Notes that play a part at a time ✅ (2026-10-27, waiting for review)
+Asked for across all four editors. `animate: words` (or `animate: type`, a typewriter) as the notes' first line; a line of `...` divides a slide into parts.
+- In the Notes tab, ▶ Play plays the next part (`reveal.ts`, `animateIn`: word by word or letter by letter; code, questions, cards and tests come in whole). Play waits while a part plays; the next slide's arrow waits until the slide has been played. Slides already played show whole, and how far a student got is kept in the browser (`gameide-reveal:<slug>`), so the notes reopen there. Reduced motion gets each part at once.
+- **Nothing pops by itself**: what the teacher wraps in `:::pop` … `:::` is a highlighted box, arriving with a little pop (`popMarks`/`popBoxes` in quiz.ts).
+- The teacher opening the assignment gets the same, kept apart (`author:`), with ⏭ Skip: it finishes the part playing, or between parts shows the whole slide. Students have no Skip.
+- The assignment page's preview shows the notes whole, without the `animate:` line, and now draws a cards block as cards (it was drawn as tests).
+- Help page section; Vitest for the header, sections and pops; `e2e/notes.spec.ts` plays a slide through as a student and skips as the teacher. 11 sabotage cases, all caught.
+
 ## More in notes: four question kinds, checklists, flip cards ✅ (2026-10-27, waiting for review)
 Asked for across all four editors (code that runs in the notes and a notes column were for PyIDE, WebIDE and FlaskIDE only — GameIDE's three columns stay as they are).
 - **`type: order`** (put the lines in order), **`type: bug`** (click the wrong line) and **`type: sort`** (sort items into groups) — `backend/quiz.py`, the same file as PyIDE's, now with the three kinds. Order and sort give part marks (order by the longest run of lines kept in order, so one line out of place costs one line); bug is right or wrong. Shuffled lines and items come out in the same order everywhere, by an FNV-1a hash both quiz.py and quiz.ts work out (`scramble`), because that order is part of the question and what an answer is marked against. Redacted like the rest: the order, the groups and the `bug:` line never reach a student.

@@ -651,6 +651,18 @@ CASES = [
  ("joints outlive bodies", PH, "    for (const [id, j] of this.joints) if (j.getBodyA() === e.body || j.getBodyB() === e.body) this.joints.delete(id);\n", "", "joints end with their instances"),
  ("spin sign", PH, "body.setAngularVelocity((-spin * DEG * sps));", "body.setAngularVelocity((spin * DEG * sps));", "spins, and physics_gravity"),
  ("spin read back", PH, "const spin = -e.body.getAngularVelocity() / DEG / sps;", "const spin = e.body.getAngularVelocity() / DEG / sps;", "spins, and physics_gravity"),
+# Played notes (animate:; notes/NotesPane.tsx, notes/reveal.ts, e2e/notes.spec.ts "animate plays")
+ ("next slide not held", "src/notes/NotesPane.tsx", "disabled={here >= deck.length - 1 || unfinished || busy}", "disabled={here >= deck.length - 1 || busy}", "animate plays", E2E),
+ ("students get Skip", "src/notes/NotesPane.tsx", "{practice && (busy || more) && (", "{(busy || more) && (", "animate plays", E2E),
+ ("nothing hidden while playing", "src/notes/reveal.ts", 'const hide = (n: HTMLElement) => n.classList.add("reveal-hidden");', 'const hide = (n: HTMLElement) => void n;', "animate plays", E2E),
+ ("played slides replay", "src/notes/NotesPane.tsx", "here < reached.slide ? parts.length :", "here < reached.slide ? 0 :", "animate plays", E2E),
+ ("how far not kept", "src/notes/NotesPane.tsx", "      localStorage.setItem(revealKey, JSON.stringify(r));", "      void JSON.stringify(r);", "animate plays", E2E),
+ ("Skip doesn't finish the part", "src/notes/NotesPane.tsx", "if (busy) finish.current?.();", "if (busy) void finish.current;", "animate plays", E2E),
+ ("Skip between parts does nothing", "src/notes/NotesPane.tsx", "else if (more) reach({ slide: here, played: parts.length });", "else if (more) reach({ slide: here, played: played });", "animate plays", E2E),
+ ("preview shows the animate line", "src/notes/TeacherNotes.tsx", "pieces(takeHighlight(takeAnimate(text).body).md)", "pieces(takeHighlight(takeAnimate(text).body && text).md)", "animate plays", E2E),
+ ("pop never boxed", "src/notes/quiz.ts", '      return `${close}<div class="pop-box">`;', '      return `${close}<div class="pop-bx">`;', "marks a box"),
+ ("sections cut inside code", "src/notes/quiz.ts", "} else if (fence === null && /^ {0,3}\\.\\.\\.\\s*$/.test(ln)) {", "} else if (/^ {0,3}\\.\\.\\.\\s*$/.test(ln)) {", "cuts a slide into sections"),
+ ("animate line counted as a slide's text", "src/notes/quiz.ts", "  const lines = takeAnimate(md).body.replace(", "  const lines = String(md ?? \"\").replace(", "never changes how many slides"),
  ("physics not stepped in the worker", PH, "    this.world!.step(1 / host.stepsPerSecond);", "    if (typeof window !== \"undefined\") this.world!.step(1 / host.stepsPerSecond);", "a physics coin falls", E2E),
 ]
 only = sys.argv[1:]
