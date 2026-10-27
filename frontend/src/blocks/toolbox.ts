@@ -85,6 +85,15 @@ export function toolbox(kind: BlocksKind = "event"): Blockly.utils.toolbox.Toolb
         prop("gm_prop_get", "y"),
         ...catalogItems("Motion"),
       ]),
+      category("Physics", COLOURS.Physics, [
+        { kind: "block", type: "gm_prop_set", fields: { PROP: "physics" }, inputs: { TO: shadow("logic_boolean", { BOOL: "TRUE" }) } },
+        prop("gm_prop_set", "bounce", 0.5),
+        prop("gm_prop_set", "weight", 1),
+        prop("gm_prop_set", "friction", 0.3),
+        prop("gm_prop_set", "spin", 5),
+        { kind: "block", type: "gm_prop_set", fields: { PROP: "fixed" }, inputs: { TO: shadow("logic_boolean", { BOOL: "TRUE" }) } },
+        ...catalogItems("Physics"),
+      ]),
       category("Instances", COLOURS.Instances, [
         { kind: "block", type: "gm_self" },
         { kind: "block", type: "gm_other" },

@@ -27,6 +27,7 @@ import type { GameDefinition, SoundOrder } from "./game";
 import { InputState } from "./input";
 import { Effects, type FxOrder, type Light } from "./effects";
 import { SpatialHash } from "./spatialHash";
+import { Physics, type PhysicsHost } from "./physics";
 import { boxOf, containsPoint, maskOverlapsBox, masksOverlap, overlaps, spriteInfo, type Box, type SpriteInfo } from "./sprites";
 import { tileNumber, type TileLayerDef, type TilesetDef } from "./game";
 
@@ -48,6 +49,17 @@ export interface LiveTiles {
  * or tile layer L as -2 - L. Python turns the last into the layer's name.
  */
 export const tileCode = (layer: number) => -2 - layer;
+
+/**
+ * Does slot c stop things — place_free, move_and_collide, collision_line,
+ * path_find? Solid instances do, and so do physics ones: a crate is in the
+ * player's way without being made solid (which would make the player's
+ * collision event put them back where they were, every step they touch it).
+ */
+/** A pair of slots (a, b) as one number: a * PAIR + b. */
+const PAIR = 1 << 20;
+
+const blocks = (st: Float64Array, c: number) => st[c * STRIDE + F.SOLID] !== 0 || st[c * STRIDE + F.PHYSICS] !== 0;
 
 /**
  * How far along the segment (0 its start, 1 its end) it first enters `box`,
@@ -203,6 +215,13 @@ export class Engine {
   readonly effects = new Effects();
   guiList: DrawCommand[] = [];
   tiles: LiveTiles[] = [];
+  /** Bumped by every tile change, so physics rebuilds its walls (physics.ts). */
+  tilesVersion = 0;
+  /** planck's world, made the first step an instance has physics on. */
+  readonly physics = new Physics();
+  /** Pairs the overlap pass reported this step, so physics contacts don't report them again. */
+  private reported = new Set<number>();
+  private touchingPairs: number[] = [];
   /** Cells tile_set() changed since the renderer last looked: [layer, cell]. */
   tileChanges: [number, number][] = [];
   debugText: string | null = null;
@@ -368,7 +387,7 @@ export class Engine {
     let found = -1;
     this.hash.query(scratch.left, scratch.top, scratch.right, scratch.bottom, (c) => {
       if (c === self || !this.matches(st, c, t)) return false;
-      if (solidOnly && !st[c * STRIDE + F.SOLID]) return false;
+      if (solidOnly && !blocks(st, c)) return false;
       const cb = c * STRIDE;
       const cx = st[cb + F.X]!, cy = st[cb + F.Y]!;
       if (!boxOf(st, c, cx, cy, this.sprites, scratch2)) return false;
@@ -424,6 +443,7 @@ export class Engine {
     const cell = r * t.def.columns + c;
     t.cells[cell] = tile >= 0 && tile < t.tileset.count ? tile : -1;
     this.tileChanges.push([layer, cell]);
+    this.tilesVersion++;
     return true;
   }
 
@@ -533,7 +553,7 @@ export class Engine {
     if (t >= -1) {
       this.hash.query(Math.min(x1, x2), Math.min(y1, y2), Math.max(x1, x2) + 1, Math.max(y1, y2) + 1, (c) => {
         if (c === self || !this.matches(st, c, t)) return false;
-        if (t === -1 && !st[c * STRIDE + F.SOLID]) return false;
+        if (t === -1 && !blocks(st, c)) return false;
         if (!boxOf(st, c, st[c * STRIDE + F.X]!, st[c * STRIDE + F.Y]!, this.sprites, scratch2)) return false;
         const hit = segmentEntersBox(x1, y1, x2, y2, scratch2);
         if (hit !== null && hit < best) {
@@ -598,7 +618,7 @@ export class Engine {
     const n = g[G.SLOTS]!;
     for (let s = 0; s < n; s++) {
       const b = s * STRIDE;
-      if (s === self || !st[b + F.ALIVE] || !st[b + F.SOLID]) continue;
+      if (s === self || !st[b + F.ALIVE] || !blocks(st, s)) continue;
       if (boxOf(st, s, st[b + F.X]!, st[b + F.Y]!, this.sprites, scratch2)) mark(scratch2.left + 0.01, scratch2.top + 0.01, scratch2.right - 0.01, scratch2.bottom - 0.01);
     }
     const at = (x: number, y: number) => Math.min(rows - 1, Math.max(0, Math.floor(y / cell))) * cols + Math.min(cols - 1, Math.max(0, Math.floor(x / cell)));
@@ -706,6 +726,8 @@ export class Engine {
       return [{ def: l, tileset, cells: Int32Array.from(l.cells), solid, oneWay }];
     });
     this.tileChanges = [];
+    this.tilesVersion++;
+    this.physics.reset();
     const cam = room.camera;
     const c = this.camera;
     c.enabled = !!cam;
@@ -899,8 +921,10 @@ export class Engine {
       if (!st[b + F.ALIVE] || this.frozen(st, g, b)) continue; // paused: no moving, no animating
       let h = st[b + F.HSPEED]!;
       let v = st[b + F.VSPEED]!;
-      const fr = st[b + F.FRICTION]!;
-      const grav = st[b + F.GRAVITY]!;
+      // A physics instance is moved by planck below, and its friction is its surface's.
+      const phys = st[b + F.PHYSICS] !== 0;
+      const fr = phys ? 0 : st[b + F.FRICTION]!;
+      const grav = phys ? 0 : st[b + F.GRAVITY]!;
       if (fr !== 0 || grav !== 0) {
         if (fr !== 0) {
           // Friction slows the speed toward zero along the direction of
@@ -922,7 +946,7 @@ export class Engine {
         st[b + F.SPEED] = Math.hypot(h, v);
         if (h !== 0 || v !== 0) st[b + F.DIRECTION] = ((Math.atan2(-v, h) / DEG) % 360 + 360) % 360;
       }
-      if (h !== 0 || v !== 0) {
+      if (!phys && (h !== 0 || v !== 0)) {
         st[b + F.X] = st[b + F.X]! + h;
         st[b + F.Y] = st[b + F.Y]! + v;
         this.refile(st, s);
@@ -943,6 +967,10 @@ export class Engine {
       }
     }
 
+    const physics = this.physics.step(this.physicsHost(), g[G.PAUSED] === 1);
+    if (physics) for (const s of this.physics.moved()) this.refile(st, s);
+    this.reported.clear();
+
     // Collisions, after everything has moved. A pair that overlaps fires
     // every step it overlaps, as in GameMaker, not only on first contact.
     for (let s = 0; s < n; s++) {
@@ -958,8 +986,10 @@ export class Engine {
             if (!st[cb + F.ALIVE] || !this.collides[t * nt + st[cb + F.TYPE]!]) return false;
             const cx = st[cb + F.X]!, cy = st[cb + F.Y]!;
             if (!boxOf(st, c, cx, cy, this.sprites, scratch2) || !overlaps(scratch, scratch2)) return false;
-            if (masksOverlap(st, s, st[b + F.X]!, st[b + F.Y]!, c, cx, cy, this.sprites, scratch, scratch2))
+            if (masksOverlap(st, s, st[b + F.X]!, st[b + F.Y]!, c, cx, cy, this.sprites, scratch, scratch2)) {
               this.pushEvent(events, EV.COLLISION, s, c);
+              if (physics) this.reported.add(s * PAIR + c);
+            }
             return false;
           });
         }
@@ -982,6 +1012,26 @@ export class Engine {
           this.pushEvent(events, EV.INTERSECT_BOUNDARY, s, 0);
         st[b + F.OUTSIDE] = outside ? 1 : 0;
         st[b + F.BOUNDARY] = boundary ? 1 : 0;
+      }
+    }
+
+    // Physics bodies resting on each other only touch — their masks share an
+    // edge, which the overlap test above doesn't count — so a crate sitting
+    // on a button would never fire its collision event. planck knows which
+    // pairs touch: those fire too, unless the overlap test already did.
+    if (physics) {
+      const pairs = this.touchingPairs;
+      this.physics.touching(pairs);
+      for (let i = 0; i < pairs.length; i += 2) {
+        for (const [a, c] of [[pairs[i]!, pairs[i + 1]!], [pairs[i + 1]!, pairs[i]!]] as const) {
+          const ab = a * STRIDE, cb = c * STRIDE;
+          if (!st[ab + F.ALIVE] || !st[cb + F.ALIVE] || this.frozen(st, g, ab)) continue;
+          const t = st[ab + F.TYPE]!;
+          if (!(this.flags[t]! & HANDLES.COLLISION) || !this.collides[t * nt + st[cb + F.TYPE]!]) continue;
+          if (this.reported.has(a * PAIR + c)) continue;
+          this.reported.add(a * PAIR + c);
+          this.pushEvent(events, EV.COLLISION, a, c);
+        }
       }
     }
     return events[0]!;
@@ -1010,6 +1060,27 @@ export class Engine {
     return commands?.error ?? null;
   }
 
+  // ---------------------------------------------------------------- physics (physics.ts)
+
+  private physicsHost(): PhysicsHost {
+    const { st, g } = this.fresh();
+    return { st, g, sprites: this.sprites, tiles: this.tiles, tilesVersion: this.tilesVersion, stepsPerSecond: this.def.stepsPerSecond ?? 60 };
+  }
+
+  physics_gravity(x: number, y: number) {
+    this.physics.setGravity(x, y);
+  }
+
+  /** physics_join(): see Physics.join. b = -1 joins a to the room itself. */
+  physics_join(a: number, b: number, kind: string, x: number, y: number, hasPoint: boolean): number {
+    this.flushDirty();
+    return this.physics.join(this.physicsHost(), a, b, kind, x, y, hasPoint);
+  }
+
+  physics_unjoin(id: number) {
+    this.physics.unjoin(id);
+  }
+
   /** Every tile layer's cells now, as JSON, for a persistent room being left (Python keeps it). */
   tiles_get(): string {
     return JSON.stringify(this.tiles.map((t) => Array.from(t.cells)));
@@ -1024,6 +1095,7 @@ export class Engine {
         if (t.cells[i] !== cells[i]) {
           t.cells[i] = cells[i]!;
           this.tileChanges.push([L, i]);
+          this.tilesVersion++;
         }
       }
     });

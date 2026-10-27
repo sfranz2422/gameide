@@ -56,6 +56,7 @@ __all__ = [
     # collision
     "place_meeting", "place_free", "instance_place", "collision_point", "tile_at", "tile_set",
     "collision_line", "path_find",
+    "physics_gravity", "physics_join", "physics_unjoin",
     # input
     "keyboard_check", "keyboard_check_pressed", "keyboard_check_released", "touch_controls",
     "mouse_check", "mouse_check_pressed", "mouse_check_released", "mouse_x", "mouse_y",
@@ -320,6 +321,19 @@ class GameObject:
         # `if move_and_collide(0, self.vy):` is true when the floor stops it.
         return [_objs[c] if c >= 0 else _tile_layer_names()[-2 - c] for c in (_res[i] for i in range(1, n + 1))]
 
+    def push(self, dx, dy):
+        """
+        Pushes a physics instance: its speed changes by (dx, dy) pixels per
+        step, divided by its weight — so a heavy crate moves less for the
+        same shove. A fixed one, or one without physics, doesn't move.
+        """
+        b = self._b
+        if not _st[b + _L.F.PHYSICS] or _st[b + _L.F.FIXED]:
+            return
+        w = _st[b + _L.F.WEIGHT] or 1.0
+        self.hspeed += _num(dx, "push", "dx") / w
+        self.vspeed += _num(dy, "push", "dy") / w
+
     def move_towards(self, x, y, speed):
         self.direction = point_direction(self.x, self.y, x, y)
         self.speed = speed
@@ -473,6 +487,27 @@ def _install_properties():
             _st[b + F.OUTLINE] = kind
         return property(get, set_)
 
+    def physics_get(self):
+        return _st[self._b + F.PHYSICS] != 0
+
+    def physics_set(self, on):
+        b = self._b
+        if on and not _st[b + F.PHYSICS] and _st[b + F.FRICTION] == 0:
+            # friction is a physics body's grip on what it touches. None at
+            # all and a crate slides off every slope like ice, so turning
+            # physics on gives it some; set friction after to change it.
+            _st[b + F.FRICTION] = 0.3
+        _st[b + F.PHYSICS] = 1.0 if on else 0.0
+
+    def weight_get(self):
+        return _st[self._b + F.WEIGHT]
+
+    def weight_set(self, w):
+        w = _num(w, "weight", "weight")
+        if w <= 0:
+            raise ValueError(f"weight must be more than 0 (1 is usual, 5 is heavy), not {w!r}.")
+        _st[self._b + F.WEIGHT] = w
+
     props = {
         "x": boxy(F.X), "y": boxy(F.Y),
         "xprevious": plain(F.XPREV), "yprevious": plain(F.YPREV),
@@ -489,6 +524,8 @@ def _install_properties():
         "depth": plain(F.DEPTH),
         "image_blend": property(blend_get, blend_set), "blend_mode": property(mode_get, mode_set),
         "outline": edge(1, "outline"), "glow": edge(2, "glow"),
+        "physics": property(physics_get, physics_set), "bounce": plain(F.BOUNCE),
+        "weight": property(weight_get, weight_set), "fixed": flag(F.FIXED), "spin": plain(F.SPIN),
     }
     for name, prop in props.items():
         setattr(GameObject, name, prop)
@@ -683,6 +720,56 @@ def path_find(x1, y1, x2, y2, cell=16):
 
 def move_towards(x, y, speed):
     _me("move_towards").move_towards(x, y, speed)
+
+
+# ---------------------------------------------------------------- physics (engine/physics.ts)
+
+_JOINTS = ("hinge", "rope", "weld", "spring")
+
+
+def physics_gravity(x, y):
+    """Which way, and how hard, physics pulls everything: pixels per step per step (0, 0.3 to start)."""
+    _js.physics_gravity(_num(x, "physics_gravity", "x"), _num(y, "physics_gravity", "y"))
+
+
+def physics_join(a, b=None, kind="hinge", x=None, y=None):
+    """
+    Joins two physics instances (or `a` to the room itself, when b is None)
+    and gives back the joint, for physics_unjoin:
+      "hinge"   pinned at (x, y), free to turn: a wheel, a door, a pendulum
+      "weld"    pinned at (x, y), held at the angle they are now: one thing
+      "rope"    a's middle tied to (x, y) on b, never further than now apart
+      "spring"  like a rope that pulls back, and pushes back too
+    (x, y) is in the room. A hinge or weld is at a's origin if it's left out,
+    a rope or spring at b's (or a's own place, for the room).
+    """
+    if kind not in _JOINTS:
+        raise ValueError(f"physics_join: kind is one of {', '.join(repr(k) for k in _JOINTS)}, not {kind!r}."
+                         + _suggest(str(kind), _JOINTS))
+    for name, inst in (("a", a), ("b", b)):
+        if inst is None and name == "b":
+            continue
+        if not isinstance(inst, GameObject) or not inst._alive:
+            raise TypeError(f"physics_join: {name} is an instance (like self or other), not {inst!r}.")
+        if not inst.physics:
+            raise ValueError(f"physics_join: {inst!r} needs self.physics = True before it can be joined.")
+        if inst.sprite is None:
+            raise ValueError(f"physics_join: {inst!r} has no sprite, so physics has no shape for it.")
+    if b is a:
+        raise ValueError("physics_join: an instance can't be joined to itself.")
+    has_point = x is not None or y is not None
+    if has_point and (x is None or y is None):
+        raise ValueError("physics_join: give both x and y, or neither.")
+    j = _js.physics_join(a._slot, -1 if b is None else b._slot, kind,
+                         _num(x, "physics_join", "x") if has_point else 0.0,
+                         _num(y, "physics_join", "y") if has_point else 0.0, has_point)
+    return j or None
+
+
+def physics_unjoin(joint):
+    """Ends a joint physics_join made. One already ended (an instance in it was destroyed) is no matter."""
+    if joint is not None:
+        _js.physics_unjoin(int(joint))
 
 
 def point_direction(x1, y1, x2, y2):
@@ -1775,8 +1862,10 @@ def _dispatch_engine_events():
             if name is None:
                 continue
             # GameMaker: touching a solid instance puts you back where you
-            # were before the step's movement, then the event runs.
-            if other.solid:
+            # were before the step's movement, then the event runs. Not when
+            # physics is in it: planck has already kept them apart, and the
+            # put-back would undo its move every step they touch.
+            if other.solid and not o.physics and not other.physics:
                 o.x = o.xprevious
                 o.y = o.yprevious
             _cur = o
@@ -2231,6 +2320,7 @@ def _load_game(game):
         tpl[F.VISIBLE] = 1.0 if o.get("visible", True) else 0.0
         tpl[F.SOLID] = 1.0 if o.get("solid", False) else 0.0
         tpl[F.DEPTH] = o.get("depth", 0)
+        tpl[F.WEIGHT] = 1.0
         for a in range(_L.ALARM_COUNT):
             tpl[F.ALARM0 + a] = -1.0
         _templates.append(tpl)

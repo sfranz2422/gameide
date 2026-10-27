@@ -19,6 +19,7 @@ export type Category =
   | "Collision"
   | "Input"
   | "Motion"
+  | "Physics"
   | "Drawing"
   | "Rooms"
   | "Camera"
@@ -32,7 +33,7 @@ export type Category =
  * blocks palette and the sheet pickers each list categories; catalog.test.ts
  * holds all three to this, so a new category can't go missing from one.
  */
-export const CATEGORIES: Category[] = ["Instances", "Collision", "Input", "Motion", "Drawing", "Sound", "Saving", "Rooms", "Camera", "Effects", "Debug"];
+export const CATEGORIES: Category[] = ["Instances", "Collision", "Input", "Motion", "Physics", "Drawing", "Sound", "Saving", "Rooms", "Camera", "Effects", "Debug"];
 
 export type ParamType =
   | "number" | "string" | "object" | "sprite" | "key" | "button" | "color" | "boolean" | "room" | "instance" | "layer" | "any"
@@ -114,6 +115,15 @@ export const API: ApiEntry[] = [
   fn("Collision", "path_find", [p("x1", "number"), p("y1", "number"), p("x2", "number"), p("y2", "number"), p("cell", "number", "16")],
     "a list of (x, y) points, or an empty list",
     "A way from (x1, y1) to (x2, y2) round every solid tile and solid instance, on a grid of `cell` pixels: the points to walk through, in order. Empty when there is no way. For games seen from above; follow it with move_towards."),
+
+  // Physics (engine/physics.ts): self.physics = True and the properties beside it do most of it.
+  fn("Physics", "physics_gravity", [p("x", "number"), p("y", "number")], "nothing",
+    "Which way, and how hard, physics pulls everything with self.physics = True: pixels per step, added each step. It starts as physics_gravity(0, 0.3); (0, 0) floats, like space."),
+  fn("Physics", "physics_join", [p("a", "instance"), p("b", "instance", "None"), p("kind", "string", '"hinge"'), p("x", "number", "None"), p("y", "number", "None")],
+    "a joint, for physics_unjoin",
+    `Joins two physics instances, or a to the room itself when b is None. "hinge": pinned at (x, y) and free to turn — wheels, doors, pendulums. "weld": stuck together as one. "rope": never further apart than now. "spring": a rope that pulls back. (x, y) is a's origin if left out (b's, for a rope or spring).`),
+  fn("Physics", "physics_unjoin", [p("joint", "any")], "nothing",
+    "Ends a joint physics_join made: cut the rope. A joint already gone (one of its instances was destroyed) is no matter."),
 
   // Input
   fn("Input", "keyboard_check", [p("key", "key")], "True or False", "Is this key held down?"),
@@ -296,7 +306,7 @@ export const PROPERTIES: { name: string; description: string }[] = [
   { name: "direction", description: "Direction of travel in degrees: 0 right, 90 up." },
   { name: "gravity", description: "Added to the speed each step, in gravity_direction." },
   { name: "gravity_direction", description: "Direction gravity pulls: 270 is down." },
-  { name: "friction", description: "Taken off the speed each step." },
+  { name: "friction", description: "Taken off the speed each step. With physics: how much it grips what it touches (0 slides like ice)." },
   { name: "sprite", description: "The name of the sprite drawn, or None." },
   { name: "image_index", description: "Which frame of the sprite is showing." },
   { name: "image_speed", description: "Animation speed: 1 is the sprite's own speed, 2 twice as fast, 0 stopped." },
@@ -308,6 +318,12 @@ export const PROPERTIES: { name: string; description: string }[] = [
   { name: "solid", description: "Whether place_free and move_and_collide treat it as a wall." },
   { name: "ignore_pause", description: "True keeps this instance running while the game is paused (game_pause): a pause menu, a blinking cursor." },
   { name: "drop_through", description: "Steps left of falling through one-way platforms: self.drop_through = 12 when Down is pressed drops off one. Counts down by itself." },
+  { name: "physics", description: "True hands it to physics: it falls, bounces, stacks, tips over and rolls, its sprite's mask its shape. Its x, y, image_angle, hspeed and vspeed are still yours to set." },
+  { name: "bounce", description: "With physics: how bouncy, 0 (lands dead) to 1 (bounces back as high)." },
+  { name: "weight", description: "With physics: how heavy, 1 to start. Heavier things push lighter ones aside, and push() moves them less." },
+  { name: "fixed", description: "With physics: True and it never moves — things land on it, bounce off it and hang from it." },
+  { name: "spin", description: "With physics: how fast it turns, in degrees a step, counter-clockwise." },
+  { name: "push", description: "other.push(dx, dy): shoves a physics instance — its speed changes by (dx, dy), divided by its weight." },
   { name: "depth", description: "Lower depth draws on top." },
   { name: "image_blend", description: 'A colour the sprite is tinted with: "red" makes it reddish; "white" is as drawn.' },
   { name: "blend_mode", description: '"normal", "add" (glowing: fire, lasers, magic), "multiply" (darker) or "screen" (lighter).' },

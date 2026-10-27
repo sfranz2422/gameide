@@ -45,6 +45,7 @@ NT, GR, QZ, CK = "../backend/notes.py", "../backend/grades.py", "src/notes/quiz.
 TU, TUP, TP = "../backend/tutorials.py", "src/tutorials/tutorial.ts", "src/tutorials/TutorialPane.tsx"
 FX, FEEL, BRG = "src/engine/effects.ts", "src/engine/render/feel.ts", "src/python/bridge.ts"
 PXR = "src/engine/render/pixiRenderer.ts"
+PH = "src/engine/physics.ts"
 CASES = [
  ("layout drift", RT, '"x": boxy(F.X)', '"x": boxy(F.Y)', "every built-in property"),
  ("no polar sync", RT, "            _st[b + i] = v\n            set_polar(b)", "            _st[b + i] = v", "two views of one motion"),
@@ -53,7 +54,7 @@ CASES = [
  ("input after step", RT, "        _input_events()\n        _call_all(_lists[\"on_step\"], \"on_step\")", "        _call_all(_lists[\"on_step\"], \"on_step\")\n        _input_events()", "GameMaker's order"),
  ("alarm late", EN, "if (v <= 1) {", "if (v < 1) {", "third step"),
  ("no parent walk", RT, "                p = objects[cur].get(\"parent\")\n                cur = _type_index.get(p) if p else None", "                cur = None", "parent's collision"),
- ("no solid revert", RT, "            if other.solid:\n                o.x = o.xprevious", "            if False:\n                o.x = o.xprevious", "solid instance puts"),
+ ("no solid revert", RT, "            if other.solid and not o.physics and not other.physics:\n                o.x = o.xprevious", "            if False:\n                o.x = o.xprevious", "solid instance puts"),
  ("outside every step", EN, "outside && !st[b + F.OUTSIDE])", "outside)", "outside room fires once"),
  ("strip by key name", BRG, "  return JSON.stringify({\n    ...def,", "  if (def) return JSON.stringify(def, (k, v) => ([\"font\", \"sound\", \"image\"].includes(k) ? undefined : v));\n  return JSON.stringify({\n    ...def,", "a script called font"),
  ("pictures sent to Python", BRG, "    sprites: def.sprites.map(({ images, pixelMasks, ...rest }) => rest),\n", "", "still stay on this side"),
@@ -583,6 +584,36 @@ CASES = [
  ("no tint", PXR, "      sp.tint = st[b + F.TINT]!;", "", "game feel is drawn", E2E),
  ("turn in does nothing", "src/editor/AssignmentBits.tsx", "            await api(`/api/projects/${encodeURIComponent(projectId)}/turn-in`, { json: {} });", "            void 0;", "a class:", E2E),
  ("no read-only bar", EP, '          {store.kind === "view" ? (', "          {store.kind !== store.kind ? (", "a class:", E2E),
+ # Physics (engine/physics.ts; src/python/physics.test.ts, e2e/physics.editor.spec.ts)
+ ("physics moved twice", EN, "if (!phys && (h !== 0 || v !== 0)) {", "if (h !== 0 || v !== 0) {", "takes push"),
+ ("physics teleport ignored", PH, "if (x !== e.x || y !== e.y || angle !== e.angle) {", "if (x !== e.x && y !== e.y && angle !== e.angle) {", "is moved by its own code"),
+ ("physics vspeed ignored", PH, "if (h !== e.h || v !== e.v) {", "if (h !== e.h) {", "is moved by its own code"),
+ ("physics not written back", PH, "st[b + F.Y] = e.y = y;", "e.y = y;", "falls, lands on solid tiles"),
+ ("weight is density", PH, "f.setDensity(weight / Math.max(e.area, 1e-6));", "f.setDensity(weight + 0 * e.area);", "has its weight as its mass"),
+ ("weight ignored", PH, "f.setDensity(weight / Math.max(e.area, 1e-6));", "f.setDensity(1 / Math.max(e.area, 1e-6));", "has its weight as its mass"),
+ ("kinematic teleports", PH, "body.setLinearVelocity(new Vec2((dx * sps) / PPM, (dy * sps) / PPM));", "body.setTransform(new Vec2(x / PPM, y / PPM), -angle * DEG);", "rides a moving solid platform"),
+ ("solid not kinematic", PH, ': st[b + F.SOLID] ? "kinematic" : null;', ": null;", "rides a moving solid platform"),
+ ("physics put back by solid", RT, "if other.solid and not o.physics and not other.physics:", "if other.solid:", "rides a moving solid platform"),
+ ("physics no friction", RT, "            _st[b + F.FRICTION] = 0.3", "            _st[b + F.FRICTION] = 0.0", "rides a moving solid platform"),
+ ("box skins", PH, "const skin = Settings.polygonRadius - Settings.linearSlop;", "const skin = 0 * Settings.linearSlop;", "stacks on others"),
+ ("one-way swept box", PH, "const bottom = shapeBox.upperBound.y * PPM;", "const bottom = other.getAABB(0).upperBound.y * PPM + 0 * shapeBox.upperBound.y;", "lands on one-way tiles"),
+ ("drop through asleep", PH, "if (st[b + F.DROP]! > 0) body.setAwake(true);", "void body;", "lands on one-way tiles"),
+ ("drop through ignored", PH, "if (dropping || bottom > tile.top + ONE_WAY_SLACK)", "if (bottom > tile.top + ONE_WAY_SLACK + 0 * Number(dropping))", "lands on one-way tiles"),
+ ("walls cover gaps", PH, "while (c + w < cols && !used[r * cols + c + w] && isSolid(c + w, r)) w++;", "while (c + w < cols && !used[r * cols + c + w]) w++;", "walls follow tile_set"),
+ ("walls grow down", PH, "if (used[(r + h) * cols + c + i] || !isSolid(c + i, r + h)) break grow;", "if (used[(r + h) * cols + c + i]) break grow;", "walls are only where solid tiles are"),
+ ("walls not rebuilt", EN, "    this.tileChanges.push([layer, cell]);\n    this.tilesVersion++;", "    this.tileChanges.push([layer, cell]);", "walls follow tile_set"),
+ ("physics runs paused", EN, "this.physics.step(this.physicsHost(), g[G.PAUSED] === 1);", "this.physics.step(this.physicsHost(), g[G.PAUSED] === 2);", "is not moved while the game is paused"),
+ ("touching no events", EN, "          this.pushEvent(events, EV.COLLISION, a, c);", "          void a;", "touching fires collision events"),
+ ("touching twice", EN, "          if (this.reported.has(a * PAIR + c)) continue;\n", "", "touching fires collision events"),
+ ("physics not in the way", EN, "|| st[c * STRIDE + F.PHYSICS] !== 0;", ";", "is in the way of move_and_collide"),
+ ("push ignores weight", RT, "        w = _st[b + _L.F.WEIGHT] or 1.0", "        w = 1.0", "takes push"),
+ ("rope is a rod", PH, "? new RopeJoint({ ...anchors, maxLength: length })", "? new DistanceJoint({ ...anchors, length })", "a rope goes slack"),
+ ("hinge welds", PH, "joint = kind === \"hinge\" ? new RevoluteJoint({}, A, B, at) : new WeldJoint({}, A, B, at);", "joint = kind === \"hinge\" ? new WeldJoint({}, A, B, at) : new WeldJoint({}, A, B, at);", "a hinge holds a plank"),
+ ("hinge default at 0,0", PH, "const at = hasPoint ? new Vec2(x / PPM, y / PPM) : new Vec2(ax / PPM, ay / PPM);", "const at = hasPoint ? new Vec2(x / PPM, y / PPM) : new Vec2(0 * ax, 0 * ay);", "a hinge with no point"),
+ ("joints outlive bodies", PH, "    for (const [id, j] of this.joints) if (j.getBodyA() === e.body || j.getBodyB() === e.body) this.joints.delete(id);\n", "", "joints end with their instances"),
+ ("spin sign", PH, "body.setAngularVelocity((-spin * DEG * sps));", "body.setAngularVelocity((spin * DEG * sps));", "spins, and physics_gravity"),
+ ("spin read back", PH, "const spin = -e.body.getAngularVelocity() / DEG / sps;", "const spin = e.body.getAngularVelocity() / DEG / sps;", "spins, and physics_gravity"),
+ ("physics not stepped in the worker", PH, "    this.world!.step(1 / host.stepsPerSecond);", "    if (typeof window !== \"undefined\") this.world!.step(1 / host.stepsPerSecond);", "a physics coin falls", E2E),
 ]
 only = sys.argv[1:]
 # A name that matches no case would otherwise run nothing and still say

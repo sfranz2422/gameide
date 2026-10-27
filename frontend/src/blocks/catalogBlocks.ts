@@ -48,6 +48,7 @@ export const blockNames = () => currentNames();
  */
 export const COLOURS: Record<Category | "Variables" | "Logic" | "Loops" | "Math" | "Text" | "Events" | "Functions", string> = {
   Motion: "#4C97FF",
+  Physics: "#3D7BD9",
   Instances: "#D65CD6",
   Collision: "#0FBD8C",
   Input: "#5CB1D6",
@@ -327,8 +328,8 @@ for (const e of API) {
 
 /** Built-in properties a block can set: not object_name (read-only). */
 // Not alarm (its own block) or once (a method, for event sheets).
-const SETTABLE = PROPERTIES.filter((p) => !["object_name", "alarm", "once"].includes(p.name)).map((p) => p.name);
-const READABLE = PROPERTIES.filter((p) => !["alarm", "once"].includes(p.name)).map((p) => p.name);
+const SETTABLE = PROPERTIES.filter((p) => !["object_name", "alarm", "once", "push"].includes(p.name)).map((p) => p.name);
+const READABLE = PROPERTIES.filter((p) => !["alarm", "once", "push"].includes(p.name)).map((p) => p.name);
 const propField = (names: string[]) => new Blockly.FieldDropdown(names.map((n) => [n, n]));
 const propTip = (b: Blockly.Block) => () => PROPERTIES.find((p) => p.name === b.getFieldValue("PROP"))?.description ?? "";
 

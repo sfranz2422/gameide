@@ -59,10 +59,16 @@ export const F = {
   OUTLINE_COLOR: 45,
   DROP: 46, // drop_through: steps left of falling through one-way tiles (counts down each step)
   UNPAUSED: 47, // ignore_pause: 1 = keeps running while the game is paused (a pause menu)
+  // Physics (physics.ts): read by the engine each step, x/y/angle/speeds written back.
+  PHYSICS: 48, // 1 = planck moves it; its own motion (gravity, friction, speeds) is skipped
+  BOUNCE: 49, // restitution: 0 lands dead, 1 bounces back as high
+  WEIGHT: 50, // its mass, whatever its size; push() divides by it (starts at 1)
+  FIXED: 51, // 1 = a physics body that never moves: things bounce off it and hang from it
+  SPIN: 52, // degrees per step, anticlockwise as image_angle is
 } as const;
 
 export const ALARM_COUNT = 12;
-export const STRIDE = F.UNPAUSED + 1; // 48
+export const STRIDE = F.SPIN + 1; // 53
 
 /** blend_mode's names, by the number F.BLEND holds. */
 export const BLEND_MODES = ["normal", "add", "multiply", "screen"] as const;
