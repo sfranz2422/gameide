@@ -23,7 +23,7 @@ test("XP: given by the teacher, shown to the student, avatars, the token shop an
   await teacher.getByTestId("new-class-go").click();
   await teacher.waitForURL(/#\/class\/\d+$/);
   const classId = teacher.url().split("/").pop()!;
-  await teacher.getByTestId("roster-emails").fill("ola@example.com");
+  await teacher.getByTestId("roster-emails").fill("ola@example.com\npip@example.com");
   await teacher.getByTestId("roster-add").click();
   await expect(teacher.getByText("ola@example.com")).toBeVisible();
 
@@ -72,13 +72,29 @@ test("XP: given by the teacher, shown to the student, avatars, the token shop an
   await expect(teacher.getByTestId("request")).toHaveCount(0);
   await expect(row).toContainText("List Wrangler");
 
-  // A random event: big on the teacher's screen, then on the class's page.
+  // A random event: big on the teacher's screen, then on the class's page —
+  // and in the green popup for everyone in the class, wherever they are in
+  // the app, whether it gave them XP or not, naming who it did (first names).
+  const { ctx: pctx, page: pip } = await signedIn(browser, "pip@example.com");
+  await pip.goto("/#/games");
+  await ola.goto("/#/games");
+  await pip.waitForTimeout(1500); // their first ask marks where events count from
   await teacher.getByTestId("random-event").click();
   await expect(teacher.getByTestId("event-show")).toBeVisible();
   const title = await teacher.getByTestId("event-show").locator("h2").innerText();
   if (SHOTS) await teacher.screenshot({ path: `${SHOTS}/xp-event.png` });
   await teacher.getByRole("button", { name: "OK", exact: true }).click();
   if (SHOTS) await teacher.screenshot({ path: `${SHOTS}/xp-class.png`, fullPage: true });
+  for (const s of [ola, pip]) {
+    const pop = s.getByTestId("xp-toast").filter({ hasText: title });
+    await expect(pop).toHaveCount(1, { timeout: 30_000 });
+    // Green — red only for the student the event took XP from.
+    const bg = await pop.evaluate((e) => getComputedStyle(e).backgroundColor);
+    const text = await pop.innerText();
+    expect(bg === "rgb(51, 153, 119)" || (bg === "rgb(184, 69, 69)" && /You −/.test(text)), `${bg} ${text}`).toBe(true);
+    await expect(pop).not.toContainText(/[A-Z][a-z]* [A-Z]\./); // never a last initial
+  }
+  await pctx.close();
   await ola.goto(`/#/class/${classId}`);
   await expect(ola.getByTestId("event-banner")).toContainText(title);
   if (SHOTS) {

@@ -63,14 +63,34 @@ const NEWS_KEY = "gameide-xp-news";
  * activity. The mark of what was already shown is per browser AND per
  * student, so a shared Chromebook doesn't show one student another's XP.
  */
+/** A random event as its class sees it (eventText in the other editors' xp.js). */
+interface EventNews {
+  id: number;
+  title: string;
+  icon: string;
+  hits: { name: string; xp: number; me: boolean }[];
+  mine: number | null;
+}
+export function eventSaid(ev: EventNews): string {
+  const names = (list: EventNews["hits"]) => {
+    const n = list.map((h) => (h.me ? "You" : h.name));
+    return n.length > 4 ? `${n.slice(0, 3).join(", ")} and ${n.length - 3} more` : n.join(", ");
+  };
+  const signed = (x: number) => `${x > 0 ? "+" : "−"}${Math.abs(x)} XP`;
+  const h = ev.hits;
+  if (!h.length) return "nobody had XP to lose";
+  if (h.every((x) => x.xp === h[0]!.xp)) return `${names(h)} ${signed(h[0]!.xp)}`;
+  return h.map((x) => `${names([x])} ${signed(x.xp)}`).join(", ");
+}
+
 export function XpToasts() {
   const { me } = useSession();
-  const [shown, setShown] = useState<{ key: number; xp: number; reason: string }[]>([]);
+  const [shown, setShown] = useState<{ key: number; xp: number; reason: string; head?: string }[]>([]);
   const next = useRef(0);
-  const push = useCallback((xp: number, reason: string) => {
+  const push = useCallback((xp: number, reason: string, head?: string) => {
     const key = ++next.current;
-    setShown((s) => [...s, { key, xp, reason }].slice(-4));
-    setTimeout(() => setShown((s) => s.filter((t) => t.key !== key)), 5000);
+    setShown((s) => [...s, { key, xp, reason, head }].slice(-4));
+    setTimeout(() => setShown((s) => s.filter((t) => t.key !== key)), head ? 8000 : 5000);
   }, []);
 
   useEffect(() => {
@@ -88,19 +108,24 @@ export function XpToasts() {
     let alive = true;
     const poll = async () => {
       if (document.hidden) return;
-      let mark: { user: number; after: number } | null = null;
+      let mark: { user: number; after: number; events?: number } | null = null;
       try {
         mark = JSON.parse(localStorage.getItem(NEWS_KEY) ?? "null");
       } catch {
         /* none */
       }
-      const after = mark && mark.user === me.user!.id ? `?after=${mark.after}` : "";
+      const ours = !!mark && mark.user === me.user!.id;
+      const q = [ours ? `after=${mark!.after}` : "", ours && typeof mark!.events === "number" ? `events_after=${mark!.events}` : ""].filter(Boolean);
       try {
-        const r = await api<{ user: number | null; latest: number; awards: { xp: number; reason: string }[] }>(`/api/me/xp/news${after}`);
+        const r = await api<{ user: number | null; latest: number; awards: { xp: number; reason: string }[]; events?: EventNews[]; events_latest?: number }>(
+          `/api/me/xp/news${q.length ? "?" + q.join("&") : ""}`,
+        );
         if (!alive || r.user === null) return;
         for (const a of r.awards) push(a.xp, a.reason);
+        // Every student in the class sees a random event, naming who it hit.
+        for (const ev of r.events ?? []) push(ev.mine ?? 0, eventSaid(ev), `${ev.icon} ${ev.title}`);
         try {
-          localStorage.setItem(NEWS_KEY, JSON.stringify({ user: r.user, after: r.latest }));
+          localStorage.setItem(NEWS_KEY, JSON.stringify({ user: r.user, after: r.latest, events: r.events_latest }));
         } catch {
           /* private window: it asks from the start each time, and shows nothing old */
         }
@@ -123,10 +148,14 @@ export function XpToasts() {
     <div className="xp-toasts" aria-live="polite">
       {shown.map((t) => (
         <div key={t.key} className={`xp-toast${t.xp < 0 ? " minus" : ""}`} data-testid="xp-toast">
-          <b>
-            {t.xp > 0 ? "+" : ""}
-            {t.xp} XP
-          </b>
+          {t.head ? (
+            <b>{t.head}</b>
+          ) : (
+            <b>
+              {t.xp > 0 ? "+" : ""}
+              {t.xp} XP
+            </b>
+          )}
           <span>{t.reason}</span>
         </div>
       ))}
@@ -803,6 +832,16 @@ export function ClassBoard({ classId }: { classId: number }) {
           <div>
             <b>{data.event.title}</b>
             <p className="small">{data.event.text}</p>
+            {data.event.hits.length > 0 && (
+              <p className="small xp-hits" data-testid="event-hits">
+                {data.event.hits.map((h, i) => (
+                  <span key={i} className={h.xp < 0 ? "xp-minus" : "xp-plus"}>
+                    {h.name} {h.xp > 0 ? "+" : "−"}
+                    {Math.abs(h.xp)}
+                  </span>
+                ))}
+              </p>
+            )}
           </div>
         </div>
       )}

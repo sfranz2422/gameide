@@ -180,7 +180,10 @@ def _event_out(db, row, show_hidden=True):
     hits = []
     for a in awards:
         u = users.get(a.user_id)
-        name = xp.board_name(u) if u is not None and (show_hidden or not u.board_hidden) else "A classmate"
+        # First name only on the students' page; the teacher's keeps the
+        # initial, to tell two Anas apart.
+        name = ((xp.board_name(u) if show_hidden else xp.first_name(u))
+                if u is not None and (show_hidden or not u.board_hidden) else "A classmate")
         hits.append({"name": name, "xp": a.xp})
     hits.sort(key=lambda h: h["name"].lower())
     icon = next((e["icon"] for e in xp.EVENTS if e["id"] == row.kind), "\U0001F3B2")
@@ -438,29 +441,86 @@ def xp_run():
         db.close()
 
 
+#: How long after a random event it still pops up on a student's page. The
+#: class page shows the day's event; a popup an hour late is just confusing.
+EVENT_NEWS_MINUTES = 30
+
+
+def _event_news(db, user, after):
+    """([events], latest id): random events in any class the student is on
+    the roster of, newer than event `after` — for the popup every page shows
+    (XpToasts). Every student in the class sees one, not only the ones it gave
+    XP to: those were the only ones who saw anything, so for the rest an
+    event the teacher set off in front of them never appeared. Who it hit is
+    named first name only (xp.first_name), "A classmate" for anyone hidden
+    from the leaderboard; `mine` is this student's own share, if any. No
+    `after` gives only where to count from, as for awards."""
+    from sqlalchemy import func as _func
+    q = (db.query(accounts.ClassEvent)
+           .join(accounts.Enrollment, accounts.Enrollment.class_id == accounts.ClassEvent.class_id)
+           .filter(_func.lower(accounts.Enrollment.email) == (user.email or "").lower()))
+    newest = q.order_by(accounts.ClassEvent.id.desc()).first()
+    latest = newest.id if newest is not None else 0
+    if after is None:
+        return [], latest
+    since = accounts.now() - timedelta(minutes=EVENT_NEWS_MINUTES)
+    out = []
+    for row in q.filter(accounts.ClassEvent.id > after).order_by(accounts.ClassEvent.id).limit(5):
+        when = row.created_at
+        if when is not None and when.tzinfo is None and since.tzinfo is not None:
+            when = when.replace(tzinfo=timezone.utc)
+        if row.undone or (when is not None and when < since):
+            continue
+        awards = (db.query(accounts.XpAward)
+                    .filter(accounts.XpAward.source.like("event:%d:%%" % row.id)).all())
+        people = {u.id: u for u in db.query(accounts.User).filter(
+            accounts.User.id.in_([a.user_id for a in awards] or [0]))}
+        hits, mine = [], None
+        for a in awards:
+            u = people.get(a.user_id)
+            if a.user_id == user.id:
+                mine = a.xp
+            hits.append({"name": xp.first_name(u) if u is not None and not u.board_hidden else "A classmate",
+                         "xp": a.xp, "me": a.user_id == user.id})
+        hits.sort(key=lambda h: (not h["me"], h["name"].lower()))
+        icon = next((e["icon"] for e in xp.EVENTS if e["id"] == row.kind), "\U0001F3B2")
+        out.append({"id": row.id, "title": row.title, "icon": icon, "hits": hits, "mine": mine})
+    return out, latest
+
+
 @bp.get("/api/me/xp/news")
 def xp_news():
     """XP given since award `after`, for the pop-up every page shows. A GET
     to /api/, so polling it is never activity. Leaves out runs, which the
     editor announces as they happen. No `after`: just where to count from,
     so a first visit isn't a flood of their whole history; `user` lets a
-    shared Chromebook's browser notice a different student."""
+    shared Chromebook's browser notice a different student.
+
+    `events_after` (the page's mark for random events, _event_news) asks
+    for the class's events too; then an event's own award is left out of
+    `awards`, since the event's popup already says what it gave them."""
     db = _db()
     try:
         user = _current_user(db)
         if not earns_xp(user):
-            return jsonify(user=None, latest=0, awards=[])
+            return jsonify(user=None, latest=0, awards=[], events=[], events_latest=0)
+        try:
+            events_after = int(request.args["events_after"]) if "events_after" in request.args else None
+        except ValueError:
+            events_after = None
+        events, events_latest = _event_news(db, user, events_after)
         mine = db.query(accounts.XpAward).filter(accounts.XpAward.user_id == user.id)
         newest = mine.order_by(accounts.XpAward.id.desc()).first()
         latest = newest.id if newest is not None else 0
         try:
             after = int(request.args.get("after", ""))
         except ValueError:
-            return jsonify(user=user.id, latest=latest, awards=[])
+            return jsonify(user=user.id, latest=latest, awards=[], events=events, events_latest=events_latest)
+        skip = {"run"} | ({"event"} if events_after is not None else set())
         awards = [{"xp": a.xp, "reason": a.reason, "kind": a.source.split(":", 1)[0]}
                   for a in mine.filter(accounts.XpAward.id > after).order_by(accounts.XpAward.id).limit(10)
-                  if a.source.split(":", 1)[0] != "run"]
-        return jsonify(user=user.id, latest=latest, awards=awards)
+                  if a.source.split(":", 1)[0] not in skip]
+        return jsonify(user=user.id, latest=latest, awards=awards, events=events, events_latest=events_latest)
     finally:
         db.close()
 

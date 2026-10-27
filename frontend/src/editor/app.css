@@ -2906,26 +2906,26 @@ a.btn {
   gap: 8px;
   pointer-events: none;
 }
+/* Filled green, as in the other editors — the class knows it as "the green
+   popup"; a penalty is red. */
 .xp-toast {
   display: grid;
   gap: 2px;
   min-width: 190px;
+  max-width: min(460px, calc(100vw - 36px));
   padding: 10px 14px;
-  border-radius: 10px;
-  background: var(--panel);
-  border: 1px solid var(--go);
+  border-radius: 12px;
+  background: var(--go);
+  color: #fff;
+  font-weight: 600;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
   animation: xp-in 0.25s ease-out;
 }
 .xp-toast b {
-  color: var(--go-hover);
   font-size: 18px;
 }
 .xp-toast.minus {
-  border-color: #c25555;
-}
-.xp-toast.minus b {
-  color: #f08080;
+  background: #b84545;
 }
 @keyframes xp-in {
   from {
@@ -3168,6 +3168,21 @@ a.btn {
 }
 .event-banner p {
   margin: 2px 0 0;
+}
+/* Who the event hit, first names only (rewards.py, _event_out). */
+.event-banner .xp-hits {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+  margin-top: 6px;
+}
+.xp-hits .xp-plus {
+  color: var(--go-hover);
+  font-weight: 600;
+}
+.xp-hits .xp-minus {
+  color: #f08080;
+  font-weight: 600;
 }
 .shop-table tr.off-shelf {
   opacity: 0.5;

@@ -671,6 +671,12 @@ CASES = [
  ("pause onto a pop marker", "src/notes/quiz.ts", '      if (carry && ln.trim() && !ln.includes("%%POP")) {', "      if (carry && ln.trim()) {", "pause joins a line"),
  ("pause line left alone", "src/notes/quiz.ts", "        else carry += p[1];\n        continue;", "        else carry += p[1];\n        if (carry) out.push(ln);\n        continue;", "pause joins a line"),
  ("pauses shown as carets", "src/notes/NotesPane.tsx", '  if (!html.includes("^") || typeof document === "undefined") return html;', '  if (html.includes("") || typeof document === "undefined") return html;', "animate plays", E2E),
+ ("symbols need word edges", "src/checks/checks.ts", '  const before = /^[A-Za-z0-9_]/.test(word) ? "(?<![A-Za-z0-9_])" : "";', '  const before = "(?<![A-Za-z0-9_])";', "existence, events, code and counts"),
+ ("events only for whoever they hit", "../backend/rewards.py", '        hits, mine = [], None\n', '        hits, mine = [], None\n        if not any(a.user_id == user.id for a in awards):\n            continue\n', "every student in the class gets the event", PY),
+ ("event popup ignored", "src/xp/XpPages.tsx", "        for (const ev of r.events ?? []) push(ev.mine ?? 0, eventSaid(ev), `${ev.icon} ${ev.title}`);", "        for (const ev of r.events ?? []) void ev;", "random events", E2E),
+ ("event names with initials", "../backend/rewards.py", '            hits.append({"name": xp.first_name(u) if u is not None and not u.board_hidden else "A classmate",', '            hits.append({"name": xp.board_name(u) if u is not None and not u.board_hidden else "A classmate",', "by first name only", PY),
+ ("class page names with initials", "../backend/rewards.py", "        name = ((xp.board_name(u) if show_hidden else xp.first_name(u))", "        name = ((xp.board_name(u) if show_hidden else xp.board_name(u))", "on the class page too", PY),
+ ("toast not green", "src/editor/app.css", "  border-radius: 12px;\n  background: var(--go);", "  border-radius: 12px;\n  background: var(--panel);", "random events", E2E),
  ("physics not stepped in the worker", PH, "    this.world!.step(1 / host.stepsPerSecond);", "    if (typeof window !== \"undefined\") this.world!.step(1 / host.stepsPerSecond);", "a physics coin falls", E2E),
 ]
 only = sys.argv[1:]

@@ -742,6 +742,7 @@ teacher.post(f"/api/shop/item/{item.get_json()['id']}", json={"active": False})
 check("an item taken off the shelf isn't offered", "Choose the music" not in [i["name"] for i in xa.get("/api/me/xp").get_json()["shops"][0]["items"]])
 
 # Random events.
+marks = {c: c.get("/api/me/xp/news").get_json() for c in (xa, xb, xc)}
 r = teacher.post(f"/api/classes/{XC}/event").get_json()
 ev = r.get("event", {})
 check("a random event is drawn and applied", ev.get("title") in [e["title"] for e in xp.EVENTS] and isinstance(ev.get("hits"), list), r)
@@ -750,6 +751,39 @@ moved = db.query(accounts.XpAward).filter(accounts.XpAward.source.like("event:%d
 db.close()
 check("…its XP is rows the event names", moved == len(ev.get("hits", [])))
 check("the class's page shows it", (xa.get(f"/api/classes/{XC}/board").get_json().get("event") or {}).get("id") == ev.get("id"))
+banner = xa.get(f"/api/classes/{XC}/board").get_json().get("event") or {}
+check("…naming who it hit by first name only",
+      all(h["name"] == "A classmate" or (" " not in h["name"] and "." not in h["name"]) for h in banner.get("hits", [])),
+      banner.get("hits"))
+# Every student in the class gets the event's popup, hit or not — only the
+# ones it gave XP to used to see anything.
+seen = {c: c.get(f"/api/me/xp/news?after={m['latest']}&events_after={m['events_latest']}").get_json() for c, m in marks.items()}
+check("every student in the class gets the event in their news",
+      all([e["id"] for e in n["events"]] == [ev.get("id")] for n in seen.values()), seen)
+check("…with first names, and their own share as `mine`",
+      all(h["name"] == "A classmate" or " " not in h["name"] for n in seen.values() for h in n["events"][0]["hits"])
+      and sum(1 for n in seen.values() if n["events"][0]["mine"] is not None) == len(ev.get("hits", [])), seen)
+check("…and its award isn't said twice", not any(a["kind"] == "event" for n in seen.values() for a in n["awards"]))
+# Named by first name only — users with a real surname, and an everyone event.
+db = server.SessionLocal()
+for who, first in (("xa", "Xena"), ("xb", "Xavi"), ("xc", "Xiu")):
+    u = db.get(accounts.User, ids[who])
+    u.first_name, u.last_name = first, "Quill"
+db.commit()
+db.close()
+real_pick = xp.pick_event
+xp.pick_event = lambda rng: next(e for e in xp.EVENTS if e["who"] == "all" and e["xp"] > 0)
+try:
+    ev2 = teacher.post(f"/api/classes/{XC}/event").get_json()["event"]
+finally:
+    xp.pick_event = real_pick
+names = [h["name"] for h in xb.get(f"/api/me/xp/news?after=0&events_after={ev.get('id')}").get_json()["events"][0]["hits"]]
+check("…by first name only — Xena, never Xena Q.", "Xena" in names and not any("Q." in n for n in names), names)
+board_names = [h["name"] for h in (xb.get(f"/api/classes/{XC}/board").get_json().get("event") or {}).get("hits", [])]
+check("…on the class page too", "Xena" in board_names and not any("Q." in n for n in board_names), board_names)
+teacher.post(f"/api/classes/{XC}/event/{ev2['id']}/undo")
+check("a page not asking for events gets none, as before",
+      xa.get(f"/api/me/xp/news?after={marks[xa]['latest']}").get_json()["events"] == [])
 check("only the class's teacher draws one", other_teacher.post(f"/api/classes/{XC}/event").status_code == 403)
 teacher.post(f"/api/classes/{XC}/event/{ev.get('id')}/undo")
 db = server.SessionLocal()

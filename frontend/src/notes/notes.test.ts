@@ -46,7 +46,9 @@ function game() {
   const jump = newEvent({ type: "step" });
   jump.code = 'if keyboard_check_pressed("space"):\n    self.vy = -8\n';
   jumper.events.push(jump);
-  p.objects.push(player, coin, jumper);
+  const summer = newObject("Summer");
+  summer.events.push(newEvent({ type: "create" }));
+  p.objects.push(player, coin, jumper, summer);
   const room = newRoom("Level1");
   room.instances.push(newInstance(room, coin.id, 0, 0), newInstance(room, coin.id, 10, 0), newInstance(room, player.id, 5, 5));
   p.rooms.push(room);
@@ -56,6 +58,7 @@ function game() {
 describe("checks of the project", () => {
   const p = game();
   const run = (line: string) => checkProject(p, readCheck(line));
+  const jumpSum = p.objects.find((o) => o.name === "Summer")!.events[0]!;
   it("existence, events, code and counts", () => {
     expect(run("object Player exists")?.ok).toBe(true);
     expect(run("sprite hero exists")).toEqual({ ok: false, detail: "There's no sprite called hero yet." });
@@ -69,6 +72,13 @@ describe("checks of the project", () => {
     expect(run("Jumper uses keyboard_check_pressed")?.ok).toBe(true);
     expect(run("uses keyboard_check")?.ok).toBe(true);
     expect(run("avoids while")?.ok).toBe(true);
+    // A symbol has no word edges: `3+4` uses + though a digit touches it.
+    jumpSum.code = "print(3+4)\nprint(10*2)\n";
+    expect(run("Summer.create uses +")?.ok).toBe(true);
+    expect(run("Summer.create uses *")?.ok).toBe(true);
+    expect(run("Summer.create uses -")?.ok).toBe(false);
+    expect(run("Summer.create uses print")?.ok).toBe(true);
+    expect(run("Summer.create uses pri")?.ok).toBe(false);
     expect(run("Player.step is written in python")?.ok).toBe(true);
     expect(run("Player.step is written in blocks")).toEqual({ ok: false, detail: "Player's step event is written in Python, not blocks." });
     expect(readCheck("Player.step is in an event sheet")).toMatchObject({ kind: "mode", mode: "sheet" });

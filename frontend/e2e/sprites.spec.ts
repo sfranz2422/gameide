@@ -152,7 +152,9 @@ test("the free art library: cells of a sheet become a sprite's frames, and a who
   await page.getByTestId("open-library").click();
   await page.getByTestId("library-pixel-platformer").click();
   const sheet = page.getByTestId("sheet-canvas-Characters");
-  await expect(sheet).toBeVisible();
+  // Drawn, not just there: measured before the picture arrived it was the
+  // blank 300 × 150 canvas, and the clicks missed (failed under load).
+  await expect(sheet).toHaveAttribute("data-ready", "1");
   const box = (await sheet.boundingBox())!;
   const cell = box.width / 9; // 9 characters across
   await sheet.click({ position: { x: cell / 2, y: cell / 2 } }); // the first

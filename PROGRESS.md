@@ -1,5 +1,10 @@
 # Progress
 
+## Fixes: `uses +`, events for the whole class, photos everywhere ✅ (2026-10-27, waiting for review)
+- **`uses +` failed on `print(3+4)`** (a Python Basics lesson): a check's word had to have no letter or digit beside it, which is right for `for` but meant the 3 beside the + hid it. The edge rule now applies only where the word itself starts or ends with a letter or digit (`checks.ts`, `wordIn`). PyIDE's and FlaskIDE's `uses` couldn't see an operator at all; they read it from the code's tree now.
+- **A random event reaches the whole class**: `/api/me/xp/news` sends the class's events (`events_after`) to every student, hit or not, and the popup names who it hit — "⭐ Glowing code review · Ana +10 XP", "You" for themselves. First names only, there and on the class page's banner, which now lists them. The popup is filled green, as in the other editors; red for a student it took XP from.
+- **Approved photos**: GameIDE already served one from any editor; PyIDE, WebIDE and FlaskIDE served only their own, so a photo approved in GameIDE was a broken picture on their class pages. Fixed there.
+
 ## Notes that play a part at a time ✅ (2026-10-27, waiting for review)
 Asked for across all four editors. `animate: words` (or `animate: type`, a typewriter) as the notes' first line; a line of `...` divides a slide into parts.
 - In the Notes tab, ▶ Play plays the next part (`reveal.ts`, `animateIn`: word by word or letter by letter; code, questions, cards and tests come in whole). Play waits while a part plays; the next slide's arrow waits until the slide has been played. Slides already played show whole, and how far a student got is kept in the browser (`gameide-reveal:<slug>`), so the notes reopen there. Reduced motion gets each part at once.

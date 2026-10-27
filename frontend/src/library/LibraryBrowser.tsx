@@ -176,7 +176,8 @@ function SheetPicker({
         </span>
       </div>
       <div className="library-canvas checker-bg">
-        <canvas ref={canvas} onClick={click} data-testid={`sheet-canvas-${sheet.name}`} />
+        {/* data-ready once the sheet is drawn: until then it's the browser's blank 300 × 150 and takes no clicks. */}
+        <canvas ref={canvas} onClick={click} data-testid={`sheet-canvas-${sheet.name}`} data-ready={img ? "1" : undefined} />
       </div>
       <div className="row">
         <button

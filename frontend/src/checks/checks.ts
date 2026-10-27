@@ -153,8 +153,18 @@ export const needsGame = (c: Check) => c.kind === "runs" || c.kind === "after" |
 const same = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
 /** "Key Pressed: Space", "key pressed space" and "Key_Pressed space" are one name. */
 const eventName = (s: string) => s.toLowerCase().replace(/[_:]/g, " ").replace(/\s+/g, " ").trim();
-const wordIn = (code: string, word: string) =>
-  new RegExp(String.raw`(?<![A-Za-z0-9_])${word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![A-Za-z0-9_])`).test(code);
+/**
+ * The word in the code, not inside a longer name: "for" isn't in "format".
+ * The edge rule only applies where the word itself starts or ends with a
+ * letter or digit — `uses +` checked `3+4` with it, and the 3 beside the +
+ * made a student's right answer fail (a Python Basics lesson, 2026-10-27).
+ */
+const wordIn = (code: string, word: string) => {
+  const esc = word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const before = /^[A-Za-z0-9_]/.test(word) ? "(?<![A-Za-z0-9_])" : "";
+  const after = /[A-Za-z0-9_]$/.test(word) ? "(?![A-Za-z0-9_])" : "";
+  return new RegExp(before + esc + after).test(code);
+};
 
 function codeOf(p: Project, object: string | null, event: string | null): { code: string; missing: string | null } {
   if (!object) {
