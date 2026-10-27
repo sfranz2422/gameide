@@ -3,6 +3,9 @@
 ## Notes that play a part at a time ✅ (2026-10-27, waiting for review)
 Asked for across all four editors. `animate: words` (or `animate: type`, a typewriter) as the notes' first line; a line of `...` divides a slide into parts.
 - In the Notes tab, ▶ Play plays the next part (`reveal.ts`, `animateIn`: word by word or letter by letter; code, questions, cards and tests come in whole). Play waits while a part plays; the next slide's arrow waits until the slide has been played. Slides already played show whole, and how far a student got is kept in the browser (`gameide-reveal:<slug>`), so the notes reopen there. Reduced motion gets each part at once.
+- **Speed**: `animate: words slow` / `animate: type fast`, or just `animate: slow`; none is normal. The first speed (70 ms a word) was too quick to read along with — normal is now 250 ms a word, slow 450 (`SPEEDS` in reveal.ts, the same numbers as notes.js).
+- **Pause**: `^` on its own waits about a second mid-section (`^^` twice), then carries on by itself; hidden wherever notes show whole, never read in code.
+- **↺ Replay** for the teacher: a slide once played showed whole for good, so a change to it could never be watched play.
 - **Nothing pops by itself**: what the teacher wraps in `:::pop` … `:::` is a highlighted box, arriving with a little pop (`popMarks`/`popBoxes` in quiz.ts).
 - The teacher opening the assignment gets the same, kept apart (`author:`), with ⏭ Skip: it finishes the part playing, or between parts shows the whole slide. Students have no Skip.
 - The assignment page's preview shows the notes whole, without the `animate:` line, and now draws a cards block as cards (it was drawn as tests).

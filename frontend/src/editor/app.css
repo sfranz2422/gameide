@@ -3229,6 +3229,10 @@ a.btn {
 .reveal-hidden {
   visibility: hidden;
 }
+/* A pause (`^`) in played notes: a place to wait, never shown. */
+.reveal-pause {
+  display: none;
+}
 .reveal-pop {
   animation: reveal-pop 0.5s ease-out;
 }

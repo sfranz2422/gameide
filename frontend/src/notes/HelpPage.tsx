@@ -107,7 +107,7 @@ room -> where the game happens
 export const ANIMATED = `animate: words
 
 ## Step 1
-An object can move itself.
+An object can ^ move itself.
 
 ...
 
@@ -157,12 +157,14 @@ export function HelpPage() {
         <p>
           Put <code>animate: words</code> as the notes' first line, and students get <b>▶ Play</b> above them. Each press plays the next part of the slide, word
           by word — <code>animate: type</code> types it out letter by letter instead. A line with only <code>...</code> on it divides a slide into the parts it's
-          played in; a slide with none plays in one go. Wrap anything that should stand out in <code>:::pop</code> and <code>:::</code> lines: it arrives with a
+          played in; a slide with none plays in one go. Too quick or too slow? Add a speed: <code>animate: words slow</code>,{" "}
+          <code>animate: type fast</code>, or just <code>animate: slow</code> — without one it's <code>normal</code>. A <code>^</code> on its own (spaces round it, or a line to
+          itself) pauses there about a second before the rest comes in by itself; <code>^^</code> waits twice as long. A <code>^</code> in code is left alone. Wrap anything that should stand out in <code>:::pop</code> and <code>:::</code> lines: it arrives with a
           little pop, and stays in a highlighted box. Nothing else pops.
         </p>
         <p>
           The next slide's arrow waits until the slide has been played. Slides already played show whole, so going back replays nothing, and the notes reopen
-          where the student got to. When you open the assignment yourself they play too, with <b>⏭ Skip</b> — students don't get that.
+          where the student got to. When you open the assignment yourself they play too, with <b>⏭ Skip</b>, and <b>↺ Replay</b> to watch a slide again after you change it — students get neither.
         </p>
         <pre className="help-example">{ANIMATED}</pre>
         <h2 id="checks">Checks</h2>

@@ -22,7 +22,7 @@ import { api } from "../store/api";
 import { allTests, runTests, type GameRunner, type TestResult } from "../checks/checks";
 import type { Project } from "../store/project";
 import { announceXp } from "../xp/runXp";
-import { BLANK, codeLines, fnv, parseCards, parseQuiz, pieces, popBoxes, popMarks, sections, slides, takeAnimate, type Piece, type Question } from "./quiz";
+import { BLANK, codeLines, fnv, parseCards, parseQuiz, PAUSE, pauseLines, pieces, popBoxes, popMarks, sections, slides, takeAnimate, type Piece, type Question, type Speed } from "./quiz";
 import { animateIn, type Finish } from "./reveal";
 import { Spotlight } from "../tutorials/TutorialPane";
 import { takeHighlight } from "../tutorials/tutorial";
@@ -38,13 +38,46 @@ export function renderMarkdown(md: string): string {
   // out, so a task list arrived as bare items. A span with a data- attribute
   // survives, and enhanceTasks makes it a real checkbox, in the DOM.
   // `...` (a section divider) is never shown, and `:::pop` … `:::` becomes a box (quiz.ts, popMarks).
-  const raw = (marked.parse(popMarks(sections(md ?? "").join("\n\n")), { breaks: true, async: false }) as string).replace(
+  const raw = (marked.parse(pauseLines(popMarks(sections(md ?? "").join("\n\n"))), { breaks: true, async: false }) as string).replace(
     /<input\b[^>]*type="checkbox"[^>]*>/g,
     (tag) => `<span class="task-box" data-done="${/\bchecked\b/.test(tag) ? "1" : "0"}"></span>`,
   );
-  const html = popBoxes(DOMPurify.sanitize(raw, SANITIZE) as string);
+  const html = markPauses(popBoxes(DOMPurify.sanitize(raw, SANITIZE) as string));
   // Links open in a new tab, and can't reach back into this one.
   return html.replace(/<a /g, '<a target="_blank" rel="noopener noreferrer" ');
+}
+
+/**
+ * Each `^` pause (quiz.ts, pauseLines) as an empty span.reveal-pause, which
+ * CSS hides and reveal.ts waits at — never inside code or a question.
+ */
+function markPauses(html: string): string {
+  if (!html.includes("^") || typeof document === "undefined") return html;
+  const box = document.createElement("template");
+  box.innerHTML = html;
+  const walk = document.createTreeWalker(box.content, NodeFilter.SHOW_TEXT);
+  const hits: Text[] = [];
+  for (let n = walk.nextNode(); n; n = walk.nextNode()) {
+    if (n.nodeValue?.includes("^") && !n.parentElement?.closest("code, pre, textarea")) hits.push(n as Text);
+  }
+  for (const n of hits) {
+    const text = n.nodeValue ?? "";
+    const frag = document.createDocumentFragment();
+    let last = 0;
+    for (const m of text.matchAll(PAUSE)) {
+      const at = m.index! + m[1]!.length;
+      frag.appendChild(document.createTextNode(text.slice(last, at)));
+      const span = document.createElement("span");
+      span.className = "reveal-pause";
+      span.dataset.beats = String(m[2]!.length);
+      frag.appendChild(span);
+      last = at + m[2]!.length;
+    }
+    if (!last) continue;
+    frag.appendChild(document.createTextNode(text.slice(last)));
+    n.replaceWith(frag);
+  }
+  return box.innerHTML;
 }
 
 /**
@@ -159,6 +192,7 @@ export function NotesPane({ notes, assignment, project, runner, practice }: Note
   // What's turned through: the slides, or the notes whole when they have none.
   const pages = deck.length ? deck : [head.body];
   const mode = head.animate;
+  const speed = head.speed;
   const key = `gameide-slide:${assignment}`;
 
   /* PLAYED A SECTION AT A TIME (`animate:` at the top of the notes; notes.js
@@ -237,6 +271,11 @@ export function NotesPane({ notes, assignment, project, runner, practice }: Note
     setBusy(true);
     reach({ slide: here, played: played + 1 });
   };
+  /* The teacher only: this slide unplayed again. Without it a slide once
+     played showed whole for good, so a change to it could never be watched. */
+  const replay = () => {
+    if (!busy) reach({ slide: here, played: 0 });
+  };
   const skip = () => {
     if (busy) finish.current?.();
     else if (more) reach({ slide: here, played: parts.length });
@@ -285,6 +324,11 @@ export function NotesPane({ notes, assignment, project, runner, practice }: Note
               ⏭ Skip
             </button>
           )}
+          {practice && !busy && played > 0 && (
+            <button className="btn reveal-replay" onClick={replay} title="Play this slide again from the start" data-testid="reveal-replay">
+              ↺ Replay
+            </button>
+          )}
           <span className="muted small reveal-hint">
             {busy ? "" : more ? (parts.length > 1 ? `Part ${played + 1} of ${parts.length}` : "") : deck.length && here < deck.length - 1 ? "Done — on to the next slide →" : "Done"}
           </span>
@@ -301,6 +345,7 @@ export function NotesPane({ notes, assignment, project, runner, practice }: Note
             <Section
               key={`${here}:${i}`}
               how={busy && i === played - 1 ? mode : ""}
+              speed={speed}
               onFinish={(f) => (finish.current = f)}
               onPlayed={() => setBusy(false)}
             >
@@ -318,18 +363,18 @@ export function NotesPane({ notes, assignment, project, runner, practice }: Note
  * as it first appears — before the browser paints it, so it's never seen
  * whole and then hidden; the rest are simply there.
  */
-function Section({ how, onFinish, onPlayed, children }: { how: "" | "words" | "type"; onFinish: (f: Finish) => void; onPlayed: () => void; children: React.ReactNode }) {
+function Section({ how, speed, onFinish, onPlayed, children }: { how: "" | "words" | "type"; speed: Speed; onFinish: (f: Finish) => void; onPlayed: () => void; children: React.ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
-  const first = useRef({ how, onFinish, onPlayed });
+  const first = useRef({ how, speed, onFinish, onPlayed });
   useLayoutEffect(() => {
-    const { how, onFinish, onPlayed } = first.current;
+    const { how, speed, onFinish, onPlayed } = first.current;
     if (!how || !ref.current) return;
     let gone = false;
     let stop: Finish | null = null;
     void animateIn(ref.current, how, (f) => {
       stop = f;
       onFinish(f);
-    }).then(() => {
+    }, speed).then(() => {
       if (!gone) onPlayed();
     });
     // Taken away mid-play (or React's development double run): show it all,

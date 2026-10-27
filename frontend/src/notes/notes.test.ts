@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 import cases from "./parse-cases.json";
-import { parseCards, parseQuiz, pieces, popBoxes, popMarks, scramble, sections, slides, takeAnimate } from "./quiz";
+import { parseCards, parseQuiz, pauseLines, pieces, popBoxes, popMarks, scramble, sections, slides, takeAnimate } from "./quiz";
 import { checkGame, checkProject, parseTests, readCheck, runTests, allTests, type GameRunner } from "../checks/checks";
 import { blankProject, newEvent, newObject, newRoom, newInstance } from "../store/project";
 import { ANIMATED, CHECK_EXAMPLES } from "./HelpPage";
+import { SPEEDS } from "./reveal";
 
 describe("questions and tests are read as the server reads them", () => {
   it("every question case reads the same as quiz.py", () => {
@@ -182,13 +183,36 @@ describe("order, sort and flip cards", () => {
 // same rules as notes.js's takeHeader/sections/popMarks in the other editors.
 describe("animate: notes", () => {
   it("takes the animate line off the top, and names how", () => {
-    expect(takeAnimate("animate: words\n# Hi")).toEqual({ animate: "words", body: "# Hi" });
+    expect(takeAnimate("animate: words\n# Hi")).toEqual({ animate: "words", speed: "normal", body: "# Hi" });
     expect(takeAnimate("animate: type\n# Hi").animate).toBe("type");
     expect(takeAnimate("animate: on\n# Hi").animate).toBe("words");
   });
   it("leaves a name it doesn't know in, as text, and only the top line counts", () => {
-    expect(takeAnimate("animate: fast\n# Hi")).toEqual({ animate: "", body: "animate: fast\n# Hi" });
+    expect(takeAnimate("animate: quick\n# Hi")).toEqual({ animate: "", speed: "normal", body: "animate: quick\n# Hi" });
     expect(takeAnimate("# Hi\nanimate: words").animate).toBe("");
+  });
+  it("takes a speed after the kind, or alone; one it doesn't know stays as text", () => {
+    expect(takeAnimate("animate: words slow\n# Hi")).toEqual({ animate: "words", speed: "slow", body: "# Hi" });
+    expect(takeAnimate("animate: type fast\n# Hi")).toMatchObject({ animate: "type", speed: "fast" });
+    expect(takeAnimate("animate: slow\n# Hi")).toEqual({ animate: "words", speed: "slow", body: "# Hi" });
+    expect(takeAnimate("animate: words quickly\n# Hi").animate).toBe("");
+  });
+  it("plays slowly enough to read along (70 ms a word was not), slow < normal < fast", () => {
+    for (const k of ["word", "letter", "block"] as const) {
+      expect(SPEEDS.slow[k]).toBeGreaterThan(SPEEDS.normal[k]);
+      expect(SPEEDS.normal[k]).toBeGreaterThan(SPEEDS.fast[k]);
+    }
+    expect(SPEEDS.normal.word).toBeGreaterThanOrEqual(200);
+  });
+  it("a ^ pause joins a line, never sits alone, and is never read in code", () => {
+    expect(pauseLines("One\n^\nTwo")).toBe("One ^\nTwo");
+    expect(pauseLines("One\n\n^^\n\nTwo")).toBe("One\n\n\n^^ Two");
+    expect(pauseLines("- a\n\n^\n- b")).toBe("- a\n\n- ^ b");
+    expect(pauseLines("```\n^\n```\nx")).toBe("```\n^\n```\nx");
+    expect(pauseLines("x ^ y")).toBe("x ^ y");
+    // A pause before :::pop goes inside the box, not onto its marker.
+    expect(pauseLines(popMarks("A\n\n^^\n:::pop\nLook\n:::"))).toMatch(/^%%POPSTART%%$[\s\S]*^\^\^ Look$/m);
+    expect(SPEEDS.normal.pause).toBeGreaterThanOrEqual(500);
   });
   it("never changes how many slides there are", () => {
     const deck = "# One\n...\nmore\n---\n# Two";

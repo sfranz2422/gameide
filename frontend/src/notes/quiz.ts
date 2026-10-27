@@ -259,18 +259,30 @@ export function parseCards(text: string): { front: string; back: string }[] {
  * editors (notes.js, takeHeader). {animate, body}: the mode ("" for none)
  * and the notes without the line. A name it doesn't know stays in, as text,
  * so a typo shows on the slide instead of silently doing nothing.
+ *
+ * A speed may follow, `animate: words slow`, or stand alone, `animate: slow`
+ * (words); none is "normal". The first speed (70 ms a word, about 850 words
+ * a minute) was far too quick to read along with — SPEEDS in reveal.ts.
  */
-const ANIMATE_LINE = /^[ \t]*animate[ \t]*:[ \t]*([a-z]+)[ \t]*$/i;
+const ANIMATE_LINE = /^[ \t]*animate[ \t]*:[ \t]*([a-z]+)(?:[ \t]+([a-z]+))?[ \t]*$/i;
+export type Speed = "slow" | "normal" | "fast";
+const SPEED_NAMES: Speed[] = ["slow", "normal", "fast"];
 const ANIMATIONS: Record<string, "words" | "type"> = {
   words: "words", word: "words", reveal: "words", on: "words", yes: "words", true: "words",
   type: "type", typewriter: "type", typing: "type",
 };
-export function takeAnimate(md: string): { animate: "" | "words" | "type"; body: string } {
+export function takeAnimate(md: string): { animate: "" | "words" | "type"; speed: Speed; body: string } {
   const text = String(md ?? "");
   const m = /^\s*([^\n]*)\n?/.exec(text);
   const hit = m ? ANIMATE_LINE.exec(m[1]!.replace(/\r$/, "")) : null;
-  const mode = hit ? ANIMATIONS[hit[1]!.toLowerCase()] : undefined;
-  return mode ? { animate: mode, body: text.slice(m![0].length) } : { animate: "", body: text };
+  if (hit) {
+    const first = hit[1]!.toLowerCase(), second = (hit[2] ?? "").toLowerCase();
+    const body = text.slice(m![0].length);
+    if (SPEED_NAMES.includes(first as Speed) && !second) return { animate: "words", speed: first as Speed, body };
+    const mode = ANIMATIONS[first];
+    if (mode && (!second || SPEED_NAMES.includes(second as Speed))) return { animate: mode, speed: (second || "normal") as Speed, body };
+  }
+  return { animate: "", speed: "normal", body: text };
 }
 
 /**
@@ -326,6 +338,42 @@ export function popMarks(md: string): string {
     .join("\n");
 }
 /** Rendered HTML with each marker pair made a box. Each marker is a paragraph of its own, so what's between is whole blocks. */
+/**
+ * A pause while a section plays (notes.js's pauseLines): `^` with a space,
+ * or the line's end, on each side waits about a second; `^^` twice as long.
+ * A line of only carets joins the end of the line before (or the start of
+ * the line after, under a blank line), since alone it would make an empty
+ * paragraph — a gap on the slide. Never inside fenced code.
+ */
+export const PAUSE = /(^|\s)(\^+)(?=\s|$)/g;
+export function pauseLines(md: string): string {
+  const out: string[] = [];
+  let fence: string | null = null, carry = "";
+  for (let ln of String(md ?? "").split("\n")) {
+    const f = /^ {0,3}(`{3,}|~{3,})/.exec(ln);
+    if (f) {
+      if (fence === null) fence = f[1]!;
+      else if (f[1]![0] === fence[0] && f[1]!.length >= fence.length) fence = null;
+    } else if (fence === null) {
+      const p = /^ {0,3}(\^+)\s*$/.exec(ln);
+      if (p) {
+        const before = out.length ? out[out.length - 1]! : "";
+        if (before.trim() && !/^ {0,3}(`{3,}|~{3,})|%%POP/.test(before)) out[out.length - 1] = before.replace(/\s+$/, "") + " " + p[1];
+        else carry += p[1];
+        continue;
+      }
+      // Not onto a :::pop marker: that would stop it being one.
+      if (carry && ln.trim() && !ln.includes("%%POP")) {
+        const indent = /^\s*(?:[-*+] |\d+[.)] |#{1,6} |> )?/.exec(ln)![0];
+        ln = indent + carry + " " + ln.slice(indent.length);
+        carry = "";
+      }
+    }
+    out.push(ln);
+  }
+  return out.join("\n");
+}
+
 export function popBoxes(html: string): string {
   let open = 0;
   const out = html.replace(/<p>%%POP(START|END)%%<\/p>/g, (_, which: string) => {

@@ -12,13 +12,21 @@
  * Called before the browser paints the new section (useLayoutEffect), so
  * it's never seen whole and then hidden.
  */
+import type { Speed } from "./quiz";
+
 export type Finish = () => void;
 
-const WORD_MS = 70, CHAR_MS = 16, BLOCK_MS = 260;
+/** ms a word, a letter and a block take to come in, at each speed (notes.js's SPEEDS). */
+export const SPEEDS: Record<Speed, { word: number; letter: number; block: number; pause: number }> = {
+  slow: { word: 450, letter: 80, block: 700, pause: 1500 },
+  normal: { word: 250, letter: 45, block: 450, pause: 1000 },
+  fast: { word: 120, letter: 22, block: 260, pause: 600 },
+};
 const TEXT_BLOCKS = new Set(["P", "H1", "H2", "H3", "H4", "H5", "H6", "UL", "OL", "BLOCKQUOTE", "DL"]);
 
-export function animateIn(part: HTMLElement, how: "words" | "type", onFinish: (f: Finish) => void): Promise<void> {
+export function animateIn(part: HTMLElement, how: "words" | "type", onFinish: (f: Finish) => void, speed: Speed = "normal"): Promise<void> {
   if (typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return Promise.resolve();
+  const { word: WORD_MS, letter: CHAR_MS, block: BLOCK_MS, pause: PAUSE_MS } = SPEEDS[speed] ?? SPEEDS.normal;
   const steps: [HTMLElement, number, string][] = [];
   const hide = (n: HTMLElement) => n.classList.add("reveal-hidden");
   const splitText = (node: Element) => {
@@ -42,7 +50,10 @@ export function animateIn(part: HTMLElement, how: "words" | "type", onFinish: (f
         }
         child.parentNode!.replaceChild(frag, child);
       } else if (child instanceof HTMLElement || child instanceof SVGElement) {
-        if (/^(IMG|INPUT|IFRAME|SVG)$/i.test(child.tagName)) {
+        if (child.classList.contains("reveal-pause")) {
+          // A `^`: a wait before what comes after it.
+          steps.push([child as HTMLElement, PAUSE_MS * (Number((child as HTMLElement).dataset.beats) || 1), ""]);
+        } else if (/^(IMG|INPUT|IFRAME|SVG)$/i.test(child.tagName)) {
           hide(child as HTMLElement);
           steps.push([child as HTMLElement, BLOCK_MS, ""]);
         } else splitText(child);

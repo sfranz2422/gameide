@@ -250,12 +250,13 @@ test("notes: a checklist that stays ticked, flip cards, and order, bug, sort and
   await tctx.close();
 });
 
-const PLAYED = `animate: words
+const PLAYED = `animate: words fast
 # Moving
 An object can move itself: each step it adds a little to its x, and the game draws it there, so it slides along the screen.
 
 ...
 
+^^
 :::pop
 Press Check my work.
 :::
@@ -297,6 +298,7 @@ test("notes: animate plays a part at a time, the arrow waits, and only the teach
   await expect(pane).not.toContainText("An object can move itself");
   await expect(pane.getByTestId("slide-next")).toBeDisabled();
   await expect(pane.getByTestId("reveal-skip")).toHaveCount(0);
+  await expect(pane.getByTestId("reveal-replay")).toHaveCount(0);
 
   // Part 1, word by word: Play waits while it plays.
   await pane.getByTestId("reveal-play").click();
@@ -310,7 +312,11 @@ test("notes: animate plays a part at a time, the arrow waits, and only the teach
   // Part 2, the pop.
   await pane.getByTestId("reveal-play").click();
   await expect(pane.locator(".pop-box.reveal-pop")).toBeVisible();
+  // The ^^ before it was a pause, never shown.
+  await expect(pane.locator(".reveal-pause")).toHaveCount(1);
+  await expect(pane).not.toContainText("^");
   await expect(pane.getByTestId("reveal-play")).toHaveCount(0);
+  await expect(pane.getByTestId("reveal-replay")).toHaveCount(0);
   await expect(pane.getByTestId("slide-next")).toBeEnabled();
   // Played, the slide stays whole: back from the next one replays nothing.
   await pane.getByTestId("slide-next").click();
@@ -338,5 +344,9 @@ test("notes: animate plays a part at a time, the arrow waits, and only the teach
   await mine.getByTestId("reveal-skip").click();
   await expect(mine).toContainText("Press Check my work.");
   await expect(mine.getByTestId("slide-next")).toBeEnabled();
+  // A slide already played can be watched again (after changing it, say).
+  await mine.getByTestId("reveal-replay").click();
+  await expect(mine).toContainText("Press ▶ Play to start this slide.");
+  await expect(mine.getByTestId("reveal-play")).toHaveText("▶ Play");
   await tctx.close();
 });

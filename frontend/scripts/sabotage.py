@@ -663,6 +663,14 @@ CASES = [
  ("pop never boxed", "src/notes/quiz.ts", '      return `${close}<div class="pop-box">`;', '      return `${close}<div class="pop-bx">`;', "marks a box"),
  ("sections cut inside code", "src/notes/quiz.ts", "} else if (fence === null && /^ {0,3}\\.\\.\\.\\s*$/.test(ln)) {", "} else if (/^ {0,3}\\.\\.\\.\\s*$/.test(ln)) {", "cuts a slide into sections"),
  ("animate line counted as a slide's text", "src/notes/quiz.ts", "  const lines = takeAnimate(md).body.replace(", "  const lines = String(md ?? \"\").replace(", "never changes how many slides"),
+ ("normal plays too fast to read", "src/notes/reveal.ts", "normal: { word: 250,", "normal: { word: 70,", "slowly enough to read along"),
+ ("a speed alone isn't read", "src/notes/quiz.ts", 'if (SPEED_NAMES.includes(first as Speed) && !second) return', 'if (SPEED_NAMES.includes(first as Speed) && !second && first === "x") return', "takes a speed after the kind"),
+ ("the notes' speed not used", "src/notes/NotesPane.tsx", "    }, speed).then(() => {", '    }, speed === speed ? "normal" : speed).then(() => {', "animate plays", E2E),
+ ("students get Replay", "src/notes/NotesPane.tsx", "{practice && !busy && played > 0 && (", "{!busy && played > 0 && (", "animate plays", E2E),
+ ("Replay does nothing", "src/notes/NotesPane.tsx", "    if (!busy) reach({ slide: here, played: 0 });", "    if (!busy) reach({ slide: here, played: played });", "animate plays", E2E),
+ ("pause onto a pop marker", "src/notes/quiz.ts", '      if (carry && ln.trim() && !ln.includes("%%POP")) {', "      if (carry && ln.trim()) {", "pause joins a line"),
+ ("pause line left alone", "src/notes/quiz.ts", "        else carry += p[1];\n        continue;", "        else carry += p[1];\n        if (carry) out.push(ln);\n        continue;", "pause joins a line"),
+ ("pauses shown as carets", "src/notes/NotesPane.tsx", '  if (!html.includes("^") || typeof document === "undefined") return html;', '  if (html.includes("") || typeof document === "undefined") return html;', "animate plays", E2E),
  ("physics not stepped in the worker", PH, "    this.world!.step(1 / host.stepsPerSecond);", "    if (typeof window !== \"undefined\") this.world!.step(1 / host.stepsPerSecond);", "a physics coin falls", E2E),
 ]
 only = sys.argv[1:]
