@@ -610,6 +610,15 @@ CASES = [
  ("series mouse event wrong button", "src/tutorials/series.ts", 'button: arg as "left", edge', 'button: "right" as "left", edge', "el3-button"),
  ("series walls not solid", "src/tutorials/series.ts", "solid: !!o.solid });", "solid: false });", "el3-platformer"),
  ("walkthrough runner leaps ahead", "src/tutorials/nodeRunner.ts", "(count < 30 ? 1 : 10)", "(count < 30 ? 10 : 10)", "el3-strike"),
+ # Notes: order, bug and sort questions, checklists, flip cards (src/notes/; backend/quiz.py, notes.py)
+ ("quiz.ts shuffles differently", "src/notes/quiz.ts", "for (const b of bytes) h = Math.imul(h ^ b, 0x01000193) >>> 0;", "for (const b of bytes) h = Math.imul(h ^ b, 0x01000197) >>> 0;", "every question case reads the same"),
+ ("quiz.ts sort groups lost", "src/notes/quiz.ts", "    q.answers = groups;\n", "    q.answers = [];\n", "every question case reads the same"),
+ ("cards not a piece", "src/notes/quiz.ts", '(lang === "quiz" || lang === "cards" || testKinds.includes(lang))', '(lang === "quiz" || testKinds.includes(lang))', "find a cards block"),
+ ("server takes a half-sorted answer", "../backend/notes.py", '            if key.kind == "sort" and not all(g in json.loads(key.answers or "[]") for g in got):', '            if False:', "a sort with an item left out is refused", PY),
+ ("server bug key leaks", "../backend/quiz.py", "            pass                     # the code is in the prompt; `bug:` stays here", "            lines.extend('bug: ' + c for c in q['correct'])", "has no key", PY),
+ ("ticks forgotten", "src/notes/NotesPane.tsx", '    box.checked = stored === null ? spot.dataset.done === "1" : stored === "1";', '    box.checked = spot.dataset.done === "1" && stored !== "x";', "a checklist that stays ticked", E2E),
+ ("cards don't turn", "src/notes/NotesPane.tsx", 'dangerouslySetInnerHTML={{ __html: renderMarkdown(on ? c.back : c.front) }}', 'dangerouslySetInnerHTML={{ __html: renderMarkdown(on ? c.front : c.front) }}', "a checklist that stays ticked", E2E),
+ ("a click on a group's item only picks it", "src/notes/NotesPane.tsx", "if (picked >= 0 && picked !== i && shownPlaced[picked] !== shownPlaced[i]) put(shownPlaced[i]!);", "if (picked >= 0 && picked !== i && shownPlaced[picked] !== shownPlaced[i] && i < 0) put(shownPlaced[i]!);", "a checklist that stays ticked", E2E),
  # Physics (engine/physics.ts; src/python/physics.test.ts, e2e/physics.editor.spec.ts)
  ("physics moved twice", EN, "if (!phys && (h !== 0 || v !== 0)) {", "if (h !== 0 || v !== 0) {", "takes push"),
  ("physics teleport ignored", PH, "if (x !== e.x || y !== e.y || angle !== e.angle) {", "if (x !== e.x && y !== e.y && angle !== e.angle) {", "is moved by its own code"),

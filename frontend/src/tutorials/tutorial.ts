@@ -97,6 +97,7 @@ export function takeHighlight(md: string): { md: string; highlight: string | nul
   const kept = pieces(md, ["check", "tests"])
     .map((p) => {
       if (p.type === "quiz") return "```quiz\n" + p.body + "\n```";
+      if (p.type === "cards") return "```cards\n" + p.body + "\n```";
       if (p.type === "tests") return "```" + p.kind + "\n" + p.body + "\n```";
       // Inside a code block, a line is code — `highlight: x` there is an example, kept.
       let fence: string | null = null;

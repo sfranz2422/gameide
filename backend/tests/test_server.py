@@ -858,6 +858,56 @@ res = {x["email"]: x for x in teacher.get(f"/api/assignments/{N}").get_json()["r
 check("the results show the questions' points and the total", res["quiz"] == 1.5 and res["total"] == 1.5, (res["quiz"], res["total"]))
 check("…and the long response, cleaned, to mark", res["longs"] and "<script" not in res["longs"][0]["response"])
 check("another teacher can't mark it", other_teacher.post("/api/quiz/grade", json={"assignment": N, "student": ids["xa"], "question": long_q["qid"], "score": 4}).status_code == 403)
+
+# Put in order, find the bug, sort into groups (quiz.py): the keys stay home, the answers are marked.
+PUZZLES = """```quiz
+type: order
+Put the lines in order.
+- def on_step(self):
+-     if keyboard_check("right"):
+-         self.x += ORDERKEY
+points: 3
+```
+
+```quiz
+type: bug
+Which line is wrong?
+~~~python
+x = 1
+print(x
+y = 2
+~~~
+bug: 2
+```
+
+```quiz
+type: sort
+Sort them.
+group: GRPEVENT
+- Create
+- Step
+group: GRPFUNC
+- instance_create
+- keyboard_check
+points: 4
+```
+"""
+put(teacher, "nq3", project("nq3", "Puzzles game"), 0)
+N3 = teacher.post(f"/api/classes/{XC}/assignments", json={"title": "Puzzles", "project": "nq3"}).get_json()["slug"]
+teacher.post(f"/api/assignments/{N3}/notes", json={"notes": PUZZLES})
+xa.post(f"/api/assignments/{N3}/start")
+order_q, bug_q, sort_q = quizmod.keys(PUZZLES)
+seen3 = xa.get(f"/api/assignments/{N3}").get_data(as_text=True) + json.dumps(xa.get(f"/api/projects/{xa.post(f'/api/assignments/{N3}/start').get_json()['project']}/assignment").get_json())
+check("a student's copy of order, bug and sort questions has no key", "bug: 2" not in seen3 and "GRPEVENT\\n- Create" not in seen3
+      and "item: " in seen3 and "line: " in seen3, seen3[:300])
+r = xa.post("/api/quiz/answer", json={"assignment": N3, "question": order_q["qid"], "response": json.dumps(order_q["choices"])}).get_json()
+check("lines left as shuffled get the part of them in order", r.get("correct") is False and r.get("earned", 0) < 3, r)
+r = xa.post("/api/quiz/answer", json={"assignment": N3, "question": bug_q["qid"], "response": "2"}).get_json()
+check("the bug's line is right", r.get("correct") is True, r)
+st = xa.post("/api/quiz/answer", json={"assignment": N3, "question": sort_q["qid"], "response": json.dumps(["GRPEVENT"] * 3 + [""])}).status_code
+check("a sort with an item left out is refused, not marked", st == 400, st)
+r = xa.post("/api/quiz/answer", json={"assignment": N3, "question": sort_q["qid"], "response": json.dumps(sort_q["correct"])}).get_json()
+check("…and every item in its group is all of it", r.get("correct") is True and r.get("earned") == 4, r)
 r = teacher.post("/api/quiz/grade", json={"assignment": N, "student": ids["xa"], "question": long_q["qid"], "score": 3}).get_json()
 check("its teacher marks it, and it counts", r.get("total") == 4.5, r)
 

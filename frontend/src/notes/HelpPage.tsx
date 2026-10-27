@@ -52,6 +52,45 @@ option: when the game ends
 type: long
 Describe how your game gets harder as it goes on.
 points: 5
+\`\`\`
+
+\`\`\`quiz
+type: order
+Put the lines in order so the player moves right.
+- def on_step(self):
+-     if keyboard_check("right"):
+-         self.x += 4
+\`\`\`
+
+\`\`\`quiz
+type: bug
+Which line stops this event from running?
+~~~python
+if keyboard_check("space")
+    self.vspeed = -8
+~~~
+bug: 1
+\`\`\`
+
+\`\`\`quiz
+type: sort
+Sort each into events and functions.
+group: Event
+- Create
+- Step
+group: Function
+- instance_create
+- keyboard_check
+\`\`\``;
+
+const EXTRAS = `- [ ] Make the player move
+- [ ] Add a coin
+- [x] Open the game
+
+\`\`\`cards
+sprite -> a picture, with frames
+object -> a thing in the game, with code
+room -> where the game happens
 \`\`\``;
 
 export function HelpPage() {
@@ -71,9 +110,18 @@ export function HelpPage() {
           The same formats as PyIDE, WebIDE and FlaskIDE. One try each, marked at once; the points go on top of your score. The answers are taken out before
           the notes reach a student. <code>[x]</code> marks the right choice; <code>answer:</code> lines are accepted short answers (case and spacing don't
           matter); <code>[[a|b]]</code> is a blank with its accepted answers; <code>type: match</code> pairs with <code>{"->"}</code>; <code>type: long</code> is
-          marked by you on the assignment's page. <code>points:</code> is 1 if left out.
+          marked by you on the assignment's page. <code>type: order</code> gives lines (each after <code>- </code>, in the right order) shuffled, to put back
+          in order; <code>type: bug</code> asks which line of the code in a <code>~~~</code> fence is wrong (<code>bug: 2</code>);{" "}
+          <code>type: sort</code> has a <code>group:</code> line for each group with its items under it. Order and sort give part marks.{" "}
+          <code>points:</code> is 1 if left out.
         </p>
         <pre className="help-example">{QUESTIONS}</pre>
+        <h2 id="extras">Checklists and flip cards</h2>
+        <p>
+          Not questions: nothing is marked or sent. <code>- [ ]</code> at the start of a list item is a box students tick — kept in their browser, for them
+          (<code>- [x]</code> starts ticked). A <code>```cards</code> block is a card a line, <code>front {"->"} back</code>; a click turns one over.
+        </p>
+        <pre className="help-example">{EXTRAS}</pre>
         <h2 id="checks">Checks</h2>
         <p>
           A <code>```tests</code> block holds checks, one per line, that the student's game must pass. Students press <b>Check my work</b> in the Notes tab — the

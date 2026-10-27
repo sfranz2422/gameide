@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import cases from "./parse-cases.json";
-import { parseQuiz, pieces, slides } from "./quiz";
+import { parseCards, parseQuiz, pieces, scramble, slides } from "./quiz";
 import { checkGame, checkProject, parseTests, readCheck, runTests, allTests, type GameRunner } from "../checks/checks";
 import { blankProject, newEvent, newObject, newRoom, newInstance } from "../store/project";
 import { CHECK_EXAMPLES } from "./HelpPage";
@@ -158,3 +158,22 @@ describe("the help page", () => {
     for (const [line] of CHECK_EXAMPLES) expect(readCheck(line).kind, line).not.toBe("unknown");
   });
 });
+
+describe("order, sort and flip cards", () => {
+  it("shuffle exactly as quiz.py does, and never into the right order", () => {
+    // quiz.py: scramble(["for i in range(QQONE):", "    total += i", "print(total)"])
+    expect(scramble(["for i in range(QQONE):", "    total += i", "print(total)"])).toEqual(["    total += i", "print(total)", "for i in range(QQONE):"]);
+    expect(scramble(["a", "b"])).not.toEqual(["a", "b"]);
+    expect(scramble(["x", "x"])).toEqual(["x", "x"]);
+  });
+  it("read a cards block a card a line, skipping lines without ->", () => {
+    expect(parseCards("- a -> b\nno arrow here\n`len` -> how many")).toEqual([
+      { front: "a", back: "b" },
+      { front: "`len`", back: "how many" },
+    ]);
+  });
+  it("find a cards block as a piece of its own, but not one inside another fence", () => {
+    expect(pieces("Hi\n```cards\na -> b\n```\n~~~\n```cards\n~~~").map((p) => p.type)).toEqual(["md", "cards", "md"]);
+  });
+});
+

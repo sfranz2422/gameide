@@ -142,6 +142,108 @@
     "options": [],
     "points": 2.0
    }
+  },
+  {
+   "body": "type: order\nPut them in order.\n- for i in range(1, 4):\n-     print(i)\n- print(\"Done\")\n- [1, 2]",
+   "expect": {
+    "id": "",
+    "kind": "order",
+    "prompt": "Put them in order.",
+    "choices": [
+     "for i in range(1, 4):",
+     "print(\"Done\")",
+     "    print(i)",
+     "[1, 2]"
+    ],
+    "correct": [
+     "for i in range(1, 4):",
+     "    print(i)",
+     "print(\"Done\")",
+     "[1, 2]"
+    ],
+    "answers": [],
+    "options": [],
+    "points": 1.0
+   }
+  },
+  {
+   "body": "id: 0123456789ab\npoints: 1\ntype: order\nOrder?\nline:     print(i)\nline: for i in x:",
+   "expect": {
+    "id": "0123456789ab",
+    "kind": "order",
+    "prompt": "Order?",
+    "choices": [
+     "    print(i)",
+     "for i in x:"
+    ],
+    "correct": [],
+    "answers": [],
+    "options": [],
+    "points": 1.0
+   }
+  },
+  {
+   "body": "type: bug\nWhich?\n~~~python\nfor n in range(3)\n    print(n)\n~~~\nbug: 01, 2",
+   "expect": {
+    "id": "",
+    "kind": "bug",
+    "prompt": "Which?\n~~~python\nfor n in range(3)\n    print(n)\n~~~",
+    "choices": [],
+    "correct": [
+     "1",
+     "2"
+    ],
+    "answers": [],
+    "options": [],
+    "points": 1.0
+   }
+  },
+  {
+   "body": "type: sort\nSort.\ngroup: Number\n- 5\n- 3.14\ngroup: Text\n- \"hello\"\n- \"5\"\n- é",
+   "expect": {
+    "id": "",
+    "kind": "sort",
+    "prompt": "Sort.",
+    "choices": [
+     "é",
+     "3.14",
+     "\"5\"",
+     "\"hello\"",
+     "5"
+    ],
+    "correct": [
+     "Text",
+     "Number",
+     "Text",
+     "Text",
+     "Number"
+    ],
+    "answers": [
+     "Number",
+     "Text"
+    ],
+    "options": [],
+    "points": 1.0
+   }
+  },
+  {
+   "body": "id: 0123456789ab\npoints: 1\ntype: sort\nSort.\ngroup: A\ngroup: B\nitem: x\nitem: y",
+   "expect": {
+    "id": "0123456789ab",
+    "kind": "sort",
+    "prompt": "Sort.",
+    "choices": [
+     "x",
+     "y"
+    ],
+    "correct": [],
+    "answers": [
+     "A",
+     "B"
+    ],
+    "options": [],
+    "points": 1.0
+   }
   }
  ],
  "tests": [
@@ -206,7 +308,7 @@
    }
   },
   {
-   "body": "---\ntitle: Your First Game\nlevel: Getting Started\ntime: 15 min\nstarter: empty\ndescription: A sprite, an object, a room, and a player you move with the arrow keys.\n---\n# Your first game\n\nIn this tutorial you'll make a player you can move around the screen with the arrow keys.\n\nEach step tells you what to do, then **\u2714 Check my work** checks it. When it passes, **Next** opens the next step.\n\nType the code yourself \u2014 that's how you learn it.\n\n---\n\n## A sprite\n\nA **sprite** is a picture. Press the **+** beside **Sprites** and pick the **player**.\n\nhighlight: add-sprites\n\n```check\nsprite player exists\n```\n\n---\n\n## An object\n\nAn **object** is a thing in your game: it has a sprite, and code that says what it does.\n\nPress the **+** beside **Objects**, type the name **Player**, and press Enter.\n\nhighlight: add-objects\n\n```check\nobject Player exists\n```\n\n---\n\n## Give it its sprite\n\nWith **Player** open, choose **player** in its **Sprite** box.\n\nhighlight: object-sprite\n\n```check\nPlayer has sprite\n```\n\n---\n\n## Put it in the room\n\nA **room** is where the game happens. Open **Room1** from the **Rooms** folder, then drag **Player** from the list on the left into the room.\n\nhighlight: folder-rooms\n\n```check\nroom Room1 has at least 1 Player\n```\n\n---\n\n## Make it move\n\nOpen **Player**, press **Add event** and choose **Step**. A Step event runs every frame \u2014 60 times a second.\n\nType this into it:\n\n```python\nself.x += (keyboard_check(\"right\") - keyboard_check(\"left\")) * 4\nself.y += (keyboard_check(\"down\") - keyboard_check(\"up\")) * 4\n```\n\n`keyboard_check(\"right\")` is 1 while the right arrow is held, and 0 when it isn't. So right minus left is 1, -1 or 0 \u2014 which way to go \u2014 and `* 4` is how fast.\n\nhighlight: add-event\n\n```check\nPlayer has event step\nPlayer.step uses keyboard_check\nafter 1 second holding right, Player.x increased\nafter 1 second holding down, Player.y increased\n```\n\n---\n\n## Play it\n\nPress **Play**, click the game, and move with the arrow keys.\n\nhighlight: play\n\n```check\ngame runs 2 seconds without errors\n```\n\n---\n\n## You made a game\n\nYour player moves. Ideas to try next:\n\n- Change the `4` to make it faster or slower.\n- Add a second sprite and object \u2014 a coin, a wall.\n- Try the **Collect the Coins** tutorial.\n",
+   "body": "---\ntitle: Your First Game\nlevel: Getting Started\ntime: 15 min\nstarter: empty\ndescription: A sprite, an object, a room, and a player you move with the arrow keys.\n---\n# Your first game\n\nIn this tutorial you'll make a player you can move around the screen with the arrow keys.\n\nEach step tells you what to do, then **✔ Check my work** checks it. When it passes, **Next** opens the next step.\n\nType the code yourself — that's how you learn it.\n\n---\n\n## A sprite\n\nA **sprite** is a picture. Press the **+** beside **Sprites** and pick the **player**.\n\nhighlight: add-sprites\n\n```check\nsprite player exists\n```\n\n---\n\n## An object\n\nAn **object** is a thing in your game: it has a sprite, and code that says what it does.\n\nPress the **+** beside **Objects**, type the name **Player**, and press Enter.\n\nhighlight: add-objects\n\n```check\nobject Player exists\n```\n\n---\n\n## Give it its sprite\n\nWith **Player** open, choose **player** in its **Sprite** box.\n\nhighlight: object-sprite\n\n```check\nPlayer has sprite\n```\n\n---\n\n## Put it in the room\n\nA **room** is where the game happens. Open **Room1** from the **Rooms** folder, then drag **Player** from the list on the left into the room.\n\nhighlight: folder-rooms\n\n```check\nroom Room1 has at least 1 Player\n```\n\n---\n\n## Make it move\n\nOpen **Player**, press **Add event** and choose **Step**. A Step event runs every frame — 60 times a second.\n\nType this into it:\n\n```python\nself.x += (keyboard_check(\"right\") - keyboard_check(\"left\")) * 4\nself.y += (keyboard_check(\"down\") - keyboard_check(\"up\")) * 4\n```\n\n`keyboard_check(\"right\")` is 1 while the right arrow is held, and 0 when it isn't. So right minus left is 1, -1 or 0 — which way to go — and `* 4` is how fast.\n\nhighlight: add-event\n\n```check\nPlayer has event step\nPlayer.step uses keyboard_check\nafter 1 second holding right, Player.x increased\nafter 1 second holding down, Player.y increased\n```\n\n---\n\n## Play it\n\nPress **Play**, click the game, and move with the arrow keys.\n\nhighlight: play\n\n```check\ngame runs 2 seconds without errors\n```\n\n---\n\n## You made a game\n\nYour player moves. Ideas to try next:\n\n- Change the `4` to make it faster or slower.\n- Add a second sprite and object — a coin, a wall.\n- Try the **Collect the Coins** tutorial.\n",
    "expect": {
     "steps": 8,
     "tutorial": true,
@@ -214,7 +316,7 @@
    }
   },
   {
-   "body": "---\ntitle: Collect the Coins\nlevel: Getting Started\ntime: 20 min\nstarter: coins-start\ndescription: Touch a coin to collect it, keep score, and show it on screen.\n---\n# Collect the coins\n\nThis game has a maze, coins, and a player who moves with the arrow keys. Press **Play** and try it: the coins don't do anything yet.\n\nYou'll make the coins disappear when the player touches them, count them, and show the score.\n\n---\n\n## Touching a coin\n\nOpen **Player**, press **Add event**, and under **Collision with** choose **Coin**.\n\nThis event runs when the player touches a coin. `other` is the coin it touched. Type:\n\n```python\nother.destroy()\n```\n\nhighlight: add-event\n\n```check\nPlayer has event collision with Coin\nPlayer.collision with Coin uses destroy\nafter 1 second holding right, instance_number(\"Coin\") < 15\n```\n\n---\n\n## Keep score\n\nA **global variable** is one every object can see. Start the score at 0 in Player's **Create** event \u2014 add this line under what's there:\n\n```python\nglobal_vars.score = 0\n```\n\nThen in the **Collision with Coin** event, under `other.destroy()`:\n\n```python\nglobal_vars.score += 1\n```\n\n```check\nPlayer.create uses global_vars\nafter 1 second holding right, global_vars.score >= 1\n```\n\n---\n\n## Show the score\n\nMake a new object called **Hud** (no sprite) and drag it into the room. Give it a **Draw GUI** event \u2014 it draws on top of everything:\n\n```python\ndraw_set_color(\"white\")\ndraw_text(8, 452, f\"Coins: {global_vars.score}\")\n```\n\nhighlight: add-objects\n\n```check\nobject Hud exists\nHud has event draw gui\nHud.draw gui uses draw_text\nroom Maze has 1 Hud\ngame runs 2 seconds without errors\n```\n\n---\n\n## A sound\n\nThe game already has a **coin** sound. In the **Collision with Coin** event, add:\n\n```python\nsound_play(\"coin\")\n```\n\n```check\nPlayer.collision with Coin uses sound_play\n```\n\n---\n\n## Done\n\nPlay it and collect them all. Ideas:\n\n- Show \"You got them all!\" when `not instance_exists(\"Coin\")`.\n- Make some coins worth 5.\n",
+   "body": "---\ntitle: Collect the Coins\nlevel: Getting Started\ntime: 20 min\nstarter: coins-start\ndescription: Touch a coin to collect it, keep score, and show it on screen.\n---\n# Collect the coins\n\nThis game has a maze, coins, and a player who moves with the arrow keys. Press **Play** and try it: the coins don't do anything yet.\n\nYou'll make the coins disappear when the player touches them, count them, and show the score.\n\n---\n\n## Touching a coin\n\nOpen **Player**, press **Add event**, and under **Collision with** choose **Coin**.\n\nThis event runs when the player touches a coin. `other` is the coin it touched. Type:\n\n```python\nother.destroy()\n```\n\nhighlight: add-event\n\n```check\nPlayer has event collision with Coin\nPlayer.collision with Coin uses destroy\nafter 1 second holding right, instance_number(\"Coin\") < 15\n```\n\n---\n\n## Keep score\n\nA **global variable** is one every object can see. Start the score at 0 in Player's **Create** event — add this line under what's there:\n\n```python\nglobal_vars.score = 0\n```\n\nThen in the **Collision with Coin** event, under `other.destroy()`:\n\n```python\nglobal_vars.score += 1\n```\n\n```check\nPlayer.create uses global_vars\nafter 1 second holding right, global_vars.score >= 1\n```\n\n---\n\n## Show the score\n\nMake a new object called **Hud** (no sprite) and drag it into the room. Give it a **Draw GUI** event — it draws on top of everything:\n\n```python\ndraw_set_color(\"white\")\ndraw_text(8, 452, f\"Coins: {global_vars.score}\")\n```\n\nhighlight: add-objects\n\n```check\nobject Hud exists\nHud has event draw gui\nHud.draw gui uses draw_text\nroom Maze has 1 Hud\ngame runs 2 seconds without errors\n```\n\n---\n\n## A sound\n\nThe game already has a **coin** sound. In the **Collision with Coin** event, add:\n\n```python\nsound_play(\"coin\")\n```\n\n```check\nPlayer.collision with Coin uses sound_play\n```\n\n---\n\n## Done\n\nPlay it and collect them all. Ideas:\n\n- Show \"You got them all!\" when `not instance_exists(\"Coin\")`.\n- Make some coins worth 5.\n",
    "expect": {
     "steps": 6,
     "tutorial": true,
@@ -222,7 +324,7 @@
    }
   },
   {
-   "body": "---\ntitle: Simple Platformer\nlevel: Platformers\ntime: 25 min\nstarter: platformer-start\ndescription: Gravity, solid ground, running and jumping.\n---\n# A platformer\n\nThe level is built from tiles, and some tiles are **solid**. The **Player** is there, but it has no code yet: press **Play**, and nothing moves.\n\nYou'll give it gravity, running and jumping.\n\n---\n\n## Speed\n\nOpen **Player**, add a **Create** event, and type:\n\n```python\nself.vx = 0\nself.vy = 0\n```\n\n`vx` and `vy` are how fast it moves across and down, in pixels a frame.\n\n```check\nPlayer has event create\nPlayer.create uses vy\n```\n\n---\n\n## Running\n\nAdd a **Step** event:\n\n```python\nmove = keyboard_check(\"right\") - keyboard_check(\"left\")\nself.vx = move * 4\nif move_and_collide(self.vx, 0):\n    self.vx = 0\n```\n\n`move_and_collide` moves it, but stops it against anything solid \u2014 and says whether it hit something.\n\nhighlight: add-event\n\n```check\nPlayer.step uses move_and_collide\nafter 1 second holding right, Player.x increased\n```\n\n---\n\n## Gravity\n\nUnder that, in the same Step event:\n\n```python\nself.vy = min(self.vy + 0.6, 12)\nif move_and_collide(0, self.vy):\n    self.vy = 0\n```\n\nEach frame it falls a little faster, up to 12. Hitting the ground stops the fall.\n\n```check\nPlayer.step uses min\ngame runs 2 seconds without errors\n```\n\n---\n\n## Jumping\n\nOnly jump when standing on something. Add, above the gravity lines:\n\n```python\non_ground = not place_free(self.x, self.y + 1)\nif on_ground and keyboard_check_pressed(\"space\"):\n    self.vy = -11\n```\n\n`place_free` says whether a spot is empty. One pixel below your feet not being free means you're standing.\n\n```check\nPlayer.step uses place_free\nPlayer.step uses keyboard_check_pressed\ngame runs 2 seconds without errors\n```\n\n---\n\n## Coins\n\nAdd a **Collision with Coin** event to Player:\n\n```python\nother.destroy()\nsound_play(\"coin\")\n```\n\n```check\nPlayer has event collision with Coin\nPlayer.collision with Coin uses destroy\n```\n\n---\n\n## Done\n\nYou have a platformer. Ideas:\n\n- Face the way you're going: `self.image_xscale = move` when `move != 0`.\n- Make the jump higher or the gravity stronger.\n- Add an Enemy that you can jump on.\n",
+   "body": "---\ntitle: Simple Platformer\nlevel: Platformers\ntime: 25 min\nstarter: platformer-start\ndescription: Gravity, solid ground, running and jumping.\n---\n# A platformer\n\nThe level is built from tiles, and some tiles are **solid**. The **Player** is there, but it has no code yet: press **Play**, and nothing moves.\n\nYou'll give it gravity, running and jumping.\n\n---\n\n## Speed\n\nOpen **Player**, add a **Create** event, and type:\n\n```python\nself.vx = 0\nself.vy = 0\n```\n\n`vx` and `vy` are how fast it moves across and down, in pixels a frame.\n\n```check\nPlayer has event create\nPlayer.create uses vy\n```\n\n---\n\n## Running\n\nAdd a **Step** event:\n\n```python\nmove = keyboard_check(\"right\") - keyboard_check(\"left\")\nself.vx = move * 4\nif move_and_collide(self.vx, 0):\n    self.vx = 0\n```\n\n`move_and_collide` moves it, but stops it against anything solid — and says whether it hit something.\n\nhighlight: add-event\n\n```check\nPlayer.step uses move_and_collide\nafter 1 second holding right, Player.x increased\n```\n\n---\n\n## Gravity\n\nUnder that, in the same Step event:\n\n```python\nself.vy = min(self.vy + 0.6, 12)\nif move_and_collide(0, self.vy):\n    self.vy = 0\n```\n\nEach frame it falls a little faster, up to 12. Hitting the ground stops the fall.\n\n```check\nPlayer.step uses min\ngame runs 2 seconds without errors\n```\n\n---\n\n## Jumping\n\nOnly jump when standing on something. Add, above the gravity lines:\n\n```python\non_ground = not place_free(self.x, self.y + 1)\nif on_ground and keyboard_check_pressed(\"space\"):\n    self.vy = -11\n```\n\n`place_free` says whether a spot is empty. One pixel below your feet not being free means you're standing.\n\n```check\nPlayer.step uses place_free\nPlayer.step uses keyboard_check_pressed\ngame runs 2 seconds without errors\n```\n\n---\n\n## Coins\n\nAdd a **Collision with Coin** event to Player:\n\n```python\nother.destroy()\nsound_play(\"coin\")\n```\n\n```check\nPlayer has event collision with Coin\nPlayer.collision with Coin uses destroy\n```\n\n---\n\n## Done\n\nYou have a platformer. Ideas:\n\n- Face the way you're going: `self.image_xscale = move` when `move != 0`.\n- Make the jump higher or the gravity stronger.\n- Add an Enemy that you can jump on.\n",
    "expect": {
     "steps": 7,
     "tutorial": true,
@@ -230,7 +332,7 @@
    }
   },
   {
-   "body": "---\ntitle: Blocks to Python\nlevel: Getting Started\ntime: 15 min\nstarter: player-start\ndescription: Build an event from blocks, read the Python they make, then turn it into Python.\n---\n# Blocks to Python\n\nBlocks and Python are the same code, written two ways. You'll build an event from blocks, see the Python it makes, then turn it into Python and carry on typing.\n\n---\n\n## A Step event in blocks\n\nOpen **Player**, press **Add event** and choose **Step**. Then press the **Blocks** tab above the code.\n\nhighlight: tab-blocks\n\n```check\nPlayer has event step\nPlayer.step is written in blocks\n```\n\n---\n\n## Move right\n\nBuild this from the blocks on the left:\n\n- from **Logic**, an **if** block\n- from **Input**, a **keyboard_check** block in the if's slot \u2014 choose **right**\n- from **Motion**, **change x by 4** inside the if\n\nhighlight: blocks-workspace\n\n```check\nPlayer.step uses keyboard_check\nafter 1 second holding right, Player.x increased\n```\n\n---\n\n## The Python it makes\n\nLook beside the blocks: that's the Python your blocks make. The game only ever runs that Python.\n\n```python\nif keyboard_check(\"right\"):\n    self.x += 4\n```\n\nhighlight: blocks-python\n\n---\n\n## Turn it into Python\n\nPress the **Python** tab and say OK. From now on this event is Python.\n\n```check\nPlayer.step is written in python\nPlayer.step uses keyboard_check\n```\n\n---\n\n## Now type the rest\n\nAdd moving left, in Python, under what's there:\n\n```python\nif keyboard_check(\"left\"):\n    self.x -= 4\n```\n\n```check\nafter 1 second holding left, Player.x decreased\ngame runs 2 seconds without errors\n```\n\n---\n\n## Done\n\nYou've moved from blocks to Python. Anything blocks can do, Python can \u2014 and much more.\n",
+   "body": "---\ntitle: Blocks to Python\nlevel: Getting Started\ntime: 15 min\nstarter: player-start\ndescription: Build an event from blocks, read the Python they make, then turn it into Python.\n---\n# Blocks to Python\n\nBlocks and Python are the same code, written two ways. You'll build an event from blocks, see the Python it makes, then turn it into Python and carry on typing.\n\n---\n\n## A Step event in blocks\n\nOpen **Player**, press **Add event** and choose **Step**. Then press the **Blocks** tab above the code.\n\nhighlight: tab-blocks\n\n```check\nPlayer has event step\nPlayer.step is written in blocks\n```\n\n---\n\n## Move right\n\nBuild this from the blocks on the left:\n\n- from **Logic**, an **if** block\n- from **Input**, a **keyboard_check** block in the if's slot — choose **right**\n- from **Motion**, **change x by 4** inside the if\n\nhighlight: blocks-workspace\n\n```check\nPlayer.step uses keyboard_check\nafter 1 second holding right, Player.x increased\n```\n\n---\n\n## The Python it makes\n\nLook beside the blocks: that's the Python your blocks make. The game only ever runs that Python.\n\n```python\nif keyboard_check(\"right\"):\n    self.x += 4\n```\n\nhighlight: blocks-python\n\n---\n\n## Turn it into Python\n\nPress the **Python** tab and say OK. From now on this event is Python.\n\n```check\nPlayer.step is written in python\nPlayer.step uses keyboard_check\n```\n\n---\n\n## Now type the rest\n\nAdd moving left, in Python, under what's there:\n\n```python\nif keyboard_check(\"left\"):\n    self.x -= 4\n```\n\n```check\nafter 1 second holding left, Player.x decreased\ngame runs 2 seconds without errors\n```\n\n---\n\n## Done\n\nYou've moved from blocks to Python. Anything blocks can do, Python can — and much more.\n",
    "expect": {
     "steps": 7,
     "tutorial": true,

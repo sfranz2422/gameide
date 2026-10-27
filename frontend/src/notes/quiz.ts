@@ -16,15 +16,59 @@ const ANSWER = /^answer\s*:\s*(.*)$/i;
 const POINTS = /^points?\s*:\s*(\d{1,4}(?:\.\d{1,2})?)\s*$/i;
 const QID = /^id\s*:\s*([0-9a-f]{12})\s*$/;
 const LONG = /^type\s*:\s*(long|essay)\s*$/i;
-const TYPE = /^type\s*:\s*(blanks?|fill|match|matching)\s*$/i;
+const TYPE = /^type\s*:\s*(blanks?|fill|match|matching|order|parsons|bug|sort|groups?)\s*$/i;
 const PAIR = /^[-*+]\s+(.+?)\s+->\s+(.+)$/;
 const MATCHL = /^match\s*:\s*(.+)$/i;
 const OPTION = /^option\s*:\s*(.+)$/i;
 export const BLANK = /\[\[([^[\]\n]*)\]\]/g;
+const ITEM = /^[-*+] (.*)$/;
+const LINEQ = /^(?:line|item)\s*:\s?(.*)$/i;
+const GROUP = /^group\s*:\s*(.+)$/i;
+const BUGQ = /^bugs?\s*:\s*([\d,\s]+)$/i;
+const KINDS: Record<string, string> = {
+  blank: "blank", blanks: "blank", fill: "blank", match: "match", matching: "match",
+  order: "order", parsons: "order", bug: "bug", sort: "sort", group: "sort", groups: "sort",
+};
+
+/**
+ * quiz.py's _fnv and scramble, exactly: an order or sort question's shuffled
+ * order is part of its id, and the server marks a response against it, so
+ * anything here that shuffles must shuffle the same way. FNV-1a over UTF-8
+ * (not SHA-1: there's no synchronous SHA-1 in a browser).
+ */
+export function fnv(text: string): number {
+  const bytes = new TextEncoder().encode(text);
+  let h = 0x811c9dc5;
+  for (const b of bytes) h = Math.imul(h ^ b, 0x01000193) >>> 0;
+  return h >>> 0;
+}
+export function scramble(things: string[]): string[] {
+  const keys = things.map((t, i) => fnv(`${i}\0${t}`));
+  let out = things.map((_, i) => i).sort((a, b) => keys[a]! - keys[b]! || a - b).map((i) => things[i]!);
+  if (things.some((t) => t !== things[0]) && out.every((t, i) => t === things[i])) out = [...out.slice(1), ...out.slice(0, 1)];
+  return out;
+}
+/** The lines of the first fenced code in a prompt (quiz.py, code_lines): what a bug question counts. */
+export function codeLines(prompt: string): string[] {
+  let inner: string | null = null;
+  let found: string[] | null = null;
+  for (const ln of String(prompt ?? "").split("\n")) {
+    const f = FENCE.exec(ln);
+    if (f) {
+      if (inner === null) {
+        inner = f[1]!;
+        found = [];
+        continue;
+      }
+      if (f[1]![0] === inner[0] && f[1]!.length >= inner.length) return found ?? [];
+    } else if (inner !== null) found!.push(ln);
+  }
+  return found ?? [];
+}
 
 export interface Question {
   id: string;
-  kind: "choice" | "text" | "long" | "blank" | "match";
+  kind: "choice" | "text" | "long" | "blank" | "match" | "order" | "bug" | "sort";
   prompt: string;
   choices: string[];
   correct: string[];
@@ -41,6 +85,7 @@ export function parseQuiz(body: string): Question {
   let long = false;
   let typed = "";
   const lefts: string[] = [], rights: string[] = [], options: string[] = [];
+  const ordered: string[] = [], shownItems: string[] = [], groups: string[] = [], itemGroups: (string | null)[] = [], bugs: string[] = [];
   for (const ln of lines) {
     const s = ln.trim();
     const f = FENCE.exec(ln);
@@ -55,6 +100,31 @@ export function parseQuiz(body: string): Question {
       continue;
     }
     let m: RegExpExecArray | null;
+    // Lines and items before choices, as quiz.parse: `- [1, 2]` is code.
+    const bare = ln.replace(/^\s+/, "");
+    if (typed === "order" || typed === "sort") {
+      if ((m = ITEM.exec(bare)) && m[1]!.trim()) {
+        if (typed === "order") ordered.push(m[1]!.replace(/\s+$/, ""));
+        else {
+          shownItems.push(m[1]!.trim());
+          itemGroups.push(groups.length ? groups[groups.length - 1]! : "");
+        }
+        continue;
+      }
+      if ((m = LINEQ.exec(bare)) && m[1]!.trim()) {
+        shownItems.push(typed === "order" ? m[1]!.replace(/\s+$/, "") : m[1]!.trim());
+        itemGroups.push(null);
+        continue;
+      }
+    }
+    if (typed === "sort" && (m = GROUP.exec(s))) {
+      groups.push(m[1]!.trim());
+      continue;
+    }
+    if (typed === "bug" && (m = BUGQ.exec(s))) {
+      for (const b of m[1]!.split(/[,\s]+/)) if (b) bugs.push(b);
+      continue;
+    }
     if ((m = CHOICE.exec(s))) {
       q.choices.push(m[2]!.trim());
       if (m[1] !== " ") q.correct.push(m[2]!.trim());
@@ -63,7 +133,7 @@ export function parseQuiz(body: string): Question {
     } else if ((m = POINTS.exec(s))) q.points = parseFloat(m[1]!);
     else if ((m = QID.exec(s))) q.id = m[1]!;
     else if (LONG.test(s)) long = true;
-    else if ((m = TYPE.exec(s))) typed = /^match/i.test(m[1]!) ? "match" : "blank";
+    else if ((m = TYPE.exec(s))) typed = KINDS[m[1]!.toLowerCase()]!;
     else if (typed === "match" && (m = PAIR.exec(s))) {
       lefts.push(m[1]!.trim());
       rights.push(m[2]!.trim());
@@ -91,12 +161,45 @@ export function parseQuiz(body: string): Question {
     q.answers = [];
     q.options = [...new Set([...rights, ...options])].sort();
     q.kind = "match";
+  } else if (typed === "order") {
+    q.answers = [];
+    if (ordered.length) {
+      q.choices = scramble(ordered);
+      q.correct = ordered;
+    } else {
+      q.choices = [...shownItems];
+      q.correct = [];
+    }
+    q.kind = "order";
+  } else if (typed === "sort") {
+    // choices: the items as shown (shuffled); correct: each one's group; answers: the groups, as written.
+    q.answers = groups;
+    if (itemGroups.some((g) => g)) {
+      const pairs = shownItems.map((it, i) => [it, itemGroups[i]] as const).filter(([, g]) => g);
+      const shuffled = scramble(pairs.map(([it]) => it));
+      const left = [...pairs];
+      q.correct = shuffled.map((it) => left.splice(left.findIndex(([x]) => x === it), 1)[0]![1]!);
+      q.choices = shuffled;
+    } else {
+      q.choices = [...shownItems];
+      q.correct = [];
+    }
+    q.kind = "sort";
+  } else if (typed === "bug") {
+    q.choices = [];
+    q.answers = [];
+    q.correct = bugs.map((b) => b.replace(/^0+/, "") || "0");
+    q.kind = "bug";
   } else q.kind = q.choices.length ? "choice" : "text";
   return q;
 }
 
 /** Notes as pieces: markdown, a question, or a block of tests — skipping fences, so an example isn't a question. */
-export type Piece = { type: "md"; text: string } | { type: "quiz"; body: string } | { type: "tests"; body: string; kind: string };
+export type Piece =
+  | { type: "md"; text: string }
+  | { type: "quiz"; body: string }
+  | { type: "cards"; body: string }
+  | { type: "tests"; body: string; kind: string };
 
 export function pieces(md: string, testKinds: string[] = ["tests"]): Piece[] {
   const lines = String(md ?? "").replace(/\r\n?/g, "\n").split("\n");
@@ -111,7 +214,7 @@ export function pieces(md: string, testKinds: string[] = ["tests"]): Piece[] {
     const ln = lines[i]!;
     const f = FENCE.exec(ln);
     const lang = f ? f[2]!.trim().toLowerCase() : "";
-    if (fence === null && f && (lang === "quiz" || testKinds.includes(lang))) {
+    if (fence === null && f && (lang === "quiz" || lang === "cards" || testKinds.includes(lang))) {
       const mark = f[1]!;
       const body: string[] = [];
       for (i++; i < lines.length; i++) {
@@ -120,7 +223,9 @@ export function pieces(md: string, testKinds: string[] = ["tests"]): Piece[] {
         body.push(lines[i]!);
       }
       flush();
-      out.push(lang === "quiz" ? { type: "quiz", body: body.join("\n") } : { type: "tests", body: body.join("\n"), kind: lang });
+      out.push(
+        lang === "quiz" || lang === "cards" ? { type: lang, body: body.join("\n") } : { type: "tests", body: body.join("\n"), kind: lang },
+      );
       continue;
     }
     if (f) {
@@ -131,6 +236,15 @@ export function pieces(md: string, testKinds: string[] = ["tests"]): Piece[] {
   }
   flush();
   return out;
+}
+
+/** A ```cards block, a card a line: `front -> back` (a leading `- ` is fine); lines without -> are skipped. */
+export function parseCards(text: string): { front: string; back: string }[] {
+  return String(text ?? "")
+    .split("\n")
+    .map((ln) => /^(.+?)\s+->\s+(.+)$/.exec(ln.trim().replace(/^[-*+]\s+/, "")))
+    .filter((m): m is RegExpExecArray => !!m)
+    .map((m) => ({ front: m[1]!.trim(), back: m[2]!.trim() }));
 }
 
 /**

@@ -208,6 +208,23 @@ def quiz_answer():
             if not any(got):
                 return err("Answer the question first.", 400)
             response = json.dumps(got)
+        elif key.kind in ("order", "sort"):
+            # The lines in the student's order, or each item's group, one per
+            # line or item as the question showed them (quiz.py). An order
+            # that isn't those same lines is a page out of step with the
+            # question, refused like a wrong number of blanks.
+            got = quiz.items(response)
+            shown = json.loads(key.choices or "[]")
+            if (not response.lstrip().startswith("[") or len(got) != len(shown) or any(len(g) > 300 for g in got)
+                    or (key.kind == "order" and sorted(got) != sorted(shown))):
+                return err("This question has changed since the page loaded. Reload to get the new one.", 400)
+            if key.kind == "sort" and not all(g in json.loads(key.answers or "[]") for g in got):
+                return err("Put every item in a group first.", 400)
+            response = json.dumps(got)
+        elif key.kind == "bug":
+            response = response.strip()
+            if not response.isdigit() or len(response) > 4:
+                return err("Click the line with the bug first.", 400)
         elif key.kind == "long":
             if len(response) > LONG_RESPONSE_MAX * 2:
                 return err("That answer is too long to turn in.", 413)

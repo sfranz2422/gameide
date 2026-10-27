@@ -17,12 +17,12 @@
  */
 import DOMPurify from "dompurify";
 import { marked } from "marked";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../store/api";
 import { allTests, runTests, type GameRunner, type TestResult } from "../checks/checks";
 import type { Project } from "../store/project";
 import { announceXp } from "../xp/runXp";
-import { BLANK, parseQuiz, pieces, slides, type Question } from "./quiz";
+import { BLANK, codeLines, fnv, parseCards, parseQuiz, pieces, slides, type Question } from "./quiz";
 import { Spotlight } from "../tutorials/TutorialPane";
 import { takeHighlight } from "../tutorials/tutorial";
 
@@ -33,14 +33,97 @@ const SANITIZE = {
 };
 
 export function renderMarkdown(md: string): string {
-  const html = DOMPurify.sanitize(marked.parse(md ?? "", { breaks: true, async: false }) as string, SANITIZE) as string;
+  // A checklist's boxes as placeholders: the sanitiser takes every <input>
+  // out, so a task list arrived as bare items. A span with a data- attribute
+  // survives, and enhanceTasks makes it a real checkbox, in the DOM.
+  const raw = (marked.parse(md ?? "", { breaks: true, async: false }) as string).replace(
+    /<input\b[^>]*type="checkbox"[^>]*>/g,
+    (tag) => `<span class="task-box" data-done="${/\bchecked\b/.test(tag) ? "1" : "0"}"></span>`,
+  );
+  const html = DOMPurify.sanitize(raw, SANITIZE) as string;
   // Links open in a new tab, and can't reach back into this one.
   return html.replace(/<a /g, '<a target="_blank" rel="noopener noreferrer" ');
 }
 
-function Markdown({ md, className = "" }: { md: string; className?: string }) {
+/**
+ * `- [ ] item` in notes: a box the student ticks, kept in this browser, per
+ * assignment and per item — their own record of how far they've got; nothing
+ * is sent or marked. `- [x]` starts ticked. Keyed by the item's words and its
+ * place among items with the same words, so two "Test it"s are two boxes.
+ */
+export function enhanceTasks(root: HTMLElement, page: string) {
+  const seen = new Map<string, number>();
+  root.querySelectorAll<HTMLElement>("span.task-box").forEach((spot) => {
+    const item = (spot.closest("li") as HTMLElement | null) ?? (spot.parentElement as HTMLElement);
+    const text = (item.textContent ?? "").trim();
+    const n = (seen.get(text) ?? 0) + 1;
+    seen.set(text, n);
+    const key = `gameide-task:${page}:${fnv(text)}:${n}`;
+    const box = document.createElement("input");
+    box.type = "checkbox";
+    box.className = "task-check";
+    box.setAttribute("aria-label", text || "Done");
+    let stored: string | null = null;
+    try {
+      stored = localStorage.getItem(key);
+    } catch {
+      /* a private window: nothing remembered */
+    }
+    box.checked = stored === null ? spot.dataset.done === "1" : stored === "1";
+    item.classList.add("task-item");
+    item.classList.toggle("is-done", box.checked);
+    box.addEventListener("change", () => {
+      item.classList.toggle("is-done", box.checked);
+      try {
+        localStorage.setItem(key, box.checked ? "1" : "0");
+      } catch {
+        /* this visit only */
+      }
+    });
+    spot.replaceWith(box);
+  });
+}
+
+function Markdown({ md, className = "", tasks }: { md: string; className?: string; tasks?: string }) {
   const html = useMemo(() => renderMarkdown(md), [md]);
-  return <div className={`notes-md ${className}`} dangerouslySetInnerHTML={{ __html: html }} />;
+  const ref = useRef<HTMLDivElement>(null);
+  // After React has put the HTML in: it never touches what's inside again
+  // until the html itself changes, so the boxes made here stay.
+  useEffect(() => {
+    if (tasks !== undefined && ref.current) enhanceTasks(ref.current, tasks);
+  }, [html, tasks]);
+  return <div ref={ref} className={`notes-md ${className}`} dangerouslySetInnerHTML={{ __html: html }} />;
+}
+
+/** A ```cards block: each card shows its front, and a click turns it over. For practising — nothing is marked. */
+function FlipCards({ body }: { body: string }) {
+  const cards = useMemo(() => parseCards(body), [body]);
+  const [flipped, setFlipped] = useState<Set<number>>(new Set());
+  if (!cards.length) return null;
+  return (
+    <div className="flip-cards" data-testid="flip-cards">
+      {cards.map((c, i) => {
+        const on = flipped.has(i);
+        return (
+          <button
+            key={i}
+            type="button"
+            className={`flip-card${on ? " is-flipped" : ""}`}
+            aria-pressed={on}
+            title="Click to turn it over"
+            onClick={() => setFlipped((f) => {
+              const next = new Set(f);
+              if (next.has(i)) next.delete(i);
+              else next.add(i);
+              return next;
+            })}
+          >
+            <span className="notes-md inline" dangerouslySetInnerHTML={{ __html: renderMarkdown(on ? c.back : c.front) }} />
+          </button>
+        );
+      })}
+    </div>
+  );
 }
 
 interface Reply {
@@ -117,7 +200,9 @@ export function NotesPane({ notes, assignment, project, runner, practice }: Note
       <div className="notes-body">
         {pieces(shown).map((p, i) =>
           p.type === "md" ? (
-            <Markdown key={i} md={p.text} />
+            <Markdown key={i} md={p.text} tasks={assignment} />
+          ) : p.type === "cards" ? (
+            <FlipCards key={i} body={p.body} />
           ) : p.type === "quiz" ? (
             <QuestionCard key={i} q={parseQuiz(p.body)} assignment={assignment} reply={mine[parseQuiz(p.body).id]} onAnswer={answered} practice={practice} />
           ) : (
@@ -136,6 +221,11 @@ function QuestionCard({ q, assignment, reply, onAnswer, practice }: { q: Questio
   const [text, setText] = useState("");
   const blanks = q.kind === "blank" ? [...q.prompt.matchAll(BLANK)].length : 0;
   const [items, setItems] = useState<string[]>(() => Array(q.kind === "match" ? q.choices.length : blanks).fill(""));
+  // Put in order, sort into groups, find the bug (quiz.py has what each sends).
+  const [order, setOrder] = useState<string[]>(() => [...q.choices]);
+  const [placed, setPlaced] = useState<string[]>(() => q.choices.map(() => ""));
+  const [picked, setPicked] = useState(-1);
+  const [bugLine, setBugLine] = useState("");
   const [problem, setProblem] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   if (!q.id) return <p className="banner error">This question isn't finished: it needs its answer and enough choices.</p>;
@@ -143,6 +233,9 @@ function QuestionCard({ q, assignment, reply, onAnswer, practice }: { q: Questio
   const response = () => {
     if (q.kind === "choice") return choice;
     if (q.kind === "blank" || q.kind === "match") return JSON.stringify(items);
+    if (q.kind === "order") return JSON.stringify(order);
+    if (q.kind === "sort") return JSON.stringify(placed);
+    if (q.kind === "bug") return bugLine;
     if (q.kind === "long")
       // Paragraphs, escaped: the server cleans it again whatever is sent (quiz.clean_html).
       return text
@@ -152,6 +245,8 @@ function QuestionCard({ q, assignment, reply, onAnswer, practice }: { q: Questio
     return text;
   };
   const send = async () => {
+    if (q.kind === "sort" && placed.some((g) => !g)) return setProblem("Put every item in a group first.");
+    if (q.kind === "bug" && !bugLine) return setProblem("Click the line with the bug first.");
     setBusy(true);
     setProblem(null);
     try {
@@ -168,7 +263,32 @@ function QuestionCard({ q, assignment, reply, onAnswer, practice }: { q: Questio
   const promptMd = q.kind === "blank" ? (() => {
     let n = 0;
     return q.prompt.replace(BLANK, () => `**(${++n})** ____`);
-  })() : q.prompt;
+  })() : q.kind === "bug" ? withoutCode(q.prompt) : q.prompt;
+  // What's shown once answered: their answer, as they sent it.
+  const sent = (fallback: string[]) => {
+    try {
+      const got = JSON.parse(reply?.response ?? "null");
+      return Array.isArray(got) && got.length === fallback.length ? (got as string[]) : fallback;
+    } catch {
+      return fallback;
+    }
+  };
+  const shownOrder = done ? sent(order) : order;
+  const shownPlaced = done ? sent(placed) : placed;
+  const shownBug = done ? (reply!.response ?? "") : bugLine;
+  const move = (from: number, to: number) => {
+    if (to < 0 || to >= order.length) return;
+    setOrder((o) => {
+      const next = [...o];
+      next.splice(to, 0, next.splice(from, 1)[0]!);
+      return next;
+    });
+  };
+  const put = (group: string) => {
+    if (done || picked < 0) return;
+    setPlaced((p) => p.map((g, i) => (i === picked ? group : g)));
+    setPicked(-1);
+  };
   return (
     <div className={`quiz-card${done ? " done" : ""}`} data-testid="question">
       <div className="quiz-head">
@@ -231,6 +351,79 @@ function QuestionCard({ q, assignment, reply, onAnswer, practice }: { q: Questio
           ))}
         </div>
       )}
+      {q.kind === "order" && (
+        <ol className="quiz-order" data-testid="quiz-order">
+          {shownOrder.map((line, i) => (
+            <li key={`${i}:${line}`} className="quiz-order-row">
+              <code className="quiz-order-line">{line}</code>
+              <button type="button" className="quiz-order-btn" disabled={done || i === 0} onClick={() => move(i, i - 1)} aria-label="Move up">
+                ▲
+              </button>
+              <button type="button" className="quiz-order-btn" disabled={done || i === shownOrder.length - 1} onClick={() => move(i, i + 1)} aria-label="Move down">
+                ▼
+              </button>
+            </li>
+          ))}
+        </ol>
+      )}
+      {q.kind === "bug" && (
+        <div className="quiz-bug" data-testid="quiz-bug">
+          {codeLines(q.prompt).map((line, i) => (
+            <button
+              key={i}
+              type="button"
+              className={`quiz-bug-line${shownBug === String(i + 1) ? " is-picked" : ""}`}
+              disabled={done}
+              onClick={() => setBugLine(String(i + 1))}
+              aria-label={`Line ${i + 1}: ${line}`}
+            >
+              <span className="quiz-bug-num">{i + 1}</span>
+              <code className="quiz-bug-code">{line || " "}</code>
+            </button>
+          ))}
+        </div>
+      )}
+      {q.kind === "sort" && (
+        <div className="quiz-sort" data-testid="quiz-sort">
+          {["", ...q.answers.map(String)].map((group) =>
+            // The tray, once answered with every item placed, says nothing.
+            !group && done && shownPlaced.every((g) => g) ? null : (
+              <div
+                key={group || "tray"}
+                className={`${group ? "quiz-sort-group" : "quiz-sort-tray"}${!done && picked >= 0 ? " is-target" : ""}`}
+                onClick={() => put(group)}
+                data-testid={group ? `sort-group-${group}` : "sort-tray"}
+              >
+                <div className="quiz-sort-head">{group || "Not sorted yet"}</div>
+                <div className="quiz-sort-items">
+                  {q.choices.map((item, i) =>
+                    shownPlaced[i] === group ? (
+                      <button
+                        key={i}
+                        type="button"
+                        className={`quiz-sort-item${picked === i ? " is-picked" : ""}`}
+                        disabled={done}
+                        title="Click it, then click the group it belongs in"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          // With another item picked, a click on an item in a
+                          // different group puts it there: a group's box fills
+                          // with items, and a click aimed at the box landed on
+                          // one of them and only changed which was picked.
+                          if (picked >= 0 && picked !== i && shownPlaced[picked] !== shownPlaced[i]) put(shownPlaced[i]!);
+                          else setPicked(picked === i ? -1 : i);
+                        }}
+                      >
+                        <span className="notes-md inline" dangerouslySetInnerHTML={{ __html: renderMarkdown(item) }} />
+                      </button>
+                    ) : null,
+                  )}
+                </div>
+              </div>
+            ),
+          )}
+        </div>
+      )}
       {reply ? (
         <p className={`quiz-result ${reply.kind === "long" ? "" : reply.correct ? "right" : reply.earned > 0 ? "part" : "wrong"}`} data-testid="question-result">
           {reply.practice ? "Practice: " : ""}
@@ -254,6 +447,24 @@ function QuestionCard({ q, assignment, reply, onAnswer, practice }: { q: Questio
       {problem && <p className="error-text">{problem}</p>}
     </div>
   );
+}
+
+/** A bug question's prompt without its code: the code is drawn as a button a line instead. */
+function withoutCode(prompt: string): string {
+  const lines = prompt.split("\n");
+  let inner: string | null = null;
+  let start = -1;
+  for (let i = 0; i < lines.length; i++) {
+    const f = /^ {0,3}(`{3,}|~{3,})/.exec(lines[i]!);
+    if (!f) continue;
+    if (inner === null) {
+      inner = f[1]!;
+      start = i;
+    } else if (f[1]![0] === inner[0] && f[1]!.length >= inner.length) {
+      return [...lines.slice(0, start), ...lines.slice(i + 1)].join("\n");
+    }
+  }
+  return prompt;
 }
 
 // ---------------------------------------------------------------- tests

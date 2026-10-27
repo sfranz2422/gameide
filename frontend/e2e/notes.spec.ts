@@ -115,3 +115,120 @@ test("notes: slides, a question, Check my work in the game pane, and the teacher
   await sctx.close();
   await tctx.close();
 });
+
+const PUZZLES = `# Puzzles
+
+- [ ] Read this
+- [ ] Solve them all
+
+\`\`\`cards
+sprite -> a picture, with frames
+room -> where the game happens
+\`\`\`
+
+\`\`\`quiz
+type: order
+Put the lines in order.
+- def on_step(self):
+-     if keyboard_check("right"):
+-         self.x += 4
+\`\`\`
+
+\`\`\`quiz
+type: bug
+Which line is wrong?
+~~~python
+x = 1
+print(x
+y = 2
+~~~
+bug: 2
+\`\`\`
+
+\`\`\`quiz
+type: sort
+Sort them.
+group: Event
+- Create
+- Step
+group: Function
+- instance_create
+- keyboard_check
+\`\`\`
+`;
+
+test("notes: a checklist that stays ticked, flip cards, and order, bug and sort questions", async ({ browser }) => {
+  test.setTimeout(180_000);
+  const { ctx: tctx, page: teacher } = await signedIn(browser, "teach3@example.com");
+  await teacher.goto("/#/games");
+  await chooseTemplate(teacher, "platformer");
+  await expect(teacher.getByTestId("save-status")).toHaveText("Saved");
+  await teacher.goto("/#/classes");
+  await teacher.getByTestId("new-class-name").fill("Puzzles P6");
+  await teacher.getByTestId("new-class-go").click();
+  await teacher.getByTestId("roster-emails").fill("pia@example.com");
+  await teacher.getByTestId("roster-add").click();
+  await expect(teacher.getByText("pia@example.com")).toBeVisible();
+  await teacher.getByTestId("new-assignment").click();
+  await teacher.getByTestId("assignment-game").selectOption({ label: "Platformer" });
+  await teacher.getByTestId("assignment-title").fill("Puzzles");
+  await teacher.getByTestId("assignment-go").click();
+  await teacher.getByTestId("assignment-link").filter({ hasText: "Puzzles" }).click();
+  await teacher.getByTestId("notes-source").fill(PUZZLES);
+  await teacher.getByTestId("notes-save").click();
+  await expect(teacher.getByTestId("notes-save")).toHaveText("Saved");
+  const slug = teacher.url().split("/").pop()!;
+
+  const { ctx: sctx, page: pia } = await signedIn(browser, "pia@example.com");
+  await pia.goto(`/a/${slug}`);
+  await pia.waitForURL(/#\/p\//);
+  const pane = pia.getByTestId("notes-pane");
+  await expect(pane).toBeVisible();
+
+  // The checklist: ticked, and still ticked after a reload.
+  await pane.getByRole("checkbox", { name: "Read this" }).check();
+  await pia.reload();
+  await expect(pia.getByTestId("notes-pane").getByRole("checkbox", { name: "Read this" })).toBeChecked();
+  await expect(pia.getByTestId("notes-pane").getByRole("checkbox", { name: "Solve them all" })).not.toBeChecked();
+
+  // A flip card turns over.
+  const card = pia.getByTestId("flip-cards").getByRole("button").first();
+  await expect(card).toContainText("sprite");
+  await card.click();
+  await expect(card).toContainText("a picture, with frames");
+
+  // Put in order: move each line up to where it belongs.
+  const want = ["def on_step(self):", '    if keyboard_check("right"):', "        self.x += 4"];
+  const order = pia.getByTestId("quiz-order");
+  for (let t = 0; t < want.length; t++) {
+    for (;;) {
+      const lines = await order.locator(".quiz-order-line").allTextContents();
+      const at = lines.indexOf(want[t]!);
+      if (at <= t) break;
+      await order.locator(".quiz-order-row").nth(at).getByRole("button", { name: "Move up" }).click();
+    }
+  }
+  const questions = pia.getByTestId("question");
+  await questions.nth(0).getByTestId("question-answer").click();
+  await expect(questions.nth(0).getByTestId("question-result")).toContainText("✓ Right");
+
+  // Find the bug: line 2.
+  await pia.getByTestId("quiz-bug").getByRole("button", { name: /^Line 2:/ }).click();
+  await questions.nth(1).getByTestId("question-answer").click();
+  await expect(questions.nth(1).getByTestId("question-result")).toContainText("✓ Right");
+
+  // Sort: click each item, then its group.
+  const groupOf: Record<string, string> = { Create: "Event", Step: "Event", instance_create: "Function", keyboard_check: "Function" };
+  const sort = pia.getByTestId("quiz-sort");
+  for (let k = 0; k < 4; k++) {
+    const chip = sort.getByTestId("sort-tray").locator(".quiz-sort-item").first();
+    const text = (await chip.textContent())!.trim();
+    await chip.click();
+    await sort.getByTestId(`sort-group-${groupOf[text]}`).click();
+  }
+  await questions.nth(2).getByTestId("question-answer").click();
+  await expect(questions.nth(2).getByTestId("question-result")).toContainText("✓ Right");
+  if (SHOTS) await pia.screenshot({ path: `${SHOTS}/notes-puzzles.png` });
+  await sctx.close();
+  await tctx.close();
+});
