@@ -594,6 +594,12 @@ CASES = [
  ("lesson check typo", "public/tutorials/py-maths.md", "prints 1024", "prints 1025", "py-maths"),
  ("lesson console empty", "src/editor/EditorPage.tsx", "                    output={lines}\n", "", "Python Basics: lesson 1", E2E),
  ("lesson code typo", "public/tutorials/py-functions.md", "    return n * 2", "    return n * 3", "py-functions"),
+ # Tutorial series (src/tutorials/series.ts; series.test.ts): lessons that build one game
+ ("series block drifts", "public/tutorials/el1-player.md", "self.x = clamp(self.x, 0, room_width - 24)\nself.y", "self.x = clamp(self.x, 0, room_width - 32)\nself.y", "el1-player"),
+ ("series check impossible", "public/tutorials/el1-player.md", 'after 3 seconds holding left, instances("Player")[0].x == 0', 'after 3 seconds holding left, instances("Player")[0].x == 1', "el1-player"),
+ ("series starters forget", "src/tutorials/series.ts", "for (const lesson of series.lessons.slice(0, n))", "for (const lesson of series.lessons.slice(0, n * 0))", "el1-time-limit"),
+ ("series starters forget in the editor", "src/store/templates.ts", "    applyLessonsBefore(p, series, n);\n", "    applyLessonsBefore(p, series, 0 * n);\n", "Game Elements: a lesson starts", E2E),
+ ("series enemies never return", "src/tutorials/series.ts", "    self.y = random.randint(12, room_height - 12)\n`;\nconst ENEMY_BACK_SCORE", "    self.y = random.randint(12, room_height - 12)\n    self.x = -999\n`;\nconst ENEMY_BACK_SCORE", "el1-enemy"),
  # Physics (engine/physics.ts; src/python/physics.test.ts, e2e/physics.editor.spec.ts)
  ("physics moved twice", EN, "if (!phys && (h !== 0 || v !== 0)) {", "if (h !== 0 || v !== 0) {", "takes push"),
  ("physics teleport ignored", PH, "if (x !== e.x || y !== e.y || angle !== e.angle) {", "if (x !== e.x && y !== e.y && angle !== e.angle) {", "is moved by its own code"),

@@ -55,7 +55,7 @@ export interface Tutorial {
 }
 
 /** The levels the library is shelved by, in order (the spec's). */
-export const LEVELS = ["Getting Started", "Python Basics", "Platformers", "Top-Down", "Shooters", "Advanced Python"];
+export const LEVELS = ["Getting Started", "Python Basics", "Game Elements 1: The Basics", "Game Elements 2: Adding to the Fun", "Game Elements 3: Advanced Techniques", "Platformers", "Top-Down", "Shooters", "Advanced Python"];
 
 const HEADER = /^\s*---[ \t]*\n([\s\S]*?)\n---[ \t]*(?:\n|$)/;
 const HIGHLIGHT = /^highlight\s*:\s*([\w-]+)\s*$/i;

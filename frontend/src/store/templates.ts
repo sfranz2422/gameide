@@ -2,6 +2,7 @@
  * Projects a student can start from. Each is built fresh — new ids, newly
  * painted pictures — so two projects made from one template share nothing.
  */
+import { applyLessonsBefore, SERIES, type Series } from "../tutorials/series";
 import {
   blankProject,
   newEvent,
@@ -379,8 +380,20 @@ async function pythonStart(): Promise<Built> {
   return { project: p, assets: new Map() };
 }
 
+/** Lesson n of a series (tutorials/series.ts): the base game with every earlier lesson done. */
+function seriesStart(series: Series, n: number) {
+  return async (): Promise<Built> => {
+    const p = blankProject("My game");
+    const assets = new Map<string, Blob>();
+    for (const key of series.sprites) await addStarterSprite(p, assets, key);
+    applyLessonsBefore(p, series, n);
+    return { project: p, assets };
+  };
+}
+
 /** Templates for tutorials only, by their `starter:` name. */
 export const TUTORIAL_STARTERS: Record<string, () => Promise<Built>> = {
+  ...Object.fromEntries(SERIES.flatMap((s) => s.lessons.map((_, n) => [`${s.name}-${n}`, seriesStart(s, n)]))),
   empty,
   coins,
   platformer,

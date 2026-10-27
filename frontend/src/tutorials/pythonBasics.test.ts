@@ -16,55 +16,12 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { checkGame, checkProject, printedOk, readCheck, type GameRunner } from "../checks/checks";
-import { KEY_CODE } from "../engine/input";
-import { PythonGame } from "../python/bridge";
-import { buildGame } from "../python/codegen";
-import type { Project } from "../store/project";
+import { checkGame, checkProject, printedOk, readCheck } from "../checks/checks";
 import { TUTORIAL_STARTERS } from "../store/templates";
+import { nodeRunner } from "./nodeRunner";
 import { parseTutorial } from "./tutorial";
 
 const DIR = join(__dirname, "../../public/tutorials");
-
-/** A GameRunner on a PythonGame in node: steps() runs the game a few steps each time it's asked. */
-function nodeRunner(project: () => Project): GameRunner {
-  let game: PythonGame | null = null;
-  let errors: string[] = [];
-  return {
-    stepsPerSecond: 60,
-    async steps() {
-      if (!game) return 0;
-      for (let i = 0; i < 10 && !game.isStopped; i++) {
-        const e = game.step();
-        if (e) errors.push(e.message);
-      }
-      return Number(game.evalPython("__import__('gameide')._step_count"));
-    },
-    async start() {
-      errors = [];
-      const { game: g, error } = await PythonGame.load(buildGame(project(), new Map()).def);
-      if (error) throw new Error(`The game stopped with an error: ${error.message}`);
-      game = g;
-    },
-    stop() {
-      game?.dispose();
-      game = null;
-    },
-    hold(key, down) {
-      const code = KEY_CODE.get(key)!;
-      if (down) game!.engine.input.keyDown(code);
-      else game!.engine.input.keyUp(code);
-    },
-    async py(expr) {
-      try {
-        return game!.evalPython(expr);
-      } catch (e) {
-        return { error: String(e) };
-      }
-    },
-    errors: () => [...errors],
-  };
-}
 
 /** Code blocks a step shows, in order. */
 const blocksOf = (md: string) => [...md.matchAll(/```python\n([\s\S]*?)```/g)].map((m) => m[1]!);

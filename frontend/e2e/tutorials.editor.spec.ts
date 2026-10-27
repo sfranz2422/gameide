@@ -136,3 +136,18 @@ test("Python Basics: lesson 1 checks what the program printed, in the game pane"
   await expect(page.getByTestId("tutorial-console")).toContainText("Hello, world!");
   if (SHOTS) await page.screenshot({ path: `${SHOTS}/python-basics-1.png` });
 });
+
+test("Game Elements: a lesson starts from the game the lessons before it made", async ({ page }) => {
+  test.setTimeout(120_000);
+  await page.goto("/#/tutorials");
+  await expect(page.getByRole("heading", { name: "Game Elements 1: The Basics" })).toBeVisible();
+  await page.getByTestId("tutorial-card").filter({ hasText: "3. Enemy" }).getByTestId("tutorial-start").click();
+  await page.waitForURL(/#\/p\//);
+  await expect(page.getByTestId("tutorial-step")).toHaveText("Step 1 of 6");
+  // Lessons 1 and 2 are done in it: the Player moves with the keys, a gamepad and Shift.
+  await treeItem(page, "Player").click();
+  await page.getByTestId("event-Step").click();
+  await expect(page.getByTestId("event-code")).toContainText('gamepad_check("b")');
+  await expect(treeItem(page, "Enemy")).toBeVisible();
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/elements-3.png` });
+});

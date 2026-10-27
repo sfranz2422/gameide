@@ -96,6 +96,54 @@
   "description": "Variables, if and loops on the screen: draw with a loop, and grow a circle with the arrow keys."
  },
  {
+  "key": "el1-player",
+  "title": "1. Player",
+  "level": "Game Elements 1: The Basics",
+  "time": "10 min",
+  "starter": "dodge-0",
+  "description": "A player you move with the arrow keys or WASD, who can't leave the screen."
+ },
+ {
+  "key": "el1-gamepad",
+  "title": "2. Gamepad",
+  "level": "Game Elements 1: The Basics",
+  "time": "12 min",
+  "starter": "dodge-1",
+  "description": "Play with a controller: the stick, the D-pad, and a button to run."
+ },
+ {
+  "key": "el1-enemy",
+  "title": "3. Enemy",
+  "level": "Game Elements 1: The Basics",
+  "time": "12 min",
+  "starter": "dodge-2",
+  "description": "Enemies that fly across the screen, come back round at a random height, each at its own speed."
+ },
+ {
+  "key": "el1-collisions",
+  "title": "4. Collisions",
+  "level": "Game Elements 1: The Basics",
+  "time": "12 min",
+  "starter": "dodge-3",
+  "description": "When the player touches an enemy, lose a life — and when the lives run out, start again."
+ },
+ {
+  "key": "el1-score",
+  "title": "5. Score",
+  "level": "Game Elements 1: The Basics",
+  "time": "15 min",
+  "starter": "dodge-4",
+  "description": "A point for every enemy dodged, the score and lives on screen, and a best score that's kept."
+ },
+ {
+  "key": "el1-time-limit",
+  "title": "6. Time Limit",
+  "level": "Game Elements 1: The Basics",
+  "time": "15 min",
+  "starter": "dodge-5",
+  "description": "A 30-second countdown with an alarm, \"Time's up!\", and Space to play again."
+ },
+ {
   "key": "simple-platformer",
   "title": "Simple Platformer",
   "level": "Platformers",
