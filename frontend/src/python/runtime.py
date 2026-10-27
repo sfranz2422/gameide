@@ -113,7 +113,7 @@ __all__ = [
     # small maths
     "clamp", "lerp", "approach", "sign", "choose",
     # rooms and the game
-    "room_goto", "room_restart", "game_restart", "global_vars", "room_width", "room_height",
+    "room_goto", "room_restart", "room_name", "game_restart", "global_vars", "room_width", "room_height",
     "game_pause", "game_paused",
     # the camera
     "camera_follow", "camera_set", "camera_shake", "camera_zoom", "view_x", "view_y", "view_width", "view_height",
@@ -1328,6 +1328,11 @@ def room_goto(room):
             _pending_room = i
             return
     raise NameError(f'There is no room called "{room}".' + _suggest(str(room), [r["name"] for r in _rooms]))
+
+
+def room_name():
+    """The name of the room the game is in now: `if room_name() == "Title":`."""
+    return _rooms[_room_now]["name"] if _room_now >= 0 else None
 
 
 def room_restart():

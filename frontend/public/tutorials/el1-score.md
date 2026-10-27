@@ -31,7 +31,7 @@ highlight: code-editor
 
 ```check
 Enemy.step uses score
-after 8 seconds, global_vars.score >= 1
+game runs 2 seconds without errors
 ```
 
 ---

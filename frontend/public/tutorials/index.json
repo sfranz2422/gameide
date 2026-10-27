@@ -144,6 +144,54 @@
   "description": "A 30-second countdown with an alarm, \"Time's up!\", and Space to play again."
  },
  {
+  "key": "el2-title-screen",
+  "title": "1. Title Screen",
+  "level": "Game Elements 2: Adding to the Fun",
+  "time": "12 min",
+  "starter": "dodge2-0",
+  "description": "A room of its own for the game's name, and a key to start playing."
+ },
+ {
+  "key": "el2-collecting",
+  "title": "2. Collecting",
+  "level": "Game Elements 2: Adding to the Fun",
+  "time": "15 min",
+  "starter": "dodge2-1",
+  "description": "Coins worth 5 points that turn up somewhere new, and your first function in a script of its own."
+ },
+ {
+  "key": "el2-projectile",
+  "title": "3. Projectile",
+  "level": "Game Elements 2: Adding to the Fun",
+  "time": "15 min",
+  "starter": "dodge2-2",
+  "description": "Fire bullets while Space is held, tidy them away off screen, and knock enemies back."
+ },
+ {
+  "key": "el2-difficulty",
+  "title": "4. Increasing Difficulty",
+  "level": "Game Elements 2: Adding to the Fun",
+  "time": "12 min",
+  "starter": "dodge2-3",
+  "description": "Enemies that speed up every time they come round — up to a limit — and more of them as time goes on."
+ },
+ {
+  "key": "el2-multiplayer",
+  "title": "5. Multiplayer",
+  "level": "Game Elements 2: Adding to the Fun",
+  "time": "15 min",
+  "starter": "dodge2-4",
+  "description": "A second player on WASD, made from the first one with its own keys — one object defining another."
+ },
+ {
+  "key": "el2-end-screen",
+  "title": "6. End Screen",
+  "level": "Game Elements 2: Adding to the Fun",
+  "time": "15 min",
+  "starter": "dodge2-5",
+  "description": "A game-over room with the final score, back to the title from there, and a best score that's saved."
+ },
+ {
   "key": "simple-platformer",
   "title": "Simple Platformer",
   "level": "Platformers",

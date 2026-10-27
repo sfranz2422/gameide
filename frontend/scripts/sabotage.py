@@ -600,6 +600,11 @@ CASES = [
  ("series starters forget", "src/tutorials/series.ts", "for (const lesson of series.lessons.slice(0, n))", "for (const lesson of series.lessons.slice(0, n * 0))", "el1-time-limit"),
  ("series starters forget in the editor", "src/store/templates.ts", "    applyLessonsBefore(p, series, n);\n", "    applyLessonsBefore(p, series, 0 * n);\n", "Game Elements: a lesson starts", E2E),
  ("series enemies never return", "src/tutorials/series.ts", "    self.y = random.randint(12, room_height - 12)\n`;\nconst ENEMY_BACK_SCORE", "    self.y = random.randint(12, room_height - 12)\n    self.x = -999\n`;\nconst ENEMY_BACK_SCORE", "el1-enemy"),
+ ("room_name lies", RT, 'return _rooms[_room_now]["name"] if _room_now >= 0 else None', 'return _rooms[0]["name"] if _room_now >= 0 else None', "el2-title-screen"),
+ ("series doesn't carry on", "src/tutorials/series.ts", "if (series.continues) applyLessonsBefore(", "if (series.continues && n < 0) applyLessonsBefore(", "el2-collecting"),
+ ("series scripts never made", "src/tutorials/series.ts", "    else p.scripts.push({ ...newScript(name), code });\n", "    else void newScript;\n", "el2-collecting"),
+ ("series events never deleted", "src/tutorials/series.ts", "    obj.events = obj.events.filter((x) => !sameKey(x.key, key));\n", "    void key;\n", "el2-end-screen"),
+ ("series parents ignored", "src/tutorials/series.ts", "parent: parent?.id ?? null });", "parent: null });", "el2-multiplayer"),
  # Physics (engine/physics.ts; src/python/physics.test.ts, e2e/physics.editor.spec.ts)
  ("physics moved twice", EN, "if (!phys && (h !== 0 || v !== 0)) {", "if (h !== 0 || v !== 0) {", "takes push"),
  ("physics teleport ignored", PH, "if (x !== e.x || y !== e.y || angle !== e.angle) {", "if (x !== e.x && y !== e.y && angle !== e.angle) {", "is moved by its own code"),

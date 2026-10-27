@@ -6,7 +6,7 @@
  */
 import type { GameRunner } from "../checks/checks";
 import { KEY_CODE } from "../engine/input";
-import { PythonGame } from "../python/bridge";
+import { getPyodide, PythonGame } from "../python/bridge";
 import { buildGame } from "../python/codegen";
 import type { Project } from "../store/project";
 
@@ -26,6 +26,9 @@ export function nodeRunner(project: () => Project): GameRunner {
     },
     async start() {
       errors = [];
+      // The same random numbers every run: a lesson's checks must pass for
+      // every student, and a test that passed by luck would hide one that doesn't.
+      (await getPyodide()).runPython("import random; random.seed(7)");
       const { game: g, error } = await PythonGame.load(buildGame(project(), new Map()).def);
       if (error) throw new Error(`The game stopped with an error: ${error.message}`);
       game = g;

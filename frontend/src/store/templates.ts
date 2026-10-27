@@ -2,7 +2,7 @@
  * Projects a student can start from. Each is built fresh — new ids, newly
  * painted pictures — so two projects made from one template share nothing.
  */
-import { applyLessonsBefore, SERIES, type Series } from "../tutorials/series";
+import { applyLessonsBefore, SERIES, seriesSprites, type Series } from "../tutorials/series";
 import {
   blankProject,
   newEvent,
@@ -385,7 +385,7 @@ function seriesStart(series: Series, n: number) {
   return async (): Promise<Built> => {
     const p = blankProject("My game");
     const assets = new Map<string, Blob>();
-    for (const key of series.sprites) await addStarterSprite(p, assets, key);
+    for (const key of seriesSprites(series)) await addStarterSprite(p, assets, key);
     applyLessonsBefore(p, series, n);
     return { project: p, assets };
   };

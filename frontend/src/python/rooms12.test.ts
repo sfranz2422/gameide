@@ -201,3 +201,19 @@ describe("persistent rooms", () => {
     expect(py(p, "len(instances('Thing'))")).toBe(2);
   });
 });
+
+describe("room_name", () => {
+  it("is the room the game is in now", async () => {
+    const { game } = await load({
+      code: { Thing: "class Thing(GameObject):\n    pass\n" },
+      rooms: [
+        { name: "Title", width: 100, height: 100, instances: [] },
+        { name: "Level", width: 100, height: 100, instances: [] },
+      ],
+    });
+    expect(py(game, "room_name()")).toBe("Title");
+    py(game, "room_goto('Level')");
+    run(game);
+    expect(py(game, "room_name()")).toBe("Level");
+  });
+});

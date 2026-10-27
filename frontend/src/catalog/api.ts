@@ -211,6 +211,7 @@ export const API: ApiEntry[] = [
   // Rooms and the game
   fn("Rooms", "room_goto", [p("room", "room")], "nothing", "Goes to another room at the end of this step."),
   fn("Rooms", "room_restart", [], "nothing", "Starts this room again at the end of this step."),
+  fn("Rooms", "room_name", [], "the room's name", 'The name of the room the game is in now: if room_name() == "Title":'),
   fn("Rooms", "game_restart", [], "nothing", "Starts the whole game again, from the first room."),
   fn("Rooms", "game_pause", [p("paused", "boolean", "True")], "nothing",
     "Pauses the game (or carries on, with False): nothing moves, animates, counts down or collides, and Step and key events run only for instances with self.ignore_pause = True — a pause menu. Everything is still drawn."),

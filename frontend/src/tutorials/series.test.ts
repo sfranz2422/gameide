@@ -56,7 +56,7 @@ describe("tutorial series", () => {
         for (const [s, step] of t.steps.entries()) {
           const edit = lesson.edits[s];
           if (edit) applyEdit(project, edit);
-          const code = project.objects.flatMap((o) => o.events.map((e) => e.code)).join("\n\n");
+          const code = [...project.objects.flatMap((o) => o.events.map((e) => e.code)), ...project.scripts.map((x) => x.code)].join("\n\n");
           for (const block of [...step.md.matchAll(/```python\n([\s\S]*?)```/g)].map((m) => m[1]!))
             expect(contains(code, block), `${lesson.key} step ${s + 1} shows code the game doesn't have:\n${block}`).toBe(true);
           for (const c of step.checks) {
