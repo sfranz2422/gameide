@@ -605,6 +605,11 @@ CASES = [
  ("series scripts never made", "src/tutorials/series.ts", "    else p.scripts.push({ ...newScript(name), code });\n", "    else void newScript;\n", "el2-collecting"),
  ("series events never deleted", "src/tutorials/series.ts", "    obj.events = obj.events.filter((x) => !sameKey(x.key, key));\n", "    void key;\n", "el2-end-screen"),
  ("series parents ignored", "src/tutorials/series.ts", "parent: parent?.id ?? null });", "parent: null });", "el2-multiplayer"),
+ ("series room size ignored", "src/tutorials/series.ts", "    if (set.width) room.width = set.width;\n", "    if (set.width) room.width = room.width;\n", "el3-camera"),
+ ("series camera follows nothing", "src/tutorials/series.ts", "      room.camera.follow = follow.id;\n", "      void follow;\n", "el3-camera"),
+ ("series mouse event wrong button", "src/tutorials/series.ts", 'button: arg as "left", edge', 'button: "right" as "left", edge', "el3-button"),
+ ("series walls not solid", "src/tutorials/series.ts", "solid: !!o.solid });", "solid: false });", "el3-platformer"),
+ ("walkthrough runner leaps ahead", "src/tutorials/nodeRunner.ts", "(count < 30 ? 1 : 10)", "(count < 30 ? 10 : 10)", "el3-strike"),
  # Physics (engine/physics.ts; src/python/physics.test.ts, e2e/physics.editor.spec.ts)
  ("physics moved twice", EN, "if (!phys && (h !== 0 || v !== 0)) {", "if (h !== 0 || v !== 0) {", "takes push"),
  ("physics teleport ignored", PH, "if (x !== e.x || y !== e.y || angle !== e.angle) {", "if (x !== e.x && y !== e.y && angle !== e.angle) {", "is moved by its own code"),

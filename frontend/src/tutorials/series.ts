@@ -19,8 +19,10 @@ import { newEvent, newInstance, newObject, newRoom, newScript, type EventKey, ty
 export interface Edit {
   /** New rooms; `first` puts it at the top of the list, which makes it where the game starts. */
   rooms?: { name: string; first?: boolean }[];
-  /** New objects the step makes: name, its sprite's name (or null), and its parent object's name. */
-  objects?: { name: string; sprite: string | null; parent?: string }[];
+  /** New objects the step makes: name, its sprite's name (or null), its parent object's name, and Solid ticked. */
+  objects?: { name: string; sprite: string | null; parent?: string; solid?: boolean }[];
+  /** A room's settings changed in the room editor: its size, and its camera (following an object by name). */
+  roomSettings?: Record<string, { width?: number; height?: number; camera?: { enabled?: boolean; follow?: string } }>;
   /** Scripts, by name → their whole code after the step. */
   scripts?: Record<string, string>;
   /** Events deleted, as "Object.event". */
@@ -50,9 +52,10 @@ export interface Series {
   lessons: SeriesLesson[];
 }
 
-/** An event's key from its name in an Edit ("step", "alarm 0", "collision Enemy"). */
+/** An event's key from its name in an Edit ("step", "alarm 0", "collision Enemy", "mouse left pressed"). */
 export function eventKey(p: Project, name: string): EventKey {
-  const [type, arg] = name.split(" ", 2) as [string, string | undefined];
+  const [type, arg, edge] = name.split(" ", 3) as [string, string | undefined, string | undefined];
+  if (type === "mouse") return { type: "mouse", button: arg as "left", edge: edge as "pressed", global: false };
   if (type === "alarm") return { type: "alarm", n: Number(arg) };
   if (type === "collision") {
     const other = p.objects.find((o) => o.name === arg);
@@ -81,7 +84,19 @@ export function applyEdit(p: Project, e: Edit) {
     if (o.sprite && !sprite) throw new Error(`There's no sprite called ${o.sprite}.`);
     const parent = o.parent ? p.objects.find((x) => x.name === o.parent) : null;
     if (o.parent && !parent) throw new Error(`There's no object called ${o.parent} to be the parent.`);
-    p.objects.push({ ...newObject(o.name), sprite: sprite?.id ?? null, parent: parent?.id ?? null });
+    p.objects.push({ ...newObject(o.name), sprite: sprite?.id ?? null, parent: parent?.id ?? null, solid: !!o.solid });
+  }
+  for (const [name, set] of Object.entries(e.roomSettings ?? {})) {
+    const room = p.rooms.find((r) => r.name === name);
+    if (!room) throw new Error(`There's no room called ${name}.`);
+    if (set.width) room.width = set.width;
+    if (set.height) room.height = set.height;
+    if (set.camera?.enabled !== undefined) room.camera.enabled = set.camera.enabled;
+    if (set.camera?.follow) {
+      const follow = p.objects.find((o) => o.name === set.camera!.follow);
+      if (!follow) throw new Error(`There's no object called ${set.camera.follow} to follow.`);
+      room.camera.follow = follow.id;
+    }
   }
   for (const [name, code] of Object.entries(e.scripts ?? {})) {
     const script = p.scripts.find((s) => s.name === name);
@@ -454,4 +469,418 @@ export const DODGE2: Series = {
   ],
 };
 
-export const SERIES: Series[] = [DODGE, DODGE2];
+// ---------------------------------------------------------------- Game Elements 3: Advanced Techniques — a space shooter
+
+const TURN = `if keyboard_check("left"):
+    self.image_angle += 5
+if keyboard_check("right"):
+    self.image_angle -= 5
+`;
+const THRUST = `if keyboard_check("up"):
+    self.direction = self.image_angle
+    self.speed = 4
+else:
+    self.speed = 0
+`;
+const WRAP = `self.x = self.x % room_width
+self.y = self.y % room_height
+`;
+const SPEEDS = `draw_set_color("white")
+draw_text(10, 10, f"hspeed {self.hspeed:.1f}   vspeed {self.vspeed:.1f}")
+`;
+const PUSH = `import math
+if keyboard_check("up"):
+    self.hspeed += math.cos(math.radians(self.image_angle)) * 0.2
+    self.vspeed -= math.sin(math.radians(self.image_angle)) * 0.2
+`;
+const CAP = `if self.speed > 6:
+    self.speed = 6
+`;
+const BRAKE = `if keyboard_check("down"):
+    self.speed *= 0.9
+`;
+const SHIP_MOVE = TURN + PUSH + CAP + BRAKE + WRAP;
+const SHOOT_ONCE = `if keyboard_check_pressed("space"):
+    b = instance_create(self.x, self.y, "Bullet")
+    b.direction = self.image_angle
+    b.image_angle = self.image_angle
+    b.speed = 8
+`;
+const SHOOT_HELD = `if keyboard_check("space") and self.can_fire:
+    b = instance_create(self.x, self.y, "Bullet")
+    b.direction = self.image_angle
+    b.image_angle = self.image_angle
+    b.speed = 8
+    self.can_fire = False
+    self.alarm[0] = 10
+`;
+const SEE_THROUGH = `if self.safe:
+    self.image_alpha = 0.4
+else:
+    self.image_alpha = 1
+`;
+const ROCK_CREATE = `import random
+self.image_xscale = 3
+self.image_yscale = 3
+self.direction = random.randint(0, 359)
+self.speed = random.uniform(1, 2.5)
+`;
+const SPAWN = `import random
+x = random.choice([0, room_width])
+y = random.randint(0, room_height)
+instance_create(x, y, "Rock")
+self.alarm[0] = 120
+`;
+const shipHit = (safeSteps: number, hp: boolean, sparks: boolean) => `if not self.safe:
+    self.safe = True
+    self.alarm[1] = ${safeSteps}
+    other.destroy()
+${hp ? "    self.hp -= 25\n    if self.hp <= 0:\n        room_restart()\n" : ""}${sparks ? '    particles(self.x, self.y, count=20, color="orange")\n' : ""}`;
+const BAR = (colours: boolean) => `draw_set_color("dkgray")
+draw_rect(10, 56, 210, 68)
+${colours ? 'if self.hp > 50:\n    draw_set_color("lime")\nelif self.hp > 25:\n    draw_set_color("orange")\nelse:\n    draw_set_color("red")\n' : 'draw_set_color("lime")\n'}draw_rect(10, 56, 10 + self.hp * 2, 68)
+`;
+const OVER_SHIP = `draw_self()
+draw_set_color("red")
+draw_rect(self.x - 12, self.y - 22, self.x - 12 + self.hp * 0.24, self.y - 19)
+`;
+const SPLIT = `if self.image_xscale > 1.5:
+    for i in range(2):
+        r = instance_create(self.x, self.y, "Rock")
+        r.image_xscale = self.image_xscale / 2
+        r.image_yscale = self.image_yscale / 2
+`;
+const PAUSE_KEY = (escape: boolean) => `if keyboard_check_pressed("p")${escape ? ' or keyboard_check_pressed("escape")' : ""}:
+    game_pause(not game_paused())
+`;
+const MENU_KEYS = `if game_paused():
+    if keyboard_check_pressed("down"):
+        self.choice = (self.choice + 1) % len(self.options)
+    if keyboard_check_pressed("up"):
+        self.choice = (self.choice - 1) % len(self.options)
+`;
+const MENU_PICK = `    if keyboard_check_pressed("enter"):
+        game_pause(False)
+        if self.options[self.choice] == "Restart":
+            room_restart()
+`;
+const PAUSED_DRAW = `if game_paused():
+    draw_set_alpha(0.6)
+    draw_set_color("black")
+    draw_rect(0, 0, 640, 480)
+    draw_set_alpha(1)
+    draw_set_color("white")
+    draw_set_halign("center")
+    draw_text(320, 150, "PAUSED")
+`;
+const MENU_LIST = `    for i in range(len(self.options)):
+        if i == self.choice:
+            draw_set_color("yellow")
+        else:
+            draw_set_color("white")
+        draw_text(320, 220 + i * 30, self.options[i])
+`;
+const BUTTON_DRAW = `draw_self()
+draw_set_color("white")
+draw_set_halign("center")
+draw_set_valign("middle")
+draw_text(self.x + 96, self.y + 32, "START")
+`;
+const HOVER = `if collision_point(mouse_x, mouse_y, "StartButton") == self:
+    self.image_blend = "yellow"
+else:
+    self.image_blend = "white"
+`;
+
+export const SPACE: Series = {
+  name: "space",
+  sprites: ["ship", "bullet", "ball", "block"],
+  base: {
+    objects: [{ name: "Ship", sprite: "ship" }, { name: "Rock", sprite: "ball" }, { name: "Bullet", sprite: "bullet" }],
+    place: [{ object: "Ship", x: 320, y: 240 }],
+  },
+  lessons: [
+    {
+      key: "el3-angled",
+      edits: {
+        1: { code: { "Ship.step": TURN } },
+        2: { code: { "Ship.step": TURN + THRUST } },
+        3: { code: { "Ship.draw_gui": SPEEDS } },
+        4: { code: { "Ship.step": TURN + THRUST + WRAP } },
+      },
+    },
+    {
+      key: "el3-drift",
+      edits: {
+        1: { code: { "Ship.step": TURN + PUSH + WRAP } },
+        2: { code: { "Ship.create": "self.friction = 0.05\n" } },
+        3: { code: { "Ship.step": TURN + PUSH + CAP + WRAP } },
+        4: { code: { "Ship.step": SHIP_MOVE } },
+      },
+    },
+    {
+      key: "el3-spawning",
+      edits: {
+        1: { code: { "Rock.create": ROCK_CREATE, "Rock.step": WRAP }, place: [{ object: "Rock", x: 100, y: 100 }, { object: "Rock", x: 540, y: 380 }] },
+        2: { objects: [{ name: "Spawner", sprite: null }], place: [{ object: "Spawner", x: 0, y: 0 }], code: { "Spawner.create": "self.alarm[0] = 120\n", "Spawner.alarm 0": SPAWN } },
+        3: { code: { "Ship.step": SHIP_MOVE + SHOOT_ONCE, "Bullet.outside_room": "self.destroy()\n" } },
+        4: { code: { "Bullet.collision Rock": "other.destroy()\nself.destroy()\n" } },
+        5: { code: { "Spawner.draw_gui": "draw_set_color(\"white\")\ndraw_text(10, 30, f\"Rocks: {instance_number('Rock')}\")\n" } },
+      },
+    },
+    {
+      key: "el3-delay",
+      edits: {
+        1: { code: { "Ship.create": "self.friction = 0.05\nself.can_fire = True\n", "Ship.step": SHIP_MOVE + SHOOT_HELD, "Ship.alarm 0": "self.can_fire = True\n" } },
+        2: {
+          code: {
+            "Ship.create": "self.friction = 0.05\nself.can_fire = True\nself.safe = False\n",
+            "Ship.collision Rock": shipHit(120, false, false),
+            "Ship.alarm 1": "self.safe = False\n",
+            "Ship.step": SHIP_MOVE + SHOOT_HELD + SEE_THROUGH,
+          },
+        },
+        3: { code: { "Ship.collision Rock": shipHit(180, false, false) } },
+      },
+    },
+    {
+      key: "el3-health",
+      edits: {
+        1: { code: { "Ship.create": "self.friction = 0.05\nself.can_fire = True\nself.safe = False\nself.hp = 100\n", "Ship.collision Rock": shipHit(180, true, false) } },
+        2: { code: { "Ship.draw_gui": SPEEDS + BAR(false) } },
+        3: { code: { "Ship.draw_gui": SPEEDS + BAR(true) } },
+        4: { code: { "Ship.draw": OVER_SHIP } },
+        5: { code: { "Ship.step": SHIP_MOVE + SHOOT_HELD + SEE_THROUGH + "self.hp = min(100, self.hp + 0.02)\n" } },
+      },
+    },
+    {
+      key: "el3-explosions",
+      edits: {
+        1: { code: { "Rock.destroy": 'effect("explosion", self.x, self.y)\n' } },
+        2: { code: { "Rock.destroy": 'effect("explosion", self.x, self.y)\ncamera_shake(4, 10)\n' } },
+        3: { code: { "Rock.destroy": 'effect("explosion", self.x, self.y)\ncamera_shake(4, 10)\n' + SPLIT } },
+        4: { code: { "Ship.collision Rock": shipHit(180, true, true) } },
+        5: { code: { "Rock.destroy": 'effect("explosion", self.x, self.y)\ncamera_shake(4, 10)\n' + SPLIT + "hit_pause(3)\n" } },
+      },
+    },
+    {
+      key: "el3-pause",
+      edits: {
+        1: { objects: [{ name: "Menu", sprite: null }], place: [{ object: "Menu", x: 0, y: 0 }], code: { "Menu.create": "self.ignore_pause = True\n", "Menu.step": PAUSE_KEY(false) } },
+        2: { code: { "Menu.draw_gui": PAUSED_DRAW } },
+        3: {
+          code: {
+            "Menu.create": 'self.ignore_pause = True\nself.options = ["Resume", "Restart"]\nself.choice = 0\n',
+            "Menu.draw_gui": PAUSED_DRAW + MENU_LIST,
+            "Menu.step": PAUSE_KEY(false) + MENU_KEYS,
+          },
+        },
+        4: { code: { "Menu.step": PAUSE_KEY(false) + MENU_KEYS + MENU_PICK } },
+        5: { code: { "Menu.step": PAUSE_KEY(true) + MENU_KEYS + MENU_PICK } },
+      },
+    },
+    {
+      key: "el3-button",
+      edits: {
+        1: {
+          rooms: [{ name: "Title", first: true }],
+          objects: [{ name: "StartButton", sprite: "block" }],
+          place: [{ object: "StartButton", x: 224, y: 208, room: "Title" }],
+          code: { "StartButton.create": "self.image_xscale = 3\n", "StartButton.draw": BUTTON_DRAW },
+        },
+        2: { code: { "StartButton.mouse left pressed": 'room_goto("Room1")\n' } },
+        3: { code: { "StartButton.step": HOVER } },
+        4: { code: { "StartButton.step": HOVER + 'if keyboard_check_pressed("enter"):\n    room_goto("Room1")\n' } },
+      },
+    },
+  ],
+};
+
+// ---------------------------------------------------------------- Game Elements 3: Advanced Techniques — a cave platformer
+
+const MAP_SMALL = [
+  "....................",
+  "....................",
+  "....................",
+  "....................",
+  "....................",
+  "....................",
+  "...............###..",
+  "....................",
+  "..........####......",
+  "....................",
+  "....####............",
+  "....................",
+  "....................",
+  "P...................",
+  "####################",
+];
+const MAP_COINS = [
+  "....................",
+  "....................",
+  "....................",
+  "....................",
+  "....................",
+  "................c...",
+  "...............###..",
+  "...........c........",
+  "..........####......",
+  ".....c..............",
+  "....####............",
+  "....................",
+  "....................",
+  "P...................",
+  "####################",
+];
+const MAP_WIDE = [
+  "............................................................",
+  "............................................................",
+  "............................................................",
+  "....................................................c.......",
+  "...................................................####.....",
+  "................c...........................................",
+  "...............###........c.................................",
+  "...........c.............###............c...................",
+  "..........####.........................###......#####.......",
+  ".....c......................................................",
+  "....####.......................c............................",
+  "..............................###...........................",
+  "............................................................",
+  "P...........................................................",
+  "############################################################",
+];
+const MAP_FULL = [
+  "............................................................",
+  "............................................................",
+  "............................................................",
+  "....................................................c.......",
+  "...................................................####.....",
+  "................c...........................................",
+  "...............###........c.................................",
+  "...........c.............###............c...................",
+  "..........####.........................###......#####.......",
+  ".....c......................................................",
+  "....####.......................c............................",
+  "..............................###...........................",
+  "............................................................",
+  "P...F.......s.................s..............s..............",
+  "############################################################",
+];
+
+const mapCode = (rows: string[], more: string) => `rows = [
+${rows.map((r) => `    "${r}",`).join("\n")}
+]
+for row in range(len(rows)):
+    for col in range(len(rows[row])):
+        if rows[row][col] == "#":
+            instance_create(col * 32, row * 32, "Wall")
+${more}`;
+const MAKE_PLAYER = `        elif rows[row][col] == "P":
+            instance_create(col * 32, row * 32, "Player")
+`;
+const MAKE_COIN = `        elif rows[row][col] == "c":
+            instance_create(col * 32 + 16, row * 32 + 16, "Coin")
+`;
+const MAKE_SLIME = `        elif rows[row][col] == "s":
+            instance_create(col * 32 + 16, row * 32 + 20, "Slime")
+        elif rows[row][col] == "F":
+            instance_create(col * 32, row * 32 + 8, "Friend")
+`;
+const RUN_FALL = `move = keyboard_check("right") - keyboard_check("left")
+move_and_collide(move * 3, 0)
+`;
+const JUMP = `on_ground = not place_free(self.x, self.y + 1)
+if on_ground and keyboard_check("up"):
+    self.vy = -9
+`;
+const SHORT_HOP = `if self.vy < 0 and not keyboard_check("up"):
+    self.vy = max(self.vy, -3)
+`;
+const GRAVITY = (cap: boolean) => `self.vy += 0.5
+${cap ? "self.vy = min(self.vy, 10)\n" : ""}if move_and_collide(0, self.vy):
+    self.vy = 0
+`;
+const PLATFORMER = RUN_FALL + JUMP + SHORT_HOP + GRAVITY(true);
+const FACING = `if move != 0:
+    self.facing = move
+if keyboard_check_pressed("x"):
+    instance_create(self.x + self.facing * 28, self.y - 4, "Slash")
+`;
+const TALK = (count: boolean) => `friend = instance_nearest(self.x, self.y, "Friend")
+if friend and point_distance(self.x, self.y, friend.x, friend.y) < 48:
+    if keyboard_check_pressed("z"):
+        say(${count ? 'f"There are {instance_number(\'Slime\')} slimes left."' : '"Hello! Press X to fight the slimes."'}, "Friend")
+`;
+const SLIME_STEP = `if not place_free(self.x + self.hspeed * 13, self.y):
+    self.hspeed = -self.hspeed
+`;
+const CAVE_CREATE = "self.vy = 0\ncamera_follow(self, 0.1)\n";
+
+export const CAVE: Series = {
+  name: "cave",
+  sprites: ["player", "wall", "coin", "enemy", "block"],
+  base: {
+    objects: [
+      { name: "Wall", sprite: "wall", solid: true },
+      { name: "Player", sprite: "player" },
+      { name: "Coin", sprite: "coin" },
+      { name: "Slime", sprite: "enemy" },
+      { name: "Friend", sprite: "player" },
+      { name: "Slash", sprite: "block" },
+    ],
+  },
+  lessons: [
+    {
+      key: "el3-level-map",
+      edits: {
+        1: { objects: [{ name: "Level", sprite: null }], place: [{ object: "Level", x: 0, y: 0 }], code: { "Level.create": mapCode(MAP_SMALL, "") } },
+        2: { code: { "Level.create": mapCode(MAP_SMALL, MAKE_PLAYER) } },
+        3: { code: { "Level.create": mapCode(MAP_COINS, MAKE_PLAYER + MAKE_COIN) } },
+      },
+    },
+    {
+      key: "el3-platformer",
+      edits: {
+        1: { code: { "Player.create": "self.vy = 0\n", "Player.step": RUN_FALL + GRAVITY(false) } },
+        2: { code: { "Player.step": RUN_FALL + JUMP + GRAVITY(false) } },
+        3: { code: { "Player.step": RUN_FALL + JUMP + SHORT_HOP + GRAVITY(false) } },
+        4: { code: { "Player.step": PLATFORMER } },
+      },
+    },
+    {
+      key: "el3-camera",
+      edits: {
+        1: { roomSettings: { Room1: { width: 1920 } }, code: { "Level.create": mapCode(MAP_WIDE, MAKE_PLAYER + MAKE_COIN) } },
+        2: { roomSettings: { Room1: { camera: { enabled: true, follow: "Player" } } } },
+        3: { code: { "Player.create": CAVE_CREATE } },
+        4: { code: { "Player.create": CAVE_CREATE + "camera_zoom(1.5)\n" } },
+      },
+    },
+    {
+      key: "el3-strike",
+      edits: {
+        1: {
+          code: {
+            "Level.create": mapCode(MAP_FULL, MAKE_PLAYER + MAKE_COIN + MAKE_SLIME),
+            "Slime.create": "self.hspeed = -1\n",
+            "Slime.step": SLIME_STEP,
+            "Player.collision Slime": "room_restart()\n",
+          },
+        },
+        2: {
+          code: {
+            "Player.create": CAVE_CREATE + "camera_zoom(1.5)\nself.facing = 1\n",
+            "Player.step": PLATFORMER + FACING,
+            "Slash.create": "self.image_xscale = 0.5\nself.image_yscale = 0.5\nself.image_alpha = 0.5\nself.alarm[0] = 15\n",
+            "Slash.alarm 0": "self.destroy()\n",
+            "Slash.collision Slime": 'effect("hit", other.x, other.y)\nother.destroy()\n',
+          },
+        },
+        3: { code: { "Friend.create": 'self.image_blend = "lime"\n', "Player.step": PLATFORMER + FACING + TALK(false) } },
+        4: { code: { "Player.step": PLATFORMER + FACING + TALK(true) } },
+      },
+    },
+  ],
+};
+
+export const SERIES: Series[] = [DODGE, DODGE2, SPACE, CAVE];

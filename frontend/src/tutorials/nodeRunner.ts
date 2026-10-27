@@ -1,8 +1,9 @@
 /**
  * A GameRunner (checks/checks.ts) for the tutorial walkthrough tests: the
- * project built exactly as Play builds it, run in node's Pyodide. steps()
- * runs the game ten steps each time it's asked, which is how a check's
- * "after 1 second" moves on without a clock.
+ * project built exactly as Play builds it, run in node's Pyodide. Each
+ * time steps() is asked it says how far the game has got and then runs it a
+ * little further, which is how a check's "after 1 second" moves on without
+ * a clock.
  */
 import type { GameRunner } from "../checks/checks";
 import { KEY_CODE } from "../engine/input";
@@ -18,11 +19,17 @@ export function nodeRunner(project: () => Project): GameRunner {
     stepsPerSecond: 60,
     async steps() {
       if (!game) return 0;
-      for (let i = 0; i < 10 && !game.isStopped; i++) {
+      const count = Number(game.evalPython("__import__('gameide')._step_count"));
+      // One step at a time at first, so "after 0.1 seconds" is 6 steps and
+      // not 20 (a check's first call only asks where the count starts, and
+      // ten steps a call put a short-lived slash out of existence before it
+      // was looked at); ten at a time after that, so a 10-second check
+      // doesn't take a minute.
+      for (let i = 0; i < (count < 30 ? 1 : 10) && !game.isStopped; i++) {
         const e = game.step();
         if (e) errors.push(e.message);
       }
-      return Number(game.evalPython("__import__('gameide')._step_count"));
+      return count;
     },
     async start() {
       errors = [];

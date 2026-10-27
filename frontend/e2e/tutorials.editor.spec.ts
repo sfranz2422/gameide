@@ -6,7 +6,7 @@
  * is kept in the game, so the library knows and a reload carries on.
  */
 import { expect, test } from "@playwright/test";
-import { screenAt, setCode, SHOTS, treeItem } from "./helpers";
+import { py, screenAt, setCode, SHOTS, treeItem } from "./helpers";
 
 test("Your First Game, step by step: strict Next, spotlights, checks that play the game, progress kept", async ({ page }) => {
   test.setTimeout(180_000);
@@ -150,4 +150,18 @@ test("Game Elements: a lesson starts from the game the lessons before it made", 
   await expect(page.getByTestId("event-code")).toContainText('gamepad_check("b")');
   await expect(treeItem(page, "Enemy")).toBeVisible();
   if (SHOTS) await page.screenshot({ path: `${SHOTS}/elements-3.png` });
+});
+
+test("Game Elements 3: the cave platformer, with its real sprites, lands where the lessons' checks expect", async ({ page }) => {
+  test.setTimeout(120_000);
+  await page.goto("/#/tutorials");
+  await page.getByTestId("tutorial-card").filter({ hasText: "12. Strike and Interact" }).getByTestId("tutorial-start").click();
+  await page.waitForURL(/#\/p\//);
+  await page.getByTestId("play").click();
+  await expect(page.getByTestId("fps")).toBeVisible({ timeout: 60_000 });
+  // The wide map built by lessons 9 and 11, and a player standing on its floor:
+  // "after 1 second, instances("Player")[0].y == 424" in lesson 10 depends on the painted sprite's box.
+  await expect.poll(async () => await py(page, "instance_number('Wall')"), { timeout: 10_000 }).toBe(89);
+  await expect.poll(async () => await py(page, "instances('Player')[0].y"), { timeout: 10_000 }).toBe(424);
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/elements-cave.png` });
 });

@@ -192,6 +192,102 @@
   "description": "A game-over room with the final score, back to the title from there, and a best score that's saved."
  },
  {
+  "key": "el3-angled",
+  "title": "1. Angled Movement",
+  "level": "Game Elements 3: Advanced Techniques",
+  "time": "12 min",
+  "starter": "space-0",
+  "description": "A ship that turns, and flies the way it's pointing — direction, speed, and the hspeed and vspeed they make."
+ },
+ {
+  "key": "el3-drift",
+  "title": "2. Top-Down Physics",
+  "level": "Game Elements 3: Advanced Techniques",
+  "time": "15 min",
+  "starter": "space-1",
+  "description": "Push, don't set: speed that builds up and drifts, friction to slow it, a top speed, and brakes."
+ },
+ {
+  "key": "el3-spawning",
+  "title": "3. Spawning and Destroying",
+  "level": "Game Elements 3: Advanced Techniques",
+  "time": "15 min",
+  "starter": "space-2",
+  "description": "Rocks that drift, more of them on a timer, bullets made where the ship points, and both destroyed when they meet."
+ },
+ {
+  "key": "el3-delay",
+  "title": "4. Delay Timer",
+  "level": "Game Elements 3: Advanced Techniques",
+  "time": "15 min",
+  "starter": "space-3",
+  "description": "Wait before something can happen again — a rate of fire, and a moment of safety after a hit — with alarms."
+ },
+ {
+  "key": "el3-health",
+  "title": "5. Health Bars",
+  "level": "Game Elements 3: Advanced Techniques",
+  "time": "15 min",
+  "starter": "space-4",
+  "description": "Health as a number, a bar drawn from it that changes colour, one that floats over the ship, and healing."
+ },
+ {
+  "key": "el3-explosions",
+  "title": "6. Explosions",
+  "level": "Game Elements 3: Advanced Techniques",
+  "time": "15 min",
+  "starter": "space-5",
+  "description": "Effects and screen shake when a rock goes, rocks that break into smaller rocks, and sparks when the ship's hit."
+ },
+ {
+  "key": "el3-pause",
+  "title": "7. Pause Menu",
+  "level": "Game Elements 3: Advanced Techniques",
+  "time": "15 min",
+  "starter": "space-6",
+  "description": "P pauses the game; a menu of choices from a list, picked with the arrow keys and Enter."
+ },
+ {
+  "key": "el3-button",
+  "title": "8. Button Click and Tap",
+  "level": "Game Elements 3: Advanced Techniques",
+  "time": "12 min",
+  "starter": "space-7",
+  "description": "A START button on a title screen that works with a mouse click or a tap, and lights up when you point at it."
+ },
+ {
+  "key": "el3-level-map",
+  "title": "9. Level Maps",
+  "level": "Game Elements 3: Advanced Techniques",
+  "time": "15 min",
+  "starter": "cave-0",
+  "description": "A new game, a platformer: its level drawn as rows of text, and loops that turn the text into walls."
+ },
+ {
+  "key": "el3-platformer",
+  "title": "10. Platformer Tools",
+  "level": "Game Elements 3: Advanced Techniques",
+  "time": "15 min",
+  "starter": "cave-1",
+  "description": "Walking that stops at walls, gravity, jumping only from the ground, short hops and a top falling speed."
+ },
+ {
+  "key": "el3-camera",
+  "title": "11. Scrolling Camera",
+  "level": "Game Elements 3: Advanced Techniques",
+  "time": "15 min",
+  "starter": "cave-2",
+  "description": "A level three screens wide, and a camera that follows the player through it, smoothly."
+ },
+ {
+  "key": "el3-strike",
+  "title": "12. Strike and Interact",
+  "level": "Game Elements 3: Advanced Techniques",
+  "time": "20 min",
+  "starter": "cave-3",
+  "description": "Slimes to fight with a sword strike that lasts a moment, and a friend to talk to when you're close."
+ },
+ {
   "key": "simple-platformer",
   "title": "Simple Platformer",
   "level": "Platformers",
