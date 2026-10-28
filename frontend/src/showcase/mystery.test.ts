@@ -157,6 +157,7 @@ describe.skipIf(!have)("Mystery Meat from Outer Space", () => {
     // The finale without a photo: not yet.
     py(g, "STATE.update(room='mothership', items=['hotsauce'])");
     act(g, "use", "hotsauce", "machine");
+    expect(py(g, "STATE['code'] is None")).toBe(true); // not even the recipe screen
     expect(py(g, "STATE.get('ended')")).toBeFalsy();
   });
 

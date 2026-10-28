@@ -88,8 +88,35 @@ def is_magenta(r, g, b):
     return r > 150 and b > 150 and g < 110 and abs(r - b) < 90
 
 
-def cut_frames(im, expect=None):
-    """Sprites on flat magenta: the magenta made clear, and each figure cut out, left to right."""
+# Which icon on the items sheet is which item, counting along the rows.
+# Gemini drew a 4 x 4 grid of 16, not the 4 x 3 asked for: a second milk
+# carton, a lone battery, a second key, a blank notepad and a lunch tray
+# came along too, and are skipped. In ITEMS order: camera, batteries,
+# carton, sample, hot sauce, ice, keycard, roof key, photo, notepad, tinfoil.
+ITEM_CELLS = [0, 1, 2, 4, 5, 7, 8, 9, 11, 13, 14]
+
+
+def icon_rows(sheet):
+    """The rows of a grid of icons on magenta, found by the bands of plain magenta between them."""
+    w, h = sheet.size
+    small = sheet.convert("RGB").resize((w // 4, h // 4), Image.NEAREST)
+    px = small.load()
+    full = [any(not is_magenta(*px[x, y]) for x in range(small.width)) for y in range(small.height)]
+    rows, start = [], None
+    for y, c in enumerate(full + [False]):
+        if c and start is None:
+            start = y
+        elif not c and start is not None:
+            if y - start > small.height // 30:
+                rows.append((max(0, start * 4 - 4), min(h, y * 4 + 4)))
+            start = None
+    return rows
+
+
+def cut_frames(im, expect=None, join=0):
+    """Sprites on flat magenta: the magenta made clear, and each figure cut out, left to right.
+    join: pieces closer than this (a fraction of the width) are one thing —
+    the two batteries are one icon, with a sliver of magenta between them."""
     im = im.convert("RGBA")
     px = im.load()
     w, h = im.size
@@ -108,6 +135,14 @@ def cut_frames(im, expect=None):
             if x - start > w // 60:          # not a stray speck
                 runs.append((start, x))
             start = None
+    if join:
+        merged = []
+        for a, b in runs:
+            if merged and a - merged[-1][1] < w * join:
+                merged[-1] = (merged[-1][0], b)
+            else:
+                merged.append((a, b))
+        runs = merged
     # Two figures touching (a waving hand reaching the next one) make one
     # run twice as wide as the rest: split it at its thinnest column.
     if len(runs) > 2:
@@ -124,7 +159,9 @@ def cut_frames(im, expect=None):
         runs = split
     frames = []
     for x1, x2 in runs:
-        part = biggest_piece(im.crop((x1, 0, x2, h)))
+        part = im.crop((x1, 0, x2, h))
+        if not join:                 # an icon may be in pieces on purpose (two batteries, a key and its star)
+            part = biggest_piece(part)
         box = part.getchannel("A").getbbox()
         if box:
             frames.append(part.crop(box))
@@ -402,9 +439,11 @@ def build(assets_dir, out):
         icons = []
         sheet = Image.open(f).convert("RGBA")
         sw, sh = sheet.size
-        for r in range(3):              # a 4 x 3 grid: each row cut on its own
-            icons += cut_frames(sheet.crop((0, r * sh // 3, sw, (r + 1) * sh // 3)))
-        icons = [ImageOps.contain(i, (31, 17), Image.BOX) for i in icons][:12]
+        for y1, y2 in icon_rows(sheet):  # each row of the grid cut on its own
+            icons += cut_frames(sheet.crop((0, y1, sw, y2)), join=0.03)
+        print(f"  items: {len(icons)} icons")
+        icons = [icons[i] for i in ITEM_CELLS] if len(icons) > max(ITEM_CELLS) else icons
+        icons = [ImageOps.contain(i, (31, 17), Image.BOX) for i in icons]
         canvas = []
         for i in icons:
             c = Image.new("RGBA", (33, 19), (0, 0, 0, 0))

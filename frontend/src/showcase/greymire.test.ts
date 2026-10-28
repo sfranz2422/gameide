@@ -43,7 +43,10 @@ const press = (g: PythonGame, k: string) => {
 const where = (g: PythonGame) => py(g, "f\"{STATE['mode']}:{STATE['page']}\"") as string;
 /** On a page: Enter shows it whole, then a number takes that choice. */
 const take = (g: PythonGame, n: number) => {
-  press(g, "enter");
+  // Enter finishes the words typing out, but once they're whole it picks
+  // the lit choice: pressed then, it took "Hold back" in a duel whose short
+  // round had already finished typing — a failure only some random duels hit.
+  if (!(py(g, "len(instances('Book')[0].rows)") as number)) press(g, "enter");
   press(g, String(n));
   step(g, 2);
 };

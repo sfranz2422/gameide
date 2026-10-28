@@ -722,7 +722,7 @@ CASES = [
  ("greymire: a portrait over the duel", "../showcase/greymire/game/_3screens.py", "    if who:\n        draw_sprite(", "    if self.mode == \"duel\":\n        who = FOES[STATE[\"duel\"][\"foe\"]][\"who\"]\n    if who:\n        draw_sprite(", "a duel", GM),
  ("mystery: nothing is used on its own", "../showcase/mystery/game/_2engine.py", " and not used_alone(v, thing):", ":", "newsroom to the front page", MM),
  ("mystery: a conversation's answers never come", "../showcase/mystery/game/_2engine.py", "    say_line(\"robin\", words)\n    after()", "    say_line(\"robin\", words)", "newsroom to the front page", MM),
- ("mystery: the kitchen always open", "../showcase/mystery/game/_3story.py", "    if flag(\"glorbin_away\"):\n        go(\"kitchen\", 30, 124)", "    if True:\n        go(\"kitchen\", 30, 124)", "doors shut", MM),
+ ("mystery: the kitchen always open", "../showcase/mystery/game/_3story.py", "    if flag(\"glorbin_away\"):\n        go(\"kitchen\", 284, 126, \"left\")", "    if True:\n        go(\"kitchen\", 284, 126, \"left\")", "doors shut", MM),
  ("mystery: no tin hat needed", "../showcase/mystery/game/_3story.py", "    if not flag(\"hat_on\"):\n        picture(\"sleepy\", 90)", "    if False:\n        picture(\"sleepy\", 90)", "doors shut", MM),
  ("mystery: no proof needed", "../showcase/mystery/game/_3story.py", "    if not has(\"photo\"):\n        say_line(\"robin\", \"Wait.", "    if False:\n        say_line(\"robin\", \"Wait.", "doors shut", MM),
  ("mystery: walking into walls", "../showcase/mystery/game/_2engine.py", "    if inside(x, y, poly):\n        return x, y", "    if True:\n        return x, y", "foot of it", MM),
