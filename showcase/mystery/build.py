@@ -108,9 +108,23 @@ def cut_frames(im, expect=None):
             if x - start > w // 60:          # not a stray speck
                 runs.append((start, x))
             start = None
+    # Two figures touching (a waving hand reaching the next one) make one
+    # run twice as wide as the rest: split it at its thinnest column.
+    if len(runs) > 2:
+        widths = sorted(b - a for a, b in runs)
+        usual = widths[len(widths) // 2]
+        split = []
+        for x1, x2 in runs:
+            if x2 - x1 > 1.6 * usual:
+                lo, hi = x1 + (x2 - x1) * 3 // 10, x1 + (x2 - x1) * 7 // 10
+                cut = min(range(lo, hi), key=lambda x: sum(1 for y in range(0, h, 2) if alpha.getpixel((x, y))))
+                split += [(x1, cut), (cut, x2)]
+            else:
+                split.append((x1, x2))
+        runs = split
     frames = []
     for x1, x2 in runs:
-        part = im.crop((x1, 0, x2, h))
+        part = biggest_piece(im.crop((x1, 0, x2, h)))
         box = part.getchannel("A").getbbox()
         if box:
             frames.append(part.crop(box))
@@ -119,11 +133,54 @@ def cut_frames(im, expect=None):
     return frames
 
 
-def to_pixels(frames, height):
-    """Every frame shrunk by the same amount (the tallest to `height`), its colours cut, its edges hard."""
+def biggest_piece(part):
+    """The figure alone: only the largest connected shape is kept. Gemini
+    sometimes leaves a stray extra head or hand floating between figures,
+    which would otherwise ride along in the frame."""
+    step = 4                                  # found on a coarse grid, then cleared at full size
+    a = part.getchannel("A")
+    w, h = part.size
+    gw, gh = (w + step - 1) // step, (h + step - 1) // step
+    on = [[a.getpixel((min(w - 1, x * step), min(h - 1, y * step))) > 0 for x in range(gw)] for y in range(gh)]
+    seen, pieces = [[False] * gw for _ in range(gh)], []
+    for y in range(gh):
+        for x in range(gw):
+            if on[y][x] and not seen[y][x]:
+                cells, todo = [], [(x, y)]
+                seen[y][x] = True
+                while todo:
+                    cx, cy = todo.pop()
+                    cells.append((cx, cy))
+                    for nx in range(cx - 1, cx + 2):       # diagonals count as touching
+                        for ny in range(cy - 1, cy + 2):
+                            if 0 <= nx < gw and 0 <= ny < gh and on[ny][nx] and not seen[ny][nx]:
+                                seen[ny][nx] = True
+                                todo.append((nx, ny))
+                pieces.append(cells)
+    if len(pieces) < 2:
+        return part
+    keep = set(max(pieces, key=len))
+    mask = Image.new("L", (gw, gh), 0)
+    for cx, cy in keep:
+        mask.putpixel((cx, cy), 255)
+    mask = mask.resize((gw * step, gh * step), Image.NEAREST).crop((0, 0, w, h))
+    # A little slack at the edge of the grid cells, so the kept figure's own outline isn't nibbled.
+    from PIL import ImageFilter
+    mask = mask.filter(ImageFilter.MaxFilter(2 * step + 1))
+    out = part.copy()
+    out.putalpha(Image.composite(a, Image.new("L", (w, h), 0), mask))
+    return out
+
+
+def to_pixels(frames, height, each=False):
+    """Every frame shrunk by the same amount (the tallest to `height`), its colours cut, its edges hard.
+    each: every frame to `height` on its own, for a walk cycle that Gemini
+    drew at uneven sizes (Robin shrank and grew a step at a time)."""
     k = height / max(f.height for f in frames)
     out = []
     for f in frames:
+        if each:
+            k = height / f.height
         small = f.resize((max(1, round(f.width * k)), max(1, round(f.height * k))), Image.BOX)
         rgb = small.convert("RGB").quantize(32, dither=Image.Dither.NONE).convert("RGB")
         a = small.getchannel("A").point(lambda v: 255 if v > 110 else 0)
@@ -327,7 +384,7 @@ def build(assets_dir, out):
         if all(files):
             frames = []
             for f in files:
-                frames += to_pixels(cut_frames(Image.open(f)), HEIGHTS[who])
+                frames += to_pixels(cut_frames(Image.open(f)), HEIGHTS[who], each=f.stem.endswith("-walk"))
             made += SHEETS[who]
             if len(frames) < count:      # fewer figures than poses: the last one stands in for the rest
                 print(f"  {who}: {len(frames)} figures for {count} poses")

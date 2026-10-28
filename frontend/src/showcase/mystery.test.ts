@@ -188,6 +188,14 @@ describe.skipIf(!have)("Mystery Meat from Outer Space", () => {
     expect(py(g, "STATE['menu'] is None")).toBe(true);
   });
 
+  it("every spot is stood at, and every door comes out, on the floor", async () => {
+    const { game: g } = await start();
+    const off = py(g, `([f"{r}/{s['id']}: stand {s['stand']}" for r, room in ROOMS.items() for s in room['spots'] if not inside(*s['stand'], room['walk'])]
+ + [f"{r}/{s['id']}: comes out at {s['exit']}" for r, room in ROOMS.items() for s in room['spots'] if s.get('exit') and not inside(s['exit'][1], s['exit'][2], ROOMS[s['exit'][0]]['walk'])]
+ + [f"{r}/{s['id']}: box {s['box']}" for r, room in ROOMS.items() for s in room['spots'] if not (0 <= s['box'][0] < s['box'][2] <= 320 and 0 <= s['box'][1] < s['box'][3] <= ROOM_H)])`) as string[];
+    expect(off).toEqual([]);
+  });
+
   it("a click on a wall walks to the foot of it; one click finishes one line, not the whole talk", async () => {
     const { game: g } = await start();
     py(g, "click_floor(100, 20)");

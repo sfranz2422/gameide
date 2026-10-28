@@ -732,6 +732,8 @@ CASES = [
  ("mystery: Never mind leaves the screen up", "../showcase/mystery/game/_5code.py", "    out.append((\"Never mind.\", lambda: STATE.update(code=None)))", "    out.append((\"Never mind.\", lambda: None))", "wrong answer to a Python puzzle", MM),
  ("mystery: a solved puzzle asks again", "../showcase/mystery/game/_3story.py", "    puzzle(\"freezer\", lambda: (set_flag(\"freezer_open\"), ", "    puzzle(\"freezer\", lambda: (", "wrong answer to a Python puzzle", MM),
  ("mystery: a talk line picked at a fraction of a pixel", "../showcase/mystery/game/_4screen.py", "    i = int((my - (SENTENCE_Y + 10)) // 11)", "    i = (my - (SENTENCE_Y + 10)) // 11", "wrong answer to a Python puzzle", MM),
+ ("mystery: a spot stood at off the floor", "../showcase/mystery/game/_1world.py", '"stand": (212, 124)', '"stand": (212, 100)', "on the floor", MM),
+ ("mystery: a door comes out in the wall", "../showcase/mystery/game/_1world.py", '"exit": ("basement", 28, 130)', '"exit": ("basement", 28, 100)', "on the floor", MM),
  ("mystery: one click skips the whole talk", "../showcase/mystery/game/_2engine.py", "            clicked = False          # one click finishes one line", "            pass                     # one click finishes one line", "foot of it", MM),
  ("physics not stepped in the worker", PH, "    this.world!.step(1 / host.stepsPerSecond);", "    if (typeof window !== \"undefined\") this.world!.step(1 / host.stepsPerSecond);", "a physics coin falls", E2E),
 ]

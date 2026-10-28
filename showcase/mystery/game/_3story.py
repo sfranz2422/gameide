@@ -114,9 +114,11 @@ def _():
 
 
 says("look", "board", "My WEIRD STUFF board: a light over the school at night, a new lunch lady nobody hired, and now everybody yawning.")
+says("look", "bookshelf", "Old yearbooks, a dictionary, and a camera nobody has seen work since 1998.")
+says("pick", "bookshelf", "The yearbooks are glued together with old lunch. I'll leave them.")
 says("look", "computer", "The school computer. It takes four minutes to open a picture of a cat.")
 says("use", "computer", "I search for 'lunch lady from outer space'. The filter blocks it. Suspicious.")
-says("look", "desk", "My desk. Somewhere under there is last month's homework.")
+says("look", "desk", "My desk. Somewhere under there is last month's homework. And a spare camera with no film since 1998.")
 says("open", "desk", "Paper clips, a cold french fry, and an IOU from Dot for one (1) favour.")
 says("push", "computer", "I give it a whack. It makes a noise like a sad cow. Normal.")
 
@@ -132,7 +134,7 @@ says("look", "stairs", "The stairs up to the roof. There's a chain across them w
 
 def roof_stairs():
     if flag("roof_open"):
-        go("roof", 30, 124)
+        go("roof", 45, 130)
     else:
         say_line("robin", "There's a padlocked chain across the stairs. Astronomy club only.")
 
@@ -146,7 +148,7 @@ def _():
     set_flag("roof_open")
     sound("click")
     say_line("robin", "The padlock clicks open. Up to the roof!")
-    go("roof", 30, 124)
+    go("roof", 45, 130)
 
 
 # ---------------------------------------------------------------- the cafeteria
@@ -202,7 +204,7 @@ def _():
 
 def kitchen_door():
     if flag("glorbin_away"):
-        go("kitchen", 30, 124)
+        go("kitchen", 284, 126, "left")
     else:
         say_line("glorbin", "Staff only, sweetie! The kitchen's no place for a nosy little reporter.")
 
@@ -271,6 +273,9 @@ def open_freezer():
     set_flag("took_ice")
 
 
+says("look", "keypad", "A keypad on the freezer. There's a sticky note on it, covered in Python.")
+
+
 @on("open", "freezer")
 def _():
     if flag("freezer_open"):
@@ -281,6 +286,8 @@ def _():
 
 
 STORY[("use", "freezer")] = STORY[("open", "freezer")]
+STORY[("use", "keypad")] = STORY[("open", "freezer")]
+STORY[("push", "keypad")] = STORY[("open", "freezer")]
 
 
 # ---------------------------------------------------------------- the principal's office
@@ -292,7 +299,7 @@ says("pick", "keys", "The principal's keys? I'm brave. Not THAT brave.")
 says("look", "hoover", "Principal Hoover. He's been asleep since Tuesday.")
 says("push", "hoover", "He rolls over and mumbles something about detention.")
 says("use", "hotsauce", "He's had three helpings. It'd take the whole bottle, and I'm going to need it.", "hoover")
-says("look", "window", "The football field. The whole team is asleep on it.")
+says("look", "window", "The schoolyard. Not a soul out there. Everyone's asleep at their desks.")
 says("look", "intercom", "The school intercom. The whole school hears whatever you say into it.")
 
 
@@ -455,12 +462,14 @@ def beam_up():
         say_line("robin", "...A wave of sleepiness... Zzz... Huh? I'm still on the roof. Something up there puts people to sleep. I need protecting.")
         return
     picture("beam", 60)
-    go("mothership", 60, 126, "right")
+    go("mothership", 90, 128, "right")
     say_line("glorbin", "WHO DARES... oh. It's the nosy little reporter. In a tin hat. Clever Earthling.")
 
 
 # ---------------------------------------------------------------- the mothership
 
+says("look", "hatch", "The airlock. On the other side is a whole lot of nothing.")
+says("open", "hatch", "And let all the air out? I need that air. I'm using it.")
 says("look", "commander", "Ms. Glorbin, the REAL her. Three eyes, little tentacles. Still wearing the hairnet.")
 says("look", "machine", "The Sleepy Sauce machine. It's pumping sauce down to every school on Earth.")
 says("look", "spacewindow", "Earth. From up here you can't even tell everyone's asleep.")

@@ -256,11 +256,14 @@ def draw_ending(t):
     draw_rect(0, 0, 320, 200)
     draw_sprite("pic_newspaper", 0, NEWS_X, 0)
     x1, y1, x2, y2 = NEWS_PHOTO
-    draw_sprite_ext("glorbin", ACTORS["glorbin"]["poses"]["alien"], (x1 + x2) // 2, y2 - 2, 1, 1, 0, "white", 1)
-    for i, line in enumerate(("LUNCH LADY FROM", "OUTER SPACE!")):
-        draw_centered(NEWS_X + NEWS_W / 2, NEWS_HEAD_Y + i * 11, line, "#1a1a1a")
+    draw_set_color("#1b1030")              # Robin's photo: taken on the mothership, so space behind her
+    draw_rect(x1, y1, x2, y2)
+    draw_sprite_ext("glorbin", ACTORS["glorbin"]["poses"]["alien"], (x1 + x2) // 2, y2 - 1, 0.8, 0.8, 0, "white", 1)
+    for y, line in zip(NEWS_HEAD_Y, ("LUNCH LADY FROM", "OUTER SPACE!")):
+        draw_centered(NEWS_X + NEWS_W / 2, y, line, "#1a1a1a")
     draw_words(4, 4, "THE END", "#ffe14d")
-    draw_words(4, 186, "Click to play again", "#4fb3a9")
+    draw_words(242, 176, "Click to", "#4fb3a9")      # beside the paper: across the bottom it ran over it
+    draw_words(242, 186, "play again", "#4fb3a9")
 
 
 def draw_title(self, t, mx, my):
