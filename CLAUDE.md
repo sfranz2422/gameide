@@ -359,6 +359,15 @@ student), `Comment`.
   `"v<id>"` — the shared column PyIDE points at a share snapshot. Only "auto"
   versions are pruned, and assets are never deleted, so a turned-in version
   always opens with its pictures.
+- **The week's calendar** (`editor/ClassCalendar.tsx`, `calendarWeek.ts`;
+  `save_calendar` in classes.py) is PyIDE's: the same shared
+  `classes.calendar` column, the block of text the teacher pasted
+  (`Monday:` … `Tuesday:` …), stored as typed. `calendarWeek.ts` is a port
+  of PyIDE's `static/calendar.js` and must read a week exactly as it does —
+  `calendarWeek.test.ts` compares the two whenever `~/pyide` is checked out.
+  A day's name with no colon after it ("Friday quiz") is a to-do, not a day;
+  a dated day is Today only on its date. *Also post to* reaches only the
+  teacher's own classes here, and one that isn't refuses the whole save.
 - **Turned-in work is never lost**: an assignment anything was turned in to
   can only be archived; deleting a class archives its assignments; students'
   games are theirs.

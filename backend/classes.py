@@ -348,7 +348,8 @@ def get_class(class_id):
                 func.lower(accounts.User.email).in_([s.email.lower() for s in students] or [""])).all()}
             settings = db.query(ClassSettings).filter_by(class_id=course.id).first()
             others = _courses(db).filter(accounts.Course.teacher_id == user.id, accounts.Course.id != course.id).order_by(accounts.Course.name).all()
-            return jsonify(id=course.id, name=course.name, teaching=True, courseId=course.course_id,
+            return jsonify(id=course.id, name=course.name, teaching=True, calendar=course.calendar or "",
+                           courseId=course.course_id,
                            courseName=course.course_name, rosterAt=_iso(course.roster_at), items=out,
                            students=[{"email": s.email, "name": s.name or known.get(s.email.lower(), ""),
                                       "signedIn": s.email.lower() in known} for s in students],
@@ -383,7 +384,7 @@ def get_class(class_id):
                         "turnedIn": _iso(s.submitted_at) if s and s.times_submitted > 0 else None,
                         "score": totals.get(a.id), "unread": unread.get(p.id, 0) if p else 0})
         teacher = db.query(accounts.User).filter_by(id=course.teacher_id).first()
-        return jsonify(id=course.id, name=course.name, teaching=False, items=out,
+        return jsonify(id=course.id, name=course.name, teaching=False, items=out, calendar=course.calendar or "",
                        teacher=teacher.display_name() if teacher else "")
     finally:
         db.close()
@@ -411,6 +412,46 @@ def update_class(class_id):
         db.commit()
         count, roster_error = _sync_roster(db, user, course) if relinked else (None, "")
         return jsonify(ok=True, students=count, rosterError=roster_error)
+    finally:
+        db.close()
+
+
+#: As PyIDE's MAX_DESCRIPTION: the same column, written from either.
+MAX_CALENDAR = 20000
+
+
+@bp.post("/api/classes/<int:class_id>/calendar")
+def save_calendar(class_id):
+    """The week's calendar at the top of the class's page: the block of text
+    the teacher pasted ("Monday: … Tuesday: …"), stored as typed in the
+    shared `classes.calendar` and drawn by editor/calendarWeek.ts — the
+    same column PyIDE's class page shows, read by the same rules.
+
+    `also` is the teacher's other classes to post the same week to (two
+    periods doing the same week). Each must be this teacher's own class in
+    this editor; one that isn't refuses the whole save rather than quietly
+    posting to some and not others."""
+    db = _db()
+    try:
+        user = _need_teacher(db)
+        course, _ = _class_for(db, user, class_id, teaching_only=True)
+        body = request.get_json(silent=True) or {}
+        text = body.get("calendar")
+        if not isinstance(text, str):
+            return err("That isn't a calendar.", 400)
+        if len(text) > MAX_CALENDAR:
+            return err("That calendar is too long.", 413)
+        also = body.get("also") or []
+        if not isinstance(also, list) or not all(isinstance(i, int) and not isinstance(i, bool) for i in also):
+            return err("Those aren't classes.", 400)
+        mine = {c.id: c for c in _courses(db).filter(accounts.Course.teacher_id == user.id).all()}
+        if any(i not in mine for i in also):
+            return err("One of those classes isn't yours.", 404)
+        text = text.strip()
+        for c in [course] + [mine[i] for i in also if i != course.id]:
+            c.calendar = text
+        db.commit()
+        return jsonify(ok=True, calendar=text, posted=1 + len(set(also) - {course.id}))
     finally:
         db.close()
 

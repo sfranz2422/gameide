@@ -20,6 +20,7 @@ import { CheckAll, NotesEditor } from "../notes/TeacherNotes";
 import { Fragment } from "react";
 import DOMPurify from "dompurify";
 import { Icon } from "./ui/icons";
+import { StudentCalendar, TeacherCalendar } from "./ClassCalendar";
 
 interface ClassroomState {
   configured: boolean;
@@ -261,6 +262,8 @@ interface ClassData {
   name: string;
   teaching: boolean;
   items: Item[];
+  /** The week the teacher pasted, as typed (ClassCalendar draws it); "" is none. */
+  calendar?: string;
   teacher?: string;
   courseId?: string;
   courseName?: string;
@@ -297,6 +300,7 @@ export function ClassPage({ classId }: { classId: number }) {
 function StudentClass({ data }: { data: ClassData }) {
   return (
     <Page title={data.name} head={data.teacher ? <span className="muted">{data.teacher}</span> : null}>
+      <StudentCalendar text={data.calendar ?? ""} />
       <div className="class-items">
         {data.items.map((i) =>
           i.kind === "group" ? (
@@ -393,6 +397,7 @@ function TeacherClass({ data, reload }: { data: ClassData; reload: () => void })
         </p>
       )}
       {note && <p className="banner">{note}</p>}
+      <TeacherCalendar classId={data.id} text={data.calendar ?? ""} others={data.others ?? []} onSaved={reload} />
       <div className="class-items">
         {live.map((i, n) => (
           <div key={i.id} className={`class-item${i.hidden ? " hidden-item" : ""}${i.kind === "group" ? " group" : ""}`} data-testid={i.kind === "group" ? "class-group" : "class-assignment"}>

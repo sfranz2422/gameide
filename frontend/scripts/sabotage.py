@@ -736,6 +736,13 @@ CASES = [
  ("mystery: a door comes out in the wall", "../showcase/mystery/game/_1world.py", '"exit": ("basement", 28, 130)', '"exit": ("basement", 28, 100)', "on the floor", MM),
  ("mystery: one click skips the whole talk", "../showcase/mystery/game/_2engine.py", "            clicked = False          # one click finishes one line", "            pass                     # one click finishes one line", "foot of it", MM),
  ("physics not stepped in the worker", PH, "    this.world!.step(1 / host.stepsPerSecond);", "    if (typeof window !== \"undefined\") this.world!.step(1 / host.stepsPerSecond);", "a physics coin falls", E2E),
+ ("calendar: a day's name alone starts a day", "src/editor/calendarWeek.ts", r'"[*_]*\\s*(?::|[-–—]\\s|$)[*_]*\\s*(.*)$", // colon', r'"[*_]*\\s*(?::|[-–—]\\s|\\s|$)[*_]*\\s*(.*)$", // colon', "only starts with a day's name"),
+ ("calendar: dates ignored for today", "src/editor/calendarWeek.ts", "  const dated = days.some((d) => d.when);", "  const dated = days.some((d) => d.when && false);", "dated, only on its date"),
+ ("calendar: a line gets no bullet", "src/editor/calendarWeek.ts", '  return "- " + line.trim();', "  return line.trim();", "typed bullets keep their indent"),
+ ("calendar: CRLF kept", "src/editor/calendarWeek.ts", r'(text || "").replace(/\r\n?/g, "\n").split', r'(text || "").split', "Windows line endings"),
+ ("calendar: drifts from PyIDE's", "src/editor/calendarWeek.ts", r'  return { title: title.join("\n").trim(), days };', r'  return { title: title.join(" ").trim(), days };', "exactly as PyIDE's"),
+ ("calendar: posts to classes not theirs", CL, "        if any(i not in mine for i in also):", "        if False:", "refuses the whole save", PY),
+ ("calendar: students aren't sent it", CL, 'items=out, calendar=course.calendar or "",', 'items=out, calendar="",', "students are sent it", PY),
 ]
 only = sys.argv[1:]
 # A name that matches no case would otherwise run nothing and still say

@@ -505,6 +505,44 @@ check("a new group goes on top", ids[0] == g)
 teacher.post(f"/api/classes/{GD}/order", json={"items": list(reversed(ids))})
 check("the page is put in the teacher's order", [i["id"] for i in teacher.get(f"/api/classes/{GD}").get_json()["items"]] == list(reversed(ids)))
 check("…and the students see it the same", [i["id"] for i in dana.get(f"/api/classes/{GD}").get_json()["items"]] == list(reversed(ids)))
+
+# The week's calendar (save_calendar): the shared classes.calendar, as typed.
+def calendar_of(cid):
+    db = server.SessionLocal()
+    try:
+        return db.get(accounts.Course, cid).calendar
+    finally:
+        db.close()
+
+
+check("a class starts with no calendar", teacher.get(f"/api/classes/{GD}").get_json()["calendar"] == ""
+      and dana.get(f"/api/classes/{GD}").get_json()["calendar"] == "")
+r = teacher.post(f"/api/classes/{GD}/calendar", json={"calendar": "\nMonday:\nLevel 1\nTuesday: playtest\n\n"})
+check("the teacher saves the week, stored as typed with its ends trimmed",
+      r.status_code == 200 and calendar_of(GD) == "Monday:\nLevel 1\nTuesday: playtest")
+check("…and the class's students are sent it", dana.get(f"/api/classes/{GD}").get_json()["calendar"] == calendar_of(GD))
+check("…on that class only", calendar_of(P4) == "")
+r = teacher.post(f"/api/classes/{GD}/calendar", json={"calendar": "Monday:\nA", "also": [P4]})
+check("Also post to puts the same week on the teacher's other class",
+      r.status_code == 200 and calendar_of(GD) == calendar_of(P4) == "Monday:\nA" and r.get_json()["posted"] == 2)
+OTHERS = other_teacher.post("/api/classes", json={"name": "Their class"}).get_json()["id"]
+r = teacher.post(f"/api/classes/{GD}/calendar", json={"calendar": "Monday:\nB", "also": [P4, OTHERS]})
+check("another teacher's class in the list refuses the whole save",
+      r.status_code == 404 and calendar_of(GD) == calendar_of(P4) == "Monday:\nA" and calendar_of(OTHERS) == "")
+r = teacher.post(f"/api/classes/{GD}/calendar", json={"calendar": "Monday:\nB", "also": [PYCLASS]})
+check("…so does the teacher's own class in another editor", r.status_code == 404 and calendar_of(PYCLASS) == "")
+check("also that isn't a list of classes is refused",
+      teacher.post(f"/api/classes/{GD}/calendar", json={"calendar": "x", "also": str(P4)}).status_code == 400)
+check("another teacher can't set it", other_teacher.post(f"/api/classes/{GD}/calendar", json={"calendar": "x"}).status_code == 403
+      and calendar_of(GD) == "Monday:\nA")
+check("a student can't", dana.post(f"/api/classes/{GD}/calendar", json={"calendar": "x"}).status_code == 403)
+check("something that isn't text is refused", teacher.post(f"/api/classes/{GD}/calendar", json={"calendar": 5}).status_code == 400)
+check("one too long is refused",
+      teacher.post(f"/api/classes/{GD}/calendar", json={"calendar": "x" * (classes.MAX_CALENDAR + 1)}).status_code == 413)
+check("Clear takes it off", teacher.post(f"/api/classes/{GD}/calendar", json={"calendar": ""}).status_code == 200
+      and dana.get(f"/api/classes/{GD}").get_json()["calendar"] == "")
+teacher.post(f"/api/classes/{P4}/calendar", json={"calendar": ""})
+other_teacher.delete(f"/api/classes/{OTHERS}")
 check("a deleted game of a student's comes back when the assignment is opened",
       dana.delete(f"/api/projects/{DP}").status_code == 200 and dana.post(f"/api/assignments/{A}/start").get_json()["project"] == DP
       and dana.get(f"/api/projects/{DP}").status_code == 200)

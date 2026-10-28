@@ -155,3 +155,47 @@ test("someone not in a class can't see it, and a hidden assignment can't be star
   await sctx.close();
   await tctx.close();
 });
+
+test("the week's calendar: pasted as text, previewed as day cards, posted to two periods, seen by the class", async ({ browser }) => {
+  const { ctx: tctx, page: teacher } = await signedIn(browser, "teach3@example.com");
+  const errors = watchErrors(teacher);
+  for (const name of ["Calendar P7", "Calendar P4"]) {
+    await teacher.goto("/#/classes");
+    await teacher.getByTestId("new-class-name").fill(name);
+    await teacher.getByTestId("new-class-go").click();
+    await expect(teacher.getByRole("heading", { name })).toBeVisible();
+  }
+  await teacher.getByTestId("roster-emails").fill("cal@example.com");
+  await teacher.getByTestId("roster-add").click();
+  await expect(teacher.getByText("cal@example.com")).toBeVisible();
+
+  await teacher.getByTestId("edit-calendar").click();
+  // The preview is drawn as it's typed, before anything is saved.
+  await teacher.getByTestId("calendar-text").fill("Week of Oct 27\nMonday:\nLevel 1\nFriday quiz on loops\nTuesday: playtest\n- swap with a partner");
+  const days = teacher.getByTestId("cal-day");
+  await expect(days).toHaveCount(2);
+  await expect(days.nth(0)).toContainText("Friday quiz on loops"); // a to-do, not a third day
+  await expect(teacher.locator(".cal-heading")).toHaveText("Week of Oct 27");
+  await teacher.getByRole("checkbox", { name: "Calendar P7" }).check();
+  await teacher.getByTestId("save-calendar").click();
+  await expect(teacher.getByTestId("edit-calendar")).toHaveText("Edit calendar");
+  await expect(days).toHaveCount(2);
+  if (SHOTS) await teacher.screenshot({ path: `${SHOTS}/class-calendar.png`, fullPage: true });
+
+  // The other period got the same week.
+  await teacher.goto("/#/classes");
+  await teacher.getByTestId("class-card").filter({ hasText: "Calendar P7" }).click();
+  await expect(teacher.getByTestId("cal-day")).toHaveCount(2);
+
+  // A student of the class sees it, with nothing to edit.
+  const { ctx: sctx, page: student } = await signedIn(browser, "cal@example.com");
+  await student.goto("/#/classes");
+  await student.getByTestId("class-card").filter({ hasText: "Calendar P4" }).click();
+  await expect(student.getByTestId("cal-day")).toHaveCount(2);
+  await expect(student.getByTestId("cal-day").nth(1)).toContainText("swap with a partner");
+  await expect(student.getByTestId("edit-calendar")).toHaveCount(0);
+
+  expect(errors).toEqual([]);
+  await sctx.close();
+  await tctx.close();
+});

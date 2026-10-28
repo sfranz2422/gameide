@@ -2791,6 +2791,146 @@ a.btn {
   width: 100%;
   box-sizing: border-box;
 }
+/* The week's calendar (ClassCalendar.tsx), above a class's assignments.
+   The theme's variables only, so the light theme repaints it too. A row
+   of day cards that wraps on a narrow window and stacks on a phone;
+   today's card wears the accent. */
+.class-calendar {
+  margin: 0 0 18px;
+  padding: 14px 16px 16px;
+  border-radius: 10px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+}
+.cal-bar {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.cal-heading {
+  font-family: var(--heading);
+  font-size: 19px;
+  font-weight: 700;
+}
+.cal-heading > * {
+  margin: 0;
+  font-size: inherit;
+}
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--cal-days, 5), minmax(0, 1fr));
+  gap: 10px;
+}
+@media (max-width: 900px) {
+  .cal-grid {
+    grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  }
+}
+@media (max-width: 560px) {
+  .cal-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.cal-day {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  padding: 10px 12px 12px;
+  border-radius: 8px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+}
+.cal-day.is-today {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent) inset;
+  background: color-mix(in srgb, var(--accent) 10%, var(--bg));
+}
+.cal-day-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding-bottom: 6px;
+  margin-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+.cal-dow {
+  font-weight: 700;
+}
+.cal-date {
+  color: var(--muted);
+  font-size: 13px;
+}
+.cal-today {
+  margin-left: auto;
+  padding: 1px 8px;
+  border-radius: 20px;
+  background: var(--accent);
+  color: var(--bg);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.cal-body {
+  font-size: 14px;
+  line-height: 1.45;
+}
+.cal-body ul {
+  margin: 0;
+  padding-left: 18px;
+}
+.cal-body li + li {
+  margin-top: 4px;
+}
+.cal-body a {
+  color: var(--accent);
+}
+.cal-body img {
+  max-width: 100%;
+  height: auto;
+}
+.cal-nothing {
+  margin: 0;
+  color: var(--muted);
+}
+.cal-hint {
+  margin: 0;
+}
+.cal-edit {
+  margin-top: 14px;
+}
+.class-page textarea.cal-box {
+  width: 100%;
+  box-sizing: border-box;
+  font-family: var(--mono);
+}
+.cal-problem {
+  color: var(--warn);
+}
+.cal-also {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin: 8px 0;
+  padding: 0;
+  border: 0;
+}
+.cal-also legend {
+  padding: 0;
+  margin-bottom: 4px;
+  color: var(--muted);
+}
+.cal-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.btn.cal-clear {
+  color: var(--danger);
+}
 .class-items {
   display: grid;
   gap: 8px;
