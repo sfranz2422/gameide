@@ -1130,6 +1130,10 @@ check("…and nothing beside them", anon.get("/tutorials/../favicon.svg").status
 (fake_dist / "library" / "kenney" / "tiny-town" / "tiles.png").write_bytes(b"PNGTILES")
 r = anon.get("/library/kenney/tiny-town/tiles.png")
 check("the free art library's pictures are served", r.status_code == 200 and r.data == b"PNGTILES", r.status_code)
+(fake_dist / "starters" / "novel").mkdir(parents=True)
+(fake_dist / "starters" / "novel" / "dawn.webp").write_bytes(b"WEBPDAWN")
+r = anon.get("/starters/novel/dawn.webp")
+check("the Starter Projects' pictures are served", r.status_code == 200 and r.data == b"WEBPDAWN", r.status_code)
 server.DIST = real_dist
 
 print()

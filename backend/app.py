@@ -815,6 +815,17 @@ def art_library(name):
     return r
 
 
+@app.get("/starters/<path:name>")
+def starter_pictures(name):
+    """The Starter Projects' pictures (public/starters/; store/starterProjects.ts).
+    Like /library: without this route, Start on those tutorials did nothing on
+    the real site (the starter's pictures 404'd), while the test server, which
+    serves every public/ file, showed it working."""
+    r = send_from_directory(DIST / "starters", name)
+    r.headers["Cache-Control"] = "public, max-age=86400"
+    return r
+
+
 @app.get("/avatars/<path:name>")
 def avatar_pictures(name):
     """The avatars a student picks from (xp.AVATARS; public/avatars/, the same pictures as PyIDE's)."""
