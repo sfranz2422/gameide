@@ -109,7 +109,7 @@ __all__ = [
     # drawing
     "draw_self", "draw_sprite", "draw_text", "draw_rect", "draw_set_color", "draw_set_font",
     "draw_sprite_ext", "draw_line", "draw_circle", "draw_ellipse", "draw_triangle", "draw_rect_gradient",
-    "draw_set_halign", "draw_set_valign", "string_width", "string_height",
+    "draw_set_halign", "draw_set_valign", "string_width", "string_height", "string_wrap",
     # small maths
     "clamp", "lerp", "approach", "sign", "choose",
     # rooms and the game
@@ -123,7 +123,7 @@ __all__ = [
     "save_set", "save_get", "save_delete", "save_clear",
     # game feel
     "particles", "effect", "weather", "particles_clear", "hit_pause", "lighting", "light", "screen_effect",
-    "screen_flash", "screen_fade", "tween", "tween_stop", "ease", "say", "dialogue_open", "dialogue_clear",
+    "screen_flash", "screen_fade", "tween", "tween_stop", "ease", "say", "ask", "answer", "dialogue_open", "dialogue_clear",
     "draw_set_alpha",
     # debugging
     "show_debug",
@@ -889,9 +889,11 @@ def draw_sprite(sprite, frame, x, y):
         _draw_list.append(["sprite", _draw_depth, _sprite_of(sprite), frame, x, y, _alpha])
 
 
-def draw_text(x, y, text):
+def draw_text(x, y, text, width=None):
+    """Writes text at (x, y). With a width, long lines are broken between words to fit it."""
     if _check_draw("draw_text"):
-        _draw_list.append(["text", _draw_depth, x, y, str(text), _color, _font, _font_size, _alpha, _halign, _valign])
+        text = str(text) if width is None else string_wrap(text, width)
+        _draw_list.append(["text", _draw_depth, x, y, text, _color, _font, _font_size, _alpha, _halign, _valign])
 
 
 def draw_sprite_ext(sprite, frame, x, y, xscale=1, yscale=1, angle=0, color="white", alpha=1):
@@ -954,6 +956,38 @@ def string_width(text):
 def string_height(text):
     """How tall draw_text would draw this, in pixels, in the font set now (more lines, taller)."""
     return _js.text_size(str(text), _font, _font_size, 1)
+
+
+# Wrapped text, by what it was wrapped with. Measuring is a call out to the
+# page's fonts per word, and a story's page is drawn sixty times a second.
+_wrapped = {}
+
+
+def string_wrap(text, width):
+    """The text with line breaks put between words, so no line is wider than width in the font set now.
+    Type it out with string_wrap(text, w)[:n]: wrapping only what is typed so far moves words between lines as they appear."""
+    width = _num(width, "string_wrap", "width")
+    text = str(text)
+    key = (text, _font, _font_size, width)
+    got = _wrapped.get(key)
+    if got is None:
+        lines = []
+        for para in text.split("\n"):
+            line = ""
+            for word in para.split(" "):
+                longer = f"{line} {word}" if line else word
+                # A word wider than the whole width keeps a line to itself, unbroken.
+                if line and string_width(longer) > width:
+                    lines.append(line)
+                    line = word
+                else:
+                    line = longer
+            lines.append(line)
+        got = "\n".join(lines)
+        if len(_wrapped) > 400:
+            _wrapped.clear()
+        _wrapped[key] = got
+    return got
 
 
 # ---------------------------------------------------------------- small maths
@@ -1220,15 +1254,40 @@ def _step_tweens():
 
 
 # Dialogue: say() queues lines; a box at the bottom of the screen types each
-# one out, and Space, Enter or a click shows it all, then goes on.
-_dialogue = []    # [(name or None, text)]
+# one out, and Space, Enter or a click shows it all, then goes on. ask()
+# queues a question in the same line, so it comes after what was said
+# before it: its choices appear under it once it's typed out.
+_dialogue = []    # [(name or None, text, choices or None, then or None)]
 _dlg_chars = 0.0
 _dlg_age = 0      # steps the current line has been up: the key that said it doesn't also skip it
+_dlg_pick = 0     # the choice lit up
+_dlg_mouse = None # where the mouse was: only moving it lights a choice, or a still mouse would fight the keys
+_answer = None
 
 
 def say(text, name=None):
     """Shows text in a box at the bottom of the screen, typed out. Space, Enter or a click goes on."""
-    _dialogue.append((None if name is None else str(name), str(text)))
+    _dialogue.append((None if name is None else str(name), str(text), None, None))
+
+
+def ask(question, choices, name=None, then=None):
+    """Asks a question in the dialogue box, with choices under it: click or tap one, or pick with the arrow keys
+    and Enter, or press its number. answer() is the choice made; then, if given, is a function called with it."""
+    if isinstance(choices, str) or not hasattr(choices, "__iter__"):
+        raise TypeError(f'ask needs a list of choices, like ["Fight", "Run"], not {choices!r}.')
+    choices = [str(c) for c in choices]
+    if not 1 <= len(choices) <= 9:
+        raise ValueError(f"ask takes 1 to 9 choices, not {len(choices)}: they're picked with the keys 1 to 9.")
+    if then is not None and not callable(then):
+        raise TypeError(f"ask's then is a function to call with the choice (its name, no brackets), not {then!r}.")
+    global _answer
+    _answer = None
+    _dialogue.append((None if name is None else str(name), str(question), choices, then))
+
+
+def answer():
+    """The choice picked for the last ask(), as its text; None while it is still being asked."""
+    return _answer
 
 
 def dialogue_open():
@@ -1238,10 +1297,13 @@ def dialogue_open():
 
 def dialogue_clear():
     """Closes the dialogue box and forgets lines still waiting."""
-    global _dlg_chars, _dlg_age
+    global _dlg_chars, _dlg_age, _dlg_pick, _dlg_mouse, _answer
     _dialogue.clear()
     _dlg_chars = 0.0
     _dlg_age = 0
+    _dlg_pick = 0
+    _dlg_mouse = None
+    _answer = None
 
 
 def _wrap(text, width):
@@ -1279,13 +1341,53 @@ def screen_flash(color="white", steps=8):
 
 def _overlays():
     """After Draw GUI: the dialogue box, then flashes and fades over everything."""
-    global _dlg_chars, _dlg_age
+    global _dlg_chars, _dlg_age, _dlg_pick, _dlg_mouse, _answer
     w = view_width or room_width
     h = view_height or room_height
+    rows = []   # a question's choices: (top, bottom) of each on screen, from the last frame's layout
     if _dialogue:
-        name, text = _dialogue[0]
-        go = _dlg_age > 0 and (keyboard_check_pressed("space") or keyboard_check_pressed("enter") or mouse_check_pressed("left"))
-        if go and _dlg_chars < len(text):
+        name, text, choices, then = _dialogue[0]
+        cols = max(12, int((w - 56) / 8.6))
+        top = h - 20 - 24 * len(_wrap(text, cols)) - (26 if name else 12) - (24 * len(choices) + 8 if choices else 0)
+        y = top + 10 + (24 if name else 0) + 24 * len(_wrap(text, cols)) + 8
+        rows = [(y + 24 * i - 2, y + 24 * i + 22) for i in range(len(choices or ()))]
+        typed = _dlg_chars >= len(text)
+        click = mouse_check_pressed("left")
+        go = _dlg_age > 0 and (keyboard_check_pressed("space") or keyboard_check_pressed("enter") or click)
+        picked = None
+        if choices and typed and _dlg_age > 0:
+            # The mouse is in the room; the box is on the screen, where the view and its zoom put it.
+            zoom = _g[_L.G.ZOOM] or 1.0
+            mx, my = (mouse_x - view_x) * zoom, (mouse_y - view_y) * zoom
+            over = next((i for i, (a, b) in enumerate(rows) if a <= my < b and 12 <= mx < w - 12), None)
+            if over is not None and (mx, my) != _dlg_mouse:
+                _dlg_pick = over
+            _dlg_mouse = (mx, my)
+            if keyboard_check_pressed("up"):
+                _dlg_pick = (_dlg_pick - 1) % len(choices)
+            if keyboard_check_pressed("down"):
+                _dlg_pick = (_dlg_pick + 1) % len(choices)
+            for i in range(len(choices)):
+                if keyboard_check_pressed(str(i + 1)):
+                    picked = i
+            if click:
+                # A click picks the choice under it; anywhere else it does nothing (a tap that missed).
+                picked = over if picked is None else picked
+            elif picked is None and (keyboard_check_pressed("space") or keyboard_check_pressed("enter")):
+                picked = _dlg_pick
+        if choices and typed:
+            if picked is not None:
+                _dialogue.pop(0)
+                _dlg_chars = 0.0
+                _dlg_age = 0
+                _dlg_pick = 0
+                _dlg_mouse = None
+                _answer = choices[picked]
+                if then is not None:
+                    then(_answer)
+            else:
+                _dlg_age += 1
+        elif go and not typed:
             _dlg_chars = len(text)
         elif go:
             _dialogue.pop(0)
@@ -1295,10 +1397,11 @@ def _overlays():
             _dlg_chars = min(len(text), _dlg_chars + 1)
             _dlg_age += 1
     if _dialogue:
-        name, text = _dialogue[0]
-        lines = _wrap(text[: int(_dlg_chars)], max(12, int((w - 56) / 8.6)))
-        all_lines = _wrap(text, max(12, int((w - 56) / 8.6)))
-        top = h - 20 - 24 * len(all_lines) - (26 if name else 12)
+        name, text, choices, then = _dialogue[0]
+        cols = max(12, int((w - 56) / 8.6))
+        lines = _wrap(text[: int(_dlg_chars)], cols)
+        all_lines = _wrap(text, cols)
+        top = h - 20 - 24 * len(all_lines) - (26 if name else 12) - (24 * len(choices) + 8 if choices else 0)
         d = -1e6
         _gui.append(["rect", d, 12, top, w - 12, h - 12, 0x10141F, 0, 0.9])
         _gui.append(["rect", d + 0.1, 12, top, w - 12, h - 12, 0xFFFFFF, 1, 0.85])
@@ -1308,7 +1411,16 @@ def _overlays():
             y += 24
         if lines:
             _gui.append(["text", d - 0.1, 26, y, "\n".join(lines), 0xFFFFFF, -1, 16, 1.0])
-        if _dlg_chars >= len(text) and (_step_count // 20) % 2 == 0:
+        typed = _dlg_chars >= len(text)
+        if choices and typed:
+            y += 24 * len(all_lines) + 8
+            for i, c in enumerate(choices):
+                lit = i == _dlg_pick
+                if lit:
+                    _gui.append(["rect", d + 0.05, 18, y - 2, w - 18, y + 22, 0xFFD166, 0, 0.18])
+                _gui.append(["text", d - 0.1, 26, y, f"{i + 1}. {c}", 0xFFD166 if lit else 0xFFFFFF, -1, 16, 1.0])
+                y += 24
+        elif typed and (_step_count // 20) % 2 == 0:
             _gui.append(["text", d - 0.1, w - 34, h - 36, "▼", 0xFFD166, -1, 14, 1.0])
     if _sflash[0] > 0:
         _gui.append(["rect", -2e6, 0, 0, w, h, _sflash[2], 0, 0.85 * _sflash[0] / _sflash[1]])

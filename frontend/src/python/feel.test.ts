@@ -266,6 +266,79 @@ describe("dialogue, fades and alpha", () => {
     expect(texts(g)).toContain("H");
   });
 
+  it("ask() comes after what's said, shows its choices once typed, and the arrow keys and Enter pick one", async () => {
+    const { game: g } = await game("    pass\n");
+    const tap = (k: string) => {
+      g.engine.input.keyDown(key(k));
+      run(g, 1);
+      g.engine.input.keyUp(key(k));
+      run(g, 1);
+    };
+    py(g, 'say("A heron watches you."); ask("Fight or run?", ["Fight", "Run"], name="Gallow")');
+    run(g, 2);
+    expect(texts(g).join("|")).toContain("A");
+    expect(texts(g)).not.toContain("1. Fight");
+    tap("space");
+    tap("space"); // that line said; the question starts typing
+    expect(texts(g)).toContain("Gallow");
+    expect(texts(g)).not.toContain("1. Fight"); // no choices until the question is all there
+    tap("space"); // shows the question whole — and picks nothing
+    expect(texts(g)).toEqual(expect.arrayContaining(["Fight or run?", "1. Fight", "2. Run"]));
+    expect(py(g, "answer() is None")).toBe(true);
+    tap("down");
+    tap("enter");
+    expect(py(g, "answer()")).toBe("Run");
+    expect(py(g, "dialogue_open()")).toBe(false);
+    expect(texts(g)).toEqual([]);
+  });
+
+  it("ask() picks by number, calls then with the choice, and a click picks the one under it", async () => {
+    const { game: g } = await game("    pass\n");
+    py(g, 'global_vars.got = []\ndef took(c):\n    global_vars.got.append(c)\nask("Which door?", ["Left", "Middle", "Right"], then=took)');
+    run(g, 40);
+    g.engine.input.keyDown(key("3"));
+    run(g, 1);
+    g.engine.input.keyUp(key("3"));
+    expect(py(g, "global_vars.got")).toEqual(["Right"]);
+
+    py(g, 'ask("Again?", ["Yes", "No"], then=took)');
+    run(g, 40);
+    const at = (label: string) => g.engine.guiList.find((c) => c[0] === "text" && c[4] === label) as number[];
+    const click = (x: number, y: number) => {
+      g.engine.input.mouseMove(x, y);
+      g.engine.input.mouseDown(0);
+      run(g, 1);
+      g.engine.input.mouseUp(0);
+      run(g, 1);
+    };
+    click(at("2. No")[2]! + 4, 2); // the top of the screen: not a choice
+    expect(py(g, "answer() is None")).toBe(true);
+    click(at("2. No")[2]! + 4, at("2. No")[3]! + 6);
+    expect(py(g, "global_vars.got")).toEqual(["Right", "No"]);
+    expect(py(g, "answer()")).toBe("No");
+  });
+
+  it("ask() says what's wrong with its choices", async () => {
+    const { game: g } = await game("    pass\n");
+    expect(() => py(g, 'ask("Fight?", "Fight")')).toThrow(/list of choices/);
+    expect(() => py(g, 'ask("Pick", list(range(10)))')).toThrow(/1 to 9 choices/);
+    expect(() => py(g, 'ask("Pick", ["a"], then="go")')).toThrow(/function to call/);
+  });
+
+  it("draw_text with a width breaks lines between words; string_wrap does it alone", async () => {
+    // Headless, a character is 0.6 em: 9.6 px at 16 px.
+    const { game: g } = await game("    def on_draw(self):\n        draw_text(0, 0, 'the lantern burns low', 100)\n");
+    run(g, 1);
+    const drawn = g.engine.drawList.find((c) => c[0] === "text")![4] as string;
+    expect(drawn).toBe("the\nlantern\nburns low");
+    expect(py(g, 'string_wrap("aaa bbb ccc", 75)')).toBe("aaa bbb\nccc");
+    expect(py(g, 'string_wrap("a reedwarden", 40)')).toBe("a\nreedwarden"); // too long a word keeps its own line, whole
+    expect(py(g, 'string_wrap("one\\ntwo three", 90)')).toBe("one\ntwo three");
+    expect(py(g, 'string_wrap("aaa bbb", 75)')).toBe("aaa bbb");
+    py(g, "draw_set_font(None, 32)");
+    expect(py(g, 'string_wrap("aaa bbb", 75)')).toBe("aaa\nbbb"); // in the font set now
+  });
+
   it("screen_fade darkens step by step and lasts; screen_flash fades out", async () => {
     const { game: g } = await game("    pass\n");
     const cover = (d: number) => g.engine.guiList.find((c) => c[0] === "rect" && c[1] === d) as number[] | undefined;

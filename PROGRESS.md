@@ -1,5 +1,11 @@
 # Progress
 
+## The Lantern of Greymire, part 1: ask(), wrapped text, the prompts (2026-10-28, in progress)
+- The next featured game: an illustrated gamebook like inkle's Sorcery!, in a haunted marsh. The teacher is making its pictures with Gemini from `showcase/greymire/PROMPTS.md` (one locked ink-and-watercolour style, a reference picture attached to every prompt).
+- **`ask(question, choices, name=None, then=None)`**: a question in the dialogue box, after any `say()` lines waiting, with its choices under it once it's typed out. Click or tap one, arrow keys and Enter, or its number. `answer()` is the choice (None while asking); `then` is called with it. A click that shows the question whole picks nothing, and a tap that misses the choices does nothing.
+- **`draw_text(x, y, text, width=None)`** breaks lines between words to fit the width, measured in the font set now; **`string_wrap(text, width)`** does it alone, so a page can be typed out (`string_wrap(t, w)[:n]`) without words jumping lines.
+- Tests: `feel.test.ts` (order after say, keys, numbers, a click on a choice and one off it, then, the errors, wrapping and its cache per font size) and `feel.editor.spec.ts` (a real click on the game's canvas picks the choice under it). 10 sabotage cases, all caught (one first missed: the wrap cache was never asked the same text at two sizes).
+
 ## Docs as a page; Thornwood on an iPhone ✅ (2026-10-28, waiting for review)
 - **Docs is in the top bar** (`#/docs`, `editor/DocsPage.tsx`): the editor's Docs tab as a page, every function and `self.` property, searchable, in columns. There's no code there to type into, so a click copies the entry. On a phone the bar's links take a row of their own under the name; in one row, Docs and the light/dark button ran off the edge.
 - **Published games were a black screen on every iPhone** (Safari's engine is the only one there). Pixi, starting its renderer, imported its worker extensions, which the bundler had put in the worker's own file — so the import was of the worker's script, and Safari ran it a second time: "Extension type texture-source already has a handler". The touch buttons showed (the game's Python had started) but nothing drew and nothing moved. The worker now imports them itself (`gameWorker.ts`). Found by playing the published Thornwood in WebKit with the phone's screen size.

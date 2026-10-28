@@ -696,6 +696,16 @@ CASES = [
  ("Docs page search ignored", "src/editor/RunPanes.tsx", "    return API.filter((e) => !s ||", "    return API.filter((e) => true ||", "Docs is in the top bar", E2E),
  ("top bar one row on a phone", "src/editor/app.css", "@media (max-width: 640px) {\n  .site-nav {\n    flex-wrap: wrap;", "@media (max-width: 64px) {\n  .site-nav {\n    flex-wrap: wrap;", "the top bar still fits", E2E),
  ("Docs grid wider than a phone", "src/editor/app.css", "minmax(min(320px, 100%), 1fr)", "minmax(320px, 1fr)", "the top bar still fits", E2E),
+ ("ask: down key ignored", RT, "                _dlg_pick = (_dlg_pick + 1) % len(choices)", "                _dlg_pick = (_dlg_pick + 0) % len(choices)", "comes after what's said"),
+ ("ask: number keys one off", RT, "                if keyboard_check_pressed(str(i + 1)):", "                if keyboard_check_pressed(str(i)):", "picks by number"),
+ ("ask: a click anywhere picks", RT, "                picked = over if picked is None else picked", "                picked = _dlg_pick if over is None else over", "picks by number"),
+ ("ask: then never called", RT, "                    then(_answer)", "                    then", "picks by number"),
+ ("ask: choices shown while typing", RT, "        if choices and typed:\n            y += 24", "        if choices:\n            y += 24", "comes after what's said"),
+ ("ask: say queue order lost", RT, "    _dialogue.append((None if name is None else str(name), str(question), choices, then))", "    _dialogue.insert(0, (None if name is None else str(name), str(question), choices, then))", "comes after what's said"),
+ ("ask: no check on choices", RT, "    if not 1 <= len(choices) <= 9:", "    if not 1 <= len(choices) <= 99:", "says what's wrong with its choices"),
+ ("draw_text ignores width", RT, "        text = str(text) if width is None else string_wrap(text, width)", "        text = str(text)", "breaks lines between words"),
+ ("string_wrap cache ignores font size", RT, "    key = (text, _font, _font_size, width)", "    key = (text, _font, width)", "breaks lines between words"),
+ ("ask: the mouse read in the wrong place", RT, "            mx, my = (mouse_x - view_x) * zoom, (mouse_y - view_y) * zoom", "            mx, my = (mouse_x - view_x) * zoom, (mouse_y - view_y) * zoom + 30", "a choice clicked on the game's own canvas", E2E),
  ("physics not stepped in the worker", PH, "    this.world!.step(1 / host.stepsPerSecond);", "    if (typeof window !== \"undefined\") this.world!.step(1 / host.stepsPerSecond);", "a physics coin falls", E2E),
 ]
 only = sys.argv[1:]

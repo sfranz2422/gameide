@@ -151,3 +151,20 @@ test("the debugger: click an instance to see inside it; freeze the game and step
   await page.getByTestId("debug-freeze").click(); // go on
   await expect(page.getByTestId("debug-step")).toBeDisabled();
 });
+
+test("ask(): a choice clicked on the game's own canvas is the one picked", async ({ page }) => {
+  await fromTemplate(page, "coins");
+  await playWith(page, 'ask("Which way?", ["Left", "Right"])');
+  await page.waitForTimeout(1200); // typed out: the choices are up
+  const py = (code: string) => page.evaluate((c) => (window as any).__gameide.host.evalPython(c), code);
+  expect(await py("dialogue_open()")).toBe(true);
+  // Where the box puts "2. Right" (runtime.py's _overlays) in the 640 × 480
+  // room: the question's one line and two choices stacked up from the bottom.
+  const [gx, gy] = [26, 480 - 20 - 24 - 12 - (24 * 2 + 8) + 10 + 24 + 8 + 24];
+  const canvas = page.locator("canvas[data-testid=game-canvas]");
+  const box = (await canvas.boundingBox())!;
+  const [w, h] = (await canvas.evaluate((c: HTMLCanvasElement) => [c.width, c.height])) as number[];
+  await page.mouse.click(box.x + ((gx! + 30) * box.width) / w!, box.y + ((gy! + 8) * box.height) / h!);
+  await expect.poll(() => py("answer()")).toBe("Right");
+  expect(await py("dialogue_open()")).toBe(false);
+});

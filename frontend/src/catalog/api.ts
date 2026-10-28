@@ -173,8 +173,8 @@ export const API: ApiEntry[] = [
   fn("Drawing", "draw_self", [], "nothing", "Draws this instance's sprite as it would be drawn without a Draw event."),
   fn("Drawing", "draw_sprite", [p("sprite", "sprite"), p("frame", "number"), p("x", "number"), p("y", "number")],
     "nothing", "Draws one frame of a sprite at (x, y)."),
-  fn("Drawing", "draw_text", [p("x", "number"), p("y", "number"), p("text", "any")], "nothing",
-    "Writes text with its top-left corner at (x, y)."),
+  fn("Drawing", "draw_text", [p("x", "number"), p("y", "number"), p("text", "any"), p("width", "number", "None")], "nothing",
+    "Writes text with its top-left corner at (x, y). Given a width, long lines are broken between words to fit inside it."),
   fn("Drawing", "draw_rect",
     [p("x1", "number"), p("y1", "number"), p("x2", "number"), p("y2", "number"), p("outline", "boolean", "False")],
     "nothing", "Draws a rectangle between two corners, filled unless outline is True."),
@@ -207,6 +207,8 @@ export const API: ApiEntry[] = [
     'Where draw_text\'s y is from now on, in this event: "top", "middle" or "bottom" of the text.'),
   fn("Drawing", "string_width", [p("text", "any")], "a number of pixels", "How wide draw_text would write this, in the font set now."),
   fn("Drawing", "string_height", [p("text", "any")], "a number of pixels", "How tall draw_text would write this, in the font set now (more lines, taller)."),
+  fn("Drawing", "string_wrap", [p("text", "any"), p("width", "number")], "text with line breaks",
+    "The text broken between words so no line is wider than width, in the font set now. To type a page out letter by letter: draw_text(x, y, string_wrap(text, 300)[:n])."),
 
   // Rooms and the game
   fn("Rooms", "room_goto", [p("room", "room")], "nothing", "Goes to another room at the end of this step."),
@@ -283,6 +285,10 @@ export const API: ApiEntry[] = [
     'An easing at t, from 0 to 1: the curve tween() moves along. ease("out_bounce", 0.5).'),
   fn("Effects", "say", [p("text", "any"), p("name", "string", "None")], "nothing",
     "Shows text in a box at the bottom of the screen, typed out. Space, Enter or a click goes on to the next say()."),
+  fn("Effects", "ask", [p("question", "any"), p("choices", "any"), p("name", "string", "None"), p("then", "any", "None")], "nothing",
+    'Asks a question in the dialogue box with choices under it: ask("Fight or run?", ["Fight", "Run"]). Click or tap one, use the arrow keys and Enter, or press its number. Comes after say() lines already waiting.'),
+  fn("Effects", "answer", [], "the choice's text, or None",
+    'The choice picked for the last ask(): if answer() == "Run": … None while the question is still up. Or give ask a then function, called with the choice.'),
   fn("Effects", "dialogue_open", [], "True or False", "True while say() has something on screen: stop the player moving while people talk."),
   fn("Effects", "dialogue_clear", [], "nothing", "Closes the dialogue box and forgets lines still waiting."),
 
