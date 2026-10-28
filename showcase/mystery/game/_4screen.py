@@ -86,7 +86,7 @@ def spot_at(mx, my):
 def option_at(mx, my):
     if not STATE["menu"] or my < SENTENCE_Y + 10:
         return None
-    i = (my - (SENTENCE_Y + 10)) // 11
+    i = int((my - (SENTENCE_Y + 10)) // 11)   # the mouse is in fractions of a pixel in a browser: // keeps them
     return i if 0 <= i < len(STATE["menu"]) else None
 
 
@@ -157,13 +157,51 @@ def draw_speech():
     if not SPEECH:
         return
     who, text = SPEECH["who"], SPEECH["text"]
-    lines = wrap_words(text, 30)
-    x, top = speaker_top(who)
-    y = max(2, top - 10 * len(lines))
+    if STATE.get("code"):            # a puzzle on screen: the words go under it, wider
+        lines = wrap_words(text, CODE_SAY_COLS)
+        x, y = 160, ROOM_H - 2 - 10 * len(lines)
+    else:
+        lines = wrap_words(text, 30)
+        x, top = speaker_top(who)
+        y = max(2, top - 10 * len(lines))
     width = max(words_width(l) for l in lines)
     cx = clamp(x, width / 2 + 2, 320 - width / 2 - 2)
     for i, line in enumerate(lines):
         draw_centered(cx, y + i * 10, line, ACTORS[who]["color"])
+
+
+# ---------------------------------------------------------------- a Python puzzle (code)
+# The program on a dark screen over the room, like a terminal. What anyone
+# says about it goes in the space under it (draw_speech), so a puzzle's
+# screen and its explanation never cover each other: build.py checks that
+# every program and three lines of talk fit.
+
+CODE_X, CODE_Y, CODE_W = 12, 4, 296
+CODE_SAY_COLS = 50
+CODE_GREEN, CODE_DIM, CODE_RED = "#9cf06a", "#6f8f7f", "#ff6b6b"
+
+
+def code_rows(p):
+    return 2 + len(p["code"]) + (1 if p.get("error") else 0) + 1
+
+
+def draw_code(pid):
+    p = PUZZLES[pid]
+    h = 6 + 10 * code_rows(p)
+    draw_set_color("#9cf06a")
+    draw_rect(CODE_X - 2, CODE_Y - 2, CODE_X + CODE_W + 2, CODE_Y + h + 2)
+    draw_set_color("#0b1410")
+    draw_rect(CODE_X, CODE_Y, CODE_X + CODE_W, CODE_Y + h)
+    draw_words(CODE_X + 4, CODE_Y + 3, p["title"], "#ffe14d")
+    y = CODE_Y + 3 + 20
+    for i, line in enumerate(p["code"]):     # numbered like an editor: "Which line fixes line 2?"
+        draw_words(CODE_X + 4, y, str(i + 1), "#45604f")
+        draw_words(CODE_X + 16, y, line, CODE_DIM if line.lstrip().startswith("#") else CODE_GREEN)
+        y += 10
+    if p.get("error"):
+        draw_words(CODE_X + 4, y, p["error"], CODE_RED)
+        y += 10
+    draw_words(CODE_X + 4, y, p["ask"], "#ffffff")
 
 
 # ---------------------------------------------------------------- the panel under the room

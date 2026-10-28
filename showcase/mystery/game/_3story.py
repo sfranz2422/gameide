@@ -261,8 +261,7 @@ says("look", "panel", "A glowing panel with a card-shaped slot. Next to it is a 
 says("use", "keycard", "Bzzt. The panel says something rude in alien. It's not this one. The picture shows the roof...", "panel")
 
 
-@on("open", "freezer")
-def _():
+def open_freezer():
     if flag("took_ice"):
         say_line("robin", "Frozen peas, fish sticks, and nothing else glowing.")
         return
@@ -270,6 +269,18 @@ def _():
     say_line("robin", "Frozen peas, fish sticks, and a block of ice with something glowing inside!")
     get("ice")
     set_flag("took_ice")
+
+
+@on("open", "freezer")
+def _():
+    if flag("freezer_open"):
+        open_freezer()
+        return
+    say_line("robin", "It's locked with a keypad. There's a sticky note on it, in Ms. Glorbin's handwriting. It's Python!")
+    puzzle("freezer", lambda: (set_flag("freezer_open"), sound("click"), open_freezer()))
+
+
+STORY[("use", "freezer")] = STORY[("open", "freezer")]
 
 
 # ---------------------------------------------------------------- the principal's office
@@ -324,10 +335,18 @@ def call_glorbin():
     say_line("robin", "Far off, a door bangs, and footsteps squelch away down the hall. She's left the cafeteria!")
 
 
-@on("use", "intercom")
-def _():
+def intercom_talk():
     say_line("robin", "Ahem. Testing, testing...")
     menu(intercom_menu)
+
+
+@on("use", "intercom")
+def _():
+    if flag("mic_on"):
+        intercom_talk()
+        return
+    say_line("robin", "It won't switch on. A little screen shows the program that decides who may use it.")
+    puzzle("intercom", lambda: (set_flag("mic_on"), intercom_talk()))
 
 
 STORY[("talk", "intercom")] = STORY[("use", "intercom")]
@@ -338,7 +357,7 @@ says("look", "boiler", "The school boiler. It's hot enough to melt anything.")
 says("look", "bucket", "Gus's mop bucket. The water has a face in it. It's my face.")
 says("push", "bucket", "It sloshes. Gus glares.")
 says("look", "gus", "Gus the janitor. He's worn that tinfoil hat since the new lunch lady came.")
-says("look", "hamradio", "An old ham radio, crackling away.")
+says("look", "hamradio", "An old ham radio, crackling away, and Gus's Analyzer: a toaster wired to a laptop.")
 says("look", "foilshelf", "Shelves and shelves of tinfoil. Gus is prepared.")
 
 
@@ -369,8 +388,17 @@ def _():
 
 
 def gus_tests():
+    say_line("gus", "A sample! Good kid. Let's run it through my Analyzer.")
+    if flag("analyzer_fixed"):
+        analyzer_runs()
+        return
+    sound("nope")
+    say_line("gus", "Blast! It crashed again. I wrote it myself, in Python. You kids learn Python, right? Find the bad line.")
+    puzzle("analyzer", lambda: (set_flag("analyzer_fixed"), say_line("gus", "Fixed it? Let's try again."), analyzer_runs()))
+
+
+def analyzer_runs():
     lose("sample")
-    say_line("gus", "A sample! Good kid. Let's run it through the Analyzer.")
     sound("radio")
     wait(40)
     say_line("gus", "The needle's off the chart! This meat ain't from Earth. I KNEW it!")
@@ -413,6 +441,14 @@ def _():
 @on("use", "keycard", "antenna")
 def _():
     say_line("robin", "There's a slot that fits the card perfectly...")
+    if flag("sector_known"):
+        beam_up()
+        return
+    say_line("robin", "A screen lights up in alien. The card translates it. They write Python too!")
+    puzzle("antenna", lambda: (set_flag("sector_known"), beam_up()))
+
+
+def beam_up():
     sound("teleport")
     if not flag("hat_on"):
         picture("sleepy", 90)
@@ -463,6 +499,11 @@ def finale():
     if not has("photo"):
         say_line("robin", "Wait. If I stop them now, nobody will believe me. I need proof first.")
         return
+    say_line("robin", "The hopper's sealed. The machine only takes what's on its recipe list. I'll add something to the list...")
+    puzzle("machine", spice_it)
+
+
+def spice_it():
     say_line("robin", "Here's a little something extra for the recipe.")
     sound("sizzle")
     say_line("glorbin", "NO! Not the Ghost Pepper! It BURNS! It BURRRNS!")

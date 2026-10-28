@@ -86,6 +86,9 @@ else:
     draw_people(self.t)
     draw_speech()
     draw_panel(self.t, mx, my)
+    if STATE.get("code"):
+        draw_code(STATE["code"])
+        draw_speech()
     pic = picture_now()
     if pic:
         draw_picture_over(pic, self.t)

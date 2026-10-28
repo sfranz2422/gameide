@@ -214,6 +214,88 @@ def stand_in_picture(key, size):
     return im
 
 
+# ---------------------------------------------------------------- the Python puzzles, run in Python
+
+def run_python(src):
+    """What a program prints, and the name of the error it stopped on (or None)."""
+    import contextlib
+    import io
+    out = io.StringIO()
+    try:
+        with contextlib.redirect_stdout(out):
+            exec(src, {})
+    except Exception as e:  # the wrong answers are meant to crash
+        return out.getvalue(), type(e).__name__
+    return out.getvalue(), None
+
+
+def check_puzzles():
+    """Every puzzle in game/_5code.py, run for real: the right answer must
+    be the only one Python agrees with, a shown error must be the one
+    Python gives, and it must all fit on the screen in the pixel font. A
+    puzzle whose "right" answer is wrong would teach the wrong Python, and
+    nothing in the game would ever show it."""
+    ns = {}
+    exec((HERE / "game" / "_5code.py").read_text(), ns)
+    shown = {}
+    exec("\n".join(l for l in (HERE / "game" / "_4screen.py").read_text().splitlines()
+                   if l.startswith(("CODE_X", "CODE_SAY"))), shown)
+    cols = (shown["CODE_W"] - 8) // 6
+    problems = []
+    for pid, p in ns["PUZZLES"].items():
+        c = p.get("check", {})
+
+        def run(answer):
+            lines = list(p["code"])
+            if "fix" in c:
+                lines[c["fix"]] = answer
+            src = f"def input(prompt=''):\n    return {answer!r}\n" + c.get("setup", "") + "\n" + "\n".join(lines)
+            return run_python(src)
+
+        rights = [a for a in p["answers"] if a[1]]
+        if len(rights) != 1:
+            problems.append(f"{pid}: {len(rights)} right answers")
+        for words, right, why in p["answers"]:
+            out, err = run(words)
+            worked = err is None and out.strip() == c.get("goal", words)
+            if worked != right:
+                problems.append(f"{pid}: {words!r} is marked {'right' if right else 'wrong'}, but Python printed {out.strip()!r}" + (f" and raised {err}" if err else ""))
+            talk = len(_wrap(why, shown["CODE_SAY_COLS"]))
+            if talk > 3:
+                problems.append(f"{pid}: what Robin says about {words!r} is {talk} lines; 3 fit under the screen")
+            if len(words) > 52:
+                problems.append(f"{pid}: answer {words!r} is too long for the panel")
+        if p.get("error"):
+            _, err = run_python("def input(prompt=''):\n    return '9001'\n" + c.get("setup", "") + "\n" + "\n".join(p["code"]))
+            if not err or not p["error"].startswith(err):
+                problems.append(f"{pid}: the screen says {p['error']!r}, Python raised {err}")
+        for line in [p["title"], p["ask"], p.get("error", "")] + p["code"]:
+            fits = cols - (2 if line in p["code"] else 0)    # code lines start after their numbers
+            if len(line) > fits:
+                problems.append(f"{pid}: {line!r} is wider than the screen ({fits} characters)")
+            bad = set(line) - set(font.CHARS)
+            if bad:
+                problems.append(f"{pid}: the pixel font has no {''.join(sorted(bad))!r} for {line!r}")
+        rows = 2 + len(p["code"]) + (1 if p.get("error") else 0) + 1
+        bottom = shown["CODE_Y"] + 6 + 10 * rows + 2
+        if bottom > ROOM_H - 2 - 30:
+            problems.append(f"{pid}: the screen reaches y={bottom}, over where Robin's words go")
+    if problems:
+        raise SystemExit("Python puzzles:\n  " + "\n  ".join(problems))
+    return len(ns["PUZZLES"])
+
+
+def _wrap(text, cols):
+    lines, line = [], ""
+    for word in text.split(" "):
+        if line and len(line) + 1 + len(word) > cols:
+            lines.append(line)
+            line = word
+        else:
+            line = f"{line} {word}" if line else word
+    return lines + [line]
+
+
 # ---------------------------------------------------------------- sounds
 
 def sweep(seconds, f0, f1, vol=0.25):
@@ -221,6 +303,7 @@ def sweep(seconds, f0, f1, vol=0.25):
 
 
 def build(assets_dir, out):
+    print(f"  {check_puzzles()} Python puzzles, each answer run in Python")
     A = Path(assets_dir).expanduser()
     world = load_world()
     P = Adventure("Mystery Meat from Outer Space")

@@ -27,14 +27,14 @@ SPEECH = {}     # who is talking, and what: shown over their head
 def new_game():
     STATE.clear()
     STATE.update(room="newsroom", x=150, y=124, face="front", items=["notepad"], flags=[],
-                 verb="walk", first=None, menu=None)
+                 verb="walk", first=None, menu=None, code=None)
     QUEUE.clear()
     NOW.clear()
     SPEECH.clear()
 
 
 def keep():
-    save_set("game", {k: v for k, v in STATE.items() if k != "menu"})
+    save_set("game", {k: v for k, v in STATE.items() if k not in ("menu", "code")})
 
 
 def load_game():
@@ -44,6 +44,7 @@ def load_game():
     new_game()
     STATE.update(saved)
     STATE["menu"] = None
+    STATE["code"] = None
     return True
 
 

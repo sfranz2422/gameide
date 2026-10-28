@@ -726,6 +726,12 @@ CASES = [
  ("mystery: no tin hat needed", "../showcase/mystery/game/_3story.py", "    if not flag(\"hat_on\"):\n        picture(\"sleepy\", 90)", "    if False:\n        picture(\"sleepy\", 90)", "doors shut", MM),
  ("mystery: no proof needed", "../showcase/mystery/game/_3story.py", "    if not has(\"photo\"):\n        say_line(\"robin\", \"Wait.", "    if False:\n        say_line(\"robin\", \"Wait.", "doors shut", MM),
  ("mystery: walking into walls", "../showcase/mystery/game/_2engine.py", "    if inside(x, y, poly):\n        return x, y", "    if True:\n        return x, y", "foot of it", MM),
+ ("mystery: the freezer has no keypad", "../showcase/mystery/game/_3story.py", "    if flag(\"freezer_open\"):\n        open_freezer()", "    if True:\n        open_freezer()", "newsroom to the front page", MM),
+ ("mystery: the Analyzer never crashes", "../showcase/mystery/game/_3story.py", "    if flag(\"analyzer_fixed\"):\n        analyzer_runs()", "    if True:\n        analyzer_runs()", "newsroom to the front page", MM),
+ ("mystery: any answer is right", "../showcase/mystery/game/_5code.py", "        if right:\n", "        if True:\n", "wrong answer to a Python puzzle", MM),
+ ("mystery: Never mind leaves the screen up", "../showcase/mystery/game/_5code.py", "    out.append((\"Never mind.\", lambda: STATE.update(code=None)))", "    out.append((\"Never mind.\", lambda: None))", "wrong answer to a Python puzzle", MM),
+ ("mystery: a solved puzzle asks again", "../showcase/mystery/game/_3story.py", "    puzzle(\"freezer\", lambda: (set_flag(\"freezer_open\"), ", "    puzzle(\"freezer\", lambda: (", "wrong answer to a Python puzzle", MM),
+ ("mystery: a talk line picked at a fraction of a pixel", "../showcase/mystery/game/_4screen.py", "    i = int((my - (SENTENCE_Y + 10)) // 11)", "    i = (my - (SENTENCE_Y + 10)) // 11", "wrong answer to a Python puzzle", MM),
  ("mystery: one click skips the whole talk", "../showcase/mystery/game/_2engine.py", "            clicked = False          # one click finishes one line", "            pass                     # one click finishes one line", "foot of it", MM),
  ("physics not stepped in the worker", PH, "    this.world!.step(1 / host.stepsPerSecond);", "    if (typeof window !== \"undefined\") this.world!.step(1 / host.stepsPerSecond);", "a physics coin falls", E2E),
 ]
