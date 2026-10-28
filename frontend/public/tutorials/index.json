@@ -330,9 +330,33 @@
  {
   "key": "simple-platformer",
   "title": "Simple Platformer",
-  "level": "Platformers",
+  "level": "Starter Projects",
   "time": "25 min",
   "starter": "platformer-start",
   "description": "Gravity, solid ground, running and jumping."
+ },
+ {
+  "key": "top-down",
+  "title": "Top-Down Adventure",
+  "level": "Starter Projects",
+  "time": "30 min",
+  "starter": "topdown",
+  "description": "A village seen from above that already works: walk about, collect gold, dodge slimes, talk to the wizard. Then make it yours."
+ },
+ {
+  "key": "point-and-click",
+  "title": "Point-and-Click Adventure",
+  "level": "Starter Projects",
+  "time": "35 min",
+  "starter": "pointclick",
+  "description": "Robin the reporter's newsroom and hallway, already working: click to walk, look at things, pick them up, open doors. Then build the next room."
+ },
+ {
+  "key": "visual-novel",
+  "title": "Visual Novel",
+  "level": "Starter Projects",
+  "time": "30 min",
+  "starter": "novel",
+  "description": "A spooky story on a misty marsh, already working: pictures, characters, words and choices with two endings. Then write your own scenes."
  }
 ]

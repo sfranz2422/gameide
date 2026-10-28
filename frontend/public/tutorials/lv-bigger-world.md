@@ -93,4 +93,4 @@ You built a level from free art: a sprite, a tileset, two layers of tiles, a her
 
 Where next:
 - **Game Elements** builds whole games, one idea at a time.
-- **Platformers** has more for a game like this one: coins, enemies, scores.
+- **Starter Projects** has more for a game like this one: coins, enemies, scores.

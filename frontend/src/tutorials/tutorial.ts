@@ -60,7 +60,7 @@ export interface Tutorial {
  * written in Python, so a student starts with the language and then the
  * editor (2026-10-27, the teacher's call).
  */
-export const LEVELS = ["Python Basics", "Getting Started", "Game Elements 1: The Basics", "Game Elements 2: Adding to the Fun", "Game Elements 3: Advanced Techniques", "Platformers", "Top-Down", "Shooters", "Advanced Python"];
+export const LEVELS = ["Python Basics", "Getting Started", "Game Elements 1: The Basics", "Game Elements 2: Adding to the Fun", "Game Elements 3: Advanced Techniques", "Starter Projects", "Top-Down", "Shooters", "Advanced Python"];
 
 const HEADER = /^\s*---[ \t]*\n([\s\S]*?)\n---[ \t]*(?:\n|$)/;
 const HIGHLIGHT = /^highlight\s*:\s*([\w-]+)\s*$/i;

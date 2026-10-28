@@ -24,6 +24,7 @@ import { paintStarter, paintStarterTileset, STARTER_SPRITES, STARTER_TILESET } f
 import { starterSoundBlob } from "./starterSounds";
 import { cutCells, LIBRARY } from "../library/library";
 import { spriteFromFrames } from "./spriteOps";
+import { novel, pointclick, topdown } from "./starterProjects";
 
 export interface Built {
   project: Project;
@@ -503,6 +504,10 @@ export const TUTORIAL_STARTERS: Record<string, () => Promise<Built>> = {
   "platformer-start": platformerStart,
   "player-start": playerStart,
   "python-start": pythonStart,
+  // The Starter Projects shelf: games that already work (starterProjects.ts).
+  topdown,
+  pointclick,
+  novel,
   ...Object.fromEntries([0, 1, 2, 3, 4].map((n) => [`levels-${n}`, levelsStart(n)])),
 };
 

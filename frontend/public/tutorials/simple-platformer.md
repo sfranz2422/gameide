@@ -1,6 +1,6 @@
 ---
 title: Simple Platformer
-level: Platformers
+level: Starter Projects
 time: 25 min
 starter: platformer-start
 description: Gravity, solid ground, running and jumping.

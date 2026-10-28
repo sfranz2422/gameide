@@ -115,4 +115,4 @@ game runs 1 second without errors
 
 You've used variables, `if`, loops and keys in a game. That's all a game is: a lot of small decisions, every frame.
 
-Head to **Getting Started** and try **Your First Game** or **Collect the Coins**, or explore **Platformers**.
+Head to **Getting Started** and try **Your First Game** or **Collect the Coins**, or explore **Starter Projects**.
