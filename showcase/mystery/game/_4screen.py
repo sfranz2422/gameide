@@ -20,15 +20,23 @@ def words_width(text):
     return len(text) * 6
 
 
-def draw_words(x, y, text, color="#ffffff"):
+def draw_words(x, y, text, color="#ffffff", outline=False):
+    """outline: a black edge all round each letter, the way LucasArts drew
+    talk, so it reads over any room (a shadow alone was lost on busy walls)."""
     for i, ch in enumerate(str(text)):
         n = FONT_INDEX.get(ch, -1)
         if n > 0:
+            if outline:
+                for dx, dy in OUTLINE:
+                    draw_sprite_ext("font", n, x + i * 6 + dx, y + dy, 1, 1, 0, "black")
             draw_sprite_ext("font", n, x + i * 6, y, 1, 1, 0, color)
 
 
-def draw_centered(cx, y, text, color="#ffffff"):
-    draw_words(int(cx - words_width(text) / 2), y, text, color)
+OUTLINE = [(-1, -1), (0, -1), (1, -1), (-1, 0), (1, 0), (-1, 1), (0, 1), (1, 1)]
+
+
+def draw_centered(cx, y, text, color="#ffffff", outline=False):
+    draw_words(int(cx - words_width(text) / 2), y, text, color, outline)
 
 
 def wrap_words(text, cols):
@@ -106,12 +114,10 @@ def pose_of(s, talking):
 
 
 def frame_of(who, pose, t, talking):
-    poses = ACTORS[who]["poses"]
-    if talking and (t // 8) % 2:      # the mouth moves: talking and resting pictures, turn about
-        pose = {"talk": "stand", "alien_talk": "alien"}.get(pose, pose)
-        if who == "dot":
-            pose = "awake"
-    return poses.get(pose, 0)
+    # Talking holds the talking pose. Swapping it with the standing one
+    # every few frames, to move the mouth, made everyone hop on the spot:
+    # Gemini drew the two poses differently enough to jump between.
+    return ACTORS[who]["poses"].get(pose, 0)
 
 
 def robin_frame(t, talking):
@@ -123,7 +129,7 @@ def robin_frame(t, talking):
         return poses["back"]
     if f in ("left", "right"):
         return poses["side"]
-    return poses["talk"] if talking and (t // 8) % 2 else poses["front"]
+    return poses["talk"] if talking else poses["front"]     # held while talking: see frame_of
 
 
 def draw_people(t):
@@ -167,7 +173,7 @@ def draw_speech():
     width = max(words_width(l) for l in lines)
     cx = clamp(x, width / 2 + 2, 320 - width / 2 - 2)
     for i, line in enumerate(lines):
-        draw_centered(cx, y + i * 10, line, ACTORS[who]["color"])
+        draw_centered(cx, y + i * 10, line, ACTORS[who]["color"], outline=True)
 
 
 # ---------------------------------------------------------------- a Python puzzle (code)

@@ -195,6 +195,9 @@ describe.skipIf(!have)("Mystery Meat from Outer Space", () => {
  + [f"{r}/{s['id']}: comes out at {s['exit']}" for r, room in ROOMS.items() for s in room['spots'] if s.get('exit') and not inside(s['exit'][1], s['exit'][2], ROOMS[s['exit'][0]]['walk'])]
  + [f"{r}/{s['id']}: box {s['box']}" for r, room in ROOMS.items() for s in room['spots'] if not (0 <= s['box'][0] < s['box'][2] <= 320 and 0 <= s['box'][1] < s['box'][3] <= ROOM_H)])`) as string[];
     expect(off).toEqual([]);
+    // Nobody walks over the furniture: the newsroom's left desk, the kitchen's crates.
+    expect(py(g, "[inside(40, 122, ROOMS['newsroom']['walk']), inside(10, 135, ROOMS['newsroom']['walk']), inside(30, 135, ROOMS['kitchen']['walk'])]")).toEqual([false, false, false]);
+    expect(py(g, "inside(150, 124, ROOMS['newsroom']['walk'])")).toBe(true); // where a new game starts
   });
 
   it("a click on a wall walks to the foot of it; one click finishes one line, not the whole talk", async () => {
@@ -210,6 +213,10 @@ describe.skipIf(!have)("Mystery Meat from Outer Space", () => {
     g.engine.input.mouseUp(0);
     step(g, 1);
     expect(py(g, "SPEECH.get('text')")).toBe("Two.");
+    // Talking holds one picture: swapping two every few frames made them hop.
+    py(g, "STATE['face'] = 'front'");
+    expect(py(g, "len({robin_frame(t, True) for t in range(60)})")).toBe(1);
+    expect(py(g, "len({frame_of(w, p, t, True) for t in range(60) for w, p in [('glorbin', 'talk'), ('dot', 'talk'), ('glorbin', 'alien_talk')]})")).toBe(3);
   });
 
   it("answers everything with something: no click anywhere goes unanswered or breaks", async () => {

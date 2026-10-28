@@ -35,7 +35,8 @@ ITEMS = {
 ROOMS = {
     "newsroom": {
         "name": "The Newsroom", "pic": "r01-newsroom",
-        "walk": [(4, 118), (316, 118), (318, 143), (2, 143)], "scale": (118, 0.9, 143, 1.05),
+        # The open floor only: not under the desks on the left, nor the bin in the corner.
+        "walk": [(92, 118), (300, 118), (316, 126), (318, 143), (24, 143), (24, 128), (84, 128)], "scale": (118, 0.9, 143, 1.05),
         "spots": [
             {"id": "computer", "name": "computer", "box": (112, 50, 144, 84), "stand": (128, 124), "face": "back"},
             {"id": "board", "name": "bulletin board", "box": (164, 20, 229, 69), "stand": (196, 124), "face": "back"},
@@ -75,7 +76,7 @@ ROOMS = {
     },
     "kitchen": {
         "name": "The Kitchen", "pic": "r04-kitchen",
-        "walk": [(20, 120), (300, 120), (318, 143), (2, 143)], "scale": (120, 0.9, 143, 1.05),
+        "walk": [(64, 120), (300, 120), (318, 143), (78, 143)], "scale": (120, 0.9, 143, 1.05),     # not over the crates bottom left
         "spots": [
             {"id": "pot", "name": "giant pot", "box": (70, 50, 118, 94), "stand": (95, 128), "face": "back"},
             {"id": "crate", "name": "crate", "box": (113, 93, 162, 130), "stand": (138, 134), "face": "back"},
