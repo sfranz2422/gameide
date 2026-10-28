@@ -163,14 +163,19 @@ export function ConsolePane({ lines, clear, jump }: { lines: ConsoleLine[]; clea
 
 // (The catalog's own list: catalog.test.ts holds the palettes to it too.)
 
-/** The API catalog as a searchable list. Clicking an entry types it at the cursor. */
-export function DocsPane() {
+/**
+ * The API catalog as a searchable list. Clicking an entry types it at the
+ * cursor — or, given `pick` (the Docs page, which has no editor), hands it
+ * to that instead.
+ */
+export function DocsPane({ pick, hint = "Click to put it in your code" }: { pick?: (text: string) => void; hint?: string } = {}) {
   const [q, setQ] = useState("");
   const shown = useMemo(() => {
     const s = q.trim().toLowerCase();
     return API.filter((e) => !s || e.name.includes(s) || e.description.toLowerCase().includes(s));
   }, [q]);
   const insert = (text: string) => {
+    if (pick) return pick(text);
     const v = activeEditor.view;
     if (!v || v.state.readOnly) return;
     const { from, to } = v.state.selection.main;
@@ -190,7 +195,7 @@ export function DocsPane() {
               <button
                 key={e.name}
                 className="doc-entry"
-                title="Click to put it in your code"
+                title={hint}
                 onClick={() => insert(e.kind === "function" ? `${e.name}(${e.params.filter((p) => p.default === undefined).map((p) => p.name).join(", ")})` : e.name)}
               >
                 <code>{e.kind === "function" ? signature(e) : e.name}</code>
@@ -204,7 +209,7 @@ export function DocsPane() {
         <section>
           <h4>Instance properties (self.…)</h4>
           {PROPERTIES.map((p) => (
-            <button key={p.name} className="doc-entry" onClick={() => insert(`self.${p.name}`)}>
+            <button key={p.name} className="doc-entry" title={hint} onClick={() => insert(`self.${p.name}`)}>
               <code>self.{p.name}</code>
               <span>{p.description}</span>
             </button>

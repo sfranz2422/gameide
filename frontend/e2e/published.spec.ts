@@ -3,7 +3,8 @@
  * an admin approves, a remix, a report and a take-down, and a published game
  * that plays offline once installed (its service worker).
  */
-import { expect, test, type Browser, type Page } from "@playwright/test";
+import { devices, expect, test, webkit, type Browser, type Page } from "@playwright/test";
+import { existsSync } from "node:fs";
 import { chooseTemplate, playAndWait, watchErrors } from "./helpers";
 
 async function signedIn(browser: Browser, email: string) {
@@ -56,6 +57,40 @@ test("a published game plays from its link for anyone, signed out too, and shows
   await expect(play.getByTestId("player-like")).toBeDisabled();
   expect(errors.filter((e) => !e.includes("401"))).toEqual([]);
   await stranger.close();
+  await ctx.close();
+});
+
+// Safari's engine, which every browser on an iPhone is. A published game was
+// a black screen there and nowhere else (gameWorker.ts says why), so only
+// WebKit itself can tell. `npx playwright install webkit` once to have it.
+test("a published game plays on an iPhone (Safari's engine)", async ({ browser }) => {
+  test.skip(!existsSync(webkit.executablePath()), "WebKit isn't installed: npx playwright install webkit");
+  const { ctx, page } = await signedIn(browser, "ivy@example.com");
+  await newGame(page);
+  const link = await publish(page, "Ivy's Coins", "unlisted");
+  const safari = await webkit.launch();
+  const phone = await (await safari.newContext({ ...devices["iPhone 13"], baseURL: test.info().project.use.baseURL })).newPage();
+  await phone.goto(link);
+  await playIt(phone);
+  // Drawn, not just started: the game's Python runs before the renderer
+  // does, so a renderer that fails still leaves the game's numbers right.
+  const frame = () => phone.evaluate(async () => ((await (window as any).__gameide.host.snapshot()) as Blob | null)?.size ?? 0);
+  await expect.poll(frame, { timeout: 30_000 }).toBeGreaterThan(1000);
+  await expect(phone.getByRole("alert")).toHaveCount(0);
+  await safari.close();
+  await ctx.close();
+});
+
+test("an engine that can't start says so, rather than a black screen", async ({ browser }) => {
+  const { ctx, page } = await signedIn(browser, "ike@example.com");
+  await newGame(page);
+  const link = await publish(page, "Ike's Coins", "unlisted");
+  const play = await (await browser.newContext()).newPage();
+  await play.goto(link);
+  await playIt(play);
+  // What the worker sends when Pixi or WebGL fails, which no Python error comes with.
+  await play.evaluate(() => (window as any).__gameide.host.receive({ type: "fatal", message: "WebGL is turned off" }));
+  await expect(play.getByRole("alert")).toContainText("The game engine failed: WebGL is turned off");
   await ctx.close();
 });
 

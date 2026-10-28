@@ -40,9 +40,18 @@ export function PlayerApp() {
 
   // Python starts loading at once, alongside the game's files.
   useEffect(() => {
+    // The engine itself failing (Pixi, WebGL — not the game's Python) comes
+    // as an output line and then "crashed" with no error. The player once
+    // dropped both, and a game that couldn't start was a black screen.
+    let failure = "";
     const h = new GameHost({
-      state: (s) => s === "crashed" || setPhase((p) => (s === "running" ? { kind: "playing" } : p)),
-      output: () => undefined,
+      state: (s) =>
+        setPhase((p) =>
+          s === "running" ? { kind: "playing" } : s === "crashed" && p.kind !== "crashed" ? { kind: "failed", message: failure || "The game couldn't start in this browser." } : p,
+        ),
+      output: (lines) => {
+        for (const l of lines) if (l.kind === "err") failure = l.text;
+      },
       error: (error) => setPhase({ kind: "crashed", error }),
       stats: () => undefined,
       ready: setPythonReady,

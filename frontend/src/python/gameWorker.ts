@@ -5,6 +5,16 @@
  * Pyodide loads once; each Play gets a fresh game in it.
  */
 import { DOMAdapter, WebWorkerAdapter } from "pixi.js";
+// Pixi's worker extensions, imported here rather than left to Pixi, which
+// imports them itself as the renderer starts. Left to Pixi, the bundler
+// put them inside this file and made Pixi's import of them a small chunk
+// that imports this worker's own script — and Safari, every browser on an
+// iPhone, runs that script a second time instead of reusing it: everything
+// registers twice and Pixi stops with "Extension type texture-source already
+// has a handler". A published game was a black screen on every iPhone, with
+// nothing said. Chrome reuses the module, so only Safari ever showed it.
+// Imported here, Pixi's own import finds them already loaded.
+import "pixi.js/webworker";
 import { GameLoop } from "../engine/loop";
 import { PixiRenderer } from "../engine/render/pixiRenderer";
 import { getPyodide, PythonGame } from "./bridge";

@@ -1528,6 +1528,32 @@ legend {
   font-size: 12.5px;
 }
 
+/* The Docs page (#/docs): the same list, with room to spread out. */
+.docs-page .docs {
+  overflow: visible;
+  padding: 0;
+}
+.docs-page .docs-search {
+  max-width: 420px;
+  margin-bottom: 4px;
+}
+.docs-page .docs section {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr));
+  gap: 2px 12px;
+}
+.docs-page .docs h4 {
+  grid-column: 1 / -1;
+  margin-top: 20px;
+}
+.docs-page .doc-entry code,
+.docs-page .doc-entry span {
+  font-size: 13.5px;
+}
+.docs-copied code {
+  color: var(--syn-function);
+}
+
 /* ---------------------------------------------------------------- modal */
 .modal-back {
   position: fixed;
@@ -2244,6 +2270,27 @@ a.btn {
 .site-nav-item.on {
   color: var(--text);
   background: var(--panel-2);
+}
+/* A phone: the links get a row of their own under the name, the account
+   and the light/dark button. In one row they ran off the right edge, and
+   Docs and the theme button couldn't be reached. */
+@media (max-width: 640px) {
+  .site-nav {
+    flex-wrap: wrap;
+    gap: 4px 10px;
+    padding: 6px 12px;
+  }
+  .site-logo {
+    margin-right: 0;
+  }
+  .site-nav-items {
+    order: 3;
+    width: 100%;
+    justify-content: space-between;
+  }
+  .site-nav-item {
+    padding: 4px 8px;
+  }
 }
 
 /* Big, flat, coloured buttons, as microStudio's and GDevelop's are. */

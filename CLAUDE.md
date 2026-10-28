@@ -27,6 +27,15 @@ server must send them too**, or the interrupt silently degrades to killing
 the worker with no line number. `?nointerrupt` forces that fallback, for
 testing.
 
+**Safari runs the worker's script twice if anything imports it.** Pixi's
+worker extensions are imported at the top of gameWorker.ts for that reason:
+left to Pixi, the bundler made Pixi's import of them a chunk importing the
+worker's own file, and every published game was a black screen on an
+iPhone, Chrome being fine. `e2e/build.editor.spec.ts` fails on a chunk that
+imports the worker; `published.spec.ts` plays a game in WebKit (`npx
+playwright install webkit` once — it skips without it, saying so). An
+engine failure in the player is shown, never a silent black screen.
+
 ## Sprites and masks
 
 - A mask is a box, a circle or exact pixels (`engine/sprites.ts`). All of
@@ -284,7 +293,8 @@ refuses unknown names).
 Server tests are plain scripts, as in PyIDE: `backend/tests/test_server.py`
 prints ok/FAIL per check and exits non-zero. Browser tests use Playwright in
 two projects: `editor` (the build alone) and `account` (served by Flask with
-the dev sign-in and a throwaway SQLite database).
+the dev sign-in and a throwaway SQLite database). Both run in Chromium; one test
+in `account` launches WebKit itself, for iPhones.
 
 Waiting for a save in a test: wait for "Saving…" **then** "Saved". "Saved"
 alone is already showing before an edit, and passes before the save starts.

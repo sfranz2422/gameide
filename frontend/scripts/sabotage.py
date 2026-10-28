@@ -686,6 +686,16 @@ CASES = [
  ("lesson 5 opens with other code", "src/store/templates.ts", '  "move_and_collide(move * 3, 0)",', '  "move_and_collide(move * 4, 0)",', "lesson 4 ends with exactly"),
  ("lesson 3 opens without the tileset", "src/store/templates.ts", "    if (n >= 2) {\n      const sheet = pack.sheets.find((x) => x.name === \"Tiles\")!;", "    if (n >= 3) {\n      const sheet = pack.sheets.find((x) => x.name === \"Tiles\")!;", "Painting a Room", E2E),
  ("library sprite with one frame", "src/library/LibraryBrowser.tsx", "frames: await cutCells(sheet, chosen),", "frames: await cutCells(sheet, chosen.slice(0, 1)),", "Art from the Library", E2E),
+ ("Pixi left to import its worker extensions", "src/python/gameWorker.ts", 'import "pixi.js/webworker";', 'import "pixi.js";', "imports the game worker's own script", E2E),
+ ("Pixi left to import its worker extensions, on an iPhone", "src/python/gameWorker.ts", 'import "pixi.js/webworker";', 'import "pixi.js";', "plays on an iPhone", E2E),
+ ("player drops an engine failure", PA, "        for (const l of lines) if (l.kind === \"err\") failure = l.text;", "        for (const l of lines) if (l.kind === \"warn\") failure = l.text;", "engine that can't start", E2E),
+ ("player ignores a crash with no error", PA, 's === "crashed" && p.kind !== "crashed" ?', 's === "crashed" && p.kind === "failed" ?', "engine that can't start", E2E),
+ ("no Docs in the top bar", "src/editor/SiteNav.tsx", '"#/docs", Icon.docs(20), "Docs", "nav-docs")', '"#/docs", Icon.docs(20), "Docs", "nav-doc")', "Docs is in the top bar", E2E),
+ ("Docs page click types instead of copying", "src/editor/RunPanes.tsx", "    if (pick) return pick(text);", "    if (!pick) return;", "Docs is in the top bar", E2E),
+ ("Docs tab click does nothing", "src/editor/RunPanes.tsx", "    if (pick) return pick(text);", "    if (pick || !pick) return pick?.(text);", "Docs tab still types", E2E),
+ ("Docs page search ignored", "src/editor/RunPanes.tsx", "    return API.filter((e) => !s ||", "    return API.filter((e) => true ||", "Docs is in the top bar", E2E),
+ ("top bar one row on a phone", "src/editor/app.css", "@media (max-width: 640px) {\n  .site-nav {\n    flex-wrap: wrap;", "@media (max-width: 64px) {\n  .site-nav {\n    flex-wrap: wrap;", "the top bar still fits", E2E),
+ ("Docs grid wider than a phone", "src/editor/app.css", "minmax(min(320px, 100%), 1fr)", "minmax(320px, 1fr)", "the top bar still fits", E2E),
  ("physics not stepped in the worker", PH, "    this.world!.step(1 / host.stepsPerSecond);", "    if (typeof window !== \"undefined\") this.world!.step(1 / host.stepsPerSecond);", "a physics coin falls", E2E),
 ]
 only = sys.argv[1:]

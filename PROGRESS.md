@@ -1,5 +1,11 @@
 # Progress
 
+## Docs as a page; Thornwood on an iPhone ✅ (2026-10-28, waiting for review)
+- **Docs is in the top bar** (`#/docs`, `editor/DocsPage.tsx`): the editor's Docs tab as a page, every function and `self.` property, searchable, in columns. There's no code there to type into, so a click copies the entry. On a phone the bar's links take a row of their own under the name; in one row, Docs and the light/dark button ran off the edge.
+- **Published games were a black screen on every iPhone** (Safari's engine is the only one there). Pixi, starting its renderer, imported its worker extensions, which the bundler had put in the worker's own file — so the import was of the worker's script, and Safari ran it a second time: "Extension type texture-source already has a handler". The touch buttons showed (the game's Python had started) but nothing drew and nothing moved. The worker now imports them itself (`gameWorker.ts`). Found by playing the published Thornwood in WebKit with the phone's screen size.
+- **The player said nothing** when the engine failed: it ignored a crash with no Python error. It shows the message now.
+- Tests: `e2e/build.editor.spec.ts` (no chunk imports the worker), `published.spec.ts` plays a published game in WebKit until a frame is drawn and shows an engine failure, `e2e/docs.editor.spec.ts` (the page, search, copy, the phone bar, and the editor's tab still typing). 10 sabotage cases, all caught (the WebKit test first missed one: it checked the game's Python, which starts before the renderer fails, so it now waits for a drawn frame).
+
 ## Building Levels: five lessons on the editor itself; Python Basics first ✅ (2026-10-27, waiting for review)
 - **The shelves start with Python Basics**, then Getting Started: every game lesson is written in Python (the teacher's call). A tutorial that names no shelf still goes on Getting Started.
 - **Five new Getting Started lessons** (`public/tutorials/lv-*.md`), each opening with the ones before it done (`levelsStart` in store/templates.ts, built from the library's Kenney art as a student builds it):

@@ -1,6 +1,6 @@
 /**
  * Pages chosen by the URL's hash: #/ is the front door (HomePage), #/games
- * lists your games, #/p/<id> edits one, #/explore, #/gallery/<class id> and
+ * lists your games, #/p/<id> edits one, #/docs is every function, #/explore, #/gallery/<class id> and
  * #/moderation are about published games (whose own pages, /play/<id>, are
  * the player's — play.html). A hash rather than a path so the static build works from any server
  * without rewrite rules.
@@ -19,6 +19,7 @@ import { AssignmentPage, ClassesPage, ClassPage, StartAssignment } from "./Class
 import { ViewStore } from "../store/viewStore";
 import { ClassXpPage, ShopPage, XpLogPage, XpToasts } from "../xp/XpPages";
 import { HelpPage } from "../notes/HelpPage";
+import { DocsPage } from "./DocsPage";
 import { TutorialEditPage, TutorialsPage } from "../tutorials/TutorialPages";
 import { useIdleSignOut } from "./idle";
 import { ProjectsPage } from "./ProjectsPage";
@@ -73,6 +74,8 @@ export function App() {
         <TutorialEditPage key={hash} slug={hash.match(/^#\/tutorials\/edit\/([\w-]+)/)![1]!} />
       ) : hash.startsWith("#/tutorials") ? (
         <TutorialsPage />
+      ) : hash.startsWith("#/docs") ? (
+        <DocsPage />
       ) : hash.startsWith("#/help") ? (
         <HelpPage />
       ) : hash.startsWith("#/xp") ? (
