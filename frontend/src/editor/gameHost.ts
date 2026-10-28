@@ -287,6 +287,10 @@ export class GameHost {
     canvas.tabIndex = 0;
     canvas.dataset.tutorial = "game-canvas";
     canvas.dataset.testid = "game-canvas";
+    // The pane's stylesheet draws a game pixelated, which is right for pixel
+    // art and turns painted art to jagged edges: a game that asked not to be
+    // scaled in whole steps is scaled smoothly too.
+    if (!this.pixelScaling) canvas.style.imageRendering = "auto";
     container.appendChild(canvas);
     this.canvas = canvas;
     this.layout();

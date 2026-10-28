@@ -1,5 +1,12 @@
 # Progress
 
+## The Lantern of Greymire: the second showcase game ✅ (2026-10-28, waiting for review)
+- **An illustrated gamebook** in the style of inkle's Sorcery!: 60 pages, a painted map you travel by tapping places (the lantern walks the dotted paths), choices that remember (a horse found in the reeds, Marrow's whistle, Gallow's feather, Pip), a riddle, a door of three faces, Sorcery's duel (how much strength into each blow, against a foe whose face may lie), Rewind to before any choice, a save, and four endings, counted on the title. `showcase/greymire/`: the story in `game/_1story.py` as plain data a student can read and change, the book's rules in `_2book.py`, the drawing in `_3screens.py`, and one object, Book.
+- **The teacher's Gemini pictures, as they came**: 14 scenes, the map, the paper, and five portraits drawn two to a picture (cut apart by the build, faded at the edges). Gemini gave Pip a body of willow leaves in every scene after the willow, so the story does too. The pictures live in `~/Downloads/greymire/`, not the repository; fonts are IM Fell (OFL), in `fonts/`.
+- **The build checks the story** before building (like Thornwood's route checker): every choice leads to a page, every page can be reached, and every page fits its sheet, measured with the real font. It refuses to build otherwise.
+- **Engine fixes it found**: Draw-event drawing at one depth now stacks in the order it was called (all of a depth's shapes were one Graphics, so the game's words vanished under its own paper), and a game without crisp pixel scaling is drawn smoothly in the editor too (the pane drew everything pixelated).
+- Tests: `src/showcase/greymire.test.ts` (every page drawn whole with book quotes, the best ending played by keys, a duel's arithmetic and its full-strength choices fitting, Rewind, the dark ending), `feel.editor.spec.ts` (draw order read back pixel by pixel; smooth scaling). Played in WebKit with an iPhone's screen. 13 sabotage cases, all caught (a new `GM` runner rebuilds the game around each); the first runs missed two, both fixed: holding back's extra strength hidden by the cap, and an over-long page that still fit.
+
 ## The Lantern of Greymire, part 1: ask(), wrapped text, the prompts (2026-10-28, in progress)
 - The next featured game: an illustrated gamebook like inkle's Sorcery!, in a haunted marsh. The teacher is making its pictures with Gemini from `showcase/greymire/PROMPTS.md` (one locked ink-and-watercolour style, a reference picture attached to every prompt).
 - **`ask(question, choices, name=None, then=None)`**: a question in the dialogue box, after any `say()` lines waiting, with its choices under it once it's typed out. Click or tap one, arrow keys and Enter, or its number. `answer()` is the choice (None while asking); `then` is called with it. A click that shows the question whole picks nothing, and a tap that misses the choices does nothing.
@@ -1380,7 +1387,9 @@ game).
    crosses, not on every step it stays outside. This is deliberate, so a
    bullet's `destroy()` isn't called sixty times.
 7. **Within one depth**, `draw_self()` is drawn under that depth's
-   `draw_text`/`draw_rect`, whatever order they were called in.
+   other Draw-event drawing, whatever order they were called in. (The
+   rest stacks in call order since 2026-10-28; before that, texts and
+   sprites landed over or under all of a depth's shapes by chance.)
 8. The production bundle is 570 kB (PixiJS is most of it). Splitting the
    editor from the player can wait until the editor exists.
 9. Camera, sound and `tile_at` are in the spec's API but belong to Phases 5,

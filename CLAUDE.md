@@ -280,7 +280,8 @@ holds one deliberate bug per guarded behaviour, applies each, confirms the
 named test fails, and restores. Add a case whenever you add a check; a case
 that prints MISS is a test that lets the bug through. A sabotage must still
 compile (strict TypeScript refuses unused names), and a case can run a
-Playwright test (`E2E`) or one of the server's checks (`PY`) instead of
+Playwright test (`E2E`), one of the server's checks (`PY`), or Greymire's
+playtest after rebuilding that game from the broken source (`GM`) instead of
 Vitest. Its usual traps, all hit already: the
 bug lands where the check can't see it (an error on an event's last line
 hides an off-by-one), the test never produced the condition it names, a

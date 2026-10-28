@@ -12,3 +12,5 @@ backend/tests/*.db
 
 # The showcase game as built: it carries Anokolisa's art, which is not ours to put in the repository.
 showcase/out/
+# …and Greymire's, which carries the teacher's Gemini pictures.
+showcase/greymire/out/

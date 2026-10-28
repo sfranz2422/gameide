@@ -27,6 +27,7 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 RT, EN, IN, BR = "src/python/runtime.py", "src/engine/engine.ts", "src/engine/input.ts", "src/python/bridge.ts"
 CG, PJ, HOST, UP = "src/python/codegen.ts", "src/store/project.ts", "src/editor/gameHost.ts", "src/editor/useProject.ts"
 E2E = "e2e"  # a sixth item: run the Playwright test of that name instead of Vitest
+GM = "greymire"  # …or Greymire's playtest, after building the game from the sabotaged source (and again after)
 PY = "py"    # …or the server's checks (backend/tests/test_server.py); caught = that check prints FAIL
 APP = "../backend/app.py"
 RO, RE = "src/editor/rooms/roomOps.ts", "src/editor/rooms/RoomEditor.tsx"
@@ -706,6 +707,18 @@ CASES = [
  ("draw_text ignores width", RT, "        text = str(text) if width is None else string_wrap(text, width)", "        text = str(text)", "breaks lines between words"),
  ("string_wrap cache ignores font size", RT, "    key = (text, _font, _font_size, width)", "    key = (text, _font, width)", "breaks lines between words"),
  ("ask: the mouse read in the wrong place", RT, "            mx, my = (mouse_x - view_x) * zoom, (mouse_y - view_y) * zoom", "            mx, my = (mouse_x - view_x) * zoom, (mouse_y - view_y) * zoom + 30", "a choice clicked on the game's own canvas", E2E),
+ ("painted games still pixelated", GH, '    if (!this.pixelScaling) canvas.style.imageRendering = "auto";', '    if (this.pixelScaling) canvas.style.imageRendering = "auto";', "drawn smoothly, not pixelated", E2E),
+ ("shapes after a picture join the shapes under it", "src/engine/render/pixiRenderer.ts", "          sp.zIndex = -depth + this.order * CALL_ORDER;\n          this.open = null;", "          sp.zIndex = -depth + this.order * CALL_ORDER;", "drawn last is on top", E2E),
+ ("words ignore the order they were written in", "src/engine/render/pixiRenderer.ts", "          t.zIndex = -depth + this.order * CALL_ORDER;", "          t.zIndex = -depth;", "drawn last is on top", E2E),
+ ("greymire: Rewind restores nothing", "../showcase/greymire/game/_2book.py", "    STATE.update(HISTORY.pop())", "    HISTORY.pop()", "Rewind goes back", GM),
+ ("greymire: out of stamina is not the end", "../showcase/greymire/game/_2book.py", "    if STATE[\"stamina\"] <= 0 and not to.startswith(\"end:\"):", "    if STATE[\"stamina\"] < 0 and not to.startswith(\"end:\"):", "the lantern goes out", GM),
+ ("greymire: a tie lands a blow", "../showcase/greymire/game/_2book.py", "    if n > a:", "    if n >= a:", "a duel", GM),
+ ("greymire: holding back gives nothing extra", "../showcase/greymire/game/_2book.py", "(2 if n == 0 else 1)", "(1 if n == 0 else 1)", "a duel", GM),
+ ("greymire: half a page typed", "../showcase/greymire/game/_3screens.py", "    draw_text(TEXT_X, y, words[: int(self.typed)])", "    draw_text(TEXT_X, y, words[: int(self.typed) * 2 // 3])", "draws every page", GM),
+ ("greymire: straight quotes", "../showcase/greymire/game/_3screens.py", "            out.append(\"\\u201c\" if opening else \"\\u201d\")", "            out.append(\"\\u201d\" if opening else \"\\u201d\")", "draws every page", GM),
+ ("greymire: the map always walks to the first place", "../showcase/greymire/game/_3screens.py", "        target = places[self.lit]", "        target = places[0]", "best ending", GM),
+ ("greymire: a choice taken while it types", "../showcase/greymire/game/Book.py", "    if clicked or keyboard_check_pressed(\"space\") or keyboard_check_pressed(\"enter\"):\n        self.typed = len(words)\n    return", "    if clicked or keyboard_check_pressed(\"space\") or keyboard_check_pressed(\"enter\"):\n        self.typed = len(words)", "best ending", GM),
+ ("greymire: a portrait over the duel", "../showcase/greymire/game/_3screens.py", "    if who:\n        draw_sprite(", "    if self.mode == \"duel\":\n        who = FOES[STATE[\"duel\"][\"foe\"]][\"who\"]\n    if who:\n        draw_sprite(", "a duel", GM),
  ("physics not stepped in the worker", PH, "    this.world!.step(1 / host.stepsPerSecond);", "    if (typeof window !== \"undefined\") this.world!.step(1 / host.stepsPerSecond);", "a physics coin falls", E2E),
 ]
 only = sys.argv[1:]
@@ -741,6 +754,8 @@ for name, f, old, new, test, *extra in CASES:
             failed = any(l.startswith("FAIL") and test in l for l in out.splitlines())
             ran = "ok   " in out or "FAIL " in out
         else:
+            if runner == [GM]:
+                subprocess.run(["python3", str(ROOT.parent / "showcase/greymire/build.py")], capture_output=True)
             cmd = ["npx", "playwright", "test", "-g", test] if runner == [E2E] else ["npx", "vitest", "run", "-t", test]
             r = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True)
             out = r.stdout + r.stderr
@@ -750,4 +765,6 @@ for name, f, old, new, test, *extra in CASES:
         if not failed: bad.append(name)
     finally:
         p.write_text(src)
+        if runner == [GM]:
+            subprocess.run(["python3", str(ROOT.parent / "showcase/greymire/build.py")], capture_output=True)
 print("ALL SABOTAGES CAUGHT" if not bad else f"NOT CAUGHT: {bad}")

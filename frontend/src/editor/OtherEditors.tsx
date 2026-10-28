@@ -148,7 +148,7 @@ export function SettingsEditor() {
         />
         Crisp pixel scaling
         <span className="muted small">
-          Grow the game window only by whole steps (2×, 3×…), so every pixel stays square. Turn off to fill the space exactly.
+          Grow the game window only by whole steps (2×, 3×…), so every pixel stays square. Turn off to fill the space exactly, and smoothly: for painted pictures and photos.
         </span>
       </label>
       <SavedData gameId={project.id} />

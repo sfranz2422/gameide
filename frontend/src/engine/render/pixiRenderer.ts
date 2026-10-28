@@ -62,8 +62,24 @@ function paint(g: Graphics, color: number, outline: number, alpha: number) {
   else g.fill({ color, alpha });
 }
 
+/**
+ * How far apart, in zIndex, two things drawn one after the other at the same
+ * depth are: the later one a hair above. Far smaller than one depth, so the
+ * call order only ever settles ties.
+ */
+const CALL_ORDER = 1e-6;
+
+/**
+ * Draw-event drawing, in the order it was called. At one depth, what was
+ * drawn last is on top — a sheet of paper, then the words on it, then a
+ * button over both. That needs every run of shapes between two texts or
+ * sprites to be its own Graphics: one Graphics a depth, as it once was, put
+ * all the depth's shapes either under or over all its texts and sprites
+ * (whichever Pixi object happened to be made first), and words written on a
+ * picture vanished behind it, saying nothing.
+ */
 class DrawLayer {
-  private graphicsByDepth = new Map<number, Graphics>();
+  private graphics: Graphics[] = [];
   private texts: Text[] = [];
   private sprites: Sprite[] = [];
 
@@ -75,22 +91,37 @@ class DrawLayer {
     private readonly fonts: ReadonlySet<number>,
   ) {}
 
+  // The Graphics the shapes being drawn now go into, while nothing else comes between them.
+  private open: Graphics | null = null;
+  private openDepth = 0;
+  private gi = 0;
+  private order = 0;
+
   private graphicsAt(depth: number): Graphics {
-    let gfx = this.graphicsByDepth.get(depth);
+    if (this.open && this.openDepth === depth) return this.open;
+    let gfx = this.graphics[this.gi];
     if (!gfx) {
       gfx = new Graphics();
-      gfx.zIndex = -depth;
-      this.graphicsByDepth.set(depth, gfx);
+      this.graphics.push(gfx);
       this.into.addChild(gfx);
     }
+    this.gi++;
+    gfx.clear();
+    gfx.visible = true;
+    gfx.zIndex = -depth + this.order * CALL_ORDER;
+    this.open = gfx;
+    this.openDepth = depth;
     return gfx;
   }
 
   render(list: DrawCommand[]) {
-    for (const gfx of this.graphicsByDepth.values()) gfx.clear();
     let ti = 0;
     let si = 0;
+    this.gi = 0;
+    this.open = null;
+    this.order = 0;
     for (const cmd of list) {
+      this.order++;
       switch (cmd[0]) {
         case "rect": {
           const [, depth, x1, y1, x2, y2, color, outline, alpha = 1] = cmd;
@@ -150,7 +181,8 @@ class DrawLayer {
           if (t.style.fill !== color) t.style.fill = color;
           t.position.set(x, y);
           t.anchor.set(halign === "center" ? 0.5 : halign === "right" ? 1 : 0, valign === "middle" ? 0.5 : valign === "bottom" ? 1 : 0);
-          t.zIndex = -depth;
+          t.zIndex = -depth + this.order * CALL_ORDER;
+          this.open = null;
           t.alpha = alpha;
           t.visible = true;
           break;
@@ -173,12 +205,17 @@ class DrawLayer {
           sp.scale.set(xscale, yscale);
           sp.rotation = -angle * DEG; // GameMaker's angles go anticlockwise; Pixi's clockwise
           sp.tint = tint;
-          sp.zIndex = -depth;
+          sp.zIndex = -depth + this.order * CALL_ORDER;
+          this.open = null;
           sp.alpha = alpha;
           sp.visible = true;
           break;
         }
       }
+    }
+    for (let i = this.gi; i < this.graphics.length; i++) {
+      this.graphics[i]!.clear();
+      this.graphics[i]!.visible = false;
     }
     for (let i = ti; i < this.texts.length; i++) this.texts[i]!.visible = false;
     for (let i = si; i < this.sprites.length; i++) this.sprites[i]!.visible = false;

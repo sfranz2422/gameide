@@ -168,3 +168,40 @@ test("ask(): a choice clicked on the game's own canvas is the one picked", async
   await expect.poll(() => py("answer()")).toBe("Right");
   expect(await py("dialogue_open()")).toBe(false);
 });
+
+test("a game without crisp pixel scaling is drawn smoothly, not pixelated", async ({ page }) => {
+  await fromTemplate(page, "coins");
+  const canvas = page.locator("canvas[data-testid=game-canvas]");
+  const look = () => canvas.evaluate((c) => getComputedStyle(c).imageRendering);
+  await page.getByTestId("play").click();
+  await expect(page.getByTestId("fps")).toBeVisible({ timeout: 60_000 });
+  expect(await look()).toBe("pixelated");
+  await page.getByTestId("stop").click();
+  await page.getByRole("button", { name: "Game settings" }).click();
+  await page.getByTestId("pixel-scaling").uncheck();
+  await page.getByTestId("play").click();
+  await expect(page.getByTestId("fps")).toBeVisible({ timeout: 60_000 });
+  expect(await look()).toBe("auto");
+});
+
+test("at one depth, what's drawn last is on top: a shape over a picture over a shape, and words over all", async ({ page }) => {
+  await fromTemplate(page, "coins");
+  await treeItem(page, "Player").click();
+  await page.getByTestId("add-event").click();
+  await page.getByTestId("pick-draw_gui").click();
+  // Red under a wall sprite, a blue square on the wall, white words across the blue.
+  await setCode(page, [
+    'draw_set_color("red")', "draw_rect(300, 300, 420, 420)",
+    'draw_sprite("wall", 0, 330, 330)',
+    'draw_set_color("blue")', "draw_rect(336, 336, 346, 346)",
+    'draw_set_font(None, 40)', 'draw_set_color("white")', 'draw_text(300, 380, "████")',
+  ].join("\n") + "\n");
+  await page.getByTestId("play").click();
+  await expect(page.getByTestId("fps")).toBeVisible({ timeout: 60_000 });
+  await page.waitForTimeout(500);
+  const [red, wall, blue, words] = await pixels(page, [[305, 305], [355, 355], [341, 341], [310, 400]]);
+  expect(near(red!, [255, 0, 0])).toBe(true);
+  expect(near(wall!, [255, 0, 0], 60)).toBe(false); // the wall drawn over the red
+  expect(near(blue!, [0, 0, 255])).toBe(true); // the blue drawn over the wall
+  expect(near(words!, [255, 255, 255])).toBe(true); // the words over the red
+});
