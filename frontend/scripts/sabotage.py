@@ -28,6 +28,7 @@ RT, EN, IN, BR = "src/python/runtime.py", "src/engine/engine.ts", "src/engine/in
 CG, PJ, HOST, UP = "src/python/codegen.ts", "src/store/project.ts", "src/editor/gameHost.ts", "src/editor/useProject.ts"
 E2E = "e2e"  # a sixth item: run the Playwright test of that name instead of Vitest
 GM = "greymire"  # …or Greymire's playtest, after building the game from the sabotaged source (and again after)
+MM = "mystery"   # …or Mystery Meat's playtest, rebuilt the same way
 PY = "py"    # …or the server's checks (backend/tests/test_server.py); caught = that check prints FAIL
 APP = "../backend/app.py"
 RO, RE = "src/editor/rooms/roomOps.ts", "src/editor/rooms/RoomEditor.tsx"
@@ -719,6 +720,13 @@ CASES = [
  ("greymire: the map always walks to the first place", "../showcase/greymire/game/_3screens.py", "        target = places[self.lit]", "        target = places[0]", "best ending", GM),
  ("greymire: a choice taken while it types", "../showcase/greymire/game/Book.py", "    if clicked or keyboard_check_pressed(\"space\") or keyboard_check_pressed(\"enter\"):\n        self.typed = len(words)\n    return", "    if clicked or keyboard_check_pressed(\"space\") or keyboard_check_pressed(\"enter\"):\n        self.typed = len(words)", "best ending", GM),
  ("greymire: a portrait over the duel", "../showcase/greymire/game/_3screens.py", "    if who:\n        draw_sprite(", "    if self.mode == \"duel\":\n        who = FOES[STATE[\"duel\"][\"foe\"]][\"who\"]\n    if who:\n        draw_sprite(", "a duel", GM),
+ ("mystery: nothing is used on its own", "../showcase/mystery/game/_2engine.py", " and not used_alone(v, thing):", ":", "newsroom to the front page", MM),
+ ("mystery: a conversation's answers never come", "../showcase/mystery/game/_2engine.py", "    say_line(\"robin\", words)\n    after()", "    say_line(\"robin\", words)", "newsroom to the front page", MM),
+ ("mystery: the kitchen always open", "../showcase/mystery/game/_3story.py", "    if flag(\"glorbin_away\"):\n        go(\"kitchen\", 30, 124)", "    if True:\n        go(\"kitchen\", 30, 124)", "doors shut", MM),
+ ("mystery: no tin hat needed", "../showcase/mystery/game/_3story.py", "    if not flag(\"hat_on\"):\n        picture(\"sleepy\", 90)", "    if False:\n        picture(\"sleepy\", 90)", "doors shut", MM),
+ ("mystery: no proof needed", "../showcase/mystery/game/_3story.py", "    if not has(\"photo\"):\n        say_line(\"robin\", \"Wait.", "    if False:\n        say_line(\"robin\", \"Wait.", "doors shut", MM),
+ ("mystery: walking into walls", "../showcase/mystery/game/_2engine.py", "    if inside(x, y, poly):\n        return x, y", "    if True:\n        return x, y", "foot of it", MM),
+ ("mystery: one click skips the whole talk", "../showcase/mystery/game/_2engine.py", "            clicked = False          # one click finishes one line", "            pass                     # one click finishes one line", "foot of it", MM),
  ("physics not stepped in the worker", PH, "    this.world!.step(1 / host.stepsPerSecond);", "    if (typeof window !== \"undefined\") this.world!.step(1 / host.stepsPerSecond);", "a physics coin falls", E2E),
 ]
 only = sys.argv[1:]
@@ -754,8 +762,8 @@ for name, f, old, new, test, *extra in CASES:
             failed = any(l.startswith("FAIL") and test in l for l in out.splitlines())
             ran = "ok   " in out or "FAIL " in out
         else:
-            if runner == [GM]:
-                subprocess.run(["python3", str(ROOT.parent / "showcase/greymire/build.py")], capture_output=True)
+            if runner in ([GM], [MM]):
+                subprocess.run(["python3", str(ROOT.parent / f"showcase/{runner[0]}/build.py")], capture_output=True)
             cmd = ["npx", "playwright", "test", "-g", test] if runner == [E2E] else ["npx", "vitest", "run", "-t", test]
             r = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True)
             out = r.stdout + r.stderr
@@ -765,6 +773,6 @@ for name, f, old, new, test, *extra in CASES:
         if not failed: bad.append(name)
     finally:
         p.write_text(src)
-        if runner == [GM]:
-            subprocess.run(["python3", str(ROOT.parent / "showcase/greymire/build.py")], capture_output=True)
+        if runner in ([GM], [MM]):
+            subprocess.run(["python3", str(ROOT.parent / f"showcase/{runner[0]}/build.py")], capture_output=True)
 print("ALL SABOTAGES CAUGHT" if not bad else f"NOT CAUGHT: {bad}")
