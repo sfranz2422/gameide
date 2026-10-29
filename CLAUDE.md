@@ -459,7 +459,10 @@ header; steps are `---` slides; ` ```check ` blocks gate Next (strict); a
   It only follows tutorials: no Assign to, copy or download. A teacher's own
   are "Only me", in their library. **A class gets a tutorial one way, as in
   the other editors**: Try it (its starting game, in the teacher's games),
-  New assignment from that game, then Link to… in the library. An assigned
+  New assignment from that game, then Link to… in the library. **The
+  library lists every built-in as it ships**; editing or linking one makes
+  the teacher's version, a row of its own named "<title> (copy)" beside it
+  (`origin` builtin:<name>; old ones renamed once by `tutorials.migrate`). An assigned
   game claims step XP under `a:<slug>`, never the teacher's private
   `t:<slug>` its starter was made from.
 

@@ -51,16 +51,17 @@ export async function tutorialMarkdown(key: string): Promise<string> {
 export const libraryEditUrl = (slug: string) => `/teacher/tutorials/${slug}/edit`;
 
 /**
- * The library row (library.py) for a tutorial, to edit or assign it: a
- * built-in becomes the teacher's own row (origin builtin:<name>, found again
- * if it's theirs already); their own is its row; someone else's shared one
+ * The library row (library.py) for a tutorial, to edit or link it: a
+ * built-in becomes the teacher's own row, "<title> (copy)" (origin
+ * builtin:<name>, found again if it's theirs already); their own is its row; someone else's shared one
  * is copied into theirs. Its slug.
  */
 export async function libraryRowFor(key: string, title: string, mine: boolean): Promise<string> {
   const [kind, name] = [key.slice(0, key.indexOf(":")), key.slice(key.indexOf(":") + 1)];
   if (kind === "t" && mine) return name;
   const body = await tutorialMarkdown(key);
-  if (kind === "builtin") return (await api<{ slug: string }>("/api/library", { json: { origin: key, title, body } })).slug;
+  // "(copy)": the built-in stays listed in the library beside the teacher's version of it.
+  if (kind === "builtin") return (await api<{ slug: string }>("/api/library", { json: { origin: key, title: `${title} (copy)`, body } })).slug;
   return (await api<{ slug: string }>("/api/library", { json: { title, body } })).slug;
 }
 

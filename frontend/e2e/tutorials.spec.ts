@@ -255,10 +255,16 @@ test("the tutorial library: built-ins listed, one assigned and linked, an upload
   await expect(box).not.toContainText(" 0 tests");
   if (process.env.SHOT_DIR) await teacher.getByTestId("notes-editor").screenshot({ path: `${process.env.SHOT_DIR}/lib-box.png` });
   await teacher.goto("/#/library");
-  await expect(teacher.getByTestId("library-row").filter({ hasText: "Top-Down Adventure" })).toContainText("1 assignment");
-  await expect(teacher.getByTestId("library-row").filter({ hasText: "Top-Down Adventure" })).toHaveCount(1); // the built-in and its row are one
-  // Theirs now, so it can be deleted, and says what goes: their version, not the built-in.
-  await expect(topDown.getByTestId("library-delete")).toHaveText("Delete my version");
+  // Theirs is a row of its own, "(copy)", linked to that assignment, and the
+  // built-in is still listed beside it, as it ships, with nothing to delete.
+  const copy = teacher.getByTestId("library-row").filter({ hasText: "Top-Down Adventure (copy)" });
+  await expect(copy).toContainText("1 assignment");
+  await expect(copy.getByTestId("library-delete")).toBeVisible();
+  await expect(teacher.getByTestId("library-row").filter({ hasText: "Top-Down Adventure" })).toHaveCount(2);
+  const original = teacher.getByTestId("library-row").filter({ hasText: "Top-Down Adventure" }).filter({ hasNotText: "(copy)" });
+  await expect(original).toContainText("Built-in");
+  await expect(original).toContainText("Not used yet");
+  await expect(original.getByTestId("library-delete")).toHaveCount(0);
 
   // Many files at once from the computer.
   await teacher.getByTestId("library-files").setInputFiles([

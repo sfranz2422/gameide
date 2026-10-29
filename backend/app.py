@@ -906,7 +906,9 @@ def _known(text):
         _BUILTINS["stamp"] = stamp
         for f in d.glob("*.md"):
             md = f.read_text(encoding="utf-8")
-            _BUILTINS[md] = {"origin": "builtin:" + f.stem, "title": tutorials.meta(md)["title"]}
+            # "(copy)": the teacher's row sits beside the built-in in the library,
+            # which is listed as well, and the two mustn't look like one.
+            _BUILTINS[md] = {"origin": "builtin:" + f.stem, "title": tutorials.meta(md)["title"] + " (copy)"}
     return _BUILTINS.get(text)
 
 

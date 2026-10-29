@@ -214,6 +214,19 @@ def migrate(db):
     if db.query(L.id).filter(L.app == APP_NAME, L.visibility == "classes").first() is not None:
         db.query(L).filter(L.app == APP_NAME, L.visibility == "classes").update({"visibility": "private"})
         db.commit()
+    # A teacher's row made from a built-in is "<title> (copy)": the library
+    # lists the built-in itself beside it now. Rows made before keep the
+    # built-in's own title and are renamed, once — a title they've changed is
+    # theirs and left alone.
+    made = db.query(L).filter(L.app == APP_NAME, L.origin.like("builtin:%")).all()
+    renamed = False
+    for row in made:
+        md = builtin(row.origin[len("builtin:"):])
+        if md is not None and row.title == meta(md)["title"]:
+            row.title = (row.title + " (copy)")[:200]
+            renamed = True
+    if renamed:
+        db.commit()
     have = {s for (s,) in db.query(accounts.LibraryItem.slug).filter(accounts.LibraryItem.app == APP_NAME)}
     moved = 0
     old = db.query(Tutorial).all()

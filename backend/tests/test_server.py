@@ -1133,7 +1133,23 @@ db.close()
 items = teacher.get("/api/library").get_json()["items"]
 vn = [i for i in items if i["origin"] == "builtin:visual-novel"]
 check("notes that ARE a built-in are linked to the teacher's row for it", len(vn) == 1 and [u["title"] for u in vn[0]["uses"]] == ["Old visual novel"], vn)
-check("…named as the built-in", vn and vn[0]["title"] == "Visual Novel")
+check("…named as the built-in, as a copy: the built-in itself is listed beside it", vn and vn[0]["title"] == "Visual Novel (copy)")
+# A row made before that, under the built-in's own title, is renamed once; one the teacher renamed is theirs.
+db = server.SessionLocal()
+db.add(accounts.LibraryItem(slug="oldcopy001", app="gameide", teacher_id=tid, kind="tutorial", title="Top-Down Adventure",
+                            body="x", size=1, origin="builtin:top-down"))
+db.add(accounts.LibraryItem(slug="oldcopy002", app="gameide", teacher_id=tid, kind="tutorial", title="My village",
+                            body="x", size=1, origin="builtin:top-down"))
+db.commit()
+db.close()
+xa.get("/api/tutorials")
+_titles = {i["slug"]: i["title"] for i in teacher.get("/api/library").get_json()["items"]}
+check("…a built-in's row from before is renamed a copy", _titles.get("oldcopy001") == "Top-Down Adventure (copy)", _titles.get("oldcopy001"))
+check("…but not one the teacher named themselves", _titles.get("oldcopy002") == "My village")
+xa.get("/api/tutorials")
+check("…and only once", {i["slug"]: i["title"] for i in teacher.get("/api/library").get_json()["items"]}.get("oldcopy001") == "Top-Down Adventure (copy)")
+teacher.delete("/api/library/oldcopy001")
+teacher.delete("/api/library/oldcopy002")
 r = teacher.get(f"/api/assignments/{OLDB}").get_json()
 check("the assignment's page says which tutorial it is, from a built-in",
       r["tutorial"] and r["tutorial"]["slug"] == vn[0]["slug"] and r["tutorial"]["origin"] == "builtin:visual-novel", r.get("tutorial"))

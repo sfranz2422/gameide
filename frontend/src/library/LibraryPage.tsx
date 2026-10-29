@@ -87,31 +87,31 @@ export function LibraryPage() {
       (e: Error) => setSay({ text: e.message, bad: true }),
     );
   useEffect(() => {
-    void load();
+    // The Learn page's list first: it is what moves old tutorials in and names
+    // a built-in's rows "(copy)" (tutorials.migrate), so the library shows them as they now are.
+    void loadHidden().then(load);
     void fetch(new URL("tutorials/index.json", document.baseURI))
       .then((r) => r.json())
       .then((list: Builtin[]) => setBuiltins(list), () => undefined);
-    void loadHidden();
   }, []);
 
   const act = (f: () => Promise<unknown>) => f().catch((e: Error) => setSay({ text: e.message, bad: true }));
 
   const rows = useMemo<Row[]>(() => {
     if (!items) return [];
-    const taken = new Set(items.map((i) => i.origin));
-    const all: Row[] = [
-      ...items.map((item) => ({ item })),
-      ...builtins.filter((b) => !taken.has(`builtin:${b.key}`)).map((builtin) => ({ builtin })),
-    ];
+    // Every built-in is listed as it ships, whether or not the teacher has a
+    // version of it: theirs is a row of its own, "<title> (copy)", beside it.
+    // (One row for both once hid the original as soon as it was edited.)
+    const all: Row[] = [...items.map((item) => ({ item })), ...builtins.map((builtin) => ({ builtin }))];
     const q = query.trim().toLowerCase();
     return all
       .filter((r) => {
         const title = r.item ? r.item.title : r.builtin.title;
-        const isBuiltin = r.builtin || r.item.origin.startsWith("builtin:");
+        const isBuiltin = !!r.builtin;
         return (!q || title.toLowerCase().includes(q)) && (!show || (show === "builtin") === !!isBuiltin);
       })
       .sort((a, b) => {
-        // Theirs first, most recently changed; then the built-ins not yet theirs, by title.
+        // Theirs first, most recently changed; then the built-ins, by title.
         if (a.item && b.item) return a.item.updated < b.item.updated ? 1 : -1;
         if (a.item) return -1;
         if (b.item) return 1;
@@ -230,8 +230,10 @@ export function LibraryPage() {
             <tbody>
               {rows.map((r) => {
                 const title = r.item ? r.item.title : r.builtin.title;
-                const builtin = !!r.builtin || r.item!.origin.startsWith("builtin:");
-                const builtinName = r.builtin ? r.builtin.key : r.item!.origin.startsWith("builtin:") ? r.item!.origin.slice("builtin:".length) : null;
+                const builtin = !!r.builtin;
+                // A teacher's version of a built-in ("… (copy)"): theirs, beside the original.
+                const fromBuiltin = !!r.item && r.item.origin.startsWith("builtin:");
+                const builtinName = r.builtin ? r.builtin.key : null;
                 // How Try it follows it: as it ships (a built-in not yet theirs), or their row.
                 const key = r.item ? `t:${r.item.slug}` : `builtin:${r.builtin.key}`;
                 return (
@@ -276,9 +278,9 @@ export function LibraryPage() {
                         Try it
                       </button>
                       {/* Who sees it on the Learn page. A built-in's is the site's (an
-                          admin's call, for everyone); a teacher's own, theirs to publish. A
-                          built-in made theirs gets no choice of its own: "Everyone" would put
-                          it on the Learn page beside the built-in it came from. */}
+                          admin's call, for everyone); a teacher's own, theirs to publish. Their
+                          version of a built-in gets no choice: its header still has the
+                          built-in's title, so "Everyone" would put a second of it on the Learn page. */}
                       {builtinName ? (
                         me.user?.admin && (
                           <select
@@ -296,7 +298,7 @@ export function LibraryPage() {
                           </select>
                         )
                       ) : (
-                        r.item && (
+                        r.item && !fromBuiltin && (
                           <select
                             className="small-select"
                             value={r.item.visibility}
@@ -330,25 +332,17 @@ export function LibraryPage() {
                           <a className="btn small" href={`/api/library/${r.item.slug}/download`} data-testid="library-download" title="Its markdown, as a file">
                             ⤓
                           </a>
-                          {/* On a built-in made theirs (edited or linked), Delete takes away their
-                              version only: the built-in itself is everyone's and stays, back to a
-                              plain built-in row. Said so, or the one Delete among the built-ins
-                              looked like a way to delete that built-in alone. */}
                           <button
                             className="btn small red"
                             data-testid="library-delete"
                             onClick={() => {
                               const n = r.item!.uses.length;
                               const kept = n ? ` The ${n} assignment${n === 1 ? "" : "s"} using it keep the notes as they are now, as their own.` : "";
-                              const ask = builtin
-                                ? `Delete your version of “${title}”? The built-in tutorial stays as it ships, for you and everyone.${kept}`
-                                : `Delete “${title}” from the library?${kept}`;
-                              if (!confirm(ask)) return;
+                              if (!confirm(`Delete “${title}” from the library?${fromBuiltin ? " The built-in it came from stays." : ""}${kept}`)) return;
                               void act(() => api(`/api/library/${r.item!.slug}`, { method: "DELETE" }).then(load));
                             }}
-                            title={builtin ? "Your changes go; the built-in stays" : undefined}
                           >
-                            {builtin ? "Delete my version" : "Delete"}
+                            Delete
                           </button>
                         </>
                       )}
