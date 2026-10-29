@@ -75,3 +75,64 @@ body.player {
 .player-description {
   white-space: pre-wrap;
 }
+
+/* A phone (PlayerApp.tsx, isPhone): Play fills the whole screen with the
+   game, sideways where the phone allows it. Nothing else of the page shows;
+   ✕ goes back to it. */
+body.phone-play {
+  overflow: hidden;
+}
+.player-page.phone {
+  position: fixed;
+  inset: 0;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  gap: 0;
+  z-index: 10;
+  background: #000;
+}
+.player-page.phone .player-head,
+.player-page.phone .player-about {
+  display: none;
+}
+.player-page.phone .player-stage {
+  min-height: 0;
+  border-radius: 0;
+}
+.phone-leave {
+  position: absolute;
+  top: max(8px, env(safe-area-inset-top));
+  left: max(8px, env(safe-area-inset-left));
+  z-index: 5;
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 50%;
+  background: #0008;
+  color: #fff;
+  font-size: 16px;
+  opacity: 0.7;
+}
+.phone-turn {
+  display: none;
+}
+@media (orientation: portrait) {
+  .player-page.phone .phone-turn {
+    position: absolute;
+    inset: 0;
+    z-index: 4;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    background: #000e;
+    color: #fff;
+    font-size: 20px;
+  }
+}
+.phone-turn-icon {
+  font-size: 56px;
+  line-height: 1;
+}

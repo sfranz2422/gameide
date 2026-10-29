@@ -27,6 +27,37 @@ import { loadExported, loadPublished, PlayError, type GamePackage, type Publishe
 /** /play/<id> on our server; anywhere else, an exported game's own folder. */
 export const publishedId = () => location.pathname.match(/\/play\/([\w-]+)\/?$/)?.[1] ?? null;
 
+/**
+ * A phone in the hand: a touch screen with a short side under 600 pixels
+ * (tablets keep the page). On one, Play fills the screen with the game.
+ */
+export const isPhone = () => matchMedia("(pointer: coarse)").matches && Math.min(screen.width, screen.height) < 600;
+
+/**
+ * The whole screen, turned sideways. Android's Chrome allows both, after a
+ * tap; an iPhone allows neither (Safari has no full screen for a page, and
+ * no orientation lock), so there the game fills the browser's window, and
+ * held upright it asks to be turned. Each step may be refused: the game
+ * fills the window whatever happens.
+ */
+async function goLandscape() {
+  try {
+    await document.documentElement.requestFullscreen?.({ navigationUI: "hide" });
+    await (screen.orientation as ScreenOrientation & { lock?: (o: string) => Promise<void> }).lock?.("landscape");
+  } catch {
+    /* refused: the window it is */
+  }
+}
+
+function leaveLandscape() {
+  try {
+    screen.orientation?.unlock?.();
+  } catch {
+    /* never locked */
+  }
+  if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined);
+}
+
 type Phase = { kind: "loading" } | { kind: "ready" } | { kind: "playing" } | { kind: "failed"; message: string; status?: number } | { kind: "crashed"; error: PythonGameError };
 
 export function PlayerApp() {
@@ -35,6 +66,7 @@ export function PlayerApp() {
   const [pkg, setPkg] = useState<GamePackage | null>(null);
   const [info, setInfo] = useState<PublishedInfo | null>(null);
   const [pythonReady, setPythonReady] = useState(false);
+  const [phone, setPhone] = useState(false);
   const stage = useRef<HTMLDivElement>(null);
   const host = useRef<GameHost | null>(null);
 
@@ -78,6 +110,11 @@ export function PlayerApp() {
     if (!pkg || !host.current) return;
     const { def } = buildGame(pkg.project, pkg.assets);
     // Saves are per game, kept apart from the same game in the editor.
+    if (isPhone() && !autostart) {
+      setPhone(true);
+      host.current.fillScreen = true;
+      void goLandscape();
+    }
     void host.current.play(def, id ? `play:${id}` : `export:${pkg.project.id}`);
     setPhase({ kind: "playing" });
     if (id) void fetch(`/api/play/${encodeURIComponent(id)}/played`, { method: "POST" }).catch(() => undefined);
@@ -87,6 +124,14 @@ export function PlayerApp() {
   // must wait for a click before it may make sound; the desktop app is
   // allowed sound from the start, so the game simply begins.
   const autostart = new URLSearchParams(location.search).has("autostart");
+  const leavePhone = () => {
+    leaveLandscape();
+    setPhone(false);
+    if (host.current) host.current.fillScreen = false;
+  };
+  useEffect(() => {
+    document.body.classList.toggle("phone-play", phone);
+  }, [phone]);
   useEffect(() => {
     if (autostart && pythonReady && phase.kind === "ready") start();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -94,9 +139,20 @@ export function PlayerApp() {
 
   const title = info?.title ?? pkg?.project.name ?? "";
   return (
-    <div className={`player-page${info ? " published" : ""}`}>
+    <div className={`player-page${info ? " published" : ""}${phone ? " phone" : ""}`} data-testid="player-page">
       {info && <PublishedHeader info={info} setInfo={setInfo} host={host.current} />}
       <div className="player-stage" ref={stage} data-testid="player-stage">
+        {phone && (
+          <>
+            <button className="phone-leave" onClick={leavePhone} aria-label="Leave full screen" data-testid="phone-leave">
+              ✕
+            </button>
+            <div className="phone-turn" data-testid="phone-turn">
+              <span className="phone-turn-icon">⟲</span>
+              Turn your phone sideways
+            </div>
+          </>
+        )}
         {phase.kind !== "playing" && (
           <div className="player-overlay">
             {phase.kind === "loading" && <p>Loading…</p>}

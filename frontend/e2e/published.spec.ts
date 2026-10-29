@@ -81,6 +81,42 @@ test("a published game plays on an iPhone (Safari's engine)", async ({ browser }
   await ctx.close();
 });
 
+test("on a phone, Play fills the screen with the game, asks to be turned sideways, and ✕ goes back", async ({ browser }) => {
+  const { ctx, page } = await signedIn(browser, "pia@example.com");
+  await newGame(page);
+  const link = await publish(page, "Pia's Coins", "unlisted");
+  // A desktop plays it in the page, as before.
+  const desk = await (await browser.newContext({ viewport: { width: 1366, height: 768 } })).newPage();
+  await desk.goto(link);
+  await playIt(desk);
+  await expect(desk.getByTestId("player-page")).not.toHaveClass(/phone/);
+  await expect(desk.getByTestId("player-title")).toBeVisible();
+
+  const phoneCtx = await browser.newContext({ ...devices["Pixel 5"] });
+  const phone = await phoneCtx.newPage();
+  await phone.goto(link);
+  await playIt(phone);
+  await expect(phone.getByTestId("player-page")).toHaveClass(/phone/);
+  await expect(phone.getByTestId("player-title")).toBeHidden();
+  // Held upright: turn it. (Chrome went full screen too, as Android's does.)
+  await expect(phone.getByTestId("phone-turn")).toBeVisible();
+  await expect.poll(() => phone.evaluate(() => !!document.fullscreenElement)).toBe(true);
+  // An iPhone has no full screen for a page: the game fills the window all the same.
+  await phone.evaluate(() => document.exitFullscreen());
+  await expect(phone.getByTestId("player-page")).toHaveClass(/phone/);
+  // Sideways: the game fills it (640 × 480 in 851 × 393: as tall as the screen).
+  await phone.setViewportSize({ width: 851, height: 393 });
+  await expect(phone.getByTestId("phone-turn")).toBeHidden();
+  const canvas = phone.locator("canvas[data-testid=game-canvas]");
+  await expect.poll(async () => (await canvas.boundingBox())!.height).toBeGreaterThan(393 * 0.95);
+  // ✕: back to the page.
+  await phone.getByTestId("phone-leave").click();
+  await expect(phone.getByTestId("player-page")).not.toHaveClass(/phone/);
+  await expect(phone.getByTestId("player-title")).toBeVisible();
+  await phoneCtx.close();
+  await ctx.close();
+});
+
 test("an engine that can't start says so, rather than a black screen", async ({ browser }) => {
   const { ctx, page } = await signedIn(browser, "ike@example.com");
   await newGame(page);

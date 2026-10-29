@@ -60,6 +60,18 @@ export interface Inspected {
   vars?: Record<string, string>;
 }
 
+/**
+ * How much a room is scaled to fit its box. With pixel scaling, by whole
+ * numbers while the room is bigger than 1× (every game pixel the same size);
+ * filling a phone's screen, whole numbers only while they lose less than a
+ * fifth of it (gameHost.fillScreen).
+ */
+export function fitScale(w: number, h: number, boxW: number, boxH: number, pixelScaling: boolean, fillScreen: boolean): number {
+  const fit = Math.min(boxW / w, boxH / h);
+  const whole = Math.floor(fit);
+  return pixelScaling && fit >= 1 && !(fillScreen && whole < fit * 0.8) ? whole : fit;
+}
+
 export class GameHost {
   /** Plays the game's sounds: the worker can't. */
   readonly sound = new SoundPlayer();
@@ -79,6 +91,13 @@ export class GameHost {
   /** The game window's size in game pixels (the room, or its camera's view). */
   private room = { width: 640, height: 480 };
   private pixelScaling = true;
+  /**
+   * The player on a phone (PlayerApp.tsx): fill the screen. Whole-number
+   * scaling there left a 320 × 200 game at 1× in the middle of a phone held
+   * sideways (it fits 1.95×), so whole numbers are kept only while they lose
+   * less than a fifth of the room.
+   */
+  fillScreen = false;
   private resizer: ResizeObserver | null = null;
   private detachInput: (() => void) | null = null;
   private evals = new Map<number, (v: unknown) => void>();
@@ -348,8 +367,7 @@ export class GameHost {
     const canvas = this.canvas, box = this.box;
     if (!canvas || !box) return;
     const { width: w, height: h } = this.room;
-    const fit = Math.min(box.clientWidth / w, box.clientHeight / h);
-    const scale = this.pixelScaling && fit >= 1 ? Math.floor(fit) : fit;
+    const scale = fitScale(w, h, box.clientWidth, box.clientHeight, this.pixelScaling, this.fillScreen);
     canvas.style.width = `${Math.max(1, Math.floor(w * scale))}px`;
     canvas.style.height = `${Math.max(1, Math.floor(h * scale))}px`;
   }

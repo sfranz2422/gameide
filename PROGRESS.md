@@ -1,5 +1,12 @@
 # Progress
 
+## Reading the tutorials; phones on Explore (2026-10-29, waiting for review)
+- **Python to type is a card** in notes and tutorials: tinted, an accent edge, marked TYPE THIS, coloured the way the editor colours it (`NotesPane.tsx` colourCode, CodeMirror's own Python parser), and a little bigger. Names in a sentence (`vx`) are chips. It was black text in a black box.
+- **Next opens the next step at its top** (and a notes slide too). It opened scrolled as far down as the last one, at its checks.
+- **Tab takes the hint that's showing** in the code editor, as in PyIDE, WebIDE and FlaskIDE; with none showing it indents as before.
+- **Games on a phone fill the screen** (`PlayerApp.tsx`, a touch screen whose short side is under 600 px): Play hides the page around the game, goes full screen and turns sideways where the phone allows (Android's Chrome), and on an iPhone, which allows neither, fills Safari's window and asks to be turned sideways while held upright. ✕ goes back to the page. Pixel games there scale by fractions when whole numbers would waste over a fifth of the screen (`gameHost.ts` fitScale): Mystery Meat was 1× in a phone held sideways.
+- Tests: `tutorials.editor.spec.ts` (the card, its colours, scrolling), `editor.spec.ts` (Tab, both ways), `published.spec.ts` (a phone: filled, full screen, the turn-it prompt, sideways filled, ✕; a desktop unchanged), `fitScale.test.ts`. Played in WebKit as an iPhone both ways round. 7 sabotage cases, all caught (one first missed: removing Tab's line broke the build instead).
+
 ## Starter Projects: a top-down game, a point-and-click and a visual novel to start from (2026-10-28, waiting for review)
 - **The Platformers shelf is now Starter Projects**, with Simple Platformer still on it and three new tutorials, each opening on a small game that **already works**, to change and grow (`store/starterProjects.ts`, `public/tutorials/top-down.md`, `point-and-click.md`, `visual-novel.md`):
   - **Village Quest** (top-down): a 40 × 30 village painted with Kenney's Tiny Town, a hero, a wizard to talk to, gold and slimes from Tiny Dungeon. Steps: walking speed, more gold, the wizard's lines, faster slimes, a scenery tile layer.

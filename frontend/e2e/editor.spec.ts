@@ -145,6 +145,10 @@ test("Tab takes the hint that's showing, as in the other editors; with none show
   await setCode(page, "");
   await page.keyboard.type("instance_num");
   await expect(page.locator(".cm-tooltip-autocomplete")).toContainText("instance_number");
+  // CodeMirror takes no key for 75 ms after a hint opens (interactionDelay),
+  // so Enter typed at speed isn't swallowed by a hint nobody saw. A person
+  // reads the hint first; the test, under load, once pressed Tab inside it.
+  await page.waitForTimeout(150);
   await page.keyboard.press("Tab");
   // The call and its slot, as Enter would give it.
   await expect(page.getByTestId("event-code").locator(".cm-content")).toHaveText("instance_number(obj)");
