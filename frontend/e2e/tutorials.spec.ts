@@ -95,3 +95,82 @@ test("a teacher's tutorial, shared with a class, done by a student; a built-in o
   await sctx.close();
   await tctx.close();
 });
+
+const QUESTION = `
+\`\`\`quiz
+What does "lines" hold in each scene?
+- [ ] One picture
+- [x] What's said, in order
+\`\`\`
+`;
+
+test("a built-in tutorial copied, a question added, tried as practice, downloaded, and assigned: the question counts", async ({ browser }) => {
+  test.setTimeout(180_000);
+  const { ctx: tctx, page: teacher } = await signedIn(browser, "teach2@example.com");
+  await teacher.goto("/#/classes");
+  await teacher.getByTestId("new-class-name").fill("Questions P2");
+  await teacher.getByTestId("new-class-go").click();
+  await teacher.waitForURL(/#\/class\/\d+$/);
+  await teacher.getByTestId("roster-emails").fill("vic@example.com");
+  await teacher.getByTestId("roster-add").click();
+  await expect(teacher.getByText("vic@example.com")).toBeVisible();
+
+  // The markdown of a built-in one, as a file.
+  await teacher.goto("/#/tutorials");
+  const novel = teacher.getByTestId("tutorial-card").filter({ hasText: "Visual Novel" }).first();
+  const [file] = await Promise.all([teacher.waitForEvent("download"), novel.getByTestId("tutorial-download").click()]);
+  expect(file.suggestedFilename()).toBe("visual-novel.md");
+  const { readFile } = await import("node:fs/promises");
+  expect(await readFile((await file.path())!, "utf8")).toContain("title: Visual Novel");
+
+  // My copy of it, with a question in its first step.
+  await novel.getByTestId("tutorial-copy").click();
+  await teacher.waitForURL(/#\/tutorials\/copy\//);
+  const source = teacher.getByTestId("tutorial-source");
+  await expect(source).toHaveValue(/title: Visual Novel \(my copy\)/);
+  const md = (await source.inputValue()).replace("\n---\n\n## Change the words", QUESTION + "\n---\n\n## Change the words");
+  await source.fill(md);
+  await teacher.getByTestId("tutorial-save").click();
+  await teacher.waitForURL(/#\/tutorials\/edit\/\w+$/);
+
+  // Tried: the question shows in the tutorial and is marked, as practice.
+  await teacher.getByRole("button", { name: "Try it" }).click();
+  await teacher.waitForURL(/#\/p\//);
+  const q = teacher.getByTestId("tutorial-pane").getByTestId("question");
+  await expect(q).toContainText('What does "lines" hold');
+  await q.getByLabel("One picture").check();
+  await q.getByTestId("question-answer").click();
+  await expect(q.getByTestId("question-result")).toContainText("Practice: ✗ Not right");
+  await q.getByLabel("What's said, in order").check();
+  await q.getByTestId("question-answer").click();
+  await expect(q.getByTestId("question-result")).toContainText("Practice: ✓ Right");
+  await expect(teacher.getByTestId("tutorial-next")).toBeDisabled(); // the step's check still holds Next, not the question
+
+  // Assigned to the class: the student's answer is marked once and counted.
+  await teacher.goto("/#/tutorials");
+  await teacher.getByTestId("tutorial-card").filter({ hasText: "Visual Novel (my copy)" }).getByTestId("tutorial-assign").selectOption({ label: "Questions P2" });
+  await teacher.waitForURL(/#\/assignment\/\w+$/);
+  const slug = teacher.url().split("/").pop()!;
+  // A second question, added on the assignment's page: in this class's copy only.
+  const notes = teacher.getByTestId("notes-source");
+  await notes.fill((await notes.inputValue()).replace("\n---\n\n## Change the words", "\n```quiz\nHow many endings are there?\nanswer: 2\nanswer: two\n```\n\n---\n\n## Change the words"));
+  await teacher.getByTestId("notes-save").click();
+  await expect(teacher.getByTestId("notes-save")).toHaveText("Saved");
+  const { ctx: sctx, page: vic } = await signedIn(browser, "vic@example.com");
+  await vic.goto(`/a/${slug}`);
+  await vic.waitForURL(/#\/p\//);
+  await expect(vic.getByTestId("tutorial-pane").getByTestId("question")).toHaveCount(2);
+  await expect(vic.getByTestId("tutorial-pane")).toContainText("How many endings are there?"); // the assignment's own question
+  await expect(vic.getByTestId("tutorial-pane")).not.toContainText("answer: 2");
+  const sq = vic.getByTestId("tutorial-pane").getByTestId("question").first();
+  await expect(sq).toContainText('What does "lines" hold');
+  await expect(sq).not.toContainText("[x]");
+  await sq.getByLabel("What's said, in order").check();
+  await sq.getByTestId("question-answer").click();
+  await expect(sq.getByTestId("question-result")).toHaveText("✓ Right — 1 / 1");
+  await expect(sq.getByTestId("question-answer")).toHaveCount(0); // one try
+  await teacher.reload();
+  await expect(teacher.getByTestId("result-row").filter({ hasText: "Vic" })).toContainText("1");
+  await sctx.close();
+  await tctx.close();
+});

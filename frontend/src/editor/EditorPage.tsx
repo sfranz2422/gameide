@@ -332,9 +332,13 @@ export function EditorPage({ store, id }: { store: ProjectStore; id: string }) {
   // student, Turn in. The checks in the notes play this editor's own game.
   const { a: assignment, reload: reloadAssignment } = useAssignment(store, id);
   const notes = assignment?.notes?.trim() ? assignment.notes : "";
-  // A tutorial: the one this game follows (its own record of it), or the
-  // assignment's notes when they are one (a tutorial assigned to a class).
-  const tutorialKey = project?.tutorial?.key ?? (assignment && isTutorial(assignment.notes) ? `a:${assignment.slug}` : null);
+  // A tutorial: an assignment's notes when they are one (a tutorial assigned
+  // to a class), else the one this game follows (its own record of it). The
+  // assignment comes first: its game still names the tutorial it was made
+  // from, and reading that one instead left out everything the teacher had
+  // changed in the assignment's notes — its questions too — and gave the
+  // student the answers in it.
+  const tutorialKey = assignment && isTutorial(assignment.notes) ? `a:${assignment.slug}` : (project?.tutorial?.key ?? null);
   const [tutorialMd, setTutorialMd] = useState<string | null>(null);
   useEffect(() => {
     if (!tutorialKey) return setTutorialMd(null);
@@ -483,6 +487,8 @@ export function EditorPage({ store, id }: { store: ProjectStore; id: string }) {
                     runner={runner}
                     earns={store.kind === "cloud" && !!me.user && !me.user.teacher}
                     output={lines}
+                    assignment={tutorialKey.startsWith("a:") ? (assignment?.slug ?? null) : null}
+                    practice={!!assignment?.teacher || store.kind !== "cloud"}
                   />
                 </div>
               ) : notes && assignment ? (

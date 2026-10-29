@@ -70,6 +70,8 @@ export function App() {
         <StartAssignment key={start[1]} slug={start[1]!} />
       ) : classXp ? (
         <ClassXpPage key={classXp[1]} classId={Number(classXp[1])} />
+      ) : hash.match(/^#\/tutorials\/copy\/([\w:-]+)/) ? (
+        <TutorialEditPage key={hash} slug="new" from={decodeURIComponent(hash.match(/^#\/tutorials\/copy\/([\w:-]+)/)![1]!)} />
       ) : hash.match(/^#\/tutorials\/edit\/([\w-]+)/) ? (
         <TutorialEditPage key={hash} slug={hash.match(/^#\/tutorials\/edit\/([\w-]+)/)![1]!} />
       ) : hash.startsWith("#/tutorials") ? (

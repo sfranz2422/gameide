@@ -206,7 +206,7 @@ export function FlipCards({ body }: { body: string }) {
   );
 }
 
-interface Reply {
+export interface Reply {
   kind?: string;
   /** A predict question's real output, once it's answered (notes.py, _answer_reply). */
   output?: string;
@@ -443,7 +443,15 @@ function Section({ how, speed, onFinish, onPlayed, children }: { how: "" | "word
 
 // ---------------------------------------------------------------- questions
 
-function QuestionCard({ q, assignment, reply, onAnswer, practice }: { q: Question; assignment: string; reply?: Reply; onAnswer: (qid: string, r: Reply) => void; practice: boolean }) {
+/**
+ * One question. With an assignment, the answer goes to it: marked against the
+ * key kept from its notes, one try, counted. Without one (a tutorial played on
+ * its own), `block` is the question whole and is marked as practice
+ * (/api/quiz/practice): any number of tries, counted nowhere.
+ */
+export function QuestionCard({ q: asWritten, assignment, block, reply, onAnswer, practice }: { q: Question; assignment: string | null; block?: string; reply?: Reply; onAnswer: (qid: string, r: Reply) => void; practice: boolean }) {
+  // Unassigned, nothing has given it an id (the server adds one as it hides the key).
+  const q = !asWritten.id && !assignment && block ? { ...asWritten, id: `p${fnv(block)}` } : asWritten;
   const [choice, setChoice] = useState("");
   const [text, setText] = useState("");
   const blanks = q.kind === "blank" ? [...q.prompt.matchAll(BLANK)].length : 0;
@@ -478,7 +486,9 @@ function QuestionCard({ q, assignment, reply, onAnswer, practice }: { q: Questio
     setBusy(true);
     setProblem(null);
     try {
-      const r = await api<Reply>("/api/quiz/answer", { json: { assignment, question: q.id, response: response() } });
+      const r = assignment
+        ? await api<Reply>("/api/quiz/answer", { json: { assignment, question: q.id, response: response() } })
+        : await api<Reply>("/api/quiz/practice", { json: { block, response: response() } });
       onAnswer(q.id, r);
       if (r.xp) announceXp(r.xp, "Question answered");
     } catch (e) {
@@ -681,7 +691,7 @@ function QuestionCard({ q, assignment, reply, onAnswer, practice }: { q: Questio
               : reply.earned > 0
                 ? `Partly right — ${reply.earned} / ${reply.points}`
                 : `✗ Not right — 0 / ${reply.points}`}
-          {reply.practice && <span className="muted small"> (you set it, so it isn't kept)</span>}
+          {reply.practice && <span className="muted small">{assignment ? " (you set it, so it isn't kept)" : " (not counted: try it as often as you like)"}</span>}
         </p>
       ) : null}
       {!done && (

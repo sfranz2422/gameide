@@ -931,6 +931,24 @@ check("the results show the questions' points and the total", res["quiz"] == 1.5
 check("…and the long response, cleaned, to mark", res["longs"] and "<script" not in res["longs"][0]["response"])
 check("another teacher can't mark it", other_teacher.post("/api/quiz/grade", json={"assignment": N, "student": ids["xa"], "question": long_q["qid"], "score": 4}).status_code == 403)
 
+# A question in a tutorial played on its own: marked from its block, kept nowhere, no sign-in needed.
+BLOCK = "Which says a key is held?\n- [ ] keyboard_check_pressed\n- [x] keyboard_check"
+db = server.SessionLocal()
+answers_before = db.query(accounts.QuizAnswer).count()
+db.close()
+stranger = server.app.test_client()
+r = stranger.post("/api/quiz/practice", json={"block": BLOCK, "response": "keyboard_check"}).get_json()
+check("a tutorial's question is marked in practice, signed out too", r.get("correct") is True and r.get("practice") is True and r.get("earned") == 1, r)
+r = stranger.post("/api/quiz/practice", json={"block": BLOCK, "response": "keyboard_check_pressed"}).get_json()
+check("…wrong is wrong", r.get("correct") is False and r.get("earned") == 0, r)
+r = stranger.post("/api/quiz/practice", json={"block": "Fill it in: [[answer|reply]] and [[two]]\ntype: blank", "response": json.dumps(["Reply", "nope"])}).get_json()
+check("…blanks give part marks there too", r.get("earned") == 0.5, r)
+db = server.SessionLocal()
+check("…and nothing is kept", db.query(accounts.QuizAnswer).count() == answers_before)
+db.close()
+check("a block that isn't a question is refused", stranger.post("/api/quiz/practice", json={"block": "", "response": "x"}).status_code == 400
+      and stranger.post("/api/quiz/practice", json={"block": "just words", "response": "x"}).status_code == 400)
+
 # Put in order, find the bug, sort into groups (quiz.py): the keys stay home, the answers are marked.
 PUZZLES = """```quiz
 type: order

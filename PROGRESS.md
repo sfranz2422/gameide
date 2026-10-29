@@ -1,5 +1,12 @@
 # Progress
 
+## Questions in tutorials; a teacher's own copy; the markdown as a file (2026-10-29, waiting for review)
+- **Questions in tutorials**: a ```quiz block in a step shows and is answered there, as in notes (and ```cards too). It never holds Next: a step's checks do. Assigned, it is marked against the key kept from the assignment's notes, one try, counted in the grade and paid XP. Played on its own (a built-in tutorial, or a teacher's not assigned), it's practice: marked by the new `/api/quiz/practice` from the question itself, any number of tries, kept nowhere. The marking is shared with `/api/quiz/answer` (`notes._clean_response`).
+- **An assigned tutorial follows the assignment's notes.** A student's game still named the tutorial it was made from, and the editor read that one, so nothing a teacher changed on the assignment's page reached the class (and the student got a copy with the answers in). The assignment comes first now.
+- **Make my copy** on every tutorial a teacher didn't write (the built-in ones above all): the editor opens with its markdown, titled "(my copy)", to change, add questions to, save and assign.
+- **⤓ Markdown** on every tutorial for teachers: the file, to plan a lesson from.
+- Tests: `test_server.py` (practice: right, wrong, part marks, signed out, nothing kept, a non-question refused), `e2e/tutorials.spec.ts` (a built-in downloaded and copied, a question added and tried as practice, assigned with a second question added on the assignment's page, the student seeing both and no answers, one try counted). 6 sabotage cases, all caught (one first missed: the sabotage itself crashed on its second answer).
+
 ## Reading the tutorials; phones on Explore (2026-10-29, waiting for review)
 - **Python to type is a card** in notes and tutorials: tinted, an accent edge, marked TYPE THIS, coloured the way the editor colours it (`NotesPane.tsx` colourCode, CodeMirror's own Python parser), and a little bigger. Names in a sentence (`vx`) are chips. It was black text in a black box.
 - **Next opens the next step at its top** (and a notes slide too). It opened scrolled as far down as the last one, at its checks.

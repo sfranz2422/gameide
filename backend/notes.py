@@ -184,6 +184,50 @@ def _quiz_xp(db, a, user, key, answer):
     return got + rewards.full_marks_xp(db, a, user.id)
 
 
+def _clean_response(key, response):
+    """An answer as it is kept and marked, for its question's kind: (response,
+    None), or (None, the error to answer with) for one that can't be marked.
+    The same for a real answer and a practice one (/api/quiz/practice)."""
+    if key.kind in ("blank", "match"):
+        got = quiz.items(response)
+        want = len(json.loads((key.answers if key.kind == "blank" else key.correct) or "[]"))
+        if not response.lstrip().startswith("[") or len(got) != want or any(len(g) > 300 for g in got):
+            return None, err("This question has changed since the page loaded. Reload to get the new one.", 400)
+        got = [g.strip() for g in got]
+        if not any(got):
+            return None, err("Answer the question first.", 400)
+        response = json.dumps(got)
+    elif key.kind in ("order", "sort"):
+        # The lines in the student's order, or each item's group, one per
+        # line or item as the question showed them (quiz.py). An order
+        # that isn't those same lines is a page out of step with the
+        # question, refused like a wrong number of blanks.
+        got = quiz.items(response)
+        shown = json.loads(key.choices or "[]")
+        if (not response.lstrip().startswith("[") or len(got) != len(shown) or any(len(g) > 300 for g in got)
+                or (key.kind == "order" and sorted(got) != sorted(shown))):
+            return None, err("This question has changed since the page loaded. Reload to get the new one.", 400)
+        if key.kind == "sort" and not all(g in json.loads(key.answers or "[]") for g in got):
+            return None, err("Put every item in a group first.", 400)
+        response = json.dumps(got)
+    elif key.kind == "bug":
+        response = response.strip()
+        if not response.isdigit() or len(response) > 4:
+            return None, err("Click the line with the bug first.", 400)
+    elif key.kind == "long":
+        if len(response) > LONG_RESPONSE_MAX * 2:
+            return None, err("That answer is too long to turn in.", 413)
+        response = quiz.clean_html(response)
+        if not quiz.plain_text(response):
+            return None, err("Answer the question first.", 400)
+        if len(response) > LONG_RESPONSE_MAX:
+            return None, err("That answer is too long to turn in.", 413)
+    else:
+        response = response.strip()[:2000]
+
+    return response, None
+
+
 @bp.post("/api/quiz/answer")
 def quiz_answer():
     """A student's answer to one question. One try, marked at once. The
@@ -206,42 +250,9 @@ def quiz_answer():
             key = find()
         if key is None:
             return err("This question has changed since the page loaded. Reload to get the new one.", 404)
-        if key.kind in ("blank", "match"):
-            got = quiz.items(response)
-            want = len(json.loads((key.answers if key.kind == "blank" else key.correct) or "[]"))
-            if not response.lstrip().startswith("[") or len(got) != want or any(len(g) > 300 for g in got):
-                return err("This question has changed since the page loaded. Reload to get the new one.", 400)
-            got = [g.strip() for g in got]
-            if not any(got):
-                return err("Answer the question first.", 400)
-            response = json.dumps(got)
-        elif key.kind in ("order", "sort"):
-            # The lines in the student's order, or each item's group, one per
-            # line or item as the question showed them (quiz.py). An order
-            # that isn't those same lines is a page out of step with the
-            # question, refused like a wrong number of blanks.
-            got = quiz.items(response)
-            shown = json.loads(key.choices or "[]")
-            if (not response.lstrip().startswith("[") or len(got) != len(shown) or any(len(g) > 300 for g in got)
-                    or (key.kind == "order" and sorted(got) != sorted(shown))):
-                return err("This question has changed since the page loaded. Reload to get the new one.", 400)
-            if key.kind == "sort" and not all(g in json.loads(key.answers or "[]") for g in got):
-                return err("Put every item in a group first.", 400)
-            response = json.dumps(got)
-        elif key.kind == "bug":
-            response = response.strip()
-            if not response.isdigit() or len(response) > 4:
-                return err("Click the line with the bug first.", 400)
-        elif key.kind == "long":
-            if len(response) > LONG_RESPONSE_MAX * 2:
-                return err("That answer is too long to turn in.", 413)
-            response = quiz.clean_html(response)
-            if not quiz.plain_text(response):
-                return err("Answer the question first.", 400)
-            if len(response) > LONG_RESPONSE_MAX:
-                return err("That answer is too long to turn in.", 413)
-        else:
-            response = response.strip()[:2000]
+        response, problem = _clean_response(key, response)
+        if problem is not None:
+            return problem
 
         if user.id == a.teacher_id:
             return jsonify(_answer_reply(key, accounts.QuizAnswer(response=response), practice=True))
@@ -266,6 +277,32 @@ def quiz_answer():
         return jsonify(_answer_reply(key, had, xp=gained))
     finally:
         db.close()
+
+
+@bp.post("/api/quiz/practice")
+def quiz_practice():
+    """A question in a tutorial played on its own — a built-in one, or a
+    teacher's, not assigned to a class: marked from its own block, the way an
+    assignment's are, and kept nowhere. Nothing is graded, so nothing needs
+    the key hidden: those tutorials' markdown is public as it is (/tutorials/).
+    Assigned, a tutorial is an assignment's notes and /api/quiz/answer marks
+    it against the key kept from them."""
+    data = request.get_json(silent=True) or {}
+    block, response = data.get("block"), data.get("response")
+    if not isinstance(block, str) or not block.strip() or len(block) > 20000:
+        return err("That question can't be read.", 400)
+    if not isinstance(response, str) or not response.strip():
+        return err("Answer the question first.", 400)
+    found = quiz.keys("```quiz\n" + block + "\n```")
+    if not found:
+        return err("That question can't be read.", 400)
+    q = found[0]
+    key = accounts.QuizQuestion(qid=q["qid"], kind=q["kind"], prompt=q["prompt"], choices=json.dumps(q["choices"]),
+                                correct=json.dumps(q["correct"]), answers=json.dumps(q["answers"]), points=q["points"])
+    response, problem = _clean_response(key, response)
+    if problem is not None:
+        return problem
+    return jsonify(_answer_reply(key, accounts.QuizAnswer(response=response), practice=True))
 
 
 @bp.get("/api/quiz/<slug>/mine")

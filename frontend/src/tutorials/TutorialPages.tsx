@@ -48,6 +48,16 @@ export async function tutorialMarkdown(key: string): Promise<string> {
   return (await api<{ markdown: string }>(`/api/tutorials/${encodeURIComponent(name)}`)).markdown;
 }
 
+/** A tutorial's markdown as a file, to keep or to plan a lesson from. */
+async function downloadMarkdown(key: string, title: string) {
+  const md = await tutorialMarkdown(key);
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([md], { type: "text/markdown" }));
+  a.download = `${title.replace(/[^\w -]+/g, "").trim().replace(/\s+/g, "-").toLowerCase() || "tutorial"}.md`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
 /** The tutorial's starting game, made and saved in this person's games; its id. */
 async function makeStarter(store: ProjectStore, key: string, md: string): Promise<Project> {
   const t = parseTutorial(md);
@@ -180,6 +190,18 @@ export function TutorialsPage() {
                             Edit
                           </a>
                         )}
+                        {/* A teacher's way to change one that isn't theirs (the built-in
+                            ones above all): their own copy, to edit, add questions to and assign. */}
+                        {teacher && !t.mine && (
+                          <a className="btn small" href={`#/tutorials/copy/${t.key}`} data-testid="tutorial-copy" title="Your own copy of this tutorial, to change and assign">
+                            Make my copy
+                          </a>
+                        )}
+                        {teacher && (
+                          <button className="btn small" disabled={busy} onClick={() => void act(() => downloadMarkdown(t.key, t.title))} data-testid="tutorial-download" title="This tutorial's markdown, as a file">
+                            ⤓ Markdown
+                          </button>
+                        )}
                         {classes.length > 0 && (
                           <select
                             className="small-select"
@@ -238,16 +260,23 @@ Player has event step
 Each line of three dashes starts a step.
 `;
 
-export function TutorialEditPage({ slug }: { slug: string }) {
+export function TutorialEditPage({ slug, from }: { slug: string; from?: string }) {
   const { me, store } = useSession();
   const isNew = slug === "new";
-  const [md, setMd] = useState(isNew ? EXAMPLE : "");
+  const [md, setMd] = useState(isNew && !from ? EXAMPLE : "");
   const [saved, setSaved] = useState(isNew ? "" : null as string | null);
   const [visibility, setVisibility] = useState("private");
   const [problem, setProblem] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [at, setAt] = useState(0);
   useEffect(() => {
+    // A copy of another tutorial: its markdown, retitled so the two can be
+    // told apart on the shelf. Nothing is saved until Save.
+    if (from)
+      void tutorialMarkdown(from).then(
+        (text) => setMd(text.replace(/^(\s*---[ \t]*\n[\s\S]*?^title\s*:\s*)(.+)$/m, (_, head: string, title: string) => `${head}${title.trim()} (my copy)`)),
+        (e) => setProblem(e instanceof Error ? e.message : String(e)),
+      );
     if (isNew) return;
     void api<{ markdown: string; visibility: string }>(`/api/tutorials/${slug}`).then(
       (r) => {
@@ -257,7 +286,7 @@ export function TutorialEditPage({ slug }: { slug: string }) {
       },
       (e) => setProblem(e instanceof Error ? e.message : String(e)),
     );
-  }, [slug, isNew]);
+  }, [slug, isNew, from]);
   const t = useMemo(() => parseTutorial(md), [md]);
   const problems = useMemo(() => tutorialProblems(t, TARGETS), [t]);
   const step = t.steps[Math.min(at, Math.max(0, t.steps.length - 1))];
@@ -283,12 +312,13 @@ export function TutorialEditPage({ slug }: { slug: string }) {
       <SiteNav at="learn" />
       <main className="explore-page class-page">
         <header className="page-head">
-          <h1>{isNew ? "A new tutorial" : t.meta.title}</h1>
+          <h1>{from ? "Your copy" : isNew ? "A new tutorial" : t.meta.title}</h1>
           <a href="#/tutorials">All tutorials</a>
         </header>
         <p className="muted small">
           A header, then one step per <code>---</code>. Each step can have a <code>```check</code> block (Next waits for it to pass — see{" "}
-          <a href="#/help/checks">the checks</a>) and a <code>highlight:</code> line naming part of the editor to point at. <code>starter:</code> is the game it
+          <a href="#/help/checks">the checks</a>), a <code>highlight:</code> line naming part of the editor to point at, and <code>```quiz</code> questions, as in notes (see{" "}
+          <a href="#/help">the formats</a>: they're marked, and counted once the tutorial is assigned, but never hold Next). <code>starter:</code> is the game it
           starts from: {Object.keys(TUTORIAL_STARTERS).join(", ")}.
         </p>
         {problem && <p className="banner error">{problem}</p>}

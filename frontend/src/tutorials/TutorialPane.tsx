@@ -23,8 +23,8 @@ import { api } from "../store/api";
 import { readCheck, runTests, type GameRunner, type TestResult } from "../checks/checks";
 import type { ConsoleLine } from "../editor/RunPanes";
 import type { Project, TutorialProgress } from "../store/project";
-import { pieces } from "../notes/quiz";
-import { renderMarkdown } from "../notes/NotesPane";
+import { fnv, parseQuiz, pieces } from "../notes/quiz";
+import { FlipCards, QuestionCard, renderMarkdown, type Reply } from "../notes/NotesPane";
 import { announceXp } from "../xp/runXp";
 import { parseTutorial } from "./tutorial";
 
@@ -39,12 +39,19 @@ export interface TutorialPaneProps {
   earns: boolean;
   /** The Console's lines, shown under the step in a lesson with `prints` checks. */
   output?: ConsoleLine[];
+  /**
+   * The assignment this tutorial is (its notes): its questions are answered to
+   * it, marked and counted. Null, played on its own: they're practice.
+   */
+  assignment?: string | null;
+  /** The teacher trying it, or no account to keep answers in: practice either way. */
+  practice?: boolean;
 }
 
 /** How many of the Console's last lines the lesson shows. */
 const OUTPUT_LINES = 8;
 
-export function TutorialPane({ md, progress, onProgress, project, runner, earns, output }: TutorialPaneProps) {
+export function TutorialPane({ md, progress, onProgress, project, runner, earns, output, assignment = null, practice = false }: TutorialPaneProps) {
   const t = useMemo(() => parseTutorial(md), [md]);
   const printing = useMemo(() => t.steps.some((s) => s.checks.some((c) => readCheck(c.label).kind === "prints")), [t]);
   const last = Math.max(0, t.steps.length - 1);
@@ -62,6 +69,14 @@ export function TutorialPane({ md, progress, onProgress, project, runner, earns,
     for (let el: HTMLElement | null = paneRef.current; el; el = el.parentElement) if (el.scrollTop) el.scrollTop = 0;
   }, [at]);
   const hideSpot = useCallback(() => setSpot(false), []);
+  // Questions in the steps (a ```quiz block, as in notes). They never hold
+  // Next: a step's checks do that. Answered ones come back locked (assigned).
+  const [mine, setMine] = useState<Record<string, Reply>>({});
+  useEffect(() => {
+    if (!assignment || practice) return;
+    void api<{ answers: Record<string, Reply> }>(`/api/quiz/${assignment}/mine`).then((r) => setMine(r.answers), () => undefined);
+  }, [assignment, practice]);
+  const answered = useCallback((qid: string, r: Reply) => setMine((m) => ({ ...m, [qid]: r })), []);
   const step = t.steps[at];
   if (!step) return <p className="muted">This tutorial has no steps yet.</p>;
 
@@ -116,9 +131,17 @@ export function TutorialPane({ md, progress, onProgress, project, runner, earns,
         ))}
       </div>
       <div className="notes-body">
-        {pieces(step.md, ["check"]).map((p, i) =>
-          p.type === "md" ? <div key={i} className="notes-md" dangerouslySetInnerHTML={{ __html: renderMarkdown(p.text) }} /> : null,
-        )}
+        {pieces(step.md, ["check"]).map((p, i) => {
+          if (p.type === "md") return <div key={i} className="notes-md" dangerouslySetInnerHTML={{ __html: renderMarkdown(p.text) }} />;
+          if (p.type === "cards") return <FlipCards key={i} body={p.body} />;
+          if (p.type === "quiz") {
+            // Keyed by step too: the same question on two steps is two cards.
+            const q = parseQuiz(p.body);
+            const qid = q.id || `p${fnv(p.body)}`;
+            return <QuestionCard key={`${at}:${i}`} q={q} assignment={assignment} block={p.body} reply={mine[qid]} onAnswer={answered} practice={practice || !assignment} />;
+          }
+          return null; // a step's ```check: its checks card, below
+        })}
       </div>
       {printing && output && (
         <div className="console tutorial-console" data-testid="tutorial-console" aria-label="Console">
