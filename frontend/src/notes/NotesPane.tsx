@@ -15,6 +15,8 @@
  * The notes come redacted (backend/notes.py): questions carry an `id:` and
  * no key, so all this can do with an answer is send it; the server marks it.
  */
+import { pythonLanguage } from "@codemirror/lang-python";
+import { highlightCode, tagHighlighter, tags as t } from "@lezer/highlight";
 import DOMPurify from "dompurify";
 import { marked } from "marked";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -42,9 +44,52 @@ export function renderMarkdown(md: string): string {
     /<input\b[^>]*type="checkbox"[^>]*>/g,
     (tag) => `<span class="task-box" data-done="${/\bchecked\b/.test(tag) ? "1" : "0"}"></span>`,
   );
-  const html = markPauses(popBoxes(DOMPurify.sanitize(raw, SANITIZE) as string));
+  const html = colourCode(markPauses(popBoxes(DOMPurify.sanitize(raw, SANITIZE) as string)));
   // Links open in a new tab, and can't reach back into this one.
   return html.replace(/<a /g, '<a target="_blank" rel="noopener noreferrer" ');
+}
+
+/**
+ * Python to type, coloured the way the student's editor colours it
+ * (CodeEditor.tsx's highlight, the same --syn-* colours), and marked
+ * type-this so it stands out from the words around it. Black text in a
+ * black box was hard to read, and nothing in it matched what appears in the
+ * editor as they type. A block in another language is left plain.
+ */
+const SYNTAX = tagHighlighter([
+  { tag: [t.keyword, t.definitionKeyword, t.controlKeyword, t.operatorKeyword], class: "syn-keyword" },
+  { tag: [t.string, t.special(t.string)], class: "syn-string" },
+  { tag: [t.number, t.bool, t.null], class: "syn-number" },
+  { tag: t.comment, class: "syn-comment" },
+  { tag: [t.function(t.variableName), t.function(t.propertyName)], class: "syn-function" },
+  { tag: t.self, class: "syn-self" },
+  { tag: t.propertyName, class: "syn-property" },
+  { tag: [t.className, t.definition(t.variableName)], class: "syn-class" },
+]);
+
+export function colourCode(html: string): string {
+  if (!html.includes("language-python") || typeof document === "undefined") return html;
+  const box = document.createElement("template");
+  box.innerHTML = html;
+  for (const code of box.content.querySelectorAll<HTMLElement>("pre > code.language-python")) {
+    const text = code.textContent ?? "";
+    code.textContent = "";
+    highlightCode(
+      text,
+      pythonLanguage.parser.parse(text),
+      SYNTAX,
+      (piece, classes) => {
+        if (!classes) return void code.append(piece);
+        const span = document.createElement("span");
+        span.className = classes;
+        span.textContent = piece;
+        code.append(span);
+      },
+      () => code.append("\n"),
+    );
+    code.parentElement!.classList.add("type-this");
+  }
+  return box.innerHTML;
 }
 
 /**
@@ -259,6 +304,11 @@ export function NotesPane({ notes, assignment, project, runner, practice }: Note
   const { md: shown, highlight } = takeHighlight(pages[here]!);
   const [spot, setSpot] = useState(true);
   useEffect(() => setSpot(true), [at, highlight]);
+  // A new slide starts at its top (as a tutorial's step does: TutorialPane.tsx).
+  const paneRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    for (let el: HTMLElement | null = paneRef.current; el; el = el.parentElement) if (el.scrollTop) el.scrollTop = 0;
+  }, [here]);
   const hideSpot = useCallback(() => setSpot(false), []);
 
   const parts = useMemo(() => sections(shown), [shown]);
@@ -291,7 +341,7 @@ export function NotesPane({ notes, assignment, project, runner, practice }: Note
       <TestsCard key={i} notes={notes} assignment={assignment} project={project} runner={runner} practice={practice} />
     );
   return (
-    <div className="notes-pane" data-testid="notes-pane">
+    <div className="notes-pane" data-testid="notes-pane" ref={paneRef}>
       {deck.length > 0 && (
         <div className="notes-slides-bar">
           <button className="btn small" disabled={here <= 0 || busy} onClick={() => go(here - 1)} aria-label="Previous slide">

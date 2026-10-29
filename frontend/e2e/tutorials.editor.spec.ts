@@ -165,3 +165,27 @@ test("Game Elements 3: the cave platformer, with its real sprites, lands where t
   await expect.poll(async () => await py(page, "instances('Player')[0].y"), { timeout: 10_000 }).toBe(424);
   if (SHOTS) await page.screenshot({ path: `${SHOTS}/elements-cave.png` });
 });
+
+test("a tutorial's Python is coloured and marked to type, and Next opens the next step at its top", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 520 }); // short: the steps scroll
+  await page.goto("/#/tutorials");
+  await page.getByTestId("tutorial-card").filter({ hasText: "Simple Platformer" }).getByTestId("tutorial-start").click();
+  await page.waitForURL(/#\/p\//);
+  const pane = page.getByTestId("tutorial-pane");
+  await expect(pane).toBeVisible();
+  // Scrolled down to Next at the bottom of step 1…
+  await page.getByTestId("tutorial-next").scrollIntoViewIfNeeded();
+  const scrolled = () => pane.evaluate((el) => { let most = 0; for (let e: Element | null = el; e; e = e.parentElement) most = Math.max(most, e.scrollTop); return most; });
+  expect(await scrolled()).toBeGreaterThan(0);
+  await page.getByTestId("tutorial-next").click();
+  await expect(page.getByTestId("tutorial-step")).toHaveText("Step 2 of 7");
+  // …and step 2 opens at its top, its heading in sight.
+  await expect.poll(scrolled).toBe(0);
+  await expect(pane.getByRole("heading", { name: "Speed" })).toBeInViewport();
+  // Its Python is a card to type, coloured as the editor colours it.
+  const code = pane.locator("pre.type-this").first();
+  await expect(code).toBeVisible();
+  await expect(code.locator(".syn-property").first()).toHaveText("vx");
+  await expect(code.locator(".syn-number").first()).toHaveText("0");
+  if (SHOTS) await pane.screenshot({ path: `${SHOTS}/tutorial-code.png` });
+});

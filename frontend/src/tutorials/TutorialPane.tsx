@@ -17,7 +17,7 @@
  * without it a beginner reading "look in the Console" had to leave the
  * lesson to see their output, and find the way back, after every Play.
  */
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { api } from "../store/api";
 import { readCheck, runTests, type GameRunner, type TestResult } from "../checks/checks";
@@ -52,9 +52,14 @@ export function TutorialPane({ md, progress, onProgress, project, runner, earns,
   const [results, setResults] = useState<TestResult[] | null>(null);
   const [running, setRunning] = useState<number | null>(null);
   const [spot, setSpot] = useState(true);
+  const paneRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     setResults(null);
     setSpot(true);
+    // A new step starts at its top. Next is at the bottom of a long step, and
+    // the next one opened scrolled just as far down: the student saw its end,
+    // or its checks, and not what to do.
+    for (let el: HTMLElement | null = paneRef.current; el; el = el.parentElement) if (el.scrollTop) el.scrollTop = 0;
   }, [at]);
   const hideSpot = useCallback(() => setSpot(false), []);
   const step = t.steps[at];
@@ -97,7 +102,7 @@ export function TutorialPane({ md, progress, onProgress, project, runner, earns,
   const done = progress.step >= t.steps.length;
 
   return (
-    <div className="tutorial-pane" data-testid="tutorial-pane">
+    <div className="tutorial-pane" data-testid="tutorial-pane" ref={paneRef}>
       <div className="tutorial-head">
         <b>{t.meta.title}</b>
         <span className="muted small" data-testid="tutorial-step">

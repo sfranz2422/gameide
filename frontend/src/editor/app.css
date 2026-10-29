@@ -25,6 +25,7 @@
   --warn: hsl(30, 100%, 70%);
   --stage: #000;
   --code-bg: #000;
+  --type-bg: hsl(205, 40%, 13%);   /* code to type, in the notes */
   --code-gutter: #0b0d0e;
   --code-text: #dedede;
   --code-active: #2a2a2a;
@@ -59,6 +60,7 @@
     --accent: #2563eb;
     --stage: #1b2333;
     --code-bg: #ffffff;
+    --type-bg: #eef4ff;
     --code-gutter: #f6f8fb;
     --code-text: #1f2937;
     --code-active: #f1f5fb;
@@ -3489,10 +3491,49 @@ a.btn {
   padding: 3px 8px;
 }
 .notes-md pre {
-  padding: 8px 10px;
-  border-radius: 6px;
+  padding: 10px 14px;
+  border-radius: 8px;
   background: var(--code-bg);
   overflow-x: auto;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--code-text);
+}
+/* Python to type (NotesPane.tsx, colourCode): its own tinted card with an
+   accent edge, coloured as the editor colours it, so it can't be mistaken
+   for the words around it. It was black text in a black box. */
+.notes-md pre.type-this {
+  position: relative;
+  background: var(--type-bg);
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  border-left: 4px solid var(--accent);
+  padding-top: 22px;
+  font-weight: 500;
+}
+.notes-md pre.type-this::before {
+  content: "TYPE THIS";
+  position: absolute;
+  top: 4px;
+  right: 10px;
+  font: 600 11px/1 system-ui, sans-serif;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+.notes-md .syn-keyword { color: var(--syn-keyword); }
+.notes-md .syn-string { color: var(--syn-string); }
+.notes-md .syn-number { color: var(--syn-number); }
+.notes-md .syn-comment { color: var(--syn-comment); font-style: italic; }
+.notes-md .syn-function { color: var(--syn-function); }
+.notes-md .syn-self { color: var(--syn-self); }
+.notes-md .syn-property { color: var(--syn-property); }
+.notes-md .syn-class { color: var(--syn-class); }
+/* A name in a sentence (`vx`, **Player**'s `self.lines`): a chip, not plain words. */
+.notes-md :not(pre) > code {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: var(--text);
+  font-size: 0.95em;
 }
 /* Code in notes is for reading and typing, not copying (the teacher's
    decision): a speed bump, not a lock. */

@@ -6,7 +6,7 @@
  * so each event keeps its own undo history and cursor — pressing Ctrl+Z in
  * Step never undoes typing done in Create.
  */
-import { autocompletion, closeBrackets, closeBracketsKeymap, completionKeymap } from "@codemirror/autocomplete";
+import { acceptCompletion, autocompletion, closeBrackets, closeBracketsKeymap, completionKeymap } from "@codemirror/autocomplete";
 import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
 import { python, pythonLanguage } from "@codemirror/lang-python";
 import { bracketMatching, HighlightStyle, indentOnInput, indentUnit, syntaxHighlighting } from "@codemirror/language";
@@ -114,7 +114,10 @@ export function CodeEditor({ docKey, value, onChange, readOnly, names, errorLine
     syntaxHighlighting(highlight),
     theme,
     errorLine,
-    keymap.of([...closeBracketsKeymap, ...defaultKeymap, ...historyKeymap, ...completionKeymap, indentWithTab]),
+    // Tab takes the hint that's showing, as it does in PyIDE, WebIDE and
+    // FlaskIDE; with no hint open it indents as before (acceptCompletion
+    // says no, and indentWithTab has it).
+    keymap.of([...closeBracketsKeymap, ...defaultKeymap, ...historyKeymap, ...completionKeymap, { key: "Tab", run: acceptCompletion }, indentWithTab]),
     EditorState.readOnly.of(!!readOnly),
     EditorView.editable.of(!readOnly),
     EditorView.updateListener.of((u) => {

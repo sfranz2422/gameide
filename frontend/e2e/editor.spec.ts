@@ -138,6 +138,24 @@ test("autocomplete offers object names inside the quotes", async ({ page }) => {
   await expect(page.locator(".cm-tooltip-autocomplete")).toContainText("Wall");
 });
 
+test("Tab takes the hint that's showing, as in the other editors; with none showing it indents", async ({ page }) => {
+  await fromTemplate(page, "coins");
+  await treeItem(page, "Player").click();
+  await page.getByTestId("event-Step").click();
+  await setCode(page, "");
+  await page.keyboard.type("instance_num");
+  await expect(page.locator(".cm-tooltip-autocomplete")).toContainText("instance_number");
+  await page.keyboard.press("Tab");
+  // The call and its slot, as Enter would give it.
+  await expect(page.getByTestId("event-code").locator(".cm-content")).toHaveText("instance_number(obj)");
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("End");
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("Tab");
+  await page.keyboard.type("x = 1");
+  await expect(page.getByTestId("event-code").locator(".cm-line").nth(1)).toHaveText("    x = 1");
+});
+
 test("the stress test runs 300+ instances, and a second Play starts fast", async ({ page }) => {
   const errors = watchErrors(page);
   await fromTemplate(page, "stress");
