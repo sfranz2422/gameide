@@ -61,11 +61,10 @@ Under **Solid tiles**, keep **Solid** chosen. Click the four grass blocks in the
 Clicked the wrong one? Click it again.
 
 ```quiz
-Which of these should be solid? Pick all that are right.
-- [x] The grass your hero stands on
-- [x] The dirt under the grass
-- [ ] A plant growing on the grass
-- [ ] A sign beside the path
+Which of these should NOT be solid?
+- [ ] The grass your hero stands on
+- [ ] The dirt under the grass
+- [x] A plant growing on the grass
 ```
 
 highlight: tileset-solid

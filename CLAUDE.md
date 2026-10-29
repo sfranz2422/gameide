@@ -454,11 +454,14 @@ header; steps are `---` slides; ` ```check ` blocks gate Next (strict); a
   has no key. Code inside a question is fenced `py` (the quiz itself fenced
   with four backticks), never `python`: the lesson tests read every
   `python` block as code the student types.
-- **The Learn page (#/tutorials) is public**: built-ins and tutorials set to
-  Everyone (`site`, admins only). A teacher's own are "Only me", in their
-  library, which tries them and assigns them; a class gets one as an
-  assignment. An assigned game claims step XP under `a:<slug>`, never the
-  teacher's private `t:<slug>` its starter was made from.
+- **The Learn page (#/tutorials) is public**: built-ins (less those an admin
+  hid, `HiddenBuiltin`) and tutorials set to Everyone (`site`, admins only).
+  It only follows tutorials: no Assign to, copy or download. A teacher's own
+  are "Only me", in their library. **A class gets a tutorial one way, as in
+  the other editors**: Try it (its starting game, in the teacher's games),
+  New assignment from that game, then Link to… in the library. An assigned
+  game claims step XP under `a:<slug>`, never the teacher's private
+  `t:<slug>` its starter was made from.
 
 ## XP
 

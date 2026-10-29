@@ -963,6 +963,40 @@ check("…blanks give part marks there too", r.get("earned") == 0.5, r)
 db = server.SessionLocal()
 check("…and nothing is kept", db.query(accounts.QuizAnswer).count() == answers_before)
 db.close()
+# Every built-in tutorial's question, answered right in practice, is marked
+# right — as the tutorial pane sends it: the block's body, without its fence.
+# One that shows code (```py inside ````quiz) was once cut off at its code by
+# the fence put back round it, and every student got "That question can't be read."
+def _quiz_bodies(md):
+    out, lines, i = [], md.split("\n"), 0
+    while i < len(lines):
+        f = re.match(r"^ {0,3}(`{3,})\s*quiz\s*$", lines[i])
+        if f:
+            body, i = [], i + 1
+            while i < len(lines) and not re.match(r"^ {0,3}`{%d,}\s*$" % len(f.group(1)), lines[i]):
+                body.append(lines[i])
+                i += 1
+            out.append("\n".join(body))
+        i += 1
+    return out
+_wrong = []
+for _f in sorted((Path(__file__).resolve().parents[2] / "frontend/public/tutorials").glob("*.md")):
+    for _body in _quiz_bodies(_f.read_text(encoding="utf-8")):
+        _k = quizmod.keys("````quiz\n" + _body + "\n````")
+        _k = _k[0] if _k else {"kind": "?", "correct": [], "answers": []}
+        # One right choice: the card takes one answer, and any right one is
+        # marked right, so "pick all" with several [x] marked one pick right.
+        if _k["kind"] == "choice" and len(_k["correct"]) != 1:
+            _wrong.append("%s: %s (%d right choices; a card takes one)" % (_f.stem, _body.split("\n")[0][:50], len(_k["correct"])))
+            continue
+        _right = {"choice": lambda k: k["correct"][0],
+                  "text": lambda k: k["answers"][0],
+                  "blank": lambda k: json.dumps([a[0] for a in k["answers"]]),
+                  "match": lambda k: json.dumps(k["correct"])}.get(_k["kind"], lambda k: "x")(_k)
+        _r = stranger.post("/api/quiz/practice", json={"block": _body, "response": _right})
+        if _r.status_code != 200 or _r.get_json().get("correct") is not True:
+            _wrong.append("%s: %s (%s)" % (_f.stem, _body.split("\n")[0][:50], _r.get_json().get("error") or "marked wrong"))
+check("every built-in tutorial's question, answered right in practice, is marked right", not _wrong, _wrong)
 check("a block that isn't a question is refused", stranger.post("/api/quiz/practice", json={"block": "", "response": "x"}).status_code == 400
       and stranger.post("/api/quiz/practice", json={"block": "just words", "response": "x"}).status_code == 400)
 
@@ -1171,6 +1205,20 @@ for _f in sorted((Path(__file__).resolve().parents[2] / "frontend/public/tutoria
             or any(k["kind"] == "long" for k in _keys):
         _short.append("%s (%d steps, %d blocks, %d keyed)" % (_f.stem, _steps, _blocks, sum(k["has_key"] for k in _keys)))
 check("every built-in tutorial has its questions, each marking itself", not _short, _short)
+
+# A built-in taken off the Learn page: the whole site's, so an admin's call.
+check("only an admin hides a built-in", teacher.post("/api/tutorials/builtin/first-game/audience", json={"audience": "hidden"}).status_code == 403)
+os.environ["ADMIN_EMAILS"] = "admin@example.com,teacher@example.com"
+check("…a built-in that exists", teacher.post("/api/tutorials/builtin/no-such-one/audience", json={"audience": "hidden"}).status_code == 404)
+check("…to Everyone or hidden, nothing else", teacher.post("/api/tutorials/builtin/first-game/audience", json={"audience": "classes"}).status_code == 400)
+teacher.post("/api/tutorials/builtin/first-game/audience", json={"audience": "hidden"})
+check("hidden, it's off the Learn page for everyone", anon.get("/api/tutorials").get_json()["hidden"] == ["first-game"]
+      and bob.get("/api/tutorials").get_json()["hidden"] == ["first-game"])
+check("…and still opens by its key, for games and assignments made from it",
+      xa.post("/api/tutorials/step", json={"key": "builtin:first-game", "step": 0}).status_code == 200)
+teacher.post("/api/tutorials/builtin/first-game/audience", json={"audience": "site"})
+check("shown again, it's back", anon.get("/api/tutorials").get_json()["hidden"] == [])
+os.environ["ADMIN_EMAILS"] = "admin@example.com"
 
 # XP for steps: once each, only steps with checks, and a bonus at the end.
 before = xa.get("/api/me/xp").get_json()["xp"]

@@ -379,6 +379,18 @@ def project_asset_ids(data: dict) -> list:
     return list(dict.fromkeys(ids))
 
 
+
+class HiddenBuiltin(Base):
+    """A built-in tutorial an admin took off the public Learn page. The
+    built-ins are files the editor ships with, the same for every site, so
+    whether one is shown is kept here: a row is "hidden", no row is "on the
+    Learn page". It still opens by its key (builtin:<name>), so a student's
+    game started from it, and an assignment made from it, carry on."""
+    __tablename__ = "gameide_hidden_builtins"
+
+    key = Column(String(40), primary_key=True)
+    hidden_at = Column(DateTime, nullable=False, default=now)
+
 def create_all(engine):
     """accounts.create_all, which now also makes the tables above."""
     accounts.create_all(engine)

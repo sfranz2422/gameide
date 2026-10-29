@@ -24,7 +24,7 @@ export default defineConfig({
       timeout: 180_000,
     },
     {
-      command: `rm -f ${DB} && cd ../backend && GAMEIDE_DEV_LOGIN=1 ADMIN_EMAILS=admin@example.com TEACHER_EMAILS=teach@example.com,teach2@example.com,teach3@example.com GAMEIDE_TEST_DATABASE_URL=sqlite:///${DB} PORT=5055 .venv/bin/python -c "import app; app.app.run(port=5055)"`,
+      command: `rm -f ${DB} && cd ../backend && GAMEIDE_DEV_LOGIN=1 ADMIN_EMAILS=admin@example.com,teach4@example.com TEACHER_EMAILS=teach@example.com,teach2@example.com,teach3@example.com,teach4@example.com GAMEIDE_TEST_DATABASE_URL=sqlite:///${DB} PORT=5055 .venv/bin/python -c "import app; app.app.run(port=5055)"`,
       url: "http://127.0.0.1:5055/healthz",
       reuseExistingServer: false,
       timeout: 60_000,

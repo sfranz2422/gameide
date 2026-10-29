@@ -8,9 +8,10 @@
  * so it is right offline and signed out too. Start makes the tutorial's
  * starting game and opens it; Resume opens the game it's in.
  *
- * A teacher can also assign one to a class: it becomes an assignment whose
- * notes are the tutorial (strict steps, Check all on its checks, marks,
- * Classroom — unchanged).
+ * A class gets one through the library (#/library): Try it makes its
+ * starting game, New assignment on the class page uses that game, and Link
+ * to… makes the tutorial its notes (strict steps, Check all on its checks,
+ * marks, Classroom — unchanged).
  */
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../store/api";
@@ -69,26 +70,6 @@ export async function startTutorial(store: ProjectStore, key: string): Promise<v
   location.hash = `#/p/${p.id}`;
 }
 
-/**
- * Assign one to a class: an assignment whose notes are the tutorial, linked
- * to its row in the library (which writes it in as the notes and keeps it in
- * step — the library is the only place notes change). The assignment's page
- * opens. The Learn page assigns from its cards; the library from its rows,
- * for a teacher's own tutorials, which aren't on the Learn page.
- */
-export async function assignTutorial(store: ProjectStore, key: string, title: string, mine: boolean, classId: number): Promise<void> {
-  const tutorial = await libraryRowFor(key, title, mine);
-  const md = await tutorialMarkdown(key);
-  // Made in the teacher's games just long enough for the class's to be taken from it.
-  const p = await makeStarter(store, key, md);
-  try {
-    const r = await api<{ slug: string }>(`/api/classes/${classId}/assignments`, { json: { title, project: p.id, tutorial } });
-    location.hash = `#/assignment/${r.slug}`;
-  } finally {
-    await store.remove(p.id).catch(() => undefined);
-  }
-}
-
 /** The tutorial's starting game, made and saved in this person's games; its id. */
 async function makeStarter(store: ProjectStore, key: string, md: string): Promise<Project> {
   const t = parseTutorial(md);
@@ -112,8 +93,8 @@ export function TutorialsPage() {
   const { me, store } = useSession();
   const [builtins, setBuiltins] = useState<Entry[]>([]);
   const [others, setOthers] = useState<Entry[]>([]);
+  const [hidden, setHidden] = useState<string[]>([]);
   const [games, setGames] = useState<ProjectSummary[]>([]);
-  const [classes, setClasses] = useState<{ id: number; name: string }[]>([]);
   const [teacher, setTeacher] = useState(false);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
@@ -122,19 +103,19 @@ export function TutorialsPage() {
     void fetch(new URL("tutorials/index.json", document.baseURI))
       .then((r) => r.json())
       .then((list: Entry[]) => setBuiltins(list.map((t) => ({ ...t, key: `builtin:${t.key}` }))), () => setProblem("The tutorials couldn't be loaded."));
-    void api<{ tutorials: (Entry & { slug: string })[]; teacher: boolean }>("/api/tutorials").then(
+    void api<{ tutorials: (Entry & { slug: string })[]; hidden?: string[]; teacher: boolean }>("/api/tutorials").then(
       (r) => {
         // With no server behind the editor, a static host answers with its own
         // page, not a list: the built-in tutorials are then all there is.
         if (!Array.isArray(r?.tutorials)) return;
         setOthers(r.tutorials);
+        // Built-ins an admin took off the Learn page (the library's audience).
+        setHidden(r.hidden ?? []);
         setTeacher(r.teacher);
       },
       () => undefined, // no server: the built-in ones are all there is
     );
     void store.list().then((l) => setGames(Array.isArray(l) ? l : []), () => undefined);
-    if (me.user?.teacher)
-      void api<{ classes: { id: number; name: string; teaching: boolean }[] }>("/api/classes").then((r) => setClasses(r.classes.filter((c) => c.teaching)), () => undefined);
   }, [store, me.user]);
 
   const act = async (f: () => Promise<void>) => {
@@ -149,9 +130,8 @@ export function TutorialsPage() {
     }
   };
   const start = (e: Entry) => act(() => startTutorial(store, e.key));
-  const assign = (e: Entry, classId: number) => act(() => assignTutorial(store, e.key, e.title, !!e.mine, classId));
 
-  const all = [...builtins, ...others];
+  const all = [...builtins.filter((t) => !hidden.includes(t.key.slice("builtin:".length))), ...others];
   const levels = [...LEVELS, ...new Set(all.map((t) => t.level).filter((l) => !LEVELS.includes(l)))];
   const byKey = useMemo(() => new Map(games.filter((g) => g.tutorial).map((g) => [g.tutorial!.key, g])), [games]);
   return (
@@ -204,23 +184,6 @@ export function TutorialsPage() {
                           <a className="btn small" href={libraryEditUrl(t.slug!)}>
                             Edit
                           </a>
-                        )}
-                        {classes.length > 0 && (
-                          <select
-                            className="small-select"
-                            value=""
-                            disabled={busy}
-                            onChange={(ev) => ev.target.value && void assign(t, Number(ev.target.value))}
-                            aria-label={`Assign ${t.title} to a class`}
-                            data-testid="tutorial-assign"
-                          >
-                            <option value="">Assign to…</option>
-                            {classes.map((c) => (
-                              <option key={c.id} value={c.id}>
-                                {c.name}
-                              </option>
-                            ))}
-                          </select>
                         )}
                       </div>
                     </div>

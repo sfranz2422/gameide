@@ -72,12 +72,11 @@ self.hspeed = -random.randint(2, 5)
 Each enemy picks its own speed as it appears.
 
 ```quiz
-Which of these could `random.randint(2, 5)` give? (Pick all that could.)
-- [x] 2
-- [x] 3
-- [x] 5
-- [ ] 6
-- [ ] 1
+Which of these can `random.randint(2, 5)` never give?
+- [ ] 2
+- [ ] 3
+- [ ] 5
+- [x] 6
 ```
 
 highlight: code-editor

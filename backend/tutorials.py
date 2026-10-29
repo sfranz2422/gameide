@@ -32,7 +32,7 @@ import grades
 import rewards
 import xp
 from accounts import now
-from gamestore import AssignmentWork, Tutorial
+from gamestore import AssignmentWork, HiddenBuiltin, Tutorial
 
 bp = Blueprint("tutorials", __name__)
 
@@ -244,7 +244,33 @@ def list_tutorials():
             if t.id not in seen and is_tutorial(t.body):
                 seen.add(t.id)
                 out.append(_out(db, t, user))
-        return jsonify(tutorials=out, teacher=_is_teacher(user), admin=_is_admin(user))
+        hidden = sorted(k for (k,) in db.query(HiddenBuiltin.key))
+        return jsonify(tutorials=out, hidden=hidden, teacher=_is_teacher(user), admin=_is_admin(user))
+    finally:
+        db.close()
+
+
+@bp.post("/api/tutorials/builtin/<name>/audience")
+def builtin_audience(name):
+    """A built-in on the Learn page ("site") or off it ("hidden"). An admin's
+    choice, for the whole site: the built-ins are everyone's."""
+    db = _db()
+    try:
+        user = _current_user(db)
+        if not _is_admin(user):
+            return err("Only an admin can do that.", 403)
+        if builtin(name) is None:
+            return err("There's no built-in tutorial called that.", 404)
+        audience = (request.get_json(silent=True) or {}).get("audience")
+        if audience not in ("site", "hidden"):
+            return err("Choose Everyone or Hidden.", 400)
+        row = db.get(HiddenBuiltin, name)
+        if audience == "hidden" and row is None:
+            db.add(HiddenBuiltin(key=name))
+        elif audience == "site" and row is not None:
+            db.delete(row)
+        db.commit()
+        return jsonify(ok=True, audience=audience)
     finally:
         db.close()
 

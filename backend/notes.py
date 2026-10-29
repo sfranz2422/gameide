@@ -278,7 +278,10 @@ def quiz_practice():
         return err("That question can't be read.", 400)
     if not isinstance(response, str) or not response.strip():
         return err("Answer the question first.", 400)
-    found = quiz.keys("```quiz\n" + block + "\n```")
+    # Fenced again longer than any fence inside it: a question that shows
+    # code (```py inside a ````quiz) was cut off at its code, and "can't be read".
+    mark = "`" * max([3] + [len(m) + 1 for m in re.findall(r"(?m)^ {0,3}(`{3,})", block)])
+    found = quiz.keys(mark + "quiz\n" + block + "\n" + mark)
     if not found:
         return err("That question can't be read.", 400)
     q = found[0]

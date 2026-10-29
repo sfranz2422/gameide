@@ -90,12 +90,11 @@ if keyboard_check("down") or keyboard_check("s") or gamepad_check("down"):
 ```
 
 ```quiz
-With this code, which of these make the player go left? (Pick all that do.)
-- [x] The left arrow
-- [x] The A key
-- [x] The left of the D-pad
-- [ ] The S key
-- [ ] The right arrow
+With this code, which of these does NOT make the player go left?
+- [ ] The left arrow
+- [ ] The A key
+- [ ] The left of the D-pad
+- [x] The S key
 ```
 
 ```check

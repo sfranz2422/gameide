@@ -5,7 +5,7 @@
  * is paid XP; the teacher assigns a built-in tutorial to the class, and
  * their results say how far each student has got.
  */
-import { expect, test, type Browser } from "@playwright/test";
+import { expect, test, type Browser, type Page } from "@playwright/test";
 import { setNotes } from "./helpers";
 
 async function signedIn(browser: Browser, email: string) {
@@ -13,6 +13,34 @@ async function signedIn(browser: Browser, email: string) {
   const page = await ctx.newPage();
   await page.goto(`/dev/login?email=${encodeURIComponent(email)}&next=/`);
   return { ctx, page };
+}
+
+/**
+ * A class gets a tutorial the way a teacher gives it one: Try it in the
+ * library (its starting game, in their games), New assignment on the class
+ * page from that game, then Link to… in the library. On the assignment's
+ * page afterwards; its slug.
+ */
+async function giveClass(teacher: Page, classUrl: string, tutorial: string, title: string): Promise<string> {
+  await teacher.goto("/#/library");
+  await teacher.getByTestId("library-row").filter({ hasText: tutorial }).first().getByTestId("library-try").click();
+  await teacher.waitForURL(/#\/p\//);
+  await expect(teacher.getByTestId("save-status")).toHaveText("Saved");
+  await teacher.goto(classUrl);
+  await teacher.getByTestId("new-assignment").click();
+  await teacher.getByTestId("assignment-game").selectOption({ label: tutorial });
+  await teacher.getByTestId("assignment-title").fill(title);
+  await teacher.getByTestId("assignment-go").click();
+  await teacher.getByTestId("assignment-link").filter({ hasText: title }).click();
+  await teacher.waitForURL(/#\/assignment\/\w+$/);
+  const slug = teacher.url().split("/").pop()!;
+  await teacher.goto("/#/library");
+  await teacher.getByTestId("library-row").filter({ hasText: tutorial }).first().getByTestId("library-link").click();
+  await teacher.getByTestId("library-dialog").getByLabel(title, { exact: true }).check();
+  await teacher.getByTestId("library-link-save").click();
+  await expect(teacher.getByTestId("library-report")).toContainText("Linked");
+  await teacher.goto(`/#/assignment/${slug}`);
+  return slug;
 }
 
 const MINE = `---
@@ -37,13 +65,14 @@ object Ball exists
 That's it.
 `;
 
-test("a teacher's tutorial, assigned from the library, done by a student; a built-in one assigned, with each student's step", async ({ browser }) => {
+test("a teacher's tutorial, given to a class from the library, done by a student; a built-in one assigned, with each student's step", async ({ browser }) => {
   test.setTimeout(180_000);
   const { ctx: tctx, page: teacher } = await signedIn(browser, "teach@example.com");
   await teacher.goto("/#/classes");
   await teacher.getByTestId("new-class-name").fill("Tutorials P6");
   await teacher.getByTestId("new-class-go").click();
   await teacher.waitForURL(/#\/class\/\d+$/);
+  const classUrl = teacher.url();
   await teacher.getByTestId("roster-emails").fill("uri@example.com");
   await teacher.getByTestId("roster-add").click();
   await expect(teacher.getByText("uri@example.com")).toBeVisible();
@@ -58,10 +87,10 @@ test("a teacher's tutorial, assigned from the library, done by a student; a buil
   await teacher.goto("/#/library");
   const row = teacher.getByTestId("library-row").filter({ hasText: "Bouncing ball" });
   await expect(row.getByRole("option", { name: "My classes" })).toHaveCount(0);
-  // Assigned to the class from its row: an assignment whose notes are the tutorial.
-  await row.getByTestId("library-assign").selectOption({ label: "Tutorials P6" });
-  await teacher.waitForURL(/#\/assignment\/\w+$/);
-  const mineSlug = teacher.url().split("/").pop()!;
+  // Nowhere to assign it but Link to…: the library has no Assign to, nor the Learn page.
+  await expect(row.getByTestId("library-assign")).toHaveCount(0);
+  // Given to the class: an assignment whose notes are the tutorial.
+  const mineSlug = await giveClass(teacher, classUrl, "Bouncing ball", "Ball homework");
 
   // The student doesn't find it on the Learn page; they do it from the assignment.
   const { ctx: sctx, page: uri } = await signedIn(browser, "uri@example.com");
@@ -81,11 +110,11 @@ test("a teacher's tutorial, assigned from the library, done by a student; a buil
   await expect(uri.getByTestId("tutorial-step")).toHaveText("Step 2 of 2 · finished ✓");
   await expect(uri.getByTestId("xp-toast").filter({ hasText: "Tutorial finished" })).toContainText("+20 XP");
 
-  // A built-in one, assigned to the class: an assignment whose notes are the tutorial.
+  // A built-in one, given to the class the same way.
   await teacher.goto("/#/tutorials");
-  await teacher.getByTestId("tutorial-card").filter({ hasText: "Your First Game" }).getByTestId("tutorial-assign").selectOption({ label: "Tutorials P6" });
-  await teacher.waitForURL(/#\/assignment\/\w+$/);
-  const slug = teacher.url().split("/").pop()!;
+  await expect(teacher.getByTestId("tutorial-card").filter({ hasText: "Your First Game" }).getByTestId("tutorial-start")).toBeVisible();
+  await expect(teacher.getByTestId("tutorial-assign")).toHaveCount(0);
+  const slug = await giveClass(teacher, classUrl, "Your First Game", "First game homework");
   await uri.goto(`/a/${slug}`);
   await uri.waitForURL(/#\/p\//);
   await expect(uri.getByTestId("tutorial-step")).toHaveText("Step 1 of 8");
@@ -118,6 +147,7 @@ test("a built-in tutorial copied, a question added, tried as practice, downloade
   await teacher.getByTestId("new-class-name").fill("Questions P2");
   await teacher.getByTestId("new-class-go").click();
   await teacher.waitForURL(/#\/class\/\d+$/);
+  const classUrl = teacher.url();
   await teacher.getByTestId("roster-emails").fill("vic@example.com");
   await teacher.getByTestId("roster-add").click();
   await expect(teacher.getByText("vic@example.com")).toBeVisible();
@@ -171,11 +201,8 @@ test("a built-in tutorial copied, a question added, tried as practice, downloade
   await expect(q.getByTestId("question-result")).toContainText("Practice: ✓ Right");
   await expect(teacher.getByTestId("tutorial-next")).toBeDisabled(); // the step's check still holds Next, not the question
 
-  // Assigned to the class, from the library: the student's answer is marked once and counted.
-  await teacher.goto("/#/library");
-  await mine.getByTestId("library-assign").selectOption({ label: "Questions P2" });
-  await teacher.waitForURL(/#\/assignment\/\w+$/);
-  const slug = teacher.url().split("/").pop()!;
+  // Given to the class, from the library: the student's answer is marked once and counted.
+  const slug = await giveClass(teacher, classUrl, "Visual Novel (my copy)", "Novel homework");
   // The assignment's page says which tutorial it is, and that it's the library's to edit.
   await expect(teacher.getByTestId("tutorial-which")).toContainText("Visual Novel (my copy)");
   await expect(teacher.getByTestId("tutorial-edit")).toHaveAttribute("href", /\/teacher\/tutorials\/\w+\/edit$/);
@@ -208,6 +235,7 @@ test("the tutorial library: built-ins listed, one assigned and linked, an upload
   await teacher.getByTestId("new-class-name").fill("Library P3");
   await teacher.getByTestId("new-class-go").click();
   await teacher.waitForURL(/#\/class\/\d+$/);
+  const classUrl = teacher.url();
 
   // The built-in ones are there before any is used, marked as built-in.
   await teacher.goto("/#/library");
@@ -215,10 +243,9 @@ test("the tutorial library: built-ins listed, one assigned and linked, an upload
   await expect(topDown).toContainText("Built-in");
   await expect(topDown).toContainText("Not used yet");
 
-  // Assigned from the Tutorials page: the library has it, linked to that assignment.
-  await teacher.goto("/#/tutorials");
-  await teacher.getByTestId("tutorial-card").filter({ hasText: "Top-Down Adventure" }).getByTestId("tutorial-assign").selectOption({ label: "Library P3" });
-  await teacher.waitForURL(/#\/assignment\/\w+$/);
+  // Given to a class from its row in the library, as it ships: the library has it, linked to that assignment.
+  await expect(topDown.getByTestId("library-audience")).toHaveCount(0); // the built-ins' audience is an admin's
+  await giveClass(teacher, classUrl, "Top-Down Adventure", "Village homework");
   await expect(teacher.getByTestId("tutorial-which")).toContainText("Top-Down Adventure");
   await expect(teacher.getByTestId("tutorial-which")).toContainText("from a built-in tutorial");
   // Its preview: no header, its checks counted and shown as checks.
@@ -252,5 +279,25 @@ test("the tutorial library: built-ins listed, one assigned and linked, an upload
   if (process.env.SHOT_DIR) await teacher.screenshot({ path: `${process.env.SHOT_DIR}/lib-edit.png` });
   await expect(teacher.locator("#stage")).toContainText("object Ball exists");
   await expect(teacher.locator("#stage")).toContainText("Points at add-event");
+  await ctx.close();
+});
+
+test("an admin takes a built-in off the Learn page, and puts it back", async ({ browser }) => {
+  const { ctx, page: admin } = await signedIn(browser, "teach4@example.com");
+  await admin.goto("/#/library");
+  const coins = admin.getByTestId("library-row").filter({ hasText: "Collect the Coins" });
+  await expect(coins.getByTestId("library-audience")).toHaveValue("site");
+  await coins.getByTestId("library-audience").selectOption("hidden");
+  await expect(coins.getByTestId("library-audience")).toHaveValue("hidden");
+  // Gone from the Learn page, for everyone, not just the admin.
+  const { ctx: sctx, page: someone } = await signedIn(browser, "learner@example.com");
+  await someone.goto("/#/tutorials");
+  await expect(someone.getByTestId("tutorial-card").filter({ hasText: "Your First Game" })).toBeVisible();
+  await expect(someone.getByTestId("tutorial-card").filter({ hasText: "Collect the Coins" })).toHaveCount(0);
+  await coins.getByTestId("library-audience").selectOption("site");
+  await expect(coins.getByTestId("library-audience")).toHaveValue("site");
+  await someone.reload();
+  await expect(someone.getByTestId("tutorial-card").filter({ hasText: "Collect the Coins" })).toBeVisible();
+  await sctx.close();
   await ctx.close();
 });

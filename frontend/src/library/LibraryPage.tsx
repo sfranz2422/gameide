@@ -15,7 +15,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../store/api";
 import { useSession } from "../editor/session";
 import { SiteNav } from "../editor/SiteNav";
-import { assignTutorial, libraryEditUrl, libraryRowFor, startTutorial, tutorialMarkdown } from "../tutorials/TutorialPages";
+import { libraryEditUrl, libraryRowFor, startTutorial, tutorialMarkdown } from "../tutorials/TutorialPages";
 
 interface Use {
   slug: string;
@@ -66,7 +66,9 @@ function asBase64(file: File): Promise<string> {
 
 export function LibraryPage() {
   const { me, store } = useSession();
-  const [classes, setClasses] = useState<{ id: number; name: string }[]>([]);
+  /** Built-ins an admin took off the Learn page (tutorials.py, HiddenBuiltin). */
+  const [hidden, setHidden] = useState<string[]>([]);
+  const loadHidden = () => api<{ hidden?: string[] }>("/api/tutorials").then((d) => setHidden(d.hidden ?? []), () => undefined);
   const [items, setItems] = useState<Item[] | null>(null);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [builtins, setBuiltins] = useState<Builtin[]>([]);
@@ -89,7 +91,7 @@ export function LibraryPage() {
     void fetch(new URL("tutorials/index.json", document.baseURI))
       .then((r) => r.json())
       .then((list: Builtin[]) => setBuiltins(list), () => undefined);
-    void api<{ classes: { id: number; name: string; teaching: boolean }[] }>("/api/classes").then((r) => setClasses(r.classes.filter((c) => c.teaching)), () => undefined);
+    void loadHidden();
   }, []);
 
   const act = (f: () => Promise<unknown>) => f().catch((e: Error) => setSay({ text: e.message, bad: true }));
@@ -229,6 +231,9 @@ export function LibraryPage() {
               {rows.map((r) => {
                 const title = r.item ? r.item.title : r.builtin.title;
                 const builtin = !!r.builtin || r.item!.origin.startsWith("builtin:");
+                const builtinName = r.builtin ? r.builtin.key : r.item!.origin.startsWith("builtin:") ? r.item!.origin.slice("builtin:".length) : null;
+                // How Try it follows it: as it ships (a built-in not yet theirs), or their row.
+                const key = r.item ? `t:${r.item.slug}` : `builtin:${r.builtin.key}`;
                 return (
                   <tr key={r.item ? r.item.slug : `b:${r.builtin.key}`} data-testid="library-row">
                     <td>
@@ -260,6 +265,51 @@ export function LibraryPage() {
                       <button className="btn small" onClick={() => setLinking(r)} data-testid="library-link">
                         Link to…
                       </button>
+                      {/* Try it, for every row: a teacher's own tutorials aren't on the Learn
+                          page (only "Everyone" ones are), and a built-in here is followed as it
+                          ships, or — once theirs — as they've changed it. It makes the
+                          tutorial's starting game in their games, which is also how a class
+                          gets one: New assignment from that game, then Link to… here. Notes
+                          without a tutorial's header can't be followed: the server says so. */}
+                      <button className="btn small" onClick={() => void act(() => startTutorial(store, key))} data-testid="library-try"
+                        title="Follow it yourself, in a game of your own, as a student would">
+                        Try it
+                      </button>
+                      {/* Who sees it on the Learn page. A built-in's is the site's (an
+                          admin's call, for everyone); a teacher's own, theirs to publish. A
+                          built-in made theirs gets no choice of its own: "Everyone" would put
+                          it on the Learn page beside the built-in it came from. */}
+                      {builtinName ? (
+                        me.user?.admin && (
+                          <select
+                            className="small-select"
+                            value={hidden.includes(builtinName) ? "hidden" : "site"}
+                            aria-label="Whether this built-in is on the public Learn page"
+                            title="For the whole site: a hidden built-in still opens for anyone who started it, and in assignments made from it"
+                            data-testid="library-audience"
+                            onChange={(e) =>
+                              void act(() => api(`/api/tutorials/builtin/${builtinName}/audience`, { json: { audience: e.target.value } }).then(loadHidden))
+                            }
+                          >
+                            <option value="site">Everyone (Learn page)</option>
+                            <option value="hidden">Hidden from the Learn page</option>
+                          </select>
+                        )
+                      ) : (
+                        r.item && (
+                          <select
+                            className="small-select"
+                            value={r.item.visibility}
+                            aria-label="Whether it is on the public Learn page"
+                            title="Everyone: on the public Learn page. Only me: in your library, for your assignments (a class gets it by having it linked)"
+                            data-testid="library-audience"
+                            onChange={(e) => void act(() => api(`/api/library/${r.item!.slug}`, { json: { visibility: e.target.value } }).then(load))}
+                          >
+                            <option value="private">Only me</option>
+                            {(me.user?.admin || r.item.visibility === "site") && <option value="site">Everyone (Learn page)</option>}
+                          </select>
+                        )
+                      )}
                       {r.builtin && (
                         <>
                           <button className="btn small" onClick={() => void duplicateBuiltin(r.builtin!)} data-testid="library-duplicate"
@@ -274,39 +324,6 @@ export function LibraryPage() {
                       )}
                       {r.item && (
                         <>
-                          {/* A teacher's own tutorials aren't on the Learn page (only "Everyone"
-                              ones are), so trying one and assigning it happen here. Notes
-                              without a tutorial's header can't be followed: the server says so. */}
-                          <button className="btn small" onClick={() => void act(() => startTutorial(store, `t:${r.item!.slug}`))} data-testid="library-try"
-                            title="Follow it yourself, in a game of your own, as a student would">
-                            Try it
-                          </button>
-                          {classes.length > 0 && (
-                            <select
-                              className="small-select"
-                              value=""
-                              onChange={(e) => e.target.value && void act(() => assignTutorial(store, `t:${r.item!.slug}`, title, true, Number(e.target.value)))}
-                              aria-label={`Assign ${title} to a class`}
-                              data-testid="library-assign"
-                            >
-                              <option value="">Assign to…</option>
-                              {classes.map((c) => (
-                                <option key={c.id} value={c.id}>
-                                  {c.name}
-                                </option>
-                              ))}
-                            </select>
-                          )}
-                          <select
-                            className="small-select"
-                            value={r.item.visibility}
-                            aria-label="Whether it is on the public Learn page"
-                            title="Everyone: on the public Learn page. Only me: in your library, for your assignments (a class gets it by having it linked)"
-                            onChange={(e) => void act(() => api(`/api/library/${r.item!.slug}`, { json: { visibility: e.target.value } }).then(load))}
-                          >
-                            <option value="private">Only me</option>
-                            {(me.user?.admin || r.item.visibility === "site") && <option value="site">Everyone (Learn page)</option>}
-                          </select>
                           <button className="btn small" onClick={() => void act(() => api(`/api/library/${r.item!.slug}/duplicate`, { json: {} }).then(load))} data-testid="library-duplicate">
                             Duplicate
                           </button>
