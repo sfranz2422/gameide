@@ -15,7 +15,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../store/api";
 import { useSession } from "../editor/session";
 import { SiteNav } from "../editor/SiteNav";
-import { assignTutorial, libraryEditUrl, libraryRowFor, startTutorial } from "../tutorials/TutorialPages";
+import { assignTutorial, libraryEditUrl, libraryRowFor, startTutorial, tutorialMarkdown } from "../tutorials/TutorialPages";
 
 interface Use {
   slug: string;
@@ -140,6 +140,20 @@ export function LibraryPage() {
     act(async () => {
       location.href = editUrl(r.item ? r.item.slug : await ownBuiltin(r.builtin));
     });
+  /**
+   * A built-in, duplicated: a new tutorial of the teacher's own, "(my copy)"
+   * in its title and its header both (the Learn page and the library read the
+   * header's), unlinked from the built-in — unlike Edit, which makes the row
+   * the built-in's own assignments link to.
+   */
+  const duplicateBuiltin = (b: Builtin) =>
+    act(async () => {
+      const title = `${b.title} (my copy)`;
+      const body = (await tutorialMarkdown(`builtin:${b.key}`)).replace(/^(\s*---[ \t]*\n[\s\S]*?^title\s*:\s*)(.+)$/m, (_, head: string) => `${head}${title}`);
+      await api("/api/library", { json: { title, body } });
+      setSay({ text: `“${title}” is in your library, yours to change.` });
+      await load();
+    });
   const upload = (list: FileList | null) => {
     const picked = Array.from(list ?? []).filter((f) => /\.(md|markdown|txt)$/i.test(f.name));
     if (!picked.length) return setSay({ text: "Choose .md tutorials.", bad: true });
@@ -246,6 +260,18 @@ export function LibraryPage() {
                       <button className="btn small" onClick={() => setLinking(r)} data-testid="library-link">
                         Link to…
                       </button>
+                      {r.builtin && (
+                        <>
+                          <button className="btn small" onClick={() => void duplicateBuiltin(r.builtin!)} data-testid="library-duplicate"
+                            title="A tutorial of your own made from this one, to change as you like">
+                            Duplicate
+                          </button>
+                          <a className="btn small" href={`tutorials/${r.builtin.key}.md`} download={`${r.builtin.key}.md`} data-testid="library-download"
+                            title="Its markdown, as a file">
+                            ⤓
+                          </a>
+                        </>
+                      )}
                       {r.item && (
                         <>
                           {/* A teacher's own tutorials aren't on the Learn page (only "Everyone"
@@ -281,10 +307,10 @@ export function LibraryPage() {
                             <option value="private">Only me</option>
                             {(me.user?.admin || r.item.visibility === "site") && <option value="site">Everyone (Learn page)</option>}
                           </select>
-                          <button className="btn small" onClick={() => void act(() => api(`/api/library/${r.item!.slug}/duplicate`, { json: {} }).then(load))}>
+                          <button className="btn small" onClick={() => void act(() => api(`/api/library/${r.item!.slug}/duplicate`, { json: {} }).then(load))} data-testid="library-duplicate">
                             Duplicate
                           </button>
-                          <a className="btn small" href={`/api/library/${r.item.slug}/download`}>
+                          <a className="btn small" href={`/api/library/${r.item.slug}/download`} data-testid="library-download" title="Its markdown, as a file">
                             ⤓
                           </a>
                           <button

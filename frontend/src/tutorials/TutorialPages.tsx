@@ -63,16 +63,6 @@ export async function libraryRowFor(key: string, title: string, mine: boolean): 
   return (await api<{ slug: string }>("/api/library", { json: { title, body } })).slug;
 }
 
-/** A tutorial's markdown as a file, to keep or to plan a lesson from. */
-async function downloadMarkdown(key: string, title: string) {
-  const md = await tutorialMarkdown(key);
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(new Blob([md], { type: "text/markdown" }));
-  a.download = `${title.replace(/[^\w -]+/g, "").trim().replace(/\s+/g, "-").toLowerCase() || "tutorial"}.md`;
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-}
-
 /** Start one: its starting game made in this person's games, and opened. */
 export async function startTutorial(store: ProjectStore, key: string): Promise<void> {
   const p = await makeStarter(store, key, await tutorialMarkdown(key));
@@ -214,30 +204,6 @@ export function TutorialsPage() {
                           <a className="btn small" href={libraryEditUrl(t.slug!)}>
                             Edit
                           </a>
-                        )}
-                        {/* A teacher's way to change one that isn't theirs (the built-in
-                            ones above all): their own copy, to edit, add questions to and assign. */}
-                        {teacher && !t.mine && (
-                          <button
-                            className="btn small"
-                            disabled={busy}
-                            data-testid="tutorial-copy"
-                            title="Your own copy of this tutorial, in your library, to change and assign"
-                            onClick={() =>
-                              void act(async () => {
-                                const md = (await tutorialMarkdown(t.key)).replace(/^(\s*---[ \t]*\n[\s\S]*?^title\s*:\s*)(.+)$/m, (_, head: string, was: string) => `${head}${was.trim()} (my copy)`);
-                                const r = await api<{ slug: string }>("/api/library", { json: { title: `${t.title} (my copy)`, body: md } });
-                                location.href = libraryEditUrl(r.slug);
-                              })
-                            }
-                          >
-                            Make my copy
-                          </button>
-                        )}
-                        {teacher && (
-                          <button className="btn small" disabled={busy} onClick={() => void act(() => downloadMarkdown(t.key, t.title))} data-testid="tutorial-download" title="This tutorial's markdown, as a file">
-                            ⤓ Markdown
-                          </button>
                         )}
                         {classes.length > 0 && (
                           <select

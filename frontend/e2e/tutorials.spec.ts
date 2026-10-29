@@ -122,17 +122,26 @@ test("a built-in tutorial copied, a question added, tried as practice, downloade
   await teacher.getByTestId("roster-add").click();
   await expect(teacher.getByText("vic@example.com")).toBeVisible();
 
-  // The markdown of a built-in one, as a file.
+  // The Learn page is for following them: copying and downloading are the library's.
   await teacher.goto("/#/tutorials");
-  const novel = teacher.getByTestId("tutorial-card").filter({ hasText: "Visual Novel" }).first();
-  const [file] = await Promise.all([teacher.waitForEvent("download"), novel.getByTestId("tutorial-download").click()]);
+  const card = teacher.getByTestId("tutorial-card").filter({ hasText: "Visual Novel" }).first();
+  await expect(card.getByTestId("tutorial-start")).toBeVisible();
+  await expect(teacher.getByTestId("tutorial-copy")).toHaveCount(0);
+  await expect(teacher.getByTestId("tutorial-download")).toHaveCount(0);
+
+  // The markdown of a built-in one, as a file, from its row in the library.
+  await teacher.goto("/#/library");
+  const novel = teacher.getByTestId("library-row").filter({ hasText: "Visual Novel" }).first();
+  const [file] = await Promise.all([teacher.waitForEvent("download"), novel.getByTestId("library-download").click()]);
   expect(file.suggestedFilename()).toBe("visual-novel.md");
   const { readFile } = await import("node:fs/promises");
   expect(await readFile((await file.path())!, "utf8")).toContain("title: Visual Novel");
 
-  // My copy of it, in the library, opened in its editor (PresMaker), with a
-  // question put into its first step and saved there (Ctrl+S).
-  await novel.getByTestId("tutorial-copy").click();
+  // Duplicated: my copy of it, in the library, opened in its editor
+  // (PresMaker), with a question put into its first step and saved there (Ctrl+S).
+  await novel.getByTestId("library-duplicate").click();
+  await expect(teacher.getByTestId("library-report")).toContainText("Visual Novel (my copy)");
+  await teacher.getByTestId("library-row").filter({ hasText: "Visual Novel (my copy)" }).getByTestId("library-edit").click();
   await teacher.waitForURL(/\/teacher\/tutorials\/\w+\/edit$/);
   await expect.poll(() => teacher.evaluate(() => !!(window as any).PM?.editor()?.getValue())).toBe(true);
   expect(await teacher.evaluate(() => (window as any).PM.editor().getValue())).toContain("title: Visual Novel (my copy)");
