@@ -740,6 +740,7 @@ CASES = [
  ("starter: the cafeteria door needs nothing", "src/store/starterProjects.ts", "self.needs = \"camera\"\\n", "", "cafeteria door needs the camera"),
  ("starter: a choice goes nowhere", "src/store/starterProjects.ts", "        if words == answer:\n            play(goes)", "        if words == answer:\n            pass", "Ferryman"),
  ("starter: the novel's tutorial step does nothing", "public/tutorials/visual-novel.md", 'after 1 second, len(SCENES) >= 8', 'after 1 second, len(SCENES) >= 7', "Visual Novel"),
+ ("library: Save doesn't say it saved", "public/static/presmaker/app.js", "      savedFlash(r.updated);\n", "      void 0;\n", "copied, a question added", E2E),
  ("library: built-in notes aren't known", "../backend/app.py", "    return _BUILTINS.get(text)\n", "    return None\n", "ARE a built-in", PY),
  ("library: old tutorials stay behind", "../backend/tutorials.py", "        if t.slug in have:\n            continue\n", "        continue\n", "an old tutorial is in the library", PY),
  ("library: assigning doesn't link", "../backend/classes.py", "            library.link(db, item, a)\n", "            pass\n", "linked to it in the library", PY),

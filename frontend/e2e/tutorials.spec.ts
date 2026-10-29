@@ -136,6 +136,9 @@ test("a built-in tutorial copied, a question added, tried as practice, downloade
   }, QUESTION);
   await teacher.keyboard.press("ControlOrMeta+s");
   await expect.poll(() => teacher.evaluate(() => (window as any).PM.dirty())).toBe(false);
+  // The Save button says so, where the teacher is looking.
+  await expect(teacher.locator('[data-cmd="save"]')).toHaveText(/✓ Saved/);
+  await expect(teacher.locator('[data-cmd="save"]')).toHaveText("Save", { timeout: 5000 });
 
   // Tried, from the Tutorials page: the question shows in the tutorial and is marked, as practice.
   await teacher.goto("/#/tutorials");
