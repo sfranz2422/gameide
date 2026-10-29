@@ -20,7 +20,8 @@ import { ViewStore } from "../store/viewStore";
 import { ClassXpPage, ShopPage, XpLogPage, XpToasts } from "../xp/XpPages";
 import { HelpPage } from "../notes/HelpPage";
 import { DocsPage } from "./DocsPage";
-import { TutorialEditPage, TutorialsPage } from "../tutorials/TutorialPages";
+import { TutorialsPage } from "../tutorials/TutorialPages";
+import { LibraryPage } from "../library/LibraryPage";
 import { useIdleSignOut } from "./idle";
 import { ProjectsPage } from "./ProjectsPage";
 import { SessionContext, type SessionInfo } from "./session";
@@ -70,10 +71,10 @@ export function App() {
         <StartAssignment key={start[1]} slug={start[1]!} />
       ) : classXp ? (
         <ClassXpPage key={classXp[1]} classId={Number(classXp[1])} />
-      ) : hash.match(/^#\/tutorials\/copy\/([\w:-]+)/) ? (
-        <TutorialEditPage key={hash} slug="new" from={decodeURIComponent(hash.match(/^#\/tutorials\/copy\/([\w:-]+)/)![1]!)} />
-      ) : hash.match(/^#\/tutorials\/edit\/([\w-]+)/) ? (
-        <TutorialEditPage key={hash} slug={hash.match(/^#\/tutorials\/edit\/([\w-]+)/)![1]!} />
+      ) : hash.startsWith("#/library") || hash.match(/^#\/tutorials\/(copy|edit)\//) ? (
+        // The tutorial library: where tutorials are written and edited (the
+        // old #/tutorials/edit and /copy pages are it now).
+        <LibraryPage />
       ) : hash.startsWith("#/tutorials") ? (
         <TutorialsPage />
       ) : hash.startsWith("#/docs") ? (

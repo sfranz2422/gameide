@@ -12,16 +12,14 @@
  * notes are the tutorial (strict steps, Check all on its checks, marks,
  * Classroom — unchanged).
  */
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api } from "../store/api";
 import type { Project } from "../store/project";
 import type { ProjectStore, ProjectSummary } from "../store/store";
 import { TUTORIAL_STARTERS } from "../store/templates";
 import { useSession } from "../editor/session";
 import { SiteNav } from "../editor/SiteNav";
-import { renderMarkdown } from "../notes/NotesPane";
-import { pieces } from "../notes/quiz";
-import { LEVELS, parseTutorial, TARGETS, tutorialProblems } from "./tutorial";
+import { LEVELS, parseTutorial } from "./tutorial";
 
 interface Entry {
   key: string;
@@ -46,6 +44,23 @@ export async function tutorialMarkdown(key: string): Promise<string> {
     return r.text();
   }
   return (await api<{ markdown: string }>(`/api/tutorials/${encodeURIComponent(name)}`)).markdown;
+}
+
+/** The tutorial library's editor for one (PresMaker, served by library.py): a page of its own. */
+export const libraryEditUrl = (slug: string) => `/teacher/tutorials/${slug}/edit`;
+
+/**
+ * The library row (library.py) for a tutorial, to edit or assign it: a
+ * built-in becomes the teacher's own row (origin builtin:<name>, found again
+ * if it's theirs already); their own is its row; someone else's shared one
+ * is copied into theirs. Its slug.
+ */
+export async function libraryRowFor(key: string, title: string, mine: boolean): Promise<string> {
+  const [kind, name] = [key.slice(0, key.indexOf(":")), key.slice(key.indexOf(":") + 1)];
+  if (kind === "t" && mine) return name;
+  const body = await tutorialMarkdown(key);
+  if (kind === "builtin") return (await api<{ slug: string }>("/api/library", { json: { origin: key, title, body } })).slug;
+  return (await api<{ slug: string }>("/api/library", { json: { title, body } })).slug;
 }
 
 /** A tutorial's markdown as a file, to keep or to plan a lesson from. */
@@ -124,11 +139,14 @@ export function TutorialsPage() {
     });
   const assign = (e: Entry, classId: number) =>
     act(async () => {
+      // Linked to its row in the library, which writes it in as the notes
+      // and keeps it in step (the library is the only place notes change).
+      const tutorial = await libraryRowFor(e.key, e.title, !!e.mine);
       const md = await tutorialMarkdown(e.key);
       // Made in the teacher's games just long enough for the class's copy to be taken from it.
       const p = await makeStarter(store, e.key, md);
       try {
-        const r = await api<{ slug: string }>(`/api/classes/${classId}/assignments`, { json: { title: e.title, project: p.id, notes: md } });
+        const r = await api<{ slug: string }>(`/api/classes/${classId}/assignments`, { json: { title: e.title, project: p.id, tutorial } });
         location.hash = `#/assignment/${r.slug}`;
       } finally {
         await store.remove(p.id).catch(() => undefined);
@@ -145,8 +163,8 @@ export function TutorialsPage() {
         <header className="page-head">
           <h1>Tutorials</h1>
           {teacher && (
-            <a className="btn go" href="#/tutorials/edit/new" data-testid="tutorial-new">
-              Write a tutorial
+            <a className="btn go" href="#/library" data-testid="tutorial-new">
+              Your tutorial library
             </a>
           )}
         </header>
@@ -186,16 +204,28 @@ export function TutorialsPage() {
                           </button>
                         )}
                         {t.mine && (
-                          <a className="btn small" href={`#/tutorials/edit/${t.slug}`}>
+                          <a className="btn small" href={libraryEditUrl(t.slug!)}>
                             Edit
                           </a>
                         )}
                         {/* A teacher's way to change one that isn't theirs (the built-in
                             ones above all): their own copy, to edit, add questions to and assign. */}
                         {teacher && !t.mine && (
-                          <a className="btn small" href={`#/tutorials/copy/${t.key}`} data-testid="tutorial-copy" title="Your own copy of this tutorial, to change and assign">
+                          <button
+                            className="btn small"
+                            disabled={busy}
+                            data-testid="tutorial-copy"
+                            title="Your own copy of this tutorial, in your library, to change and assign"
+                            onClick={() =>
+                              void act(async () => {
+                                const md = (await tutorialMarkdown(t.key)).replace(/^(\s*---[ \t]*\n[\s\S]*?^title\s*:\s*)(.+)$/m, (_, head: string, was: string) => `${head}${was.trim()} (my copy)`);
+                                const r = await api<{ slug: string }>("/api/library", { json: { title: `${t.title} (my copy)`, body: md } });
+                                location.href = libraryEditUrl(r.slug);
+                              })
+                            }
+                          >
                             Make my copy
-                          </a>
+                          </button>
                         )}
                         {teacher && (
                           <button className="btn small" disabled={busy} onClick={() => void act(() => downloadMarkdown(t.key, t.title))} data-testid="tutorial-download" title="This tutorial's markdown, as a file">
@@ -227,176 +257,6 @@ export function TutorialsPage() {
             </section>
           );
         })}
-      </main>
-    </div>
-  );
-}
-
-const EXAMPLE = `---
-title: My tutorial
-level: Getting Started
-time: 10 min
-starter: player-start
-description: What students will make.
----
-# The first step
-
-Say what to do. Code is shown to type, not to copy:
-
-\`\`\`python
-self.x += 4
-\`\`\`
-
-highlight: add-event
-
-\`\`\`check
-Player has event step
-\`\`\`
-
----
-
-## The next step
-
-Each line of three dashes starts a step.
-`;
-
-export function TutorialEditPage({ slug, from }: { slug: string; from?: string }) {
-  const { me, store } = useSession();
-  const isNew = slug === "new";
-  const [md, setMd] = useState(isNew && !from ? EXAMPLE : "");
-  const [saved, setSaved] = useState(isNew ? "" : null as string | null);
-  const [visibility, setVisibility] = useState("private");
-  const [problem, setProblem] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [at, setAt] = useState(0);
-  useEffect(() => {
-    // A copy of another tutorial: its markdown, retitled so the two can be
-    // told apart on the shelf. Nothing is saved until Save.
-    if (from)
-      void tutorialMarkdown(from).then(
-        (text) => setMd(text.replace(/^(\s*---[ \t]*\n[\s\S]*?^title\s*:\s*)(.+)$/m, (_, head: string, title: string) => `${head}${title.trim()} (my copy)`)),
-        (e) => setProblem(e instanceof Error ? e.message : String(e)),
-      );
-    if (isNew) return;
-    void api<{ markdown: string; visibility: string }>(`/api/tutorials/${slug}`).then(
-      (r) => {
-        setMd(r.markdown);
-        setSaved(r.markdown);
-        setVisibility(r.visibility);
-      },
-      (e) => setProblem(e instanceof Error ? e.message : String(e)),
-    );
-  }, [slug, isNew, from]);
-  const t = useMemo(() => parseTutorial(md), [md]);
-  const problems = useMemo(() => tutorialProblems(t, TARGETS), [t]);
-  const step = t.steps[Math.min(at, Math.max(0, t.steps.length - 1))];
-  const save = useCallback(async () => {
-    setBusy(true);
-    setProblem(null);
-    try {
-      if (isNew) {
-        const r = await api<{ slug: string }>("/api/tutorials", { json: { markdown: md, visibility } });
-        location.hash = `#/tutorials/edit/${r.slug}`;
-      } else {
-        await api(`/api/tutorials/${slug}`, { json: { markdown: md, visibility } });
-        setSaved(md);
-      }
-    } catch (e) {
-      setProblem(e instanceof Error ? e.message : String(e));
-    } finally {
-      setBusy(false);
-    }
-  }, [isNew, md, visibility, slug]);
-  return (
-    <div className="site-page">
-      <SiteNav at="learn" />
-      <main className="explore-page class-page">
-        <header className="page-head">
-          <h1>{from ? "Your copy" : isNew ? "A new tutorial" : t.meta.title}</h1>
-          <a href="#/tutorials">All tutorials</a>
-        </header>
-        <p className="muted small">
-          A header, then one step per <code>---</code>. Each step can have a <code>```check</code> block (Next waits for it to pass — see{" "}
-          <a href="#/help/checks">the checks</a>), a <code>highlight:</code> line naming part of the editor to point at, and <code>```quiz</code> questions, as in notes (see{" "}
-          <a href="#/help">the formats</a>: they're marked, and counted once the tutorial is assigned, but never hold Next). <code>starter:</code> is the game it
-          starts from: {Object.keys(TUTORIAL_STARTERS).join(", ")}.
-        </p>
-        {problem && <p className="banner error">{problem}</p>}
-        <div className="notes-editor-cols">
-          <div>
-            <textarea className="tutorial-source" value={md} onChange={(e) => setMd(e.target.value)} rows={24} spellCheck={false} aria-label="Tutorial" data-testid="tutorial-source" />
-            <div className="row">
-              <select value={visibility} onChange={(e) => setVisibility(e.target.value)} aria-label="Who can see it" data-testid="tutorial-visibility">
-                <option value="private">Only me</option>
-                <option value="classes">My classes</option>
-                {(me.user?.admin || visibility === "site") && <option value="site">Everyone</option>}
-              </select>
-              <button className="btn go" disabled={busy || md === saved} onClick={() => void save()} data-testid="tutorial-save">
-                {md === saved ? "Saved" : "Save"}
-              </button>
-              {!isNew && (
-                <button
-                  className="btn small"
-                  disabled={busy}
-                  onClick={async () => {
-                    const p = await makeStarter(store, `t:${slug}`, md);
-                    location.hash = `#/p/${p.id}`;
-                  }}
-                >
-                  Try it
-                </button>
-              )}
-              {!isNew && (
-                <button
-                  className="btn small red"
-                  onClick={() => confirm("Delete this tutorial?") && void api(`/api/tutorials/${slug}`, { method: "DELETE" }).then(() => (location.hash = "#/tutorials"))}
-                >
-                  Delete
-                </button>
-              )}
-            </div>
-            {problems.length > 0 && (
-              <ul className="banner warn small" data-testid="tutorial-problems">
-                {problems.map((p) => (
-                  <li key={p}>{p}</li>
-                ))}
-              </ul>
-            )}
-          </div>
-          <div className="notes-preview">
-            <div className="tutorial-head">
-              <b>{t.meta.title}</b>
-              <span className="muted small">
-                {t.meta.level} · {t.steps.length} steps
-              </span>
-            </div>
-            <div className="row">
-              {t.steps.map((s, i) => (
-                <button key={i} className={`btn small${i === at ? " on" : ""}`} onClick={() => setAt(i)} title={s.title}>
-                  {i + 1}
-                </button>
-              ))}
-            </div>
-            {step && (
-              <>
-                {pieces(step.md, ["check"]).map((p, i) =>
-                  p.type === "md" ? <div key={i} className="notes-md" dangerouslySetInnerHTML={{ __html: renderMarkdown(p.text) }} /> : null,
-                )}
-                {step.highlight && <p className="muted small">Points at: {step.highlight}</p>}
-                {step.checks.length > 0 && (
-                  <ul className="tests-list">
-                    {step.checks.map((c) => (
-                      <li key={c.label}>
-                        <span className="tests-mark">○</span>
-                        <code>{c.label}</code>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </>
-            )}
-          </div>
-        </div>
       </main>
     </div>
   );

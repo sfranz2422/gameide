@@ -4086,3 +4086,18 @@ a.btn {
   cursor: pointer;
   image-rendering: pixelated;
 }
+
+/* The tutorial library (library/LibraryPage.tsx; library.py on the server). */
+.library-page .library-tools { display: flex; gap: 8px; margin: 12px 0; flex-wrap: wrap; }
+.library-page .library-tools input[type="search"] { flex: 1; min-width: 200px; }
+.library-table { width: 100%; border-collapse: collapse; }
+.library-table th, .library-table td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--border); vertical-align: top; }
+.library-table th { color: var(--muted); font-weight: 600; }
+.library-table ul { margin: 4px 0 0; padding-left: 18px; }
+.library-kind { display: inline-block; font-size: 11px; padding: 1px 7px; border-radius: 999px; border: 1px solid var(--accent); color: var(--accent); }
+.library-actions { white-space: nowrap; }
+.library-actions > * { margin-right: 4px; }
+.library-dialog { max-width: 560px; width: 92vw; }
+.library-link-list { max-height: 50vh; overflow: auto; margin: 8px 0; }
+.library-link-list fieldset { border: 1px solid var(--border); border-radius: 8px; margin: 8px 0; }
+.library-link-list label { display: block; padding: 3px 0; }

@@ -7,7 +7,7 @@
  * points are in the total.
  */
 import { expect, test, type Browser } from "@playwright/test";
-import { chooseTemplate, SHOTS } from "./helpers";
+import { chooseTemplate, SHOTS, setNotes } from "./helpers";
 
 async function signedIn(browser: Browser, email: string) {
   const ctx = await browser.newContext({ viewport: { width: 1366, height: 768 } });
@@ -69,9 +69,7 @@ test("notes: slides, a question, Check my work in the game pane, and the teacher
   await teacher.getByTestId("assignment-title").fill("Coins with notes");
   await teacher.getByTestId("assignment-go").click();
   await teacher.getByTestId("assignment-link").filter({ hasText: "Coins with notes" }).click();
-  await teacher.getByTestId("notes-source").fill(NOTES);
-  await teacher.getByTestId("notes-save").click();
-  await expect(teacher.getByTestId("notes-save")).toHaveText("Saved");
+  await setNotes(teacher, NOTES);
   const slug = teacher.url().split("/").pop()!;
 
   // The student's editor opens on the notes.
@@ -184,9 +182,7 @@ test("notes: a checklist that stays ticked, flip cards, and order, bug, sort and
   await teacher.getByTestId("assignment-title").fill("Puzzles");
   await teacher.getByTestId("assignment-go").click();
   await teacher.getByTestId("assignment-link").filter({ hasText: "Puzzles" }).click();
-  await teacher.getByTestId("notes-source").fill(PUZZLES);
-  await teacher.getByTestId("notes-save").click();
-  await expect(teacher.getByTestId("notes-save")).toHaveText("Saved");
+  await setNotes(teacher, PUZZLES);
   const slug = teacher.url().split("/").pop()!;
 
   const { ctx: sctx, page: pia } = await signedIn(browser, "pia@example.com");
@@ -281,9 +277,7 @@ test("notes: animate plays a part at a time, the arrow waits, and only the teach
   await teacher.getByTestId("assignment-title").fill("Played");
   await teacher.getByTestId("assignment-go").click();
   await teacher.getByTestId("assignment-link").filter({ hasText: "Played" }).click();
-  await teacher.getByTestId("notes-source").fill(PLAYED);
-  await teacher.getByTestId("notes-save").click();
-  await expect(teacher.getByTestId("notes-save")).toHaveText("Saved");
+  await setNotes(teacher, PLAYED);
   // The page's preview shows it all at once, without the animate line.
   await expect(teacher.locator(".notes-preview")).toContainText("Press Check my work.");
   await expect(teacher.locator(".notes-preview")).not.toContainText("animate:");

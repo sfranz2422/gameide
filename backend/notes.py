@@ -110,24 +110,9 @@ def student_notes(a):
     return quiz.redact(grades.notes_of(a))
 
 
-@bp.post("/api/assignments/<slug>/notes")
-def save_notes(slug):
-    db = _db()
-    try:
-        user = _need_user(db)
-        a = _own_assignment(db, user, slug)
-        text = str((request.get_json(silent=True) or {}).get("notes") or "")
-        if len(text) > MAX_NOTES:
-            return err("Those notes are too long (%d characters at most)." % MAX_NOTES, 413)
-        files = a.file_map()
-        files[grades.NOTES] = text
-        a.files = json.dumps(files)
-        a.updated_at = now()
-        db.commit()
-        store_quiz_keys(db, a, text)
-        return jsonify(ok=True, possible=grades.possible(a))
-    finally:
-        db.close()
+# An assignment's notes are written by the tutorial library (library.py), and
+# only there: app.py's _write_notes puts a tutorial's text in and keeps its
+# keys (store_quiz_keys). This module reads them and marks answers.
 
 
 def _ensure_submission(db, a, student_id):

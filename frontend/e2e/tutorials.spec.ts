@@ -6,6 +6,7 @@
  * student has got.
  */
 import { expect, test, type Browser } from "@playwright/test";
+import { setNotes } from "./helpers";
 
 async function signedIn(browser: Browser, email: string) {
   const ctx = await browser.newContext({ viewport: { width: 1366, height: 768 } });
@@ -47,14 +48,14 @@ test("a teacher's tutorial, shared with a class, done by a student; a built-in o
   await teacher.getByTestId("roster-add").click();
   await expect(teacher.getByText("uri@example.com")).toBeVisible();
 
-  // Write one, for the class.
-  await teacher.goto("/#/tutorials");
-  await teacher.getByTestId("tutorial-new").click();
-  await teacher.getByTestId("tutorial-source").fill(MINE);
-  await expect(teacher.getByTestId("tutorial-problems")).toHaveCount(0);
-  await teacher.getByTestId("tutorial-visibility").selectOption("classes");
-  await teacher.getByTestId("tutorial-save").click();
-  await teacher.waitForURL(/#\/tutorials\/edit\/\w+$/);
+  // Write one, for the class: in the tutorial library (library.py), where
+  // tutorials are written, then shared with their classes from its page.
+  const made = await teacher.request.post("/api/library", { data: { body: MINE } });
+  expect(made.status()).toBe(201);
+  await teacher.goto("/#/library");
+  const row = teacher.getByTestId("library-row").filter({ hasText: "Bouncing ball" });
+  await row.getByLabel("Who can follow it on the Tutorials page").selectOption("classes");
+  await expect(row.getByLabel("Who can follow it on the Tutorials page")).toHaveValue("classes");
 
   // The student finds it, and does it.
   const { ctx: sctx, page: uri } = await signedIn(browser, "uri@example.com");
@@ -123,18 +124,22 @@ test("a built-in tutorial copied, a question added, tried as practice, downloade
   const { readFile } = await import("node:fs/promises");
   expect(await readFile((await file.path())!, "utf8")).toContain("title: Visual Novel");
 
-  // My copy of it, with a question in its first step.
+  // My copy of it, in the library, opened in its editor (PresMaker), with a
+  // question put into its first step and saved there (Ctrl+S).
   await novel.getByTestId("tutorial-copy").click();
-  await teacher.waitForURL(/#\/tutorials\/copy\//);
-  const source = teacher.getByTestId("tutorial-source");
-  await expect(source).toHaveValue(/title: Visual Novel \(my copy\)/);
-  const md = (await source.inputValue()).replace("\n---\n\n## Change the words", QUESTION + "\n---\n\n## Change the words");
-  await source.fill(md);
-  await teacher.getByTestId("tutorial-save").click();
-  await teacher.waitForURL(/#\/tutorials\/edit\/\w+$/);
+  await teacher.waitForURL(/\/teacher\/tutorials\/\w+\/edit$/);
+  await expect.poll(() => teacher.evaluate(() => !!(window as any).PM?.editor()?.getValue())).toBe(true);
+  expect(await teacher.evaluate(() => (window as any).PM.editor().getValue())).toContain("title: Visual Novel (my copy)");
+  await teacher.evaluate((q) => {
+    const cm = (window as any).PM.editor();
+    cm.setValue(cm.getValue().replace("\n---\n\n## Change the words", q + "\n---\n\n## Change the words"));
+  }, QUESTION);
+  await teacher.keyboard.press("ControlOrMeta+s");
+  await expect.poll(() => teacher.evaluate(() => (window as any).PM.dirty())).toBe(false);
 
-  // Tried: the question shows in the tutorial and is marked, as practice.
-  await teacher.getByRole("button", { name: "Try it" }).click();
+  // Tried, from the Tutorials page: the question shows in the tutorial and is marked, as practice.
+  await teacher.goto("/#/tutorials");
+  await teacher.getByTestId("tutorial-card").filter({ hasText: "Visual Novel (my copy)" }).getByTestId("tutorial-start").click();
   await teacher.waitForURL(/#\/p\//);
   const q = teacher.getByTestId("tutorial-pane").getByTestId("question");
   await expect(q).toContainText('What does "lines" hold');
@@ -151,11 +156,12 @@ test("a built-in tutorial copied, a question added, tried as practice, downloade
   await teacher.getByTestId("tutorial-card").filter({ hasText: "Visual Novel (my copy)" }).getByTestId("tutorial-assign").selectOption({ label: "Questions P2" });
   await teacher.waitForURL(/#\/assignment\/\w+$/);
   const slug = teacher.url().split("/").pop()!;
-  // A second question, added on the assignment's page: in this class's copy only.
-  const notes = teacher.getByTestId("notes-source");
-  await notes.fill((await notes.inputValue()).replace("\n---\n\n## Change the words", "\n```quiz\nHow many endings are there?\nanswer: 2\nanswer: two\n```\n\n---\n\n## Change the words"));
-  await teacher.getByTestId("notes-save").click();
-  await expect(teacher.getByTestId("notes-save")).toHaveText("Saved");
+  // The assignment's page says which tutorial it is, and that it's the library's to edit.
+  await expect(teacher.getByTestId("tutorial-which")).toContainText("Visual Novel (my copy)");
+  await expect(teacher.getByTestId("tutorial-edit")).toHaveAttribute("href", /\/teacher\/tutorials\/\w+\/edit$/);
+  // A second question, added to the tutorial (in the library): the assignment, linked, has it at once.
+  const now = (await (await teacher.request.get(`/api/assignments/${slug}`)).json()).notes as string;
+  await setNotes(teacher, now.replace("\n---\n\n## Change the words", "\n```quiz\nHow many endings are there?\nanswer: 2\nanswer: two\n```\n\n---\n\n## Change the words"));
   const { ctx: sctx, page: vic } = await signedIn(browser, "vic@example.com");
   await vic.goto(`/a/${slug}`);
   await vic.waitForURL(/#\/p\//);
@@ -173,4 +179,58 @@ test("a built-in tutorial copied, a question added, tried as practice, downloade
   await expect(teacher.getByTestId("result-row").filter({ hasText: "Vic" })).toContainText("1");
   await sctx.close();
   await tctx.close();
+});
+
+test("the tutorial library: built-ins listed, one assigned and linked, an upload, and its editor (PresMaker) drawing a step's checks", async ({ browser }) => {
+  test.setTimeout(180_000);
+  const { ctx, page: teacher } = await signedIn(browser, "teach3@example.com");
+  await teacher.goto("/#/classes");
+  await teacher.getByTestId("new-class-name").fill("Library P3");
+  await teacher.getByTestId("new-class-go").click();
+  await teacher.waitForURL(/#\/class\/\d+$/);
+
+  // The built-in ones are there before any is used, marked as built-in.
+  await teacher.goto("/#/library");
+  const topDown = teacher.getByTestId("library-row").filter({ hasText: "Top-Down Adventure" });
+  await expect(topDown).toContainText("Built-in");
+  await expect(topDown).toContainText("Not used yet");
+
+  // Assigned from the Tutorials page: the library has it, linked to that assignment.
+  await teacher.goto("/#/tutorials");
+  await teacher.getByTestId("tutorial-card").filter({ hasText: "Top-Down Adventure" }).getByTestId("tutorial-assign").selectOption({ label: "Library P3" });
+  await teacher.waitForURL(/#\/assignment\/\w+$/);
+  await expect(teacher.getByTestId("tutorial-which")).toContainText("Top-Down Adventure");
+  await expect(teacher.getByTestId("tutorial-which")).toContainText("from a built-in tutorial");
+  // Its preview: no header, its checks counted and shown as checks.
+  const box = teacher.getByTestId("notes-editor");
+  await expect(box).not.toContainText("starter: topdown");
+  await expect(box).toContainText("Checks — Next waits for these");
+  await expect(box).not.toContainText(" 0 tests");
+  if (process.env.SHOT_DIR) await teacher.getByTestId("notes-editor").screenshot({ path: `${process.env.SHOT_DIR}/lib-box.png` });
+  await teacher.goto("/#/library");
+  await expect(teacher.getByTestId("library-row").filter({ hasText: "Top-Down Adventure" })).toContainText("1 assignment");
+  await expect(teacher.getByTestId("library-row").filter({ hasText: "Top-Down Adventure" })).toHaveCount(1); // the built-in and its row are one
+
+  // Many files at once from the computer.
+  await teacher.getByTestId("library-files").setInputFiles([
+    { name: "Mine.md", mimeType: "text/markdown", buffer: Buffer.from("---\ntitle: Mine\nlevel: Top-Down\nstarter: empty\n---\n# Mine\n\n```check\nobject Ball exists\n```\n\nhighlight: add-event\n") },
+  ]);
+  await expect(teacher.getByTestId("library-report")).toContainText("1 added");
+  const mine = teacher.getByTestId("library-row").filter({ hasText: "Mine" });
+  await expect(mine).toBeVisible();
+  if (process.env.SHOT_DIR) await teacher.screenshot({ path: `${process.env.SHOT_DIR}/lib-page.png` });
+
+  // Its editor: PresMaker, drawing the step's checks and spotlight in words.
+  await mine.getByTestId("library-edit").click();
+  await teacher.waitForURL(/\/teacher\/tutorials\/\w+\/edit$/);
+  // Its header, cut off as the first slide, is drawn as a title card…
+  await expect(teacher.locator("#stage")).toContainText("📘 Mine", { timeout: 15_000 });
+  await expect(teacher.locator("#stage")).not.toContainText("starter: empty");
+  // …and the step after it shows its checks and spotlight in words.
+  await teacher.locator("#p-next").click();
+  await expect(teacher.locator("#stage")).toContainText("Checks — Next waits for these");
+  if (process.env.SHOT_DIR) await teacher.screenshot({ path: `${process.env.SHOT_DIR}/lib-edit.png` });
+  await expect(teacher.locator("#stage")).toContainText("object Ball exists");
+  await expect(teacher.locator("#stage")).toContainText("Points at add-event");
+  await ctx.close();
 });

@@ -10,6 +10,7 @@ here touches the real one.
 """
 import base64
 import json
+import re
 import os
 import subprocess
 import sys
@@ -56,6 +57,17 @@ def client(email=None):
     if email:
         c.get("/dev/login?email=" + email)
     return c
+
+
+def set_notes(c, slug, text):
+    """An assignment's notes, written where they are written now: its
+    tutorial in the library (library.py), saved — and linked first, if it
+    has none."""
+    items = c.get("/api/library").get_json()["items"]
+    mine = next((i for i in items if any(u["url"].endswith("/" + slug) for u in i["uses"])), None)
+    if mine is None:
+        return c.post("/api/library", json={"body": text, "linkTo": slug})
+    return c.post("/api/library/" + mine["slug"], json={"body": text})
 
 
 def put(c, slug, data, base, packed=False):
@@ -491,7 +503,7 @@ B = r.get_json().get("slug")
 check("an assignment is copied to another class, with a link of its own", r.status_code == 201 and B != A)
 check("…with none of the students' work", teacher.get(f"/api/assignments/{B}").get_json()["rows"][0]["project"] is None)
 check("…only to the teacher's own classes", teacher.post(f"/api/assignments/{A}/copy", json={"class": PYCLASS}).status_code == 400)
-teacher.post(f"/api/assignments/{B}/notes", json={"notes": "```quiz\nOne?\nanswer: one\n```\n```tests\nuses for\n```"})
+set_notes(teacher, B, "```quiz\nOne?\nanswer: one\n```\n```tests\nuses for\n```")
 check("an assignment nobody turned in is deleted, notes and all", teacher.delete(f"/api/assignments/{B}").status_code == 200
       and teacher.get(f"/api/assignments/{B}").status_code == 404)
 teacher.post(f"/api/assignments/{A}", json={"archived": True})
@@ -879,10 +891,15 @@ uses keyboard_check
 """
 put(teacher, "nq1", project("nq1", "Notes game"), 0)
 N = teacher.post(f"/api/classes/{XC}/assignments", json={"title": "Coins with notes", "project": "nq1"}).get_json()["slug"]
-check("only the assignment's teacher writes its notes", other_teacher.post(f"/api/assignments/{N}/notes", json={"notes": NOTES}).status_code == 403
-      and xa.post(f"/api/assignments/{N}/notes", json={"notes": NOTES}).status_code == 403)
-r = teacher.post(f"/api/assignments/{N}/notes", json={"notes": NOTES}).get_json()
-check("notes are saved, and say what they're worth", r.get("possible") == 2 + 1 + 1 + 4 + 1 + 2 + 1, r)
+check("notes are written in the library, not on the assignment (the old route is gone)",
+      teacher.post(f"/api/assignments/{N}/notes", json={"notes": NOTES}).status_code in (404, 405))
+check("…and no one else can link their tutorial to it",
+      other_teacher.post("/api/library", json={"body": NOTES, "linkTo": N}).status_code == 201
+      and "SECRETSPRITE" not in teacher.get(f"/api/assignments/{N}").get_json()["notes"]
+      and xa.post("/api/library", json={"body": NOTES, "linkTo": N}).status_code == 403)
+r = set_notes(teacher, N, NOTES)
+check("notes are saved, and say what they're worth", r.status_code == 201
+      and teacher.get(f"/api/assignments/{N}").get_json().get("possible") == 2 + 1 + 1 + 4 + 1 + 2 + 1, r.status_code)
 check("the teacher's page has them whole", "SECRETSPRITE" in teacher.get(f"/api/assignments/{N}").get_json()["notes"])
 
 # The leak checks: every way a student reaches an assignment's notes.
@@ -984,7 +1001,7 @@ points: 4
 """
 put(teacher, "nq3", project("nq3", "Puzzles game"), 0)
 N3 = teacher.post(f"/api/classes/{XC}/assignments", json={"title": "Puzzles", "project": "nq3"}).get_json()["slug"]
-teacher.post(f"/api/assignments/{N3}/notes", json={"notes": PUZZLES})
+set_notes(teacher, N3, PUZZLES)
 xa.post(f"/api/assignments/{N3}/start")
 order_q, bug_q, sort_q = quizmod.keys(PUZZLES)
 seen3 = xa.get(f"/api/assignments/{N3}").get_data(as_text=True) + json.dumps(xa.get(f"/api/projects/{xa.post(f'/api/assignments/{N3}/start').get_json()['project']}/assignment").get_json())
@@ -1003,7 +1020,7 @@ check("…and every item in its group is all of it", r.get("correct") is True an
 PREDICT = "```quiz\ntype: predict\nWhat prints?\n~~~python\nprint(1)\nprint(2)\n~~~\nanswer: 1 PREDICTKEY\npoints: 2\n```\n"
 put(teacher, "nq4", project("nq4", "Predict game"), 0)
 N4 = teacher.post(f"/api/classes/{XC}/assignments", json={"title": "Predict", "project": "nq4"}).get_json()["slug"]
-teacher.post(f"/api/assignments/{N4}/notes", json={"notes": PREDICT})
+set_notes(teacher, N4, PREDICT)
 P4 = xa.post(f"/api/assignments/{N4}/start").get_json()["project"]
 seen4 = json.dumps(xa.get(f"/api/projects/{P4}/assignment").get_json()) + json.dumps(xa.get(f"/api/quiz/{N4}/mine").get_json())
 check("a predict question's output doesn't reach a student before they answer", "PREDICTKEY" not in seen4 and "print(2)" in seen4)
@@ -1047,7 +1064,7 @@ check("the student's class page shows the total", [i for i in xa.get(f"/api/clas
 # Full marks from the notes alone (no points set): the quest pays when everything is earned.
 put(teacher, "nq2", project("nq2", "Quiz only"), 0)
 N2 = teacher.post(f"/api/classes/{XC}/assignments", json={"title": "Just a question", "project": "nq2"}).get_json()["slug"]
-teacher.post(f"/api/assignments/{N2}/notes", json={"notes": "```quiz\nOne?\nanswer: one\n```"})
+set_notes(teacher, N2, "```quiz\nOne?\nanswer: one\n```")
 teacher.post(f"/api/assignments/{N2}/xp-bonus", json={"xp": 25})
 qid2 = quizmod.keys("```quiz\nOne?\nanswer: one\n```")[0]["qid"]
 before = xb.get("/api/me/xp").get_json()["xp"]
@@ -1055,26 +1072,89 @@ xb.post(f"/api/assignments/{N2}/start")
 r = xb.post("/api/quiz/answer", json={"assignment": N2, "question": qid2, "response": "one"}).get_json()
 check("with no points set, earning everything in the notes is full marks, and pays the quest", r.get("xp", 0) >= 25 + xp.XP_PER_POINT, r)
 
+# ---------------------------------------------------------------- the tutorial library (library.py)
+import tutorials as _tm  # noqa: E402
+
+# A built-in tutorial is the teacher's own row the first time they use it
+# (origin builtin:<name>): asking again finds the same one.
+TD_MD = _tm.builtin("top-down")
+b1 = teacher.post("/api/library", json={"origin": "builtin:top-down", "title": "Top-Down Adventure", "body": TD_MD}).get_json()["slug"]
+b2 = teacher.post("/api/library", json={"origin": "builtin:top-down", "title": "Top-Down Adventure", "body": TD_MD}).get_json()["slug"]
+check("a built-in taken into the library is one row, however often it's asked for", b1 == b2)
+mine = [i for i in teacher.get("/api/library").get_json()["items"] if i["slug"] == b1][0]
+check("…marked where it came from", mine["origin"] == "builtin:top-down" and mine["title"] == "Top-Down Adventure", mine)
+check("a made-up origin is refused", teacher.post("/api/library", json={"origin": "builtin:../x", "body": "x"}).status_code == 400
+      and teacher.post("/api/library", json={"origin": "elsewhere:x", "body": "x"}).status_code == 400)
+
+# An assignment made from a built-in before the library: its notes are the
+# built-in word for word, so the import links it to the teacher's row for it.
+put(teacher, "lb1", project("lb1", "Old built-in"), 0)
+OLDB = teacher.post(f"/api/classes/{XC}/assignments", json={"title": "Old visual novel", "project": "lb1"}).get_json()["slug"]
+VN_MD = _tm.builtin("visual-novel")
+db = server.SessionLocal()
+oa = db.query(accounts.Assignment).filter_by(slug=OLDB).one()
+oa.files, oa.tutorial_id = json.dumps({"notes.md": VN_MD}), None
+db.commit()
+db.close()
+items = teacher.get("/api/library").get_json()["items"]
+vn = [i for i in items if i["origin"] == "builtin:visual-novel"]
+check("notes that ARE a built-in are linked to the teacher's row for it", len(vn) == 1 and [u["title"] for u in vn[0]["uses"]] == ["Old visual novel"], vn)
+check("…named as the built-in", vn and vn[0]["title"] == "Visual Novel")
+r = teacher.get(f"/api/assignments/{OLDB}").get_json()
+check("the assignment's page says which tutorial it is, from a built-in",
+      r["tutorial"] and r["tutorial"]["slug"] == vn[0]["slug"] and r["tutorial"]["origin"] == "builtin:visual-novel", r.get("tutorial"))
+teacher.post("/api/library/" + vn[0]["slug"], json={"body": VN_MD + "\nMine now.\n"})
+check("editing it changes the teacher's assignment, never the built-in",
+      teacher.get(f"/api/assignments/{OLDB}").get_json()["notes"].endswith("Mine now.\n") and _tm.builtin("visual-novel") == VN_MD)
+
+# Tutorials written before the library (gameide_tutorials) move into it, slug and all.
+db = server.SessionLocal()
+tid = db.query(accounts.User).filter_by(email="teacher@example.com").one().id
+OLDT = "---\ntitle: Old tutorial\nlevel: Top-Down\nstarter: empty\n---\n# One\nHi\n---\n## Two\nBye"
+db.add(gamestore.Tutorial(slug="oldtutor1", owner_id=tid, title="Old tutorial", level="Top-Down", markdown=OLDT, visibility="classes"))
+db.commit()
+db.close()
+check("an old tutorial is in the library, with the slug students' progress names",
+      any(t["slug"] == "oldtutor1" for t in xa.get("/api/tutorials").get_json()["tutorials"])
+      and any(i["slug"] == "oldtutor1" and i["visibility"] == "classes" for i in teacher.get("/api/library").get_json()["items"]))
+check("…and opens by its old key", xa.get("/api/tutorials/oldtutor1").get_json().get("markdown") == OLDT)
+check("…moved once", sum(1 for i in teacher.get("/api/library").get_json()["items"] if i["slug"] == "oldtutor1") == 1)
+r = teacher.get("/teacher/tutorials")
+check("the library's page is GameIDE's own (React)", r.status_code == 302 and r.headers["Location"].endswith("/#/library"))
+r = teacher.get("/teacher/tutorials/oldtutor1/edit")
+html = r.get_data(as_text=True)
+check("its editor is PresMaker, drawing GameIDE's checks and spotlights",
+      r.status_code == 200 and "window.PM_SERVER" in html and "Checks — Next waits for these" in html and re.search(r'"testsFence":\s*"check"', html), r.status_code)
+
 # ---------------------------------------------------------------- tutorials (tutorials.py)
 import tutorials as tutmod  # noqa: E402
 
 TUT = "---\ntitle: Bounce\nlevel: Top-Down\nstarter: empty\n---\n# Start\nHello\n---\n## Make a ball\n```check\nobject Ball exists\n```\n---\n## Done\nYay"
-r = xa.post("/api/tutorials", json={"markdown": TUT})
+# Written in the tutorial library (library.py): /api/tutorials only reads them now.
+check("tutorials aren't written here any more", teacher.post("/api/tutorials", json={"markdown": TUT}).status_code in (404, 405))
+r = xa.post("/api/library", json={"body": TUT})
 check("only a teacher writes a tutorial", r.status_code == 403)
-check("a tutorial needs its header", teacher.post("/api/tutorials", json={"markdown": "# no header"}).status_code == 400)
-check("only an admin publishes one for everyone", teacher.post("/api/tutorials", json={"markdown": TUT, "visibility": "site"}).status_code == 400)
-TS = teacher.post("/api/tutorials", json={"markdown": TUT}).get_json()["slug"]
+NOHEAD = teacher.post("/api/library", json={"body": "# no header"}).get_json()["slug"]
+check("notes without a tutorial's header aren't a tutorial to follow",
+      NOHEAD not in [t["slug"] for t in teacher.get("/api/tutorials").get_json()["tutorials"]] and teacher.get(f"/api/tutorials/{NOHEAD}").status_code == 404)
+TS = teacher.post("/api/library", json={"body": TUT}).get_json()["slug"]
+check("only an admin publishes one for everyone", teacher.post(f"/api/library/{TS}", json={"visibility": "site"}).status_code == 400)
 listed = {t["slug"]: t for t in teacher.get("/api/tutorials").get_json()["tutorials"]}
 check("a teacher's tutorial is listed for them, with its steps", listed.get(TS, {}).get("steps") == 3 and listed[TS]["level"] == "Top-Down", listed.get(TS))
 check("…private at first: not for their students", TS not in [t["slug"] for t in xa.get("/api/tutorials").get_json()["tutorials"]]
       and xa.get(f"/api/tutorials/{TS}").status_code == 404)
-check("only its author changes it", other_teacher.post(f"/api/tutorials/{TS}", json={"markdown": TUT, "visibility": "classes"}).status_code == 403)
-teacher.post(f"/api/tutorials/{TS}", json={"markdown": TUT, "visibility": "classes"})
+check("only its author changes it", other_teacher.post(f"/api/library/{TS}", json={"visibility": "classes"}).status_code == 404)
+teacher.post(f"/api/library/{TS}", json={"visibility": "classes"})
 check("shared with classes, the author's students see it", TS in [t["slug"] for t in xa.get("/api/tutorials").get_json()["tutorials"]]
       and "Make a ball" in xa.get(f"/api/tutorials/{TS}").get_json().get("markdown", ""))
 check("…and nobody else", TS not in [t["slug"] for t in bob.get("/api/tutorials").get_json()["tutorials"]] and bob.get(f"/api/tutorials/{TS}").status_code == 404)
-check("an admin can publish it for everyone", admin.post(f"/api/tutorials/{TS}", json={"markdown": TUT, "visibility": "site"}).status_code == 200
-      and TS in [t["slug"] for t in anon.get("/api/tutorials").get_json()["tutorials"]])
+# A teacher who is an admin publishes their own for everyone (the library
+# edits a teacher's own tutorials only).
+os.environ["ADMIN_EMAILS"] = "admin@example.com,teacher@example.com"
+TADM = teacher.post("/api/library", json={"body": TUT.replace("Bounce", "Bounce for all")}).get_json()["slug"]
+check("an admin can publish it for everyone", teacher.post(f"/api/library/{TADM}", json={"visibility": "site"}).status_code == 200
+      and TADM in [t["slug"] for t in anon.get("/api/tutorials").get_json()["tutorials"]])
+os.environ["ADMIN_EMAILS"] = "admin@example.com"
 
 # XP for steps: once each, only steps with checks, and a bonus at the end.
 before = xa.get("/api/me/xp").get_json()["xp"]
@@ -1085,15 +1165,19 @@ last = len(tutmod.steps_of(tutmod.builtin("first-game"))) - 1
 check("finishing pays its bonus", xa.post("/api/tutorials/step", json={"key": "builtin:first-game", "step": last}).get_json().get("xp") == xp.ALL_ANSWERED_XP)
 check("a step that isn't there is refused", xa.post("/api/tutorials/step", json={"key": "builtin:first-game", "step": last + 1}).status_code == 400)
 check("…and a tutorial that isn't, however its name is spelled", xa.post("/api/tutorials/step", json={"key": "builtin:../tutorials/first-game", "step": 1}).status_code == 404)
-teacher.post(f"/api/tutorials/{TS}", json={"markdown": TUT, "visibility": "private"})
+teacher.post(f"/api/library/{TS}", json={"visibility": "private"})
 check("a private tutorial pays no one else", bob.post("/api/tutorials/step", json={"key": "t:" + TS, "step": 1}).status_code == 404)
 check("teachers earn nothing from tutorials", teacher.post("/api/tutorials/step", json={"key": "builtin:first-game", "step": 2}).get_json().get("xp") == 0)
 
 # A tutorial assigned to a class: an assignment whose notes are the tutorial.
 put(teacher, "tg1", project("tg1", "Tutorial start"), 0)
-r = teacher.post(f"/api/classes/{XC}/assignments", json={"title": "Bounce", "project": "tg1", "notes": TUT})
+r = teacher.post(f"/api/classes/{XC}/assignments", json={"title": "Bounce", "project": "tg1", "tutorial": TS})
 TA = r.get_json().get("slug")
 check("assigning a tutorial makes an assignment whose notes are the tutorial", r.status_code == 201 and teacher.get(f"/api/assignments/{TA}").get_json()["notes"] == TUT)
+check("…linked to it in the library", any(u["url"].endswith("/" + TA) for i in teacher.get("/api/library").get_json()["items"] if i["slug"] == TS for u in i["uses"]))
+THEIRS = other_teacher.post("/api/library", json={"body": TUT}).get_json()["slug"]
+check("…only from the teacher's own library", teacher.post(f"/api/classes/{XC}/assignments",
+      json={"title": "Not mine", "project": "tg1", "tutorial": THEIRS}).status_code == 404)
 check("…its checks are what Check all checks", [t["label"] for t in teacher.get(f"/api/assignments/{TA}").get_json()["tests"]] == ["object Ball exists"])
 check("…the assignment's tutorial pays only those who have it", xc.post("/api/tutorials/step", json={"key": "a:" + TA, "step": 1}).status_code == 404)
 TP = xc.post(f"/api/assignments/{TA}/start").get_json()["project"]

@@ -53,6 +53,7 @@ from sqlalchemy import func
 import accounts
 import gamestore
 import grades
+import library
 import notes
 import quiz
 import rewards
@@ -608,15 +609,17 @@ def new_assignment(class_id):
             return err(problem or problem2, 400)
         starter = copy_project(db, src, user, f"{title} (starter)")
         a = _make_assignment(db, user, course, title, starter, out_of, due_at)
-        # A tutorial assigned to the class arrives with its notes: the tutorial.
-        text = str(body.get("notes") or "")
-        if text:
-            if len(text) > notes.MAX_NOTES:
-                return err("Those notes are too long.", 413)
-            a.files = json.dumps({grades.NOTES: text})
         db.commit()
-        if text:
-            notes.store_quiz_keys(db, a, text)
+        # A tutorial assigned to the class: linked to it in the library
+        # (library.py), which writes it in as the assignment's notes and keeps
+        # it in step from then on — the library is the only place notes change.
+        slug = str(body.get("tutorial") or "")
+        if slug:
+            item = (db.query(accounts.LibraryItem)
+                    .filter_by(slug=slug[:16], app=APP_NAME, teacher_id=user.id, kind="tutorial", archived=0).first())
+            if item is None:
+                return err("That tutorial isn't in your library.", 404)
+            library.link(db, item, a)
         return jsonify(slug=a.slug, starter=starter.slug), 201
     finally:
         db.close()
@@ -721,6 +724,14 @@ def assignment_results(slug):
     try:
         user = _need_teacher(db)
         a = _own_assignment(db, user, slug)
+        # Its tutorial, from the library (library.py) — the only place notes
+        # are edited; notes from before it are taken in first.
+        library.import_existing(db, user)
+        db.refresh(a)
+        box = library.tutorial_box(db, user, a)
+        tut = box["tutorial"]
+        tutorial = ({"slug": tut.slug, "title": tut.title, "others": box["tutorial_others"], "origin": tut.origin}
+                    if tut is not None else None)
         item, g = _item_of(db, a), _game_of(db, a)
         course = db.query(accounts.Course).filter_by(id=item.class_id).first() if item else None
         roster = db.query(accounts.Enrollment).filter_by(class_id=course.id).all() if course else []
@@ -800,6 +811,7 @@ def assignment_results(slug):
         post = db.query(accounts.ClassroomPost).filter_by(assignment_id=a.id).first()
         return jsonify(slug=a.slug, title=a.title, outOf=a.out_of, dueAt=_iso(g.due_at if g else None),
                        xpBonus=a.xp_bonus or 0, notes=grades.notes_of(a), possible=grades.possible(a),
+                       tutorial=tutorial, tutorialChoices=box["tutorial_choices"],
                        questions=len(grades.quiz_possible(a)), tests=grades.tests_of(a),
                        archived=bool(a.archived), hidden=bool(item and item.hidden),
                        classId=course.id if course else None, className=course.name if course else "",

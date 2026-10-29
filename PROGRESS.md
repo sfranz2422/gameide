@@ -1,5 +1,13 @@
 # Progress
 
+## The tutorial library, in GameIDE (2026-10-29, waiting for review)
+- **#/library**: every tutorial, the built-ins included (marked), with where each is used; New, Upload (same title replaces, links kept), Link to…, Edit, who can follow it, Duplicate, Download, Delete. The server is library.py, the same file as the three other editors'.
+- **The only place tutorials change**: the assignment page's notes editor is a read-only Tutorial box (which tutorial, from a built-in or not, how many other assignments share it, the students' view, and its unreadable checks and spotlights flagged); the old tutorial editor and the notes route are gone.
+- **Built-ins**: using one makes the teacher's own row for it, and assignments from it link there; old assignments whose notes are a built-in word for word are linked to it; editing changes the teacher's, never the built-in.
+- **Teachers' old tutorials** moved into the library with their slugs, so students' progress still finds them.
+- **Its editor is PresMaker on the web**, with GameIDE's ```check blocks and highlight: lines drawn in words, the header as a title card, and + Tests writing ```check lines.
+- Tests: test_server.py (built-in rows, the import by built-in, editing never touching the built-in, the move of old tutorials, the redirect and the editor page), tutorials.spec.ts (the library page, assigning a built-in, upload, PresMaker drawing checks, a copy edited and saved in PresMaker, questions counted when assigned), notes.spec.ts through the library. 6 sabotage cases, all caught (one first missed: removing a line broke the build instead).
+
 ## Questions in tutorials; a teacher's own copy; the markdown as a file (2026-10-29, waiting for review)
 - **Questions in tutorials**: a ```quiz block in a step shows and is answered there, as in notes (and ```cards too). It never holds Next: a step's checks do. Assigned, it is marked against the key kept from the assignment's notes, one try, counted in the grade and paid XP. Played on its own (a built-in tutorial, or a teacher's not assigned), it's practice: marked by the new `/api/quiz/practice` from the question itself, any number of tries, kept nowhere. The marking is shared with `/api/quiz/answer` (`notes._clean_response`).
 - **An assigned tutorial follows the assignment's notes.** A student's game still named the tutorial it was made from, and the editor read that one, so nothing a teacher changed on the assignment's page reached the class (and the student got a copy with the answers in). The assignment comes first now.

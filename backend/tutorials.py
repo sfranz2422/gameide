@@ -164,9 +164,9 @@ def _can_see(db, user, t):
         return True
     if user is None:
         return False
-    if t.owner_id == user.id or _is_admin(user):
+    if t.teacher_id == user.id or _is_admin(user):
         return True
-    return t.visibility == "classes" and t.owner_id in _teachers_of(db, user)
+    return t.visibility == "classes" and t.teacher_id in _teachers_of(db, user)
 
 
 def markdown_for(db, user, key):
@@ -175,8 +175,8 @@ def markdown_for(db, user, key):
     if kind == "builtin":
         return builtin(rest)
     if kind == "t":
-        t = db.query(Tutorial).filter_by(slug=rest[:16]).first()
-        return t.markdown if t is not None and _can_see(db, user, t) else None
+        t = _row(db, rest)
+        return t.body if t is not None and _can_see(db, user, t) else None
     if kind == "a" and user is not None:
         a = db.query(accounts.Assignment).filter_by(slug=rest[:16], app=APP_NAME).first()
         if a is None:
@@ -187,10 +187,45 @@ def markdown_for(db, user, key):
 
 
 def _out(db, t, user):
-    owner = db.query(accounts.User).filter_by(id=t.owner_id).first()
-    return {"slug": t.slug, "key": "t:" + t.slug, **meta(t.markdown), "visibility": t.visibility,
-            "owner": owner.display_name() if owner else "", "mine": user is not None and t.owner_id == user.id,
+    owner = db.query(accounts.User).filter_by(id=t.teacher_id).first()
+    return {"slug": t.slug, "key": "t:" + t.slug, **meta(t.body), "visibility": t.visibility,
+            "owner": owner.display_name() if owner else "", "mine": user is not None and t.teacher_id == user.id,
+            "origin": t.origin,
             "updated": t.updated_at.isoformat() + ("Z" if t.updated_at.tzinfo is None else "")}
+
+
+# ---------------------------------------------------------------- kept in the library
+
+def _rows():
+    """Teachers' tutorials: rows of the tutorial library (library.py), which
+    is where they're written and edited. A row is a tutorial to follow (on
+    the Tutorials page) when it has a tutorial's header; plain notes taken in
+    from an assignment are in the library but not on these shelves."""
+    L = accounts.LibraryItem
+    return L.app == APP_NAME, L.kind == "tutorial", L.archived == 0
+
+
+def _row(db, slug):
+    t = db.query(accounts.LibraryItem).filter(accounts.LibraryItem.slug == str(slug)[:16], *_rows()).first()
+    return t if t is not None and is_tutorial(t.body) else None
+
+
+def migrate(db):
+    """Tutorials written before the library (gameide_tutorials) move into it,
+    each keeping its slug, so a student's progress (t:<slug>) still finds it.
+    Once each: a row already in the library is left alone."""
+    have = {s for (s,) in db.query(accounts.LibraryItem.slug).filter(accounts.LibraryItem.app == APP_NAME)}
+    moved = 0
+    for t in db.query(Tutorial).all():
+        if t.slug in have:
+            continue
+        db.add(accounts.LibraryItem(slug=t.slug, app=APP_NAME, teacher_id=t.owner_id, kind="tutorial", title=t.title,
+                                    body=t.markdown, size=len(t.markdown.encode("utf-8")), visibility=t.visibility,
+                                    created_at=t.created_at, updated_at=t.updated_at))
+        moved += 1
+    if moved:
+        db.commit()
+    return moved
 
 
 # ---------------------------------------------------------------- routes
@@ -202,15 +237,18 @@ def list_tutorials():
     db = _db()
     try:
         user = _current_user(db)
-        rows = db.query(Tutorial).filter(Tutorial.visibility == "site").all()
+        migrate(db)
+        L = accounts.LibraryItem
+        rows = db.query(L).filter(L.visibility == "site", *_rows()).all()
         if user is not None:
-            rows += db.query(Tutorial).filter(Tutorial.owner_id == user.id).all()
+            rows += db.query(L).filter(L.teacher_id == user.id, *_rows()).all()
             teachers = _teachers_of(db, user)
             if teachers:
-                rows += db.query(Tutorial).filter(Tutorial.visibility == "classes", Tutorial.owner_id.in_(teachers)).all()
+                rows += db.query(L).filter(L.visibility == "classes", L.teacher_id.in_(teachers), *_rows()).all()
         seen, out = set(), []
         for t in sorted(rows, key=lambda t: t.title.lower()):
-            if t.id not in seen:
+            # Plain notes taken in from an assignment aren't tutorials to follow.
+            if t.id not in seen and is_tutorial(t.body):
                 seen.add(t.id)
                 out.append(_out(db, t, user))
         return jsonify(tutorials=out, teacher=_is_teacher(user), admin=_is_admin(user))
@@ -223,86 +261,18 @@ def get_tutorial(slug):
     db = _db()
     try:
         user = _current_user(db)
-        t = db.query(Tutorial).filter_by(slug=slug[:16]).first()
+        migrate(db)
+        t = _row(db, slug)
         if t is None or not _can_see(db, user, t):
             return err("There's no tutorial here.", 404)
-        return jsonify(markdown=t.markdown, **_out(db, t, user))
+        return jsonify(markdown=t.body, **_out(db, t, user))
     finally:
         db.close()
 
 
-def _clean(db, user, body, t=None):
-    """(fields, problem) for a tutorial a teacher sent."""
-    md = str(body.get("markdown") or "")
-    if len(md) > MAX_TUTORIAL:
-        return None, "That tutorial is too long (%d characters at most)." % MAX_TUTORIAL
-    if not is_tutorial(md):
-        return None, "A tutorial starts with a header: a line of ---, then title: and the rest, then another ---."
-    vis = str(body.get("visibility") or (t.visibility if t else "private"))
-    if vis not in VISIBILITIES:
-        return None, "Choose who can see it."
-    if vis == "site" and not _is_admin(user) and not (t is not None and t.visibility == "site"):
-        return None, "Only an admin can publish a tutorial for everyone."
-    m = meta(md)
-    return {"markdown": md, "visibility": vis, "title": m["title"][:200], "level": m["level"][:60]}, ""
-
-
-@bp.post("/api/tutorials")
-def new_tutorial():
-    db = _db()
-    try:
-        user = _need_user(db)
-        if not _is_teacher(user):
-            return err("Only a teacher can write a tutorial.", 403)
-        fields, problem = _clean(db, user, request.get_json(silent=True) or {})
-        if problem:
-            return err(problem, 400)
-        t = Tutorial(slug=accounts.new_id(db, Tutorial), owner_id=user.id, **fields)
-        db.add(t)
-        db.commit()
-        return jsonify(slug=t.slug), 201
-    finally:
-        db.close()
-
-
-def _own(db, user, slug):
-    t = db.query(Tutorial).filter_by(slug=slug[:16]).first()
-    if t is None:
-        fail("There's no tutorial here.", 404)
-    if t.owner_id != user.id and not _is_admin(user):
-        fail("That's someone else's tutorial.", 403)
-    return t
-
-
-@bp.post("/api/tutorials/<slug>")
-def update_tutorial(slug):
-    db = _db()
-    try:
-        user = _need_user(db)
-        t = _own(db, user, slug)
-        fields, problem = _clean(db, user, request.get_json(silent=True) or {}, t)
-        if problem:
-            return err(problem, 400)
-        for k, v in fields.items():
-            setattr(t, k, v)
-        t.updated_at = now()
-        db.commit()
-        return jsonify(ok=True)
-    finally:
-        db.close()
-
-
-@bp.delete("/api/tutorials/<slug>")
-def delete_tutorial(slug):
-    """Students' games keep their progress; the tutorial just can't be opened any more."""
-    db = _db()
-    try:
-        user = _need_user(db)
-        db.delete(_own(db, user, slug))
-        db.commit()
-        return jsonify(ok=True)
-    finally:
-        db.close()
+# Writing, changing and deleting tutorials is the library's (library.py,
+# /api/library): the one place a tutorial's text changes. These routes only
+# read them, for following.
 
 
 @bp.post("/api/tutorials/step")

@@ -489,3 +489,31 @@ Comments explain *why*, especially where the reason is a bug that already
 happened. Say so in a comment when something fails silently — a stale view,
 a misspelt event name, a draw call outside `on_draw` — because silent
 failure is what students can't debug.
+
+## The tutorial library (2026-10-29)
+
+`backend/library.py` is **the same file as PyIDE's, WebIDE's and FlaskIDE's**
+(like `accounts.py`): a teacher's tutorials, kept once (`library_items`) and
+linked to any number of assignments (`Assignment.tutorial_id`), written
+through into each linked assignment's `notes.md` on every save. **It is the
+only place a tutorial's text is edited** (the teacher's call): the assignment
+page shows a read-only Tutorial box (`TutorialBox`, TeacherNotes.tsx), the
+old `#/tutorials/edit` page and `/api/assignments/<slug>/notes` are gone, and
+`/api/tutorials` only reads. Its page is React's (`#/library`, LibraryPage.tsx;
+`/teacher/tutorials` redirects there); its editor is PresMaker on the web
+(`backend/templates/presmaker.html` and `frontend/public/static/`, MADE by
+`tools/sync_presmaker.sh` from `~/presMaker/web` with PyIDE's notes.js — never
+edit them here). The `gameide` adapter in that page draws ```check blocks and
+`highlight:` lines in words, and its + Tests writes ```check lines (unchecked
+there: only checks.ts reads GameIDE's words, so the Tutorial box flags the
+ones it can't read).
+
+**Built-ins are in every teacher's library.** One not yet used is listed from
+`index.json`; using it (Assign, Edit, Link) makes the teacher's own row
+(`origin = "builtin:<name>"`, `library.builtin_row`), and every assignment
+made from it links to that row, so changing it changes theirs and never the
+built-in. Notes that are a built-in word for word (assignments from before the
+library) are linked to that row by the import (app.py's `known` hook). Teachers'
+tutorials from `gameide_tutorials` were moved into `library_items` with their
+slugs (`tutorials.migrate`), so `t:<slug>` still finds them; visibility
+(private / classes / site) lives on the library row.

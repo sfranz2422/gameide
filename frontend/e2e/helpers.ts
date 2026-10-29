@@ -66,3 +66,21 @@ export async function placeInRoom(page: Page, room: string, object: string, x: n
   await page.mouse.click(p.x, p.y);
   await page.getByTestId("tool-select").click();
 }
+
+/**
+ * An assignment's notes, written where they are written now: its tutorial in
+ * the library (library.py) — saved, or made and linked if it has none — then
+ * the page reloaded to show them. The page must be on the assignment's own.
+ */
+export async function setNotes(page: Page, text: string) {
+  await page.waitForURL(/#\/assignment\/\w+$/);
+  const slug = page.url().split("/").pop()!;
+  const items = (await (await page.request.get("/api/library")).json()).items as { slug: string; uses: { url: string }[] }[];
+  const mine = items.find((i) => i.uses.some((u) => u.url.endsWith("/" + slug)));
+  const r = mine
+    ? await page.request.post(`/api/library/${mine.slug}`, { data: { body: text } })
+    : await page.request.post("/api/library", { data: { body: text, linkTo: slug } });
+  if (!r.ok()) throw new Error(`The library didn't take the notes: ${r.status()} ${await r.text()}`);
+  await page.reload();
+  return slug;
+}

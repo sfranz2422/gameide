@@ -16,7 +16,7 @@ import { CommentsDialog, whenText } from "./AssignmentBits";
 import { useSession } from "./session";
 import { SiteNav } from "./SiteNav";
 import { ClassBoard, XpCard } from "../xp/XpPages";
-import { CheckAll, NotesEditor } from "../notes/TeacherNotes";
+import { CheckAll, TutorialBox, type LinkedTutorial } from "../notes/TeacherNotes";
 import { Fragment } from "react";
 import DOMPurify from "dompurify";
 import { Icon } from "./ui/icons";
@@ -747,6 +747,9 @@ interface Results {
   title: string;
   xpBonus: number;
   notes: string;
+  /** Its tutorial in the library (library.py), and the teacher's others to choose from. */
+  tutorial: LinkedTutorial | null;
+  tutorialChoices: { slug: string; title: string }[];
   possible: number;
   questions: number;
   tests: { label: string; points: number }[];
@@ -851,7 +854,7 @@ export function AssignmentPage({ slug }: { slug: string }) {
           title="The notes students read in their editor's Notes tab: instructions, slides, questions, tests and spotlights"
           data-testid="go-to-notes"
         >
-          ✎ Notes
+          ✎ Tutorial
         </button>
         <button
           className="btn small"
@@ -1088,7 +1091,7 @@ export function AssignmentPage({ slug }: { slug: string }) {
           ))}
         </tbody>
       </table>
-      <NotesEditor slug={slug} notes={data.notes} onSaved={load} />
+      <TutorialBox slug={slug} notes={data.notes} tutorial={data.tutorial} choices={data.tutorialChoices ?? []} onChanged={load} />
       {talking?.project && (
         <CommentsDialog
           projectId={talking.project}

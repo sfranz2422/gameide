@@ -1,13 +1,13 @@
 /**
  * The teacher's side of an assignment's notes, on its results page:
  *
- *   NotesEditor  write the notes — markdown, `---` for slides, ```quiz
- *                questions, ```tests — with the students' view beside it
+ *   TutorialBox  which library tutorial its notes are, what students see,
+ *                and the way to edit it (the library, the only place)
  *   CheckAll     run the tests on what every student turned in, in a game
  *                hidden on this page, and send each result: the one that
  *                counts toward the grade (backend/notes.py, tests_verify)
  */
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { api } from "../store/api";
 import { GameHost } from "../editor/gameHost";
 import { buildGame } from "../python/codegen";
@@ -18,102 +18,138 @@ import { hostRunner, type HostWatch } from "../checks/hostRunner";
 import type { GameState } from "../python/protocol";
 import { pieces, parseQuiz, slides, takeAnimate } from "./quiz";
 import { FlipCards, renderMarkdown } from "./NotesPane";
-import { takeHighlight, unknownHighlights } from "../tutorials/tutorial";
+import { isTutorial, splitHeader, takeHighlight, unknownHighlights } from "../tutorials/tutorial";
 
-const EXAMPLE = `# Collect the coins
+/** An assignment's tutorial, as library.py says (GET /api/assignments/<slug>). */
+export interface LinkedTutorial {
+  slug: string;
+  title: string;
+  /** Other assignments using it: editing it changes them too. */
+  others: number;
+  origin: string;
+}
 
-Make the player move with the arrow keys, and pick up every coin.
-
----
-
-## A question
-
-\`\`\`quiz
-Which function says whether a key is held down?
-- [x] keyboard_check
-- [ ] keyboard_check_pressed
-- [ ] key_down
-\`\`\`
-
----
-
-## Checks
-
-\`\`\`tests
-object Player exists
-Player has event step
-Player.step uses keyboard_check
-after 1 second holding right, Player.x increased (2 points)
-\`\`\`
-`;
-
-export function NotesEditor({ slug, notes, onSaved }: { slug: string; notes: string; onSaved: () => void }) {
-  const [text, setText] = useState(notes);
-  const [saved, setSaved] = useState(notes);
+/**
+ * The assignment's tutorial: which one it is, what students see, and the
+ * way to the library — the only place a tutorial's text is edited (the
+ * teacher's call: no second editor, so nothing overwrites it). Its checks
+ * and spotlights are read here, by GameIDE's own reader, because the
+ * library's editor (PresMaker) doesn't know GameIDE's words.
+ */
+export function TutorialBox({ slug, notes, tutorial, choices, onChanged }: {
+  slug: string;
+  notes: string;
+  tutorial: LinkedTutorial | null;
+  choices: { slug: string; title: string }[];
+  onChanged: () => void;
+}) {
   const [problem, setProblem] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  useEffect(() => {
-    setText(notes);
-    setSaved(notes);
-  }, [notes]);
-  const deck = useMemo(() => slides(text), [text]);
+  const text = notes;
+  // A tutorial's header (title:, level:…) is how it's listed, not something
+  // students read; its ```check lines are its tests, as much as ```tests ones.
+  const body = useMemo(() => (isTutorial(text) ? splitHeader(text).body : text), [text]);
+  const deck = useMemo(() => slides(body), [body]);
   // The whole notes at once, as written: an `animate:` line is how they play, not something to show.
-  const parts = useMemo(() => pieces(takeHighlight(takeAnimate(text).body).md), [text]);
+  const parts = useMemo(() => pieces(takeHighlight(takeAnimate(body).body).md, ["tests", "check"]), [body]);
   const badSpots = useMemo(() => unknownHighlights(text), [text]);
   const questions = parts.filter((p) => p.type === "quiz").length;
-  const unknown = useMemo(() => allTests(text).filter((t) => readCheck(t.label).kind === "unknown"), [text]);
-  const save = async () => {
+  const tests = useMemo(() => [...allTests(text), ...allTests(text, "check")], [text]);
+  const unknown = tests.filter((t) => readCheck(t.label).kind === "unknown");
+  const act = async (f: () => Promise<unknown>) => {
     setBusy(true);
     setProblem(null);
     try {
-      await api(`/api/assignments/${slug}/notes`, { json: { notes: text } });
-      setSaved(text);
-      onSaved();
+      await f();
+      onChanged();
     } catch (e) {
       setProblem(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
     }
   };
+  const link = (to: string) => act(() => api(`/api/library/${to}/link`, { json: { link: [slug] } }));
+  const unlink = () =>
+    confirm("Unlink it? Its notes stay as they are now, as this assignment's own, and changes to the tutorial won't reach it any more.") &&
+    void act(() => api(`/api/library/${tutorial!.slug}/link`, { json: { unlink: [slug] } }));
+  const fresh = () =>
+    void act(async () => {
+      const r = await api<{ slug: string }>("/api/library", { json: { title: "Notes", body: "# Notes\n\n", linkTo: slug } });
+      location.href = `/teacher/tutorials/${r.slug}/edit`;
+    });
   return (
-    <section className="class-section notes-editor" data-testid="notes-editor">
-      <h2>Notes</h2>
-      <p className="muted small">
-        What students see in their editor's Notes tab. Markdown; a line of <code>---</code> starts a new slide. A <code>```quiz</code> block is a question (one try,
-        marked at once); a <code>```tests</code> block is checks their game must pass; a line <code>highlight: add-event</code> spotlights that part of the
-        editor while the slide is open (<a href="#/help/checks">the names</a>). <code>animate: words</code> as the first line plays each slide a part at a time,
-        a line of <code>...</code> between parts, and <code>:::pop</code> … <code>:::</code> makes what's between stand out (<a href="#/help/animate">how</a>). The answers never leave the server.
-      </p>
-      <div className="notes-editor-cols">
-        <div>
-          <textarea value={text} onChange={(e) => setText(e.target.value)} rows={18} spellCheck={false} aria-label="Notes" data-testid="notes-source" />
-          <div className="row">
-            <button className="btn go" disabled={busy || text === saved} onClick={() => void save()} data-testid="notes-save">
-              {text === saved ? "Saved" : "Save notes"}
-            </button>
-            {!text.trim() && (
-              <button className="btn small" onClick={() => setText(EXAMPLE)}>
-                Start from an example
-              </button>
-            )}
-            <span className="muted small">
-              {deck.length ? `${deck.length} slides · ` : ""}
-              {questions} question{questions === 1 ? "" : "s"} · {allTests(text).length} test{allTests(text).length === 1 ? "" : "s"}
+    <section className="class-section notes-editor tutorial-box" data-testid="notes-editor">
+      <h2>Tutorial</h2>
+      {tutorial ? (
+        <p data-testid="tutorial-which">
+          <b>{tutorial.title}</b>
+          {tutorial.origin.startsWith("builtin:") && <span className="muted"> (from a built-in tutorial)</span>}
+          {tutorial.others > 0 && (
+            <span className="muted">
+              {" "}
+              · also in {tutorial.others} other assignment{tutorial.others === 1 ? "" : "s"}: editing it changes them all
             </span>
-          </div>
-          {unknown.length > 0 && (
-            <p className="banner warn small">
-              GameIDE can't read {unknown.length === 1 ? "this check" : "these checks"}: {unknown.map((t) => `"${t.label}"`).join(", ")}. See{" "}
-              <a href="#/help/checks">the checks it knows</a>.
-            </p>
           )}
-          {badSpots.length > 0 && (
-            <p className="banner warn small" data-testid="notes-bad-highlight">
-              There's nothing called {badSpots.map((h) => `"${h}"`).join(", ")} to spotlight. See <a href="#/help/checks">the names</a>.
-            </p>
-          )}
-          {problem && <p className="error-text">{problem}</p>}
-        </div>
+        </p>
+      ) : (
+        <p className="muted" data-testid="tutorial-which">
+          {text.trim() ? "Its notes are its own (not linked to a tutorial)." : "No tutorial yet: students get no notes."}
+        </p>
+      )}
+      <div className="row">
+        {tutorial ? (
+          <a className="btn go" href={`/teacher/tutorials/${tutorial.slug}/edit`} data-testid="tutorial-edit">
+            Edit in library
+          </a>
+        ) : (
+          <button className="btn go" disabled={busy} onClick={fresh} data-testid="tutorial-new">
+            New tutorial
+          </button>
+        )}
+        <select
+          className="small-select"
+          value=""
+          disabled={busy}
+          onChange={(e) => e.target.value && void link(e.target.value)}
+          aria-label={tutorial ? "Use another tutorial" : "Use a tutorial from the library"}
+          data-testid="tutorial-choose"
+        >
+          <option value="">{tutorial ? "Use another…" : "Use one from the library…"}</option>
+          {choices
+            .filter((c) => c.slug !== tutorial?.slug)
+            .map((c) => (
+              <option key={c.slug} value={c.slug}>
+                {c.title}
+              </option>
+            ))}
+        </select>
+        {tutorial && (
+          <button className="btn small" disabled={busy} onClick={unlink} data-testid="tutorial-unlink"
+            title="Keep the notes as they are now, as this assignment's own: changes to the tutorial won't reach it">
+            Unlink
+          </button>
+        )}
+        <a className="btn small" href="#/library">
+          All tutorials
+        </a>
+        <span className="muted small">
+          {deck.length ? `${deck.length} slides · ` : ""}
+          {questions} question{questions === 1 ? "" : "s"} · {tests.length} test{tests.length === 1 ? "" : "s"}
+        </span>
+      </div>
+      {unknown.length > 0 && (
+        <p className="banner warn small">
+          GameIDE can't read {unknown.length === 1 ? "this check" : "these checks"}: {unknown.map((t) => `"${t.label}"`).join(", ")}. See{" "}
+          <a href="#/help/checks">the checks it knows</a>.
+        </p>
+      )}
+      {badSpots.length > 0 && (
+        <p className="banner warn small" data-testid="notes-bad-highlight">
+          There's nothing called {badSpots.map((h) => `"${h}"`).join(", ")} to spotlight. See <a href="#/help/checks">the names</a>.
+        </p>
+      )}
+      {problem && <p className="error-text">{problem}</p>}
+      {text.trim() && (
         <div className="notes-preview" aria-label="What students see">
           {parts.map((p, i) =>
             p.type === "md" ? (
@@ -127,7 +163,7 @@ export function NotesEditor({ slug, notes, onSaved }: { slug: string; notes: str
               <FlipCards key={i} body={p.body} />
             ) : (
               <div key={i} className="tests-card">
-                <b>Tests</b>
+                <b>{p.type === "tests" && p.kind === "check" ? "Checks — Next waits for these" : "Tests"}</b>
                 <ul className="tests-list">
                   {allTests("```tests\n" + p.body + "\n```").map((t) => (
                     <li key={t.label} className={readCheck(t.label).kind === "unknown" ? "fail" : ""}>
@@ -140,7 +176,7 @@ export function NotesEditor({ slug, notes, onSaved }: { slug: string; notes: str
             ),
           )}
         </div>
-      </div>
+      )}
     </section>
   );
 }

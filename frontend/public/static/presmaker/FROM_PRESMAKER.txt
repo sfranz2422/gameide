@@ -1,0 +1,2 @@
+Copied from ~/presMaker/web by tools/sync_presmaker.py. Edit PresMaker, then sync.
+9af540c 2026-10-29 Tests as lines: the IDE says which fence (GameIDE's ```check) and whether its lines are checked here

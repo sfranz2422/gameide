@@ -1,0 +1,3404 @@
+/* Dark is the base palette. Light is defined once, below, and applied either
+   by an explicit choice (data-theme) or by the computer's own setting. */
+:root {
+  --bg: #0e0e0e;
+  --bg-panel: #181818;
+  --bg-head: #1f1f1f;
+  --line: #2f2f2f;
+  --text: #ececec;
+  --muted: #9b9b9b;
+  --accent: #ef5a70;
+  --accent-hover: #f47d8e;
+  --on-accent: #ffffff;
+  /* The school's crimson, for fills with white text on them: buttons, the
+     bar's stripe, pills. --accent is the same colour in light, and lighter
+     in dark, where #BA0C30 as text is too dim to read (about 2.9:1). */
+  --brand: #ba0c30;
+  --brand-hover: #960a27;
+  --on-brand: #ffffff;
+  --green: #3ecf8e;
+  --green-hover: #35b87d;
+  --on-green: #0d2b1e;
+  --red: #ff6b6b;
+
+  --amber: #f0b429;
+  --on-red: #3a0d0d;
+  --purple: #b79cff;
+
+  --hover-bg: #222222;
+  --hover-line: #4a4a4a;
+  --sprite-hover: #241418;
+  --banner-bg: #2a1015;
+  --banner-line: #5a1a26;
+  --banner-text: #f3c9d0;
+  --chip-game-bg: #221d38;
+  --chip-game-line: #3d3560;
+  --check-a: #151515;
+  --check-b: #1b1b1b;
+  --shadow: rgba(0, 0, 0, .45);
+
+  --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --bar-h: 56px;
+  --code-size: 14px;   /* editor + output only; the chrome never scales */
+
+  color-scheme: dark;
+}
+
+/* Light. Accent and status colours are darkened so they stay legible on a
+   classroom projector, which washes contrast out badly. */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg: #ffffff;
+    --bg-panel: #f4f4f4;
+    --bg-head: #ebebeb;
+    --line: #d6d6d6;
+    --text: #141414;
+    --muted: #5e5e5e;
+    --accent: #ba0c30;
+    --accent-hover: #960a27;
+    --on-accent: #ffffff;
+    --green: #15803d;
+    --green-hover: #126c34;
+    --on-green: #ffffff;
+    --red: #b91c1c;
+
+    --amber: #b45309;
+    --on-red: #ffffff;
+    --purple: #6b21a8;
+
+    --hover-bg: #ececec;
+    --hover-line: #a6a6a6;
+    --sprite-hover: #fbeaed;
+    --banner-bg: #fbeaed;
+    --banner-line: #eab4be;
+    --banner-text: #6e0a1e;
+    --chip-game-bg: #f0e9fb;
+    --chip-game-line: #cdb6ea;
+    --check-a: #ececec;
+    --check-b: #e2e2e2;
+    --shadow: rgba(24, 34, 54, .18);
+
+    color-scheme: light;
+  }
+}
+
+:root[data-theme="light"] {
+  --bg: #ffffff;
+  --bg-panel: #f4f4f4;
+  --bg-head: #ebebeb;
+  --line: #d6d6d6;
+  --text: #141414;
+  --muted: #5e5e5e;
+  --accent: #ba0c30;
+  --accent-hover: #960a27;
+  --on-accent: #ffffff;
+  --green: #15803d;
+  --green-hover: #126c34;
+  --on-green: #ffffff;
+  --red: #b91c1c;
+
+  --amber: #b45309;
+  --on-red: #ffffff;
+  --purple: #6b21a8;
+
+  --hover-bg: #ececec;
+  --hover-line: #a6a6a6;
+  --sprite-hover: #fbeaed;
+  --banner-bg: #fbeaed;
+  --banner-line: #eab4be;
+  --banner-text: #6e0a1e;
+  --chip-game-bg: #f0e9fb;
+  --chip-game-line: #cdb6ea;
+  --check-a: #ececec;
+  --check-b: #e2e2e2;
+  --shadow: rgba(24, 34, 54, .18);
+
+  color-scheme: light;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  overflow: hidden;
+}
+
+/* ------------------------------------------------------------------- bar */
+.bar {
+  height: var(--bar-h);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 16px;
+  background: var(--bg-head);
+  border-bottom: 1px solid var(--line);
+}
+
+.brand {
+  font-weight: 650;
+  font-size: 15px;
+  letter-spacing: .2px;
+  white-space: nowrap;
+}
+.logo { margin-right: 4px; }
+
+.meta {
+  display: flex;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.field {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--text);
+  padding: 7px 10px;
+  font: inherit;
+  font-size: 13px;
+  min-width: 0;
+}
+.field:focus { outline: none; border-color: var(--accent); }
+.field::placeholder { color: var(--muted); }
+.field[readonly] { opacity: .7; }
+.field-bad {
+  border-color: var(--red);
+  box-shadow: 0 0 0 3px rgba(255, 107, 107, .18);
+}
+.field-bad:focus { border-color: var(--red); }
+.field-title { flex: 1 1 260px; max-width: 340px; }
+.field-author { flex: 0 1 160px; }
+
+.actions { display: flex; gap: 8px; }
+
+/* "Hide code" — turns Share into a demo link. Deliberately understated: it
+   sits next to Share rather than announcing itself, and reads as a modifier
+   to the button beside it rather than as an action of its own. */
+.hidecode {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 4px 0 2px;
+  color: var(--muted);
+  font-size: 12.5px;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+}
+.hidecode input { accent-color: var(--accent); cursor: pointer; margin: 0; }
+.hidecode:hover { color: var(--text); }
+.hidecode[hidden] { display: none; }
+
+/* In the share-ask dialog it is the one question, so it reads as text. */
+.share-hide { font-size: 13.5px; color: var(--text); white-space: normal; }
+.modal-actions { margin-top: 20px; }
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--text);
+  padding: 8px 14px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.btn:hover:not(:disabled) { border-color: var(--hover-line); background: var(--hover-bg); }
+.btn:disabled { opacity: .5; cursor: default; }
+/* .btn sets display, which would otherwise beat the browser's [hidden] rule */
+.btn[hidden] { display: none; }
+
+.btn-run {
+  background: var(--green);
+  border-color: var(--green);
+  color: var(--on-green);
+  font-weight: 650;
+  min-width: 104px;
+  justify-content: center;
+}
+.btn-run:hover:not(:disabled) { background: var(--green-hover); border-color: var(--green-hover); }
+.btn-icon { font-size: 11px; }
+
+.btn-icon-only {
+  padding: 8px 11px;
+  font-size: 15px;
+  line-height: 1;
+}
+
+/* Code text size. Deliberately separate from browser zoom, which blows the
+   toolbar up along with the code. */
+.stepper {
+  display: inline-flex;
+  align-items: stretch;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+.step {
+  background: none;
+  border: 0;
+  color: var(--text);
+  font: inherit;
+  font-size: 15px;
+  line-height: 1;
+  padding: 0 10px;
+  cursor: pointer;
+}
+.step:hover:not(:disabled) { background: var(--hover-bg); }
+.step:disabled { opacity: .35; cursor: default; }
+
+.step-value {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  border-left: 1px solid var(--line);
+  border-right: 1px solid var(--line);
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.btn-stop {
+  background: var(--red);
+  border-color: var(--red);
+  color: var(--on-red);
+  font-weight: 650;
+}
+.btn-stop:hover:not(:disabled) { filter: brightness(1.08); }
+.btn-stop[hidden] { display: none; }
+
+.btn-primary {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: var(--on-brand);
+  font-weight: 600;
+}
+.btn-primary:hover:not(:disabled) {
+  background: var(--brand-hover);
+  border-color: var(--brand-hover);
+}
+
+/* ---------------------------------------------------------------- banner */
+.banner {
+  background: var(--banner-bg);
+  border-bottom: 1px solid var(--banner-line);
+  color: var(--banner-text);
+  font-size: 13px;
+  padding: 9px 16px;
+}
+.banner strong { color: var(--text); }
+
+/* ----------------------------------------------------------------- panes */
+.split {
+  display: flex;
+  height: calc(100% - var(--bar-h));
+  min-height: 0;
+}
+.banner ~ .split { height: calc(100% - var(--bar-h) - 37px); }
+
+.pane {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+.pane-editor { flex: 1 1 58%; border-right: 1px solid var(--line); }
+.pane-right { flex: 1 1 42%; background: var(--bg-panel); }
+/* The notes, the editor's third column (index.html). With it up the three
+   share the width; hidden, the editor and the output grow back into it —
+   flex-grow even when a handle gave one a width of its own, or a dragged
+   output column would leave a gap where the notes were. */
+.pane-notes { flex: 1 1 30%; background: var(--bg-panel); border-left: 1px solid var(--line); }
+.pane-notes[hidden] { display: none; }
+.split:has(> .pane-notes:not([hidden])) > .pane-editor { flex-basis: 40%; }
+.split:has(> .pane-notes:not([hidden])) > .pane-right { flex-basis: 30%; }
+.split:not(:has(> .pane-notes:not([hidden]))) > .pane-right { flex-grow: 1 !important; }
+.pane-notes > .pane-head { flex-wrap: wrap; gap: 4px 10px; }
+.pane-notes > .pane-head .notes-close { margin-left: auto; }
+.pane-notes > .notes-body { flex: 1 1 0; min-height: 0; overflow-y: auto; }
+
+.pane-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .4px;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: var(--bg-head);
+  border-bottom: 1px solid var(--line);
+}
+.hint { text-transform: none; font-weight: 400; letter-spacing: 0; }
+
+/* ------------------------------------------------------------ file tabs */
+.pane-head-tabs { padding: 0 12px 0 0; gap: 8px; }
+
+.tabs {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  min-width: 0;
+}
+
+.tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  background: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0;
+  text-transform: none;
+  padding: 9px 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.tab:hover { color: var(--text); background: var(--hover-bg); }
+.tab-on {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+  background: var(--bg-panel);
+}
+
+.tab-x {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  border-radius: 3px;
+  font-size: 14px;
+  line-height: 1;
+  color: var(--muted);
+}
+.tab-x:hover { background: var(--red); color: var(--on-red); }
+
+.linkbtn {
+  background: none;
+  border: 0;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .4px;
+  text-transform: uppercase;
+  cursor: pointer;
+  padding: 0;
+}
+.linkbtn:hover { color: var(--text); }
+
+/* ---------------------------------------------------------------- editor */
+.editor-wrap {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.editor-wrap .CodeMirror {
+  position: absolute;
+  inset: 0;
+  height: 100%;
+  font-family: var(--mono);
+  font-size: var(--code-size);
+  line-height: 1.6;
+}
+.CodeMirror-gutters { border-right: 1px solid var(--line); }
+
+/* CodeMirror's built-in light theme, retuned for a projector. Its own comment
+   colour (#a50) only reaches 5.2:1 on white; #7a3e00 reaches 8.3:1, and the
+   operator purple is darkened for the same reason. */
+.cm-s-default { background: var(--bg); color: var(--text); }
+.cm-s-default .CodeMirror-gutters { background: var(--bg); }
+.cm-s-default .CodeMirror-linenumber { color: var(--muted); }
+.cm-s-default .CodeMirror-cursor { border-left-color: var(--text); }
+.cm-s-default .CodeMirror-selected { background: #cfe0fb; }
+.cm-s-default.CodeMirror-focused .CodeMirror-selected { background: #b9d3f8; }
+.cm-s-default .CodeMirror-activeline-background { background: #eef3fb; }
+.cm-s-default .cm-comment { color: #7a3e00; }
+.cm-s-default .cm-operator { color: #6b21a8; }
+
+/* material-darker renders comments and line numbers at #545454, only 2.1:1
+   against its own background — close to invisible, and lesson code is full of
+   explanatory comments. Lifted to 5.7:1. */
+.cm-s-material-darker .cm-comment { color: #909d90; }
+.cm-s-material-darker .CodeMirror-linenumber { color: #8b9499; }
+
+/* ---------------------------------------------------------------- output */
+.output {
+  flex: 1;
+  margin: 0;
+  padding: 14px;
+  overflow: auto;
+  font-family: var(--mono);
+  font-size: var(--code-size);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--text);
+}
+.output .err { color: var(--red); }
+.output .slide-head { font-weight: 700; }
+.output .dim { color: var(--muted); }
+/* plt.show(). On its own line, inside the pane however narrow; the white is
+   matplotlib's own figure background, kept so a chart reads the same in a
+   dark theme as in the textbook. Width is set from the image (runtime.js). */
+.output img.chart { display: block; max-width: 100%; height: auto;
+                    margin: 6px 0; border-radius: 4px; background: #fff; }
+
+/* ------------------------------------------------- typing into the output */
+/* input() reads here rather than in a browser dialog, so the question, the
+   answer and everything printed around them share one transcript.
+
+   The field has to be invisible as a control and identical as text: same
+   font, same size, same colour, sitting on the prompt line with no box around
+   it. Anything else and the line the student types looks unlike the line that
+   appears a moment later when it becomes output. */
+.askline { display: inline; }
+
+input.ask {
+  font: inherit;
+  font-family: var(--mono);
+  font-size: var(--code-size);
+  line-height: inherit;
+  color: var(--text);
+  background: none;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  margin: 0;
+  outline: none;
+  /* wide enough for a sentence, but it is an inline element on a wrapping
+     line, so it gives way rather than forcing a horizontal scrollbar */
+  width: 22ch;
+  max-width: 100%;
+  caret-color: var(--green);
+}
+input.ask::selection { background: var(--brand); color: #fff; }
+
+/* A hairline under the field. Without a border it is genuinely invisible when
+   unfocused, and a student who clicked into the editor and came back would
+   have nothing showing them where the program is waiting. */
+input.ask { box-shadow: inset 0 -1px 0 var(--line); }
+input.ask:focus { box-shadow: inset 0 -1px 0 var(--accent); }
+
+/* Committed input: the same text, now ordinary output. No underline, nothing
+   to click, indistinguishable from a line the program printed itself. */
+.output .typed { color: var(--text); }
+
+/* ------------------------------------------------------------ mode chip */
+.mode {
+  align-self: center;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--muted);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .5px;
+  text-transform: uppercase;
+  padding: 5px 11px;
+  /* No cursor: pointer and no :hover — this reports the mode, it does not
+     set it, and a chip that lights up under the mouse is a chip students
+     will click and then wait for something to happen. */
+  white-space: nowrap;
+}
+.mode-console { color: var(--muted); }
+.mode-game { color: var(--purple); border-color: var(--chip-game-line); background: var(--chip-game-bg); }
+
+/* --------------------------------------------------------------- stage */
+.stage {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 auto;
+  border-bottom: 1px solid var(--line);
+}
+.stage[hidden] { display: none; }
+
+.stage-frame {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  background:
+    repeating-conic-gradient(var(--check-a) 0% 25%, var(--check-b) 0% 50%) 50% / 18px 18px;
+}
+#canvas {
+  max-width: 100%;
+  height: auto;
+  background: #000;
+  border-radius: 4px;
+  box-shadow: 0 4px 18px var(--shadow);
+  image-rendering: pixelated;
+}
+#canvas:focus { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+/* In game mode the output pane becomes a log strip under the picture. */
+body.is-game .pane-right .output { flex: 1 1 auto; min-height: 90px; }
+
+/* ------------------------------------------------------------- demo page */
+/* What a "hide my code" link opens. There is no editor pane to place beside
+   the output, because there is no editor on that page at all — not hidden,
+   not read-only, absent — so the output takes the full width. */
+.demo-main {
+  display: flex;
+  height: calc(100% - var(--bar-h));
+  min-height: 0;
+}
+.demo-main .pane-right { flex: 1 1 100%; }
+
+/* A GAME IS THE PAGE. On a demo link, and on /play (the editor's New tab),
+ * there is no code and no notes to share the column with, so the game takes
+ * all of it and the output is a strip underneath. demo.js's fitCanvas sizes
+ * the canvas to the largest that fits — up as well as down, which CSS's
+ * max-width alone cannot do — keeping the game's own shape. These rules are
+ * also what keeps the editor's 40vh cap (below) off this page: with it, the
+ * game had the top half of the tab and an empty output the bottom half. */
+body.is-demo.is-game .stage { flex: 1 1 0; min-height: 0; }
+body.is-demo.is-game .stage-frame { flex: 1 1 0; min-height: 0; overflow: hidden; }
+body.is-demo.is-game .pane-right #canvas { max-height: none; }
+body.is-demo.is-game .pane-right #output-view { flex: 0 0 110px; min-height: 0; }
+
+/* Full screen is the stage alone: no heading, no checkerboard, black round
+ * the game. */
+.stage:fullscreen { background: #000; border: 0; }
+.stage:fullscreen .pane-head { display: none; }
+.stage:fullscreen .stage-frame { padding: 0; background: #000; }
+.stage:fullscreen #canvas { border-radius: 0; box-shadow: none; outline: none; }
+
+/* ----------------------------------------------------- completion popup */
+/* show-hint.css hardcodes a white box with black text, which would be a
+   glaring rectangle in dark mode. Repaint it from the tokens. */
+.CodeMirror-hints {
+  background: var(--bg-panel);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  box-shadow: 0 6px 20px var(--shadow);
+  font-family: var(--mono);
+  font-size: calc(var(--code-size) * 0.92);
+  padding: 4px;
+  z-index: 40;
+}
+.CodeMirror-hint {
+  color: var(--text);
+  border-radius: 4px;
+  padding: 3px 9px;
+}
+li.CodeMirror-hint-active {
+  background: var(--brand);
+  color: var(--on-brand);
+}
+
+/* ---------------------------------------------------------------- notes */
+/* The right pane holds two views: program output, and rendered notes. Only
+   one is ever visible, and .subpane sets display, so [hidden] needs help. */
+.subpane {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.subpane[hidden] { display: none; }
+
+.notes-body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 20px 24px 32px;
+  min-height: 0;
+}
+
+/* Assignment notes can't be selected, so the code in them can't be copied
+   into the editor. Typing it out is most of the exercise.
+
+   Done by preventing selection rather than by policing paste: a paste filter
+   would have to guess where text came from, and would block a student who
+   typed the starter code correctly and then copied their own line. This has no
+   such failure — it removes the shortcut without ever getting in the way of
+   someone doing the work.
+
+   It is a speed bump, not a lock. Developer tools will still show the text.
+   That is the same bargain as a demo link, and it stops the ordinary path.
+
+   Not while authoring: at `/` the notes are yours, and you may well want to
+   copy a line out of them. Every view a student sees — a share, a fork — is
+   covered. */
+body:not(.is-authoring) .notes-body {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Links stay usable: clicking one still works, and its text is the one thing
+   worth being able to lift out of the notes. */
+body:not(.is-authoring) .notes-body a {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+/* A short-answer box in the notes is the student's own typing. Under the
+   rule above, Safari will not let anyone type into it at all — the box
+   takes focus and every key does nothing, with no sign of why. */
+body:not(.is-authoring) .notes-body .quiz-text,
+.live-mirror .notes-body .quiz-text,
+body:not(.is-authoring) .notes-body .quiz-long-box,
+.live-mirror .notes-body .quiz-long-box,
+body:not(.is-authoring) .notes-body .quiz-blank,
+.live-mirror .notes-body .quiz-blank,
+body:not(.is-authoring) .notes-body .snippet-code,
+.live-mirror .notes-body .snippet-code,
+body:not(.is-authoring) .notes-body .snippet-guess,
+.live-mirror .notes-body .snippet-guess {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+/* Class notes are prose, so they get prose treatment rather than the
+   monospaced console look of the output pane. */
+.prose {
+  color: var(--text);
+  font-size: 15px;
+  line-height: 1.65;
+  max-width: 68ch;
+}
+.prose > :first-child { margin-top: 0; }
+.prose h1, .prose h2, .prose h3, .prose h4 {
+  line-height: 1.25;
+  margin: 1.6em 0 .5em;
+  text-wrap: balance;
+}
+.prose h1 { font-size: 1.7em; }
+.prose h2 { font-size: 1.35em; }
+.prose h3 { font-size: 1.15em; }
+.prose h4 { font-size: 1em; letter-spacing: .01em; }
+.prose h1, .prose h2 {
+  padding-bottom: .25em;
+  border-bottom: 1px solid var(--line);
+}
+.prose p, .prose ul, .prose ol, .prose blockquote { margin: 0 0 1em; }
+.prose ul, .prose ol { padding-left: 1.4em; }
+.prose li { margin: .25em 0; }
+.prose li > ul, .prose li > ol { margin: .25em 0; }
+
+.prose a { color: var(--accent); text-decoration: underline; }
+.prose a:hover { color: var(--accent-hover); }
+
+.prose code {
+  font-family: var(--mono);
+  font-size: .88em;
+  background: var(--hover-bg);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: .1em .35em;
+}
+.prose pre {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 12px 14px;
+  overflow-x: auto;
+  margin: 0 0 1em;
+}
+.prose pre code {
+  background: none;
+  border: 0;
+  padding: 0;
+  font-size: .92em;
+}
+
+.prose blockquote {
+  border-left: 3px solid var(--accent);
+  padding: .1em 0 .1em 1em;
+  color: var(--muted);
+}
+.prose hr { border: 0; border-top: 1px solid var(--line); margin: 1.8em 0; }
+
+.prose img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 6px;
+  display: block;
+  margin: .4em 0;
+}
+
+.prose table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0 0 1em;
+  font-size: .95em;
+}
+.prose th, .prose td {
+  border: 1px solid var(--line);
+  padding: 6px 10px;
+  text-align: left;
+}
+.prose th { background: var(--bg-head); font-weight: 600; }
+
+.prose kbd {
+  font-family: var(--mono);
+  font-size: .85em;
+  border: 1px solid var(--line);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  padding: .05em .4em;
+  background: var(--bg-head);
+}
+
+/* LESSONS (lesson.html, lesson_teacher.html): the notes are the page. The
+   slides fill the screen below the bar, read at a size that works from the
+   back of a room, with their ◀ ▶ bar along the bottom. */
+.lesson-main { display: flex; height: calc(100% - var(--bar-h)); min-height: 0; }
+.lesson-pane { flex: 1 1 auto; background: var(--bg-panel); }
+.lesson-pane[hidden] { display: none; }
+.lesson-body { font-size: 19px; line-height: 1.6; }
+.lesson-body > * { max-width: 920px; margin-left: auto; margin-right: auto; }
+.lesson-pane .notes-body { padding: 32px 28px 48px; }
+.lesson-pane .slide-nav { padding: 10px; }
+.lesson-pane .slide-btn { min-width: 64px; font-size: 16px; }
+/* Write: the markdown and the slides side by side. */
+.lesson-write { display: flex; flex: 1 1 auto; min-width: 0; }
+.lesson-write[hidden] { display: none; }
+.lesson-src-pane { flex: 1 1 50%; border-right: 1px solid var(--line); }
+.lesson-preview-pane { flex: 1 1 50%; background: var(--bg-panel); }
+.lesson-preview-pane .lesson-body { font-size: 16px; }
+.title-input { font: inherit; font-weight: 600; color: var(--text); background: transparent;
+               border: 1px solid transparent; border-radius: 6px; padding: 4px 8px;
+               min-width: 0; width: 100%; max-width: 420px; }
+.title-input:hover, .title-input:focus { border-color: var(--line); outline: none; }
+/* On the dashboard and the results page. */
+.kind-tag { font-size: 11px; text-transform: uppercase; letter-spacing: .5px;
+            color: var(--muted); border: 1px solid var(--line); border-radius: 4px;
+            padding: 0 5px; margin-left: 4px; }
+.lesson-answers { margin: 0 0 8px; padding-left: 22px; }
+.lesson-answers li { margin: 2px 0; }
+.lesson-answers .is-right { color: var(--green); }
+.lesson-answers .is-wrong { color: var(--red); }
+.lesson-answers .is-partial { color: var(--amber); }
+.lesson-answers li span, .lesson-answers li strong { color: var(--text); }
+@media (max-width: 760px) {
+  .lesson-write { flex-direction: column; }
+  .lesson-src-pane { border-right: 0; border-bottom: 1px solid var(--line); }
+  .lesson-body { font-size: 17px; }
+}
+
+/* The notes button(s) in the top bar (app.js, renderNotesButtons): pressed
+   while the notes are on show, like a tab that is open. */
+.notes-buttons { display: inline-flex; gap: 6px; }
+.notes-buttons:empty { display: none; }
+.notes-btn[aria-pressed="true"] { background: var(--brand); color: var(--on-brand);
+                                  border-color: var(--brand); }
+
+/* What goes in the brackets (sighint.js): small, dim, above the line, and
+   never in the way — it takes no clicks, so it cannot steal one meant for
+   the code under it. */
+.sig-hint { position: absolute; z-index: 20; pointer-events: none;
+            max-width: 520px; padding: 4px 8px; border-radius: 6px;
+            background: var(--bg-head); border: 1px solid var(--line);
+            box-shadow: 0 2px 8px var(--shadow);
+            font-family: var(--mono); font-size: 12px; line-height: 1.5;
+            color: var(--muted); white-space: nowrap; }
+.sig-hint b { color: var(--text); font-weight: 600; }
+.sig-kind { font-family: var(--sans); font-size: 11px; opacity: .8; }
+.sig-doc { font-family: var(--sans); font-size: 12px; white-space: normal; }
+
+/* The syntax card (syntax.js): it covers the output pane, where the result
+   of Run would have gone, so there is one message to read and not the
+   friendly one stacked on Python's raw one. Amber rather than red — the
+   program has not failed, Python just cannot read it yet. */
+.syntax-host { position: relative; }
+.syntax-card { position: absolute; inset: 8px; z-index: 30; overflow: auto;
+               padding: 14px 16px;
+               background: var(--bg-panel); color: var(--text);
+               border: 1px solid var(--line); border-left: 4px solid #e0a020;
+               border-radius: 8px; box-shadow: 0 6px 24px var(--shadow);
+               font-family: var(--sans); font-size: 15px; line-height: 1.5; }
+.syntax-head { display: flex; justify-content: space-between; align-items: center;
+               margin-bottom: 4px; }
+.syntax-x { border: 0; background: transparent; color: var(--muted); font-size: 20px;
+            line-height: 1; cursor: pointer; padding: 0 2px; }
+.syntax-x:hover { color: var(--text); }
+.syntax-say { margin: 0 0 8px; }
+.syntax-say code { font-family: var(--mono); font-size: .92em; padding: 0 .3em;
+                   border-radius: 4px; background: var(--bg-head); }
+.syntax-python { font-family: var(--mono); font-size: 12px; color: var(--muted);
+                 white-space: pre-wrap; word-break: break-word; }
+.syntax-bad-line { background: rgba(224, 160, 32, .16); }
+.syntax-bad-spot { border-bottom: 2px solid #e0a020; }
+
+/* ◀ 3 / 5 ▶ under slides (notes.js, slideView). Outside the part that
+   scrolls, so the arrows stay in one place however long the slide is. */
+.slide-nav { display: flex; align-items: center; justify-content: center; gap: 12px;
+             padding: 6px 10px; border-top: 1px solid var(--line);
+             background: var(--bg-head); flex: 0 0 auto; }
+.slide-nav[hidden] { display: none; }
+.slide-btn { min-width: 40px; }
+.slide-pos { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums;
+             min-width: 52px; text-align: center; }
+
+/* A question in the notes (notes.js, buildQuiz). A card, so it reads as
+   something to do rather than more to read. Right and wrong are a coloured
+   edge plus the words, never the colour alone. */
+.prose .quiz {
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--accent);
+  border-radius: 8px;
+  background: var(--bg-panel);
+  padding: 12px 14px;
+  margin: 0 0 1em;
+}
+.prose .quiz.quiz-right { border-left-color: var(--green); }
+/* The teacher's own copy, key still in it: marked apart from what a student
+   sees, so a preview is never mistaken for the real thing. */
+.prose .quiz.quiz-preview { border-left-color: var(--purple); }
+.prose .quiz.quiz-wrong { border-left-color: var(--red); }
+.prose .quiz.quiz-partial { border-left-color: var(--amber); }
+.quiz-partial .quiz-result { color: var(--amber); font-weight: 600; }
+.quiz-head { display: flex; justify-content: space-between; gap: 10px;
+             font-size: 12px; text-transform: uppercase; letter-spacing: .06em;
+             margin-bottom: 6px; }
+.quiz-label { font-weight: 600; color: var(--accent); }
+.quiz-prompt > :last-child { margin-bottom: 0; }
+.quiz-choices { display: flex; flex-direction: column; gap: 4px; margin: 10px 0 0; }
+.quiz-choice { display: flex; align-items: flex-start; gap: 8px; padding: 6px 8px;
+               border: 1px solid transparent; border-radius: 6px; cursor: pointer; }
+.quiz-choice:hover { background: var(--hover-bg); }
+.quiz-choice input { margin-top: 4px; }
+.quiz-choice.quiz-is-key { border-color: var(--green); }
+.quiz-text { width: 100%; max-width: 420px; margin-top: 10px; }
+.quiz-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+             margin-top: 10px; }
+.quiz-right .quiz-result { color: var(--green); font-weight: 600; }
+.quiz-wrong .quiz-result { color: var(--red); font-weight: 600; }
+.quiz-warn { color: var(--red); }
+.fb-quiz { white-space: nowrap; }
+
+/* A long response (notes.js, buildLong): a writing box with a toolbar of
+   five buttons, no more — bold, italic, underline and two lists are what a
+   paragraph answer needs, and every tag past those is stripped anyway. */
+.prose .quiz.quiz-long .quiz-prompt { margin-bottom: 2px; }
+.quiz-long-bar { display: flex; flex-wrap: wrap; gap: 4px; margin: 10px 0 0; }
+.quiz-long-bar[hidden] { display: none; }
+.quiz-tool { font: inherit; font-size: 13px; min-width: 32px; padding: 3px 8px;
+             border: 1px solid var(--line); border-bottom: none;
+             border-radius: 6px 6px 0 0; background: var(--bg); color: var(--text);
+             cursor: pointer; }
+.quiz-tool:hover { background: var(--hover-bg); }
+.quiz-tool-bold { font-weight: 700; }
+.quiz-tool-italic { font-style: italic; }
+.quiz-tool-underline { text-decoration: underline; }
+.quiz-long-box { min-height: 140px; max-height: 420px; overflow-y: auto;
+                 padding: 8px 10px; border: 1px solid var(--line);
+                 border-radius: 0 6px 6px 6px; background: var(--bg);
+                 color: var(--text); line-height: 1.5; cursor: text;
+                 white-space: pre-wrap; overflow-wrap: anywhere; }
+.quiz-long-box:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+.quiz-long-box:empty::before { content: attr(data-placeholder); color: var(--muted); }
+.quiz-long-locked .quiz-long-box { cursor: default; min-height: 0; }
+.quiz-long-locked .quiz-tool { cursor: default; opacity: .5; }
+.quiz-long-box ul, .quiz-long-box ol { margin: .3em 0; padding-left: 1.6em; }
+
+/* Put in order (type: order): a line of code per row, ▲ ▼ to move it, or
+   drag. The lines keep their own indentation (white-space: pre). */
+.quiz-order { list-style: none; margin: 10px 0 0; padding: 0; display: flex;
+              flex-direction: column; gap: 4px; }
+.quiz-order-row { display: flex; align-items: center; gap: 6px; padding: 4px 6px;
+                  border: 1px solid var(--line); border-radius: 6px; background: var(--bg); }
+.quiz-order-row[draggable="true"] { cursor: grab; }
+.quiz-order-line { flex: 1; white-space: pre; overflow-x: auto; }
+/* Lines of code here are rows, not inline code: no pill round each, and no
+   list indent before them (.prose's own ol and code rules would add both). */
+.prose .quiz-order { padding-left: 0; margin-left: 0; }
+.prose .quiz-order-line, .prose .quiz-bug-code { background: none; border: 0; padding: 0; font-size: 13px; }
+.quiz-order-btn, .quiz-bug-line, .quiz-sort-item, .flip-card {
+  font: inherit; color: inherit; cursor: pointer; }
+.quiz-order-btn { border: 1px solid var(--line); border-radius: 4px; background: var(--bg-panel);
+                  padding: 0 7px; line-height: 22px; }
+.quiz-order-btn:disabled { opacity: .35; cursor: default; }
+
+/* Find the bug (type: bug): the question's code, a button per line. */
+.quiz-bug { display: flex; flex-direction: column; margin: 8px 0; border: 1px solid var(--line);
+            border-radius: 6px; overflow: hidden; background: var(--bg); }
+.quiz-bug-line { display: flex; gap: 10px; text-align: left; border: 0; border-bottom: 1px solid var(--line);
+                 background: none; padding: 3px 8px; }
+.quiz-bug-line:last-child { border-bottom: 0; }
+.quiz-bug-line:hover:not(:disabled) { background: var(--hover-bg); }
+.quiz-bug-line:disabled { cursor: default; }
+.quiz-bug-num { color: var(--muted); min-width: 1.6em; text-align: right; font-family: var(--mono, monospace); }
+.quiz-bug-code { white-space: pre; background: none; }
+.quiz-bug-line.is-picked { background: color-mix(in srgb, var(--amber) 22%, transparent); }
+.quiz-bug-line.quiz-is-key { box-shadow: inset 4px 0 0 var(--green); }
+
+/* Sort into groups (type: sort): a tray of items and a box per group.
+   Click an item, then a group — or drag it there. */
+.quiz-sort { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin: 10px 0 0; }
+.quiz-sort-tray { grid-column: 1 / -1; }
+.quiz-sort-group, .quiz-sort-tray { border: 1px dashed var(--line); border-radius: 8px; padding: 6px 8px;
+                                    min-height: 64px; background: var(--bg); }
+.quiz-sort-group { border-style: solid; }
+.quiz-sort-group.is-target, .quiz-sort-tray.is-target { border-color: var(--accent); cursor: pointer; }
+.quiz-sort-head { font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 6px; }
+.quiz-sort-items { display: flex; flex-wrap: wrap; gap: 6px; }
+.quiz-sort-item { border: 1px solid var(--line); border-radius: 14px; background: var(--bg-panel); padding: 3px 10px; }
+.quiz-sort-item.is-picked { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 35%, transparent); }
+.quiz-sort-item:disabled { cursor: default; }
+
+/* Checklists: `- [ ] item` in notes, ticked and kept in this browser. */
+.prose li.task-item { list-style: none; margin-left: -1.3em; }
+.task-check { margin: 0 .5em 0 0; vertical-align: -2px; width: 16px; height: 16px; accent-color: var(--green); cursor: pointer; }
+.prose li.task-item.is-done { color: var(--muted); }
+.prose li.task-item.is-done > :not(ul):not(ol) { text-decoration: line-through; }
+
+/* Flip cards (```cards): the front, and a click turns it over. */
+.flip-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; margin: 0 0 1em; }
+.flip-card { position: relative; min-height: 96px; border: 1px solid var(--line); border-radius: 10px;
+             background: var(--bg-panel); padding: 12px; text-align: center; display: flex;
+             align-items: center; justify-content: center; transition: transform .35s; }
+.flip-card:hover { border-color: var(--accent); }
+.flip-card .flip-back { display: none; }
+.flip-card.is-flipped { background: color-mix(in srgb, var(--accent) 12%, var(--bg-panel)); transform: rotateY(360deg); }
+.flip-card.is-flipped .flip-front { display: none; }
+.flip-card.is-flipped .flip-back { display: block; }
+.flip-front { font-weight: 600; }
+
+/* Code in the notes that runs (snippets.js). */
+.snippet { border: 1px solid var(--line); border-radius: 8px; background: var(--bg-panel); margin: 0 0 1em; overflow: hidden; }
+.snippet-code { display: block; width: 100%; box-sizing: border-box; resize: vertical; border: 0;
+                border-bottom: 1px solid var(--line); background: var(--bg); color: var(--text);
+                font-family: var(--mono, ui-monospace, Menlo, Consolas, monospace); font-size: 13px;
+                line-height: 1.5; padding: 8px 10px; tab-size: 4; white-space: pre; }
+.snippet-code:focus { outline: 2px solid var(--accent); outline-offset: -2px; }
+.snippet-guess { display: block; width: calc(100% - 20px); margin: 8px 10px 0; }
+.snippet-bar { display: flex; align-items: center; gap: 10px; padding: 6px 10px; }
+.snippet-run { padding: 3px 12px; }
+.snippet-status.is-right { color: var(--green); font-weight: 600; }
+.snippet-status.is-wrong { color: var(--amber); font-weight: 600; }
+.snippet-out { margin: 0; border-top: 1px solid var(--line); background: var(--bg); padding: 8px 10px;
+               max-height: 260px; overflow: auto; white-space: pre-wrap; font-size: 13px; }
+.snippet-err { color: var(--red); }
+/* Notes played a section at a time (`animate:`, notes.js slideView). The
+   bar sits above the notes, outside the part that scrolls. Words still to
+   come are hidden with visibility, so the slide doesn't jump as they land. */
+.reveal-bar { display: flex; align-items: center; gap: 12px; padding: 8px 14px;
+              border-bottom: 1px solid var(--line); background: var(--bg-panel); }
+.reveal-bar[hidden] { display: none; }
+.reveal-play[hidden] { display: none; }
+.reveal-play:disabled { opacity: .55; cursor: default; }
+.reveal-hidden { visibility: hidden; }
+.reveal-start { margin-top: 1em; }
+.reveal-pop { animation: reveal-pop .5s ease-out; }
+@keyframes reveal-pop {
+  0% { transform: scale(.96); box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 55%, transparent); }
+  45% { transform: scale(1.02); box-shadow: 0 0 0 8px color-mix(in srgb, var(--accent) 25%, transparent); }
+  100% { transform: scale(1); box-shadow: 0 0 0 0 transparent; }
+}
+/* What the teacher wraps in :::pop (notes.js, wrapPops): a box that stands
+   out, played or not; played, it arrives with the pop above. */
+.prose .pop-box { border-left: 4px solid var(--accent); padding: 8px 12px; margin: 0 0 1em; border-radius: 8px;
+                  background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.prose .pop-box > :last-child { margin-bottom: 0; }
+.reveal-skip[hidden], .reveal-replay[hidden] { display: none; }
+/* A pause (`^`) in played notes: a place to wait, never shown. */
+.reveal-pause { display: none; }
+@media (prefers-reduced-motion: reduce) { .reveal-pop { animation: none; } }
+
+/* Predict the output (type: predict): a box for a few lines, then Run it. */
+.quiz-predict { display: block; max-width: none; font-family: var(--mono); resize: vertical; }
+.quiz-predict-run { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 10px; }
+/* display: flex would show it while still hidden: before an answer, that's the answer. */
+.quiz-predict-run[hidden] { display: none; }
+.quiz-predict-run .snippet-out { flex-basis: 100%; border: 1px solid var(--line); border-radius: 6px; }
+.snippet-frame { display: block; width: 100%; height: 220px; border: 0; border-top: 1px solid var(--line); background: #fff; }
+.quiz-long-box p { margin: 0 0 .5em; }
+.prose .quiz.quiz-marked { border-left-color: var(--green); }
+
+/* Waiting for the teacher: long responses turned in, not yet given points. */
+.needs-grading { display: inline-block; margin-left: 6px; padding: 1px 8px;
+                 border-radius: 999px; font-size: 12px; font-weight: 600;
+                 background: var(--brand); color: var(--on-brand); text-decoration: none;
+                 white-space: nowrap; vertical-align: middle; }
+.needs-grading[hidden] { display: none; }
+a.needs-grading:hover { filter: brightness(1.1); }
+.lesson-answers .long-answer { list-style: none; margin: 8px 0 12px -22px; }
+.long-answer-text { margin: 4px 0 6px; padding: 8px 10px; border: 1px solid var(--line);
+                    border-radius: 6px; background: var(--bg-panel); font-size: 14px;
+                    color: var(--text); max-height: 360px; overflow-y: auto; }
+.long-answer-text p { margin: 0 0 .5em; }
+.long-answer-text > :last-child { margin-bottom: 0; }
+.long-answer .la-score { width: 80px; }
+.long-answer.is-waiting .la-state { color: var(--accent); font-weight: 600; }
+#gc-topic[hidden], #gc-topic-note[hidden] { display: none; }
+.gc-link { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-top: 4px; }
+
+/* -------------------------------------------------------- sprite panel */
+.pane-sprites {
+  flex: 0 0 268px;
+  background: var(--bg-panel);
+  border-left: 1px solid var(--line);
+}
+.pane-sprites[hidden] { display: none; }
+
+.sprite-tools { padding: 10px 12px; border-bottom: 1px solid var(--line); }
+.sprite-tools .field { width: 100%; }
+
+.sprite-scroll { flex: 1 1 auto; overflow-y: auto; padding: 12px; min-height: 0; }
+
+.sprite-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.sprite {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 8px 4px 6px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  cursor: pointer;
+  font: inherit;
+}
+.sprite:hover { border-color: var(--accent); background: var(--sprite-hover); }
+.sprite:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.sprite[hidden] { display: none; }
+
+.sprite-img {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 44px;
+}
+.sprite-img img {
+  max-width: 100%;
+  max-height: 44px;
+  image-rendering: pixelated;
+}
+/* One frame of an animation strip, shown through a window the size of that
+   frame. The whole strip is inside, shifted to the left edge, so the cell
+   shows a standing character rather than nine tiny ones in a row.
+   `loading="lazy"` is why this is an <img> in a box and not a background
+   image: the dungeon pack is 142 pictures and most are off-screen. */
+.sprite-frame { display: block; overflow: hidden; }
+.sprite-frame img {
+  display: block;
+  max-width: none;
+  max-height: none;
+  image-rendering: pixelated;
+}
+
+/* A corner mark on anything that animates. */
+.sprite-anim {
+  position: absolute;
+  top: 3px;
+  right: 4px;
+  font-size: 9px;
+  line-height: 1;
+  color: var(--accent);
+}
+.sprite { position: relative; }
+
+/* The atlas is one big picture, not a grid cell — showing it at 44px would
+   make it a smudge. It gets the full width of the panel. */
+.atlas-card {
+  display: block;
+  width: 100%;
+  padding: 8px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+.atlas-card:hover { border-color: var(--accent); background: var(--sprite-hover); }
+.atlas-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.atlas-card[hidden] { display: none; }
+.atlas-card img {
+  display: block;
+  width: 100%;
+  border-radius: 4px;
+  image-rendering: pixelated;
+}
+.atlas-card .sprite-name { display: block; margin-top: 6px; }
+.atlas-note {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.sprite-section[hidden] { display: none; }
+.sprite-section:first-child .sprite-subhead { margin-top: 0; }
+
+.sprite-name {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--muted);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sprite:hover .sprite-name { color: var(--text); }
+
+.sprite-empty { padding: 18px 4px; font-size: 13px; }
+
+.sprite-subhead {
+  margin: 20px 0 8px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .5px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+.chip:hover { border-color: var(--accent); color: var(--text); }
+
+.sprite-foot {
+  margin: 0;
+  padding: 9px 12px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+
+/* ----------------------------------------------------------------- modal */
+.modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(6, 8, 12, .72);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 50;
+}
+.modal[hidden] { display: none; }
+
+.modal-card {
+  background: var(--bg-panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 26px;
+  width: 100%;
+  max-width: 480px;
+}
+.modal-card h2 { margin: 0 0 4px; font-size: 19px; }
+.modal-sub { margin: 0 0 18px; color: var(--muted); font-size: 13.5px; }
+.modal-note { margin: 14px 0 20px; color: var(--muted); font-size: 12.5px; line-height: 1.5; }
+
+.linkrow { display: flex; gap: 8px; }
+.linkrow input {
+  flex: 1;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--text);
+  padding: 9px 11px;
+  font-family: var(--mono);
+  font-size: 13px;
+  min-width: 0;
+}
+.linkrow input:focus { outline: none; border-color: var(--accent); }
+
+/* ---------------------------------------------------------------- mobile */
+@media (max-width: 860px) {
+  html, body { overflow: auto; }
+  .bar { height: auto; flex-wrap: wrap; padding: 10px 12px; gap: 10px; }
+  .meta { order: 3; width: 100%; }
+  .field-title, .field-author { flex: 1 1 auto; max-width: none; }
+  .split, .banner ~ .split { flex-direction: column; height: auto; }
+  .pane-editor { border-right: 0; border-bottom: 1px solid var(--line); }
+  .editor-wrap { height: 55vh; flex: 0 0 auto; }
+  .output { height: 35vh; }
+  .pane-sprites { flex: 0 0 auto; border-left: 0; border-top: 1px solid var(--line); }
+  .pane-notes { flex: 0 0 auto; border-left: 0; border-top: 1px solid var(--line); }
+  .pane-notes > .notes-body { max-height: 70vh; }
+  .sprite-scroll { max-height: 46vh; }
+  .sprite-grid { grid-template-columns: repeat(auto-fill, minmax(88px, 1fr)); }
+}
+
+/* ------------------------------------------------- signing in and saving */
+
+/* Whether the work is safe. Quiet when it is, because it almost always is —
+   the only state worth noticing is the one that says it isn't. */
+.savestate {
+  align-self: center;
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+  padding: 0 4px;
+  min-width: 68px;
+  text-align: right;
+}
+.savestate.busy { opacity: .7; }
+.savestate.bad { color: var(--red); font-weight: 600; }
+
+.account { position: relative; }
+.btn-account { max-width: 150px; overflow: hidden; text-overflow: ellipsis; }
+
+.menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  min-width: 170px;
+  background: var(--bg-panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px var(--shadow);
+  padding: 5px;
+  z-index: 60;
+}
+.menu[hidden] { display: none; }
+.menu-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: 0;
+  border-radius: 5px;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  padding: 8px 10px;
+  cursor: pointer;
+  text-decoration: none;
+}
+.menu-item:hover { background: var(--bg); }
+
+.banner-hint { background: var(--bg-panel); }
+
+.projects { max-height: 340px; overflow-y: auto; margin: 4px 0 18px; }
+.project-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  margin-bottom: 6px;
+}
+.project-row:hover { border-color: var(--accent); }
+.project-open {
+  flex: 1;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 14px;
+  padding: 10px 12px;
+  text-decoration: none;
+  color: var(--text);
+  min-width: 0;
+}
+.project-name { font-weight: 500; }
+.project-when { color: var(--muted); font-size: 12px; white-space: nowrap; }
+
+/* Quiet until you go looking for it, so nobody deletes a project on the way
+   to opening one. */
+.project-x {
+  background: none;
+  border: 0;
+  color: var(--muted);
+  font-size: 19px;
+  line-height: 1;
+  padding: 6px 12px 8px;
+  cursor: pointer;
+  opacity: .35;
+  border-radius: 6px;
+}
+.project-row:hover .project-x { opacity: 1; }
+.project-x:hover { color: var(--red); background: var(--bg); }
+
+.rowactions { white-space: nowrap; }
+.rowactions .linkbtn { margin-left: 12px; }
+.linkbtn.danger { color: var(--red); }
+
+/* ------------------------------------------------------ teacher's pages */
+.sheet {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 28px 24px 60px;
+  overflow-y: auto;
+  height: calc(100% - var(--bar-h));
+}
+.sheet h2 {
+  font-size: 15px;
+  letter-spacing: .3px;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 30px 0 12px;
+}
+.sheet .count {
+  color: var(--text);
+  background: var(--bg-panel);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 1px 9px;
+  font-size: 12px;
+  margin-left: 4px;
+}
+.pagetitle { font-weight: 600; }
+.whoami { align-self: center; color: var(--muted); font-size: 12.5px; }
+.brandlink { color: inherit; text-decoration: none; }
+
+.listing { width: 100%; border-collapse: collapse; font-size: 14px; }
+.listing th {
+  text-align: left;
+  font-size: 11.5px;
+  letter-spacing: .4px;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 600;
+  padding: 0 10px 8px;
+  border-bottom: 1px solid var(--line);
+}
+.listing td { padding: 12px 10px; border-bottom: 1px solid var(--line); }
+.listing tr:hover td { background: var(--bg-panel); }
+.listing a { color: var(--accent); text-decoration: none; }
+.listing a:hover { text-decoration: underline; }
+.listing .right { text-align: right; }
+.small { font-size: 12px; }
+
+.handout { border: 1px solid var(--line); border-radius: 9px; padding: 16px 18px; }
+.handout h2 { margin-top: 0; }
+.names { columns: 2; margin: 0; padding-left: 20px; color: var(--muted); font-size: 14px; }
+/* A student's My work page: one row per assignment, then their projects. */
+.turned-in { color: var(--green); font-weight: 500; }
+
+/* Feedback: the teacher writes it under each student, the student reads it
+ * under each assignment. pre-wrap on both ends, so paragraphs and any code
+ * quoted in a comment arrive the shape they were written. */
+.listing tr.fb-row td, .listing tr.fb-show td { padding-top: 0; }
+.listing tr.fb-row:hover td, .listing tr.fb-show:hover td { background: none; }
+.listing tr:has(+ .fb-row) td, .listing tr:has(+ .fb-show) td { border-bottom: 0; }
+.fb-text {
+  width: 100%;
+  min-height: 52px;
+  resize: vertical;
+  font: inherit;
+  font-size: 13.5px;
+  box-sizing: border-box;
+}
+.fb-foot { display: flex; align-items: center; gap: 10px; margin-top: 6px; }
+.fb-row.is-dirty .fb-state { color: var(--amber, var(--accent)); }
+.fb-again { color: var(--amber, var(--accent)); }
+.feedback {
+  border-left: 3px solid var(--accent);
+  background: var(--bg-panel);
+  border-radius: 0 6px 6px 0;
+  padding: 10px 14px;
+}
+.feedback-head { font-size: 12.5px; font-weight: 600; margin-bottom: 4px; }
+.feedback-body { white-space: pre-wrap; word-break: break-word; }
+.feedback-score { margin-bottom: 4px; }
+
+/* Grading on the teacher's assignment page: points, Classroom, and a score
+ * box beside each feedback box. */
+.grade-line { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.out-of, .fb-score { width: 76px; }
+.gc { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); }
+.gc p { margin: 6px 0; }
+/* one posted class per line */
+.gc-posts { list-style: none; margin: 0 0 8px; padding: 0 0 0 12px; }
+.gc-posts li { margin: 2px 0; }
+.fb-sync { color: var(--muted); }
+
+/* One tab per Classroom class the assignment was posted to. */
+.period-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 10px; }
+.period-tabs[hidden] { display: none; }
+.period-tab {
+  background: var(--bg-panel);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12.5px;
+  padding: 4px 12px;
+  cursor: pointer;
+}
+.period-tab:hover { color: var(--text); }
+.period-tab.is-on { border-color: var(--accent); color: var(--text); }
+.listing tr[hidden] { display: none; }
+.badge-new {
+  background: var(--brand);
+  color: var(--on-accent, #fff);
+  border-radius: 999px;
+  padding: 1px 8px;
+  font-size: 11px;
+  margin: 0 4px;
+}
+.my-assignments td:first-child,
+.my-projects td:first-child { width: 55%; }
+
+/* The dashboard's Google Classroom box: a panel like the handout link's. */
+.classroom { border: 1px solid var(--line); border-radius: 9px; padding: 4px 18px 14px; margin-top: 30px; }
+.classroom h2 { margin-top: 14px; }
+.classroom-off { margin-top: 8px; }
+
+/* The privacy page: a readable column, and headings as headings rather
+ * than the dashboard's small uppercase section labels. */
+.policy { max-width: 720px; line-height: 1.6; }
+.policy h1 { font-size: 24px; margin: 8px 0 4px; }
+.policy h2 { text-transform: none; letter-spacing: 0; color: var(--text); font-size: 17px; }
+.policy a { color: var(--accent); }
+
+.empty { text-align: center; padding: 60px 20px; color: var(--muted); }
+.empty h2 { text-transform: none; font-size: 20px; color: var(--text); }
+
+/* -------------------------------------------------------------- 404 page */
+.center {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  text-align: center;
+  padding: 24px;
+}
+.center h1 { margin: 0; font-size: 22px; }
+.center p { margin: 0; color: var(--muted); max-width: 40ch; line-height: 1.6; }
+
+/* ------------------------------------------------- the engine PyIDE serves */
+/* Ordinarily a footnote — which version is vendored, and whether PyPI has a
+   newer one. It only raises its voice when there is something to do. */
+.engine {
+  margin-top: 36px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.engine p { margin: 0 0 4px; }
+.engine p:last-child { margin-bottom: 0; }
+.engine code {
+  font-family: var(--mono);
+  font-size: 12px;
+  background: var(--bg-panel);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 1px 6px;
+}
+.engine-new {
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  padding: 12px 14px;
+  color: var(--text);
+  font-size: 13.5px;
+}
+
+/* Quiet buttons: present and reachable, and not competing with Run.
+   + Game and Support are both this — things wanted occasionally that should
+   never be hit by accident on the way to somewhere else. */
+.btn-quiet {
+  color: var(--muted);
+  border-color: transparent;
+  background: none;
+}
+.btn-quiet:hover {
+  color: var(--text);
+  background: var(--hover-bg);
+  border-color: var(--hover-line);
+}
+
+/* ------------------------------------------------- find and replace bar --
+ *
+ * CodeMirror's dialog addon brings its own colours, and the editor theme
+ * colours them again, so both light and dark read fine without help here.
+ * What it does not bring is a usable width: the search input computes to
+ * about 130px, which is four or five characters of a search term with the
+ * rest scrolled out of sight. Everything below is size, not colour. */
+.CodeMirror-dialog {
+  padding: .4rem .7rem;
+  font-size: .95em;
+}
+.CodeMirror-dialog input {
+  width: min(28rem, 60%);
+  font-family: inherit;
+  padding: .15rem .3rem;
+}
+
+/* ------------------------------------------------------------ teaching live
+ *
+ * Two editors stacked with the output under them. Deliberately NOT the
+ * side-by-side .split the editor uses: the mirror and the student's own copy
+ * have to be read one under the other, in that order, or the page stops
+ * saying "watch this, then do it yourself".
+ */
+
+.btn-live-on {
+  border-color: var(--red);
+  color: var(--red);
+}
+
+.live-code {
+  font-family: var(--mono);
+  letter-spacing: .08em;
+  text-transform: lowercase;
+}
+
+.live-chip { min-width: 84px; text-align: center; }
+.live-chip.live-on { border-color: var(--green); color: var(--green); }
+.live-chip.live-wait { border-color: var(--accent); color: var(--accent); }
+.live-chip.live-off { border-color: var(--red); color: var(--red); }
+
+.btn-stop-live {
+  border-color: var(--red);
+  color: var(--red);
+}
+
+.live-title { font-weight: 600; }
+.live-host { color: var(--muted); }
+
+.live-split {
+  display: flex;
+  height: calc(100vh - var(--bar-h));
+  min-height: 0;
+}
+
+/* Code on the left, what it does on the right — the same 58/42 the editor
+ * uses, so moving between the two pages does not move everything about.
+ *
+ * This was three panes stacked down the page to begin with. It read fine
+ * until a kaypy lesson: the canvas is 800x600, so the game took the middle
+ * of the screen, the student's own editor was squeezed to a few lines at the
+ * bottom, and Run was up in the header a long way from the code it ran.
+ */
+.live-left {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 58%;
+  min-width: 0;
+  min-height: 0;
+  border-right: 1px solid var(--line);
+}
+
+.live-right { flex: 1 1 42%; background: var(--bg-panel); }
+
+.live-pane {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* The mirror is a little shorter than the student's own editor on purpose:
+ * the page is for typing, not for watching. */
+.live-mirror {
+  flex: 1 1 45%;
+  border-bottom: 1px solid var(--line);
+}
+.live-mine { flex: 1 1 55%; }
+
+/* The mirror's pane is a row: the teacher's code, and once they have run
+ * something, its output beside it. The code keeps the larger share — it is
+ * what the class is copying — and the output scrolls on its own. */
+.live-mirror { flex-direction: row; }
+.live-mirror-code {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 62%;
+  min-width: 0;
+  min-height: 0;
+}
+.live-mirror-out {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 38%;
+  min-width: 0;
+  min-height: 0;
+  border-left: 1px solid var(--line);
+  background: var(--bg-panel);
+}
+.live-mirror-out[hidden] { display: none; }
+/* Play it here, in the head of the teacher's output: small enough to sit in a
+ * pane heading without making it taller than the one beside it. */
+.pane-head .btn-small {
+  padding: 2px 10px;
+  font-size: 12px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.pane-head .btn-small[hidden] { display: none; }
+.live-mirror-out .output { flex: 1 1 auto; }
+
+.live-mirror .CodeMirror { background: var(--bg-head); }
+
+/* THE TEACHER'S CODE IS NOT SELECTABLE.
+ *
+ * Same bargain as the notes above, and the same reason: the exercise is
+ * typing it. A student who can drag across the mirror and press Ctrl+C has
+ * the whole lesson in their own editor in two seconds, and nothing has been
+ * learnt. There is no copy button for exactly this reason, and a button is
+ * not much use if a selection does the same job.
+ *
+ * readOnly: "nocursor" on the mirror already stops it taking focus, so
+ * Ctrl+A and Ctrl+C inside it do nothing. This covers the other way in: a
+ * drag that starts outside the mirror and sweeps across it.
+ *
+ * IT IS A SPEED BUMP, NOT A LOCK, and it is worth being clear about that.
+ * The page is sent the file in order to display it, so developer tools and
+ * the poll's own address will always show the text to anyone who goes
+ * looking. What this removes is the ordinary path, which is the one thirty
+ * people would otherwise take. */
+.live-mirror,
+.live-mirror .CodeMirror,
+.live-mirror .CodeMirror-code {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Notes shown in the mirror scroll and sit in the pane like the editor does.
+ * The selection rules above still apply to them — they are the teacher's
+ * content — and the existing `.notes-body a` rule keeps links selectable, so
+ * a link put up for the class is still a link they can use. */
+.live-mirror .notes-body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 14px 18px;
+}
+.live-mirror .notes-body[hidden] { display: none; }
+
+/* The student's own editor is theirs: select, copy and paste normally. This
+ * is written out rather than left to inheritance because the rule above sits
+ * one container away, and a future change to the markup could quietly drag
+ * the lower editor into it — which would be a horrible bug to meet mid
+ * lesson, and a silent one. */
+.live-mine,
+.live-mine .CodeMirror,
+.live-mine .CodeMirror-code {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+/* Narrow enough that side by side would give both halves nothing: stack the
+ * lot and let the page scroll, rather than three unusable slivers. */
+@media (max-width: 860px) {
+  .live-split { flex-direction: column; height: auto; }
+  .live-left { flex: none; border-right: 0; }
+  .live-right { flex: none; min-height: 320px; }
+  .live-pane { height: 44vh; }
+}
+
+/* The join card, and the host's "your class is watching" page. */
+.join-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(100vh - var(--bar-h));
+  padding: 24px;
+}
+
+.join-card {
+  background: var(--bg-panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 28px 32px;
+  max-width: 460px;
+  width: 100%;
+  text-align: center;
+}
+
+.join-card h1 { font-size: 22px; margin: 0 0 6px; }
+.join-card p { margin: 0 0 14px; }
+
+.join-code {
+  font-family: var(--mono);
+  font-size: 22px;
+  letter-spacing: .18em;
+  text-align: center;
+  width: 100%;
+  margin-bottom: 14px;
+}
+
+.join-error { color: var(--red); }
+
+.live-bigcode {
+  font-family: var(--mono);
+  font-size: 40px;
+  letter-spacing: .12em;
+  color: var(--accent);
+  margin: 10px 0 18px;
+}
+
+.brand-link { color: inherit; text-decoration: none; }
+
+/* Code the teacher sent. Sits between the "Your turn" header and the
+ * student's editor, and takes only the room its lines need — capped, so a
+ * long send cannot push the editor itself off the bottom of the pane. */
+.snippet-card {
+  flex: none;
+  border-bottom: 1px solid var(--line);
+  background: var(--banner-bg);
+}
+.snippet-card[hidden] { display: none; }
+.snippet-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px;
+  font-size: 13px;
+  color: var(--banner-text);
+}
+.snippet-head span { flex: 1; font-weight: 600; }
+.snippet-head .btn { padding: 4px 12px; font-size: 13px; }
+.snippet-code {
+  margin: 0;
+  padding: 4px 12px 10px;
+  max-height: 9.5em;
+  overflow: auto;
+  font-family: var(--mono);
+  font-size: var(--code-size);
+  line-height: 1.45;
+  color: var(--text);
+  white-space: pre;
+}
+
+/* The teacher's "Send to students" menu. Positioned from the click, so it
+ * overrides .menu's anchoring to a button. */
+.ctx-menu {
+  position: fixed;
+  right: auto;
+  top: 0;
+  left: 0;
+  z-index: 200;
+}
+
+/* On the teacher's bar while something is out; clicking takes it back. */
+.live-sent {
+  border-color: var(--green);
+  color: var(--green);
+  cursor: pointer;
+}
+.live-sent[hidden] { display: none; }
+
+/* The project's notes on the live page, under the output. How the column is
+ * shared out — and why the notes are no longer a fixed 55% — is under
+ * "THE CLASS'S RIGHT-HAND COLUMN", further down. */
+.live-right .live-notes[hidden] { display: none; }
+
+/* Folded: just the head. It keeps its space rather than giving it to the
+ * notes, which is the point of the notes being a fixed size. The <pre> is
+ * hidden rather than squeezed to zero so the student's own output keeps its
+ * scroll position for when they open it again. */
+.live-right #output-view.is-folded .output { display: none; }
+.out-fold {
+  background: none;
+  border: 0;
+  padding: 0 2px;
+  font: inherit;
+  color: var(--muted);
+  cursor: pointer;
+}
+.out-fold:hover { color: var(--text); }
+
+/* The teacher's caret in the mirror: a bookmark widget, not a real cursor,
+ * so the mirror still cannot be focused. Zero width with a negative margin
+ * so drawing it does not push the rest of the line two pixels sideways. */
+.mirror-caret {
+  display: inline-block;
+  width: 0;
+  height: 1.2em;
+  margin-right: -2px;
+  border-left: 2px solid var(--accent);
+  vertical-align: text-bottom;
+  animation: mirror-blink 1.06s steps(1) infinite;
+}
+@keyframes mirror-blink { 50% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .mirror-caret { animation: none; }
+}
+.live-mirror .mirror-caret-line { background: var(--banner-bg); }
+
+/* What the teacher has highlighted, in yellow: a markText span, not a
+ * selection, so the mirror stays unfocusable and uncopyable. Translucent so
+ * the syntax colours still read through it in either theme. */
+.live-mirror .mirror-pick {
+  background: rgba(255, 214, 0, .38);
+  border-radius: 2px;
+}
+
+/* The student's file tabs share the pane head with "Your turn" and the
+ * saved note, so the tabs are the part that gives: they scroll sideways
+ * rather than pushing the note off the end of the head. */
+.mine-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 1 auto;
+  min-width: 0;
+  padding-left: 14px;
+}
+.mine-label,
+.mine-head .linkbtn { flex: 0 0 auto; white-space: nowrap; }
+.live-mine .pane-head-tabs > .dim {
+  flex: 0 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Slides, in the head of the teacher's Class sees pane while live:
+ * ◀ 3 / 5 ▶ Show all. Sized down to fit a pane head rather than the top bar,
+ * and in the head's own case so the pane does not look busier than it did. */
+.slide-ctl {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.slide-ctl[hidden] { display: none; }
+.slide-ctl .btn {
+  padding: 2px 8px;
+  font-size: 12px;
+  text-transform: none;
+  letter-spacing: 0;
+}
+/* .btn sets display, so [hidden] alone would leave the arrows showing
+ * while Show all is on. */
+.slide-ctl .btn[hidden] { display: none; }
+#slide-whole { margin-left: 6px; }
+.slide-at {
+  min-width: 44px;
+  text-align: center;
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* The fold arrow and the label of the student's output pane, side by side. */
+.out-tabs { display: inline-flex; gap: 8px; }
+
+/* The teacher's copy of the class's Notes pane, under their output while
+ * live, at the same fixed size as on the student's page. It was `1 1 45%`
+ * beside an output of `1 1 auto` — and an auto basis is the output's own
+ * content, so every line printed took height from the notes. */
+.pane-right .class-view {
+  flex: 0 0 45%;
+  border-top: 1px solid var(--line);
+}
+.pane-right #output-view { flex: 1 1 0; }
+.pane-right .class-view[hidden] { display: none; }
+
+/* A GAME TAKES ITS SHARE, NOT THE COLUMN. The canvas is 800x600 scaled to
+ * the column's width, which on a laptop is 400-odd pixels of height that
+ * would not shrink — and the notes above are a fixed 45%, so the output
+ * between them was squeezed to nothing and its text was drawn over the
+ * notes. Same on the student's live page and in the teacher's editor while
+ * live. So in game mode the canvas is capped by the screen's height, and the
+ * output and notes split what is left, each kept big enough to read. */
+body.is-game .pane-right #canvas { max-height: 40vh; width: auto; }
+body.is-game .pane-right #output-view { flex: 1 1 0; min-height: 110px; }
+body.is-game .pane-right .class-view,
+body.is-game .live-right .live-notes { flex: 1 1 0; min-height: 120px; }
+
+/* THE CLASS'S RIGHT-HAND COLUMN: GAME, OUTPUT, NOTES — AND HANDLES.
+ *
+ * Every fixed split of this column was wrong for somebody. Shared three ways
+ * on a Chromebook the notes were a heading and nothing else. Capped by
+ * `body.is-game`, the game shrank while it ran — and the moment it stopped,
+ * the class came off, the last frame stayed on screen at the column's full
+ * width, the output between it and the notes was squeezed to nothing, and
+ * its lines were drawn over the notes. So here nothing depends on whether a
+ * game is RUNNING, only on whether the stage is SHOWN, and the handles
+ * between the panes (split.js) let each student choose. A dragged size is
+ * inline on the pane and beats everything below.
+ *
+ * Defaults: the game a bit over a third of the column; the output a strip
+ * of three lines beside a game, and close to half without one; the notes
+ * whatever is left, always. Folding the output keeps its size rather than
+ * handing it to the notes, as before, so the notes do not jump when Run
+ * opens it.
+ *
+ * `body.is-live` on each so these outrank the editor's `body.is-game`
+ * rules above, which are written for a different column. */
+body.is-live .live-right .stage { flex: 0 1 38%; min-height: 0; border-bottom: 0; }
+body.is-live .live-right .stage-frame { flex: 1 1 0; min-height: 0; overflow: hidden; }
+/* live.js's fitCanvas sizes it to the frame, up as well as down. */
+body.is-live .live-right #canvas { max-height: none; max-width: none; }
+body.is-live .live-right #output-view { flex: 0 1 45%; min-height: 0; }
+body.is-live .live-right .stage:not([hidden]) ~ #output-view { flex: 0 1 96px; }
+body.is-live .live-right .output { flex: 1 1 auto; min-height: 0; }
+/* "Whatever is left, always" — and never nothing. With min-height: 0 a
+ * dragged size bigger than the column (kept from a bigger window, or from
+ * before the game pane appeared above it) left the notes 0px tall: still
+ * there, not hidden, just gone, and it survived closing the tab because the
+ * size is kept in the student's browser. 80px is split.js's REST. */
+body.is-live .live-right .live-notes { flex: 1 1 0; min-height: 80px; border-top: 0; }
+
+/* ------------------------------------------------------------- handles */
+/* `.resizer`, NOT `.split`: `.split` is the editor's own <main>. These rules
+ * were written as `.split` once, and every editor page went blank below the
+ * toolbar — the whole editor became a 7px bar, and on a narrow screen it was
+ * display: none. */
+/* A bar between two panes, with a grip in the middle. It replaces the
+ * border that used to be there, so the page has one line between panes and
+ * not two. touch-action: none, or a finger on a touch screen scrolls the
+ * page instead of dragging. */
+.resizer {
+  flex: 0 0 7px;
+  position: relative;
+  background: var(--bg-head);
+  touch-action: none;
+}
+.resizer-x { cursor: col-resize; border-left: 1px solid var(--line); border-right: 1px solid var(--line); }
+.resizer-y { cursor: row-resize; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.resizer::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  border-radius: 2px;
+  background: var(--muted);
+  opacity: .6;
+}
+.resizer-x::after { width: 3px; height: 28px; }
+.resizer-y::after { width: 28px; height: 3px; }
+.resizer:hover, .resizer:focus-visible, .resizer.is-dragging { background: var(--accent); outline: none; }
+.resizer:hover::after, .resizer:focus-visible::after, .resizer.is-dragging::after { background: #fff; opacity: 1; }
+/* While dragging, the cursor stays a resize arrow over whatever it crosses —
+ * CodeMirror, the canvas — and nothing gets selected on the way. */
+body.is-resizing-x, body.is-resizing-x * { cursor: col-resize !important; user-select: none !important; }
+body.is-resizing-y, body.is-resizing-y * { cursor: row-resize !important; user-select: none !important; }
+
+/* A handle beside a hidden pane goes with it, and the pane it sized fills
+ * the space instead — or the teacher's code would stay at a dragged width
+ * with an empty gap where their output was going to be. */
+.resizer:has(+ [hidden]), [hidden] + .resizer:not([data-size="next"]) { display: none; }
+.live-split :has(+ .resizer + [hidden]) { flex: 1 1 0 !important; }
+
+/* THE PANE AFTER A SIZED ONE TAKES WHAT IS LEFT, not a share of its own.
+ * The student's editor is `1 1 55%`: with a basis of its own it shrank
+ * alongside the pane being dragged, so the teacher's code dragged 100px
+ * taller grew 48, and the left column dragged 100px wider grew 38. Only the
+ * first drag, before anything was sized, so it looked like a stiff handle
+ * rather than a bug. Found in WebIDE first. */
+.is-sized + .resizer:not([data-size="next"]) + * { flex-basis: 0; }
+/* And keeps a floor. A size is kept per browser and can be bigger than the
+ * room there is now — split.js only clamps it while it is being dragged —
+ * and the pane after it, with no basis of its own, then got nothing at all:
+ * the class's notes went this way, and a student's own editor or the whole
+ * right column could too. A folded output is only its head, so not that. */
+.is-sized + .resizer-y:not([data-size="next"]) + :not(.is-folded) { min-height: 80px; }
+.is-sized + .resizer-x:not([data-size="next"]) + * { min-width: 80px; }
+
+/* The handles take the place of these borders. */
+body.is-live .live-left { border-right: 0; }
+body.is-live .live-mirror { border-bottom: 0; }
+body.is-live .live-mirror-out { border-left: 0; }
+
+/* THE EDITOR'S HANDLES. Left alone, the game pane is as tall as its canvas
+ * under the 40vh cap, as it always was. Dragged, it has a height of its own
+ * (split.js marks it is-sized), and the canvas is fitted to the pane instead
+ * — app.js's fitCanvas — so the frame has to give way rather than hold the
+ * canvas's height. */
+.stage.is-sized { min-height: 0; }
+.stage.is-sized .stage-frame { flex: 1 1 0; min-height: 0; overflow: hidden; }
+body .pane-right .stage.is-sized #canvas { max-height: none; max-width: none; }
+@media (min-width: 861px) {
+  /* The handles take the place of these borders, as on the live page. */
+  .split > .pane-editor { border-right: 0; }
+  .split .stage:not([hidden]) { border-bottom: 0; }
+  .split .pane-right .class-view { border-top: 0; }
+}
+
+/* Stacked, the page scrolls and there is nothing to share; split.js takes
+ * the dragged sizes off at the same width. */
+@media (max-width: 860px) {
+  .resizer { display: none; }
+}
+
+/* ---------------------------------------------------------------- classes */
+.class-cards { list-style: none; margin: 0 0 14px; padding: 0;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
+.class-card { display: flex; flex-direction: column; gap: 4px; padding: 14px 16px;
+  border: 1px solid var(--line); border-radius: 8px; background: var(--bg-panel);
+  color: var(--text); text-decoration: none; }
+.class-card:hover { border-color: var(--accent); }
+.class-card strong { font-size: 16px; }
+/* A student's classes (classes.html): a heading that says what the list is,
+ * and one wide card per class with an Open button at its end — the whole
+ * card is the link. Bare names in thin boxes did not look clickable. */
+.enrolled-title { font-size: 24px; margin: 8px 0 4px; }
+.enrolled-sub { color: var(--muted); margin: 0 0 20px; }
+.enrolled { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.enrolled-card { display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 18px 20px; border: 1px solid var(--line); border-radius: 10px;
+  background: var(--bg-panel); color: var(--text); text-decoration: none;
+  box-shadow: 0 1px 3px var(--shadow); transition: border-color .12s, transform .12s; }
+.enrolled-card:hover, .enrolled-card:focus-visible { border-color: var(--brand); transform: translateY(-1px); outline: none; }
+.enrolled-card:hover .enrolled-open { background: var(--brand-hover); border-color: var(--brand-hover); }
+.enrolled-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.enrolled-name { font-size: 18px; font-weight: 600; overflow-wrap: anywhere; }
+.enrolled-teacher { color: var(--muted); font-size: 14px; }
+.enrolled-open { flex: none; white-space: nowrap; }
+
+.class-tools { margin-bottom: 18px; }
+.class-tools .grade-line { margin-bottom: 8px; }
+.class-line p { margin: 0 0 14px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+/* a group is only a heading: a band across the list */
+.class-list tr.group-row td { background: var(--bg-panel); padding-top: 14px; padding-bottom: 8px; }
+.class-list .group-title { font-size: 15px; }
+.class-list tr.is-hidden td { opacity: .6; }
+.class-list th.order, .class-list td.order { width: 44px; padding-right: 0; white-space: nowrap; }
+/* A row's drag handle. touch-action: none, or a finger on it scrolls the
+   page instead of dragging the row. */
+.grip { border: 0; background: none; color: var(--muted, #888); cursor: grab;
+  font-size: 16px; padding: 2px 6px; line-height: 1; touch-action: none; }
+.grip:hover, .grip:focus-visible { color: var(--accent); }
+.class-list tr.is-dragging td { background: var(--bg-panel); }
+.class-list tr.is-dragging { outline: 2px solid var(--accent); outline-offset: -2px; }
+body.is-sorting, body.is-sorting * { cursor: grabbing !important; user-select: none; }
+.live-pill { color: #fff !important; background: #d64541; border-radius: 999px;
+  padding: 1px 9px; font-size: 12px; font-weight: 600; margin-left: 6px; text-decoration: none !important; }
+/* A phone: each row wraps, its buttons under its name, rather than the
+   table running off the right of the screen. */
+@media (max-width: 640px) {
+  .class-list thead { display: none; }
+  .class-list tr { display: flex; flex-wrap: wrap; align-items: center;
+    border-bottom: 1px solid var(--line); }
+  .class-list td { border-bottom: 0; }
+  .class-list td.rowactions { white-space: normal; margin-left: auto; }
+  .class-list tr.group-row td { flex: 1 1 100%; }
+  /* The header scrolls inside itself rather than widening the page under it. */
+  .class-page .bar { overflow-x: auto; }
+  .class-page .bar .pagetitle { white-space: nowrap; }
+}
+
+/* The front door (home.html): one card, two ways in. */
+.front { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
+.front-card { text-align: center; max-width: 440px; }
+.front-logo { font-size: 56px; line-height: 1; }
+.front-card h1 { margin: 10px 0 6px; font-size: 32px; }
+.front-actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin: 22px 0 14px; }
+.btn-big { font-size: 16px; padding: 12px 22px; }
+
+/* ------------------------------------------- a class, as students see it
+   A stream of cards, as a classroom page is: a group is a heading with its
+   words under it, an assignment a card with its description and buttons. */
+.stream { display: flex; flex-direction: column; gap: 14px; }
+.stream-group { margin-top: 18px; }
+.stream-group:first-child { margin-top: 0; }
+.stream-heading { font-size: 20px !important; text-transform: none !important;
+  letter-spacing: 0 !important; color: var(--text) !important; margin: 0 0 6px;
+  padding-bottom: 8px; border-bottom: 2px solid var(--accent); }
+.stream-intro { color: var(--muted); }
+.card { border: 1px solid var(--line); border-radius: 10px; background: var(--bg-panel);
+  padding: 16px 18px; border-left: 4px solid var(--accent); }
+.card.card-done { border-left-color: #2f9e6b; }
+.card-head { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.card-icon { font-size: 20px; }
+.card-title { font-size: 17px; font-weight: 600; color: var(--text); text-decoration: none; }
+.card-title:hover { color: var(--accent); text-decoration: underline; }
+.card-badges { display: inline-flex; flex-wrap: wrap; gap: 6px; margin-left: auto; }
+.badge { font-size: 12px; font-weight: 600; padding: 2px 9px; border-radius: 999px;
+  border: 1px solid var(--line); color: var(--muted); }
+.badge-done { color: #2f9e6b; border-color: #2f9e6b; }
+.badge-grade { color: var(--text); border-color: var(--accent); }
+.card .live-pill { margin-left: 0; }
+.md { line-height: 1.55; white-space: pre-wrap; }
+.md:has(> *) { white-space: normal; }          /* rendered: no longer raw text */
+.md > :first-child { margin-top: 0; }
+.md > :last-child { margin-bottom: 0; }
+.md a { color: var(--accent); }
+.md img { max-width: 100%; }
+.card-desc { margin: 10px 0 0 30px; }
+.card-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 0 30px; }
+.btn-live { background: #d64541; border-color: #d64541; color: #fff; }
+@media (max-width: 640px) {
+  .card-desc, .card-actions { margin-left: 0; }
+  .card-badges { margin-left: 0; }
+}
+/* The teacher's class page: a description's preview under its title, and
+   the box to write it in. */
+.desc-preview { font-size: 13px; color: var(--muted); margin-top: 4px; max-width: 560px; }
+.desc-preview.is-empty { display: none; }
+.desc-edit { margin-top: 8px; }
+.desc-edit .desc-box { width: 100%; max-width: 560px; font-family: inherit; }
+.desc-edit .grade-line { margin-top: 6px; }
+/* A material: no buttons, so it is the description that matters. */
+.card.card-material { border-left-color: #b07cd8; }
+.card-material .card-title:hover { color: var(--text); text-decoration: none; }
+.class-list tr.material-row td { background: color-mix(in srgb, var(--bg-panel) 50%, transparent); }
+
+/* EasyMDE (the description box's toolbar), in this app's colours. Its own
+   stylesheet is light; these follow the theme like everything else. */
+.desc-edit .EasyMDEContainer { max-width: 680px; }
+.desc-edit .editor-toolbar { background: var(--bg-panel); border-color: var(--line); opacity: 1; }
+.desc-edit .editor-toolbar button { color: var(--text) !important; }
+.desc-edit .editor-toolbar button:hover,
+.desc-edit .editor-toolbar button.active { background: var(--line); border-color: var(--line); }
+.desc-edit .editor-toolbar i.separator { border-left-color: var(--line); border-right-color: transparent; }
+.desc-edit .EasyMDEContainer .CodeMirror { background: var(--bg); color: var(--text);
+  border-color: var(--line); font-size: 14px; min-height: 140px; }
+.desc-edit .EasyMDEContainer .CodeMirror-cursor { border-left-color: var(--text); }
+.desc-edit .EasyMDEContainer .CodeMirror-selected,
+.desc-edit .EasyMDEContainer .CodeMirror-focused .CodeMirror-selected { background: color-mix(in srgb, var(--accent) 30%, transparent); }
+.desc-edit .editor-preview, .desc-edit .editor-preview-side { background: var(--bg-panel); color: var(--text); }
+.desc-edit .editor-preview img, .md img { max-width: 100%; height: auto; border-radius: 6px; }
+.desc-edit .cm-s-easymde .cm-link, .desc-edit .cm-s-easymde .cm-url { color: var(--accent); }
+.desc-edit .cm-s-easymde .cm-header { color: var(--text); }
+.js-pic-label { cursor: pointer; }
+/* The class page's Classroom tag: posted, or not yet. */
+.kind-tag.tag-classroom { color: #2f9e6b; border-color: #2f9e6b; }
+.kind-tag.tag-not-posted { opacity: .55; }
+/* The teacher's class page gets the width: titles, tags, descriptions and
+   six actions share each row, and at the site's 860px the title column was
+   squeezed until a tag broke in half. 1600px since the Not in Classroom
+   column: at 1240 a row's last action ran off the edge behind a horizontal
+   scrollbar, on a screen with room to spare either side.
+
+   And the actions WRAP, each one kept whole, so a narrower screen gets a
+   second line of them rather than a scrollbar. Kept on one line they set
+   the table's least width, which is what pushed it past the page. */
+.class-teacher .sheet { max-width: 1600px; }
+.class-teacher .class-list td.rowactions { white-space: normal; text-align: right; min-width: 220px; }
+.class-teacher .class-list td.rowactions .linkbtn { white-space: nowrap; display: inline-block;
+                                                    margin: 2px 0 2px 12px; }
+/* 960, up from 720 with the page: a week's plan as a table was cut off
+   behind its own scrollbar on a wide screen with room to spare.
+   contain: inline-size stops what is inside — that table — from setting the
+   column's width: the box takes the room the row leaves, up to 960, and
+   anything wider scrolls inside it instead of pushing the page sideways. */
+.class-teacher .desc-preview { max-width: 960px; contain: inline-size; }
+.kind-tag { white-space: nowrap; display: inline-block; }
+/* The students' class page, as wide as the teacher's: room for a video, a
+   table and a picture side by side with the words. */
+.class-student .sheet { max-width: 1600px; }
+
+/* A YouTube link on its own line, as a player (embeds.js): 16:9, as wide as
+   the description, never wider than is comfortable to watch. */
+.video-embed { position: relative; width: 100%; max-width: 720px; aspect-ratio: 16 / 9;
+  margin: 10px 0; border-radius: 8px; overflow: hidden; background: #000; }
+.video-embed iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+
+/* Tables in descriptions — markdown's | a | b | or a plain <table> — with
+   the lines and spacing they need to read as one. */
+.md table { border-collapse: collapse; margin: 10px 0; display: block; overflow-x: auto; max-width: 100%; }
+.md th, .md td { border: 1px solid var(--line); padding: 6px 12px; text-align: left; vertical-align: top; }
+.md th { background: color-mix(in srgb, var(--accent) 14%, transparent); font-weight: 600; }
+.md tr:nth-child(even) td { background: color-mix(in srgb, var(--line) 35%, transparent); }
+/* An <iframe> pasted into a description (a video, Slides, a form): never
+   wider than the card, whatever width its embed code asked for. */
+.md iframe { max-width: 100%; border: 0; border-radius: 8px; }
+/* A material's own page: the box open, and the card it makes under it. */
+.mat-preview-head { margin-top: 22px !important; }
+.desc-edit .desc-box[rows="10"] + .EasyMDEContainer .CodeMirror { min-height: 260px; }
+/* On the class page a description is a reminder, not the page: its
+   pictures and videos as thumbnails, so a row stays a row. */
+.desc-preview img, .desc-preview .video-embed, .desc-preview iframe { max-height: 110px; width: auto; }
+.desc-preview .video-embed { aspect-ratio: auto; max-width: 196px; height: 110px; }
+
+/* The class's banner (class pages): its name, and what the teacher pinned
+   under it. A picture in it runs the width of the box, like a header. */
+.class-banner { border: 1px solid var(--line); border-radius: 10px;
+                background: var(--bg-panel); padding: 16px 20px; margin: 0 0 20px; }
+.banner-head { display: flex; align-items: baseline; justify-content: space-between;
+               gap: 12px; flex-wrap: wrap; }
+.banner-title { margin: 0; font-size: 26px; }
+.banner-body:not(.is-empty) { margin-top: 10px; }
+.banner-body img { display: block; max-width: 100%; height: auto; border-radius: 8px; }
+.banner-body > :last-child { margin-bottom: 0; }
+.class-banner .desc-edit { margin-top: 10px; }
+
+/* Question formats (/help/questions): each example as written, beside how
+   it looks. Side by side where there's room, stacked on a phone. */
+.help-questions { max-width: 980px; }
+.help-example { margin: 28px 0; }
+.help-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+.help-src { margin: 4px 0 0; padding: 10px 12px; border: 1px solid var(--line);
+            border-radius: 8px; background: var(--bg-panel); white-space: pre-wrap;
+            overflow-wrap: anywhere; font-size: 13px; }
+.help-look { margin-top: 4px; }
+@media (max-width: 720px) { .help-pair { grid-template-columns: 1fr; } }
+
+/* Fill in the blank (notes.js, fillBlanks): a box sitting in the line of
+   text, or of code, where the [[blank]] was. */
+.quiz-blank { display: inline-block; width: 9em; max-width: 100%; padding: 1px 6px;
+              margin: 0 2px; font: inherit; vertical-align: baseline; }
+pre .quiz-blank, code .quiz-blank { font-family: inherit; }
+/* Matching: each left with a list of every right beside it. */
+.quiz-match { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+.quiz-match-row { display: grid; grid-template-columns: minmax(8em, 1fr) minmax(10em, 2fr);
+                  gap: 10px; align-items: center; }
+.quiz-match-left { font-weight: 500; }
+.quiz-match-pick { width: 100%; }
+@media (max-width: 520px) { .quiz-match-row { grid-template-columns: 1fr; gap: 2px; } }
+
+/* The class page's "Not in Classroom" column: grades still to send. */
+.class-list a.unsent { color: var(--amber); font-weight: 600; text-decoration: none; white-space: nowrap; }
+.class-list a.unsent:hover { text-decoration: underline; }
+.class-list .all-sent { color: var(--green); white-space: nowrap; }
+
+
+/* ------------------------------------------------------ the school's colours
+   Crimson (#BA0C30), black and grey, everywhere — the palettes at the top
+   of this file. The greys are neutral: the old ones were tinted blue, which
+   next to crimson looks like a mistake.
+
+   THE BAR IS BLACK IN BOTH THEMES, with a crimson stripe under it. Its
+   contents are drawn for a dark background whatever the theme, by giving
+   the bar the dark palette's tokens: in light mode the editor's stepper,
+   chips and buttons would otherwise be light-grey boxes on black. */
+.bar {
+  background: #0a0a0a;
+  color: #f2f2f2;
+  border-bottom: 3px solid var(--brand);
+  --text: #f2f2f2;
+  --muted: #a8a8a8;
+  --bg: #0e0e0e;
+  --bg-panel: #181818;
+  --bg-head: #0a0a0a;
+  --line: #3a3a3a;
+  --hover-bg: #242424;
+  --hover-line: #5a5a5a;
+  --accent: #ef5a70;
+  --accent-hover: #f47d8e;
+  color-scheme: dark;
+}
+.bar .btn:not(.btn-primary):not(.btn-stop):not(.btn-run) { background: transparent; }
+.needs-grading { background: var(--brand); color: var(--on-brand); }
+.class-banner { border-top: 4px solid var(--brand); }
+/* Row actions read as the text colour, crimson on hover. In crimson they
+   looked the same as Delete and Remove heading, and the red that means
+   "this destroys something" has to stay unmistakable. */
+.rowactions .linkbtn:not(.danger),
+.grade-line .linkbtn:not(.danger) { color: var(--text); }
+.rowactions .linkbtn:not(.danger):hover,
+.grade-line .linkbtn:not(.danger):hover { color: var(--accent); }
+/* A material's edge: grey, the third school colour, where it was purple. */
+.card.card-material { border-left-color: var(--muted); }
+/* Bare links — no class of their own — were the browser's blue (and its
+   purple once visited): "new project" on My work, the class's name on an
+   assignment's page. Any link with a class keeps the colour it sets. */
+a:not([class]), a:not([class]):visited { color: var(--accent); }
+a:not([class]):hover { color: var(--accent-hover); }
+
+/* ATTENDANCE (attendance.html): one box per day, the latest open, each a
+   table of who came and a line of who did not. */
+.attendance-page .sheet { max-width: 1200px; }
+.att-title { margin: 0 0 6px; font-size: 22px; }
+.att-day { border: 1px solid var(--line); border-radius: 10px; margin: 0 0 12px;
+           background: var(--bg-panel); overflow: hidden; }
+.att-head { cursor: pointer; padding: 12px 16px; }
+.att-head strong { margin-right: 10px; }
+.att-day[open] .att-head { border-bottom: 1px solid var(--line); }
+.att-count { color: var(--muted); font-size: 13px; }
+.att-table { background: var(--bg); }
+.att-time, .att-span { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.att-log { font-size: 13px; }
+.att-pill { margin-left: 8px; font-size: 11px; padding: 1px 7px; border-radius: 999px;
+            border: 1px solid var(--amber); color: var(--amber); white-space: nowrap; }
+.att-absent { margin: 0; padding: 12px 16px; font-size: 13.5px; border-top: 1px solid var(--line); }
+@media (max-width: 760px) { .att-table { display: block; overflow-x: auto; } }
+
+/* SLIDE THEMES (notes.js, takeTheme): `theme: <name>` as the first line of
+   the notes. Each theme only sets variables — the page's own names, so
+   headings, code, quiz cards, tables and links all follow it — plus its
+   background (--theme-bg) and the bar under the slides (--nav-bg). A theme
+   is its own background and ignores the page's light or dark setting, so a
+   projected deck looks the same on every laptop.
+
+   The class is on the notes element itself, which is also what scrolls, so
+   the background is the whole pane. Its children keep .prose's reading
+   width with :where(), so lesson pages' wider column still wins. */
+.notes-body.slide-themed { background: var(--theme-bg); color: var(--text); max-width: none; }
+:where(.notes-body.slide-themed.prose) > * { max-width: 68ch; }
+.slide-themed h1, .slide-themed h2 { color: var(--heading); border-bottom-color: var(--line); }
+.slide-themed h3, .slide-themed h4 { color: var(--heading-2, var(--heading)); }
+.slide-themed strong { color: var(--strong, inherit); }
+.slide-themed li::marker { color: var(--accent); }
+.slide-themed blockquote { color: var(--text); background: var(--bg-panel);
+                           border-radius: 0 8px 8px 0; padding: .5em 1em; }
+.slide-nav.slide-themed { background: var(--nav-bg); border-top-color: var(--line); }
+.reveal-bar.slide-themed { background: var(--nav-bg); border-bottom-color: var(--line); color: var(--text); }
+
+.slide-theme-ocean {
+  --theme-bg: linear-gradient(160deg, #0b2545 0%, #13315c 55%, #134074 100%);
+  --nav-bg: #0e2a4d;
+  --text: #e6f1ff; --muted: #9fb7d6; --heading: #7fd8ff; --heading-2: #a5f3fc;
+  --accent: #5ce1e6; --accent-hover: #a5f3fc; --strong: #ffffff;
+  --line: rgba(255, 255, 255, .15); --bg: rgba(0, 10, 30, .4);
+  --bg-panel: rgba(255, 255, 255, .07); --bg-head: rgba(255, 255, 255, .1);
+  --hover-bg: rgba(255, 255, 255, .1); color-scheme: dark;
+}
+.slide-theme-sunset {
+  --theme-bg: linear-gradient(165deg, #fff4e6 0%, #ffe1d6 55%, #ffd1dc 100%);
+  --nav-bg: #ffe6dc;
+  --text: #3b1f2b; --muted: #7a5560; --heading: #c2410c; --heading-2: #9d174d;
+  --accent: #b4235a; --accent-hover: #9d174d; --strong: #7c2d12;
+  --line: rgba(59, 31, 43, .16); --bg: rgba(255, 255, 255, .7);
+  --bg-panel: rgba(255, 255, 255, .55); --bg-head: rgba(255, 255, 255, .8);
+  --hover-bg: rgba(255, 255, 255, .6); color-scheme: light;
+}
+.slide-theme-forest {
+  --theme-bg: linear-gradient(170deg, #0f2a1d 0%, #173d2a 60%, #1e4d33 100%);
+  --nav-bg: #13321f;
+  --text: #e8f5e9; --muted: #a5c4ac; --heading: #c5e478; --heading-2: #ffd166;
+  --accent: #ffd166; --accent-hover: #ffe29a; --strong: #ffffff;
+  --line: rgba(255, 255, 255, .14); --bg: rgba(0, 0, 0, .28);
+  --bg-panel: rgba(255, 255, 255, .06); --bg-head: rgba(255, 255, 255, .1);
+  --hover-bg: rgba(255, 255, 255, .1); color-scheme: dark;
+}
+.slide-theme-chalkboard {
+  --theme-bg: radial-gradient(ellipse at 18% 8%, rgba(255, 255, 255, .07), transparent 55%),
+              radial-gradient(ellipse at 85% 92%, rgba(255, 255, 255, .05), transparent 50%),
+              #2c3a33;
+  --nav-bg: #5b3a1e;
+  --text: #f4f1e8; --muted: #c9c4b3; --heading: #ffe680; --heading-2: #9ee6ff;
+  --accent: #ffb3c7; --accent-hover: #ffd1dc; --strong: #ffffff;
+  --line: rgba(255, 255, 255, .25); --bg: rgba(0, 0, 0, .22);
+  --bg-panel: rgba(255, 255, 255, .06); --bg-head: rgba(255, 255, 255, .1);
+  --hover-bg: rgba(255, 255, 255, .1); color-scheme: dark;
+}
+/* The wooden frame round the board. */
+.notes-body.slide-theme-chalkboard { box-shadow: inset 0 0 0 8px #6b4423, inset 0 0 0 10px #4a2e16; }
+.slide-theme-chalkboard h1, .slide-theme-chalkboard h2, .slide-theme-chalkboard h3 {
+  font-family: "Caveat", var(--sans); font-weight: 700; letter-spacing: .01em;
+}
+.slide-theme-chalkboard h1 { font-size: 2.4em; }
+.slide-theme-chalkboard h2 { font-size: 1.9em; border-bottom-style: dashed; }
+.slide-theme-chalkboard h3 { font-size: 1.5em; }
+.slide-theme-chalkboard hr { border-top-style: dashed; }
+
+.slide-theme-arcade {
+  --theme-bg: linear-gradient(rgba(255, 79, 216, .06) 1px, transparent 1px) 0 0 / 100% 26px,
+              radial-gradient(ellipse at 50% 0%, rgba(63, 243, 255, .16), transparent 60%),
+              #0b0b1a;
+  --nav-bg: #0b0b1a;
+  --text: #e0e0ff; --muted: #a0a0d0; --heading: #ff4fd8; --heading-2: #3ff3ff;
+  --accent: #3ff3ff; --accent-hover: #9ff9ff; --strong: #fff36b;
+  --line: rgba(63, 243, 255, .28); --bg: rgba(0, 0, 0, .5);
+  --bg-panel: rgba(63, 243, 255, .06); --bg-head: rgba(63, 243, 255, .12);
+  --hover-bg: rgba(63, 243, 255, .12); color-scheme: dark;
+}
+/* A pixel font is wide: the headings are set smaller to fit the same words. */
+.slide-theme-arcade h1, .slide-theme-arcade h2, .slide-theme-arcade h3 {
+  font-family: "Press Start 2P", var(--mono); font-weight: 400; line-height: 1.5;
+  text-shadow: 0 0 10px currentColor;
+}
+.slide-theme-arcade h1 { font-size: 1.25em; }
+.slide-theme-arcade h2 { font-size: 1em; }
+.slide-theme-arcade h3, .slide-theme-arcade h4 { font-size: .8em; }
+
+/* Lined paper with a red margin. The lines scroll with the writing
+   (attachment local), as they would on a page. */
+.slide-theme-notebook {
+  --theme-bg: linear-gradient(90deg, transparent 34px, #f2a5a5 34px, #f2a5a5 36px, transparent 36px),
+              repeating-linear-gradient(#fffef8 0, #fffef8 27px, #cddff3 27px, #cddff3 28px),
+              #fffef8;
+  --nav-bg: #f6f3e7;
+  --text: #1f2a44; --muted: #5b6478; --heading: #1d4ed8; --heading-2: #b91c1c;
+  --accent: #c2410c; --accent-hover: #9a3412; --strong: #0f172a;
+  --line: rgba(31, 42, 68, .18); --bg: rgba(255, 255, 255, .85);
+  --bg-panel: rgba(255, 255, 255, .8); --bg-head: #f1f5f9;
+  --hover-bg: #f1f5f9; color-scheme: light;
+}
+.notes-body.slide-theme-notebook { background-attachment: local; padding-left: 56px; }
+.slide-theme-notebook h1, .slide-theme-notebook h2, .slide-theme-notebook h3 {
+  font-family: "Patrick Hand", var(--sans); font-weight: 400;
+}
+.slide-theme-notebook h1 { font-size: 2.1em; }
+.slide-theme-notebook h2 { font-size: 1.7em; }
+.slide-theme-notebook h3 { font-size: 1.35em; }
+
+.slide-theme-space {
+  /* A small star field, tiled: a few stars at fixed spots would be lost on
+     a big screen. Two tile sizes so the repeat does not show as a grid. */
+  --theme-bg: radial-gradient(2px 2px at 24px 36px, #fff 50%, transparent) 0 0 / 220px 190px,
+              radial-gradient(1.5px 1.5px at 140px 22px, #fff 50%, transparent) 0 0 / 220px 190px,
+              radial-gradient(2px 2px at 92px 150px, #ffe9a8 50%, transparent) 0 0 / 220px 190px,
+              radial-gradient(1.5px 1.5px at 190px 110px, #cfe8ff 50%, transparent) 0 0 / 220px 190px,
+              radial-gradient(1.5px 1.5px at 60px 80px, rgba(255, 255, 255, .8) 50%, transparent) 0 0 / 170px 230px,
+              radial-gradient(1px 1px at 150px 170px, #fff 50%, transparent) 0 0 / 170px 230px,
+              radial-gradient(ellipse at 80% 100%, rgba(124, 58, 237, .35), transparent 60%),
+              linear-gradient(#0b0221, #1b0b3a 60%, #2a0f4f);
+  --nav-bg: #160733;
+  --text: #ece6ff; --muted: #b3a8d9; --heading: #ffd166; --heading-2: #c4b5fd;
+  --accent: #7dd3fc; --accent-hover: #bae6fd; --strong: #ffffff;
+  --line: rgba(196, 181, 253, .22); --bg: rgba(0, 0, 0, .35);
+  --bg-panel: rgba(255, 255, 255, .06); --bg-head: rgba(255, 255, 255, .1);
+  --hover-bg: rgba(255, 255, 255, .1); color-scheme: dark;
+}
+/* The themes on /help/questions, side by side. */
+.theme-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
+.theme-grid .help-src { margin: 0 0 6px; }
+.theme-sample { border: 1px solid var(--line); border-radius: 8px; min-height: 200px; }
+/* The notes popped out (notes_present.html): on a projector, read from the
+   back of the room, so bigger than a lesson's 19px and growing with the
+   window — a full-screen projector is far wider than the editor's pane. */
+.present-page .lesson-body { font-size: clamp(20px, 1.9vw, 34px); }
+.present-page .lesson-body > * { max-width: 46em; }
+
+/* SEASONAL THEMES: the same variables as the themes above, one per season
+   of the school year. halloween and christmas use a display face for their
+   headings (notes.js, FONT_THEMES); the rest keep the page's own. */
+
+/* Pumpkin orange on night purple, with a moon rising top right. */
+.slide-theme-halloween {
+  --theme-bg: radial-gradient(circle at 88% 10%, #fde68a 0 30px, rgba(253, 230, 138, .3) 32px, rgba(255, 180, 80, .1) 80px, transparent 150px),
+              linear-gradient(170deg, #1a0b2e 0%, #24103a 55%, #2d1240 100%);
+  --nav-bg: #1a0b2e;
+  --text: #f3e8ff; --muted: #c4b5d9; --heading: #ff7518; --heading-2: #a3e635;
+  --accent: #ff9a3c; --accent-hover: #ffc078; --strong: #ffd8a8;
+  --line: rgba(255, 117, 24, .3); --bg: rgba(0, 0, 0, .4);
+  --bg-panel: rgba(255, 117, 24, .07); --bg-head: rgba(255, 117, 24, .14);
+  --hover-bg: rgba(255, 117, 24, .14); color-scheme: dark;
+}
+.slide-theme-halloween h1, .slide-theme-halloween h2, .slide-theme-halloween h3 {
+  font-family: "Creepster", var(--sans); font-weight: 400; letter-spacing: .04em;
+  text-shadow: 0 0 12px rgba(255, 117, 24, .45);
+}
+/* The moon is the slide's own background, and a question's card is
+   see-through: on a short slide the card's top-right corner, where the
+   points are, sat on the moon — pale text on pale yellow. An opaque night
+   under the card's tint keeps it readable. */
+.slide-theme-halloween .quiz { background: linear-gradient(var(--bg-panel), var(--bg-panel)), #1f0d33; }
+.slide-theme-halloween h1 { font-size: 2.3em; }
+.slide-theme-halloween h2 { font-size: 1.8em; }
+.slide-theme-halloween h3 { font-size: 1.4em; }
+
+/* Harvest: warm cream into amber, rust and maple headings. */
+.slide-theme-fall {
+  --theme-bg: radial-gradient(ellipse at 100% 0%, rgba(234, 88, 12, .18), transparent 45%),
+              radial-gradient(ellipse at 0% 100%, rgba(180, 83, 9, .16), transparent 50%),
+              linear-gradient(165deg, #fffaf0 0%, #fdebd0 60%, #f9d9b0 100%);
+  --nav-bg: #f6dfbf;
+  --text: #3a2414; --muted: #7c5a3f; --heading: #b45309; --heading-2: #9a3412;
+  --accent: #c2410c; --accent-hover: #9a3412; --strong: #7c2d12;
+  --line: rgba(124, 45, 18, .2); --bg: rgba(255, 255, 255, .65);
+  --bg-panel: rgba(255, 255, 255, .5); --bg-head: rgba(255, 255, 255, .75);
+  --hover-bg: rgba(255, 255, 255, .6); color-scheme: light;
+}
+
+/* Frost: pale ice blue, with snow falling (a tiled field, as space's stars). */
+.slide-theme-winter {
+  --theme-bg: radial-gradient(4px 4px at 30px 40px, #ffffff 55%, transparent) 0 0 / 200px 180px,
+              radial-gradient(3px 3px at 130px 110px, #ffffff 55%, transparent) 0 0 / 200px 180px,
+              radial-gradient(3.5px 3.5px at 80px 150px, #ffffff 55%, transparent) 0 0 / 160px 220px,
+              linear-gradient(175deg, #dcebfb 0%, #c7ddf5 55%, #b2cfee 100%);
+  --nav-bg: #d6e9fb;
+  --text: #0f2a47; --muted: #47617d; --heading: #1d4ed8; --heading-2: #0e7490;
+  --accent: #0369a1; --accent-hover: #075985; --strong: #0c1f36;
+  --line: rgba(15, 42, 71, .16); --bg: rgba(255, 255, 255, .78);
+  --bg-panel: rgba(255, 255, 255, .6); --bg-head: rgba(255, 255, 255, .85);
+  --hover-bg: rgba(255, 255, 255, .7); color-scheme: light;
+}
+
+/* Evergreen, red and gold, with a candy-cane stripe along the top. */
+.slide-theme-christmas {
+  --theme-bg: repeating-linear-gradient(-45deg, #dc2626 0 12px, #fff7ed 12px 24px) 0 0 / 100% 8px no-repeat,
+              radial-gradient(ellipse at 50% 0%, rgba(252, 211, 77, .12), transparent 60%),
+              linear-gradient(175deg, #0f3d24 0%, #14532d 60%, #166534 100%);
+  --nav-bg: #0f3d24;
+  --text: #f0fdf4; --muted: #bbdcc5; --heading: #fcd34d; --heading-2: #fca5a5;
+  --accent: #f87171; --accent-hover: #fecaca; --strong: #ffffff;
+  --line: rgba(252, 211, 77, .28); --bg: rgba(0, 0, 0, .28);
+  --bg-panel: rgba(255, 255, 255, .07); --bg-head: rgba(255, 255, 255, .12);
+  --hover-bg: rgba(255, 255, 255, .12); color-scheme: dark;
+}
+.slide-theme-christmas h1, .slide-theme-christmas h2, .slide-theme-christmas h3 {
+  font-family: "Mountains of Christmas", var(--sans); font-weight: 700;
+}
+.slide-theme-christmas h1 { font-size: 2.2em; }
+.slide-theme-christmas h2 { font-size: 1.75em; }
+.slide-theme-christmas h3 { font-size: 1.4em; }
+
+/* Blossom pink and new-leaf green on a soft pastel wash. */
+.slide-theme-spring {
+  --theme-bg: radial-gradient(ellipse at 0% 0%, rgba(244, 114, 182, .18), transparent 45%),
+              radial-gradient(ellipse at 100% 100%, rgba(74, 222, 128, .18), transparent 50%),
+              linear-gradient(160deg, #fdf2f8 0%, #f7fbf2 55%, #ecfdf3 100%);
+  --nav-bg: #f6eef3;
+  --text: #2a1f2d; --muted: #6b5a6e; --heading: #be185d; --heading-2: #15803d;
+  --accent: #db2777; --accent-hover: #9d174d; --strong: #500724;
+  --line: rgba(190, 24, 93, .16); --bg: rgba(255, 255, 255, .75);
+  --bg-panel: rgba(255, 255, 255, .6); --bg-head: rgba(255, 255, 255, .85);
+  --hover-bg: rgba(255, 255, 255, .7); color-scheme: light;
+}
+
+/* Sky above, sand below, and the sun in the corner. */
+.slide-theme-summer {
+  --theme-bg: radial-gradient(circle at 92% 8%, rgba(253, 224, 71, .7) 0, rgba(253, 186, 116, .35) 60px, transparent 130px),
+              linear-gradient(180deg, #e0f2fe 0%, #f0f9ff 45%, #fef3c7 100%);
+  --nav-bg: #fdf0c4;
+  --text: #13293d; --muted: #4f6478; --heading: #0369a1; --heading-2: #ea580c;
+  --accent: #ea580c; --accent-hover: #c2410c; --strong: #0c4a6e;
+  --line: rgba(3, 105, 161, .18); --bg: rgba(255, 255, 255, .75);
+  --bg-panel: rgba(255, 255, 255, .6); --bg-head: rgba(255, 255, 255, .85);
+  --hover-bg: rgba(255, 255, 255, .7); color-scheme: light;
+}
+
+/* "18 / 22 answered" on a question card, in the teacher's editor while
+   live (app.js, "answers, counted"). Green once everyone here has answered. */
+.quiz-head .quiz-count { margin-left: auto; text-transform: none; letter-spacing: 0;
+                         font-variant-numeric: tabular-nums; white-space: nowrap;
+                         padding: 0 8px; border: 1px solid var(--line); border-radius: 999px;
+                         color: var(--muted); font-weight: 600; }
+.quiz-head .quiz-count.all-in { border-color: var(--green); color: var(--green); }
+
+/* The teacher's laser pointer (static/laser.js). Fixed to the window and
+   placed by transform, so it floats over the mirror, a slide or anything
+   else without being inside any of them, and never takes a click
+   (pointer-events: none — on the teacher's page it sits right under the
+   mouse, and elementFromPoint would otherwise find the dot itself). Red on
+   every theme: it has to be the brightest thing on a projected screen. */
+.laser-dot {
+  position: fixed; left: 0; top: 0; z-index: 10000;
+  width: 20px; height: 20px; margin: -10px 0 0 -10px; border-radius: 50%;
+  /* See-through in the middle: it sits ON the letter pointed at, and a
+     solid dot hid exactly the thing the teacher wanted read. */
+  background: rgba(255, 38, 38, 0.45);
+  border: 2px solid rgba(255, 38, 38, 0.95);
+  box-sizing: border-box;
+  box-shadow: 0 0 8px 3px rgba(255, 38, 38, 0.6), 0 0 26px 10px rgba(255, 38, 38, 0.3);
+  pointer-events: none; opacity: 0;
+  transition: transform 0.1s linear, opacity 0.25s;
+}
+.laser-dot.on { opacity: 1; }
+/* The trail: the same dot again, smaller and fainter, arriving later. */
+.laser-trail { width: 14px; height: 14px; margin: -7px 0 0 -7px; box-shadow: none; border: 0;
+               background: rgba(255, 38, 38, 0.6); }
+.laser-trail-1.on { opacity: 0.45; transition: transform 0.18s ease-out, opacity 0.25s; }
+.laser-trail-2.on { opacity: 0.28; transition: transform 0.26s ease-out, opacity 0.25s; }
+.laser-trail-3.on { opacity: 0.15; transition: transform 0.34s ease-out, opacity 0.25s; }
+/* Lit again somewhere new: appears there, rather than gliding in. */
+.laser-dot.laser-jump { transition: none; }
+/* The teacher's own, under the mouse: no glide, it is the mouse. */
+.laser-here { transition: opacity 0.15s; }
+@media (prefers-reduced-motion: reduce) {
+  .laser-dot, .laser-trail-1.on, .laser-trail-2.on, .laser-trail-3.on { transition: opacity 0.25s; }
+}
+
+/* A class's view-only link, at the top of the teacher's class page. */
+.view-link { display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+             margin: 0 0 14px; padding: 10px 12px; border: 1px solid var(--line);
+             border-radius: 8px; }
+.view-link-label { font-weight: 600; }
+.view-link #view-url { flex: 1 1 320px; min-width: 0; font-family: "IBM Plex Mono", monospace; font-size: 13px; }
+.view-link .dim { flex-basis: 100%; }
+
+/* XP (xp.py). An avatar is a picture put into any .avatar (avatar.js), a
+   rounded square like a character card, sized by whoever holds it. */
+.avatar { display: inline-block; border-radius: 22%; overflow: hidden; flex: none;
+  width: 40px; height: 40px; background: var(--bg-head); line-height: 0; }
+.avatar svg, .avatar img { width: 100%; height: 100%; display: block; object-fit: cover; }
+
+/* The student's home: avatar, level and bar, then badges and recent XP
+   beside it — stacked on a phone. */
+.xp-card { display: grid; grid-template-columns: auto 1fr minmax(240px, 360px); gap: 20px;
+  align-items: start; border: 1px solid var(--line); border-top: 4px solid var(--brand);
+  border-radius: 10px; background: var(--bg-panel); padding: 18px 20px; margin: 0 0 24px; }
+.xp-avatar { width: 96px; height: 96px; box-shadow: 0 0 0 3px var(--line); }
+.xp-avatar:hover, .xp-avatar:focus-visible { box-shadow: 0 0 0 3px var(--brand); outline: none; }
+.xp-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.xp-level { font-size: 24px; font-weight: 600; }
+.xp-title { color: var(--muted); }
+.xp-total { margin-left: auto; font-family: var(--mono); font-size: 18px; font-weight: 500; }
+.xp-bar { height: 12px; border-radius: 6px; background: var(--bg-head); overflow: hidden;
+  margin: 10px 0 6px; border: 1px solid var(--line); }
+.xp-bar span { display: block; height: 100%; background: var(--green); border-radius: 6px; }
+.xp-next { margin: 0 0 12px; }
+.xp-facts { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
+.xp-tokens { font-size: 16px; }
+.xp-rank { font-size: 14px; padding: 3px 10px; border: 1px solid var(--line); border-radius: 999px;
+  color: var(--text); text-decoration: none; }
+.xp-rank:hover { border-color: var(--brand); }
+.xp-side h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em;
+  color: var(--muted); margin: 0 0 8px; }
+.xp-side h2 + * { margin-bottom: 14px; }
+.xp-badges { list-style: none; margin: 0; padding: 0; display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 6px; }
+.xp-badges li { display: flex; flex-direction: column; align-items: center; gap: 2px;
+  text-align: center; padding: 6px 2px; border-radius: 8px; border: 1px solid var(--line); }
+.xp-badges li.locked { opacity: .35; filter: grayscale(1); }
+.xp-badge-icon { font-size: 22px; line-height: 1.1; }
+.xp-badge-name { font-size: 11px; line-height: 1.2; }
+.xp-recent { list-style: none; margin: 0; padding: 0; font-size: 14px; }
+.xp-recent li { padding: 3px 0; border-bottom: 1px solid var(--line); }
+.xp-recent li:last-child { border-bottom: 0; }
+.xp-plus { color: var(--green); font-family: var(--mono); }
+.xp-minus { color: var(--red); font-family: var(--mono); }
+.xp-hide { display: flex; gap: 6px; align-items: center; color: var(--muted); cursor: pointer; }
+.xp-hide input { accent-color: var(--accent); }
+@media (max-width: 860px) {
+  .xp-card { grid-template-columns: auto 1fr; }
+  .xp-side { grid-column: 1 / -1; }
+}
+@media (max-width: 520px) {
+  .xp-card { grid-template-columns: 1fr; justify-items: start; }
+  .xp-total { margin-left: 0; }
+}
+
+/* A class's leaderboard. */
+.xp-board { margin-top: 28px; max-width: 720px; }
+.xp-boards { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 0 24px;
+  max-width: 1300px; }
+.xp-boards .xp-board { max-width: none; }
+.xp-board-list { list-style: none; margin: 0; padding: 0; border: 1px solid var(--line);
+  border-radius: 10px; overflow: hidden; background: var(--bg-panel); }
+.xp-board-list li { display: flex; align-items: center; gap: 12px; padding: 8px 14px;
+  border-bottom: 1px solid var(--line); }
+.xp-board-list li:last-child { border-bottom: 0; }
+.xp-board-list li.me { background: color-mix(in srgb, var(--brand) 16%, transparent); }
+.xp-place { width: 2.2em; text-align: right; font-family: var(--mono); font-weight: 500; }
+/* By place, not by row: two students tied for third are both third. */
+.xp-board-list li.top .xp-place { color: var(--amber); }
+.xp-board-avatar { width: 36px; height: 36px; }
+.xp-board-name { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.xp-board-xp { font-family: var(--mono); white-space: nowrap; }
+
+/* The teacher's XP page. */
+.xp-table { width: 100%; border-collapse: collapse; }
+.xp-table th, .xp-table td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line);
+  vertical-align: middle; }
+.xp-who { display: flex; gap: 10px; align-items: center; }
+.xp-give { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.xp-give .xp-amount { width: 6em; }
+.xp-give .xp-reason { width: 14em; }
+
+/* The avatar picker: the chosen picture large, and a grid of the rest. */
+.avatar-editor { display: grid; grid-template-columns: 240px 1fr; gap: 28px; align-items: start; }
+.avatar-preview { position: sticky; top: calc(var(--bar-h) + 16px); display: flex;
+  flex-direction: column; gap: 10px; align-items: flex-start; }
+.avatar-preview .avatar { width: 220px; height: 220px; box-shadow: 0 0 0 4px var(--line); }
+.avatar-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+.avatar-option { position: relative; display: flex; flex-direction: column; align-items: center;
+  gap: 6px; padding: 8px 8px 10px; border: 2px solid var(--line); border-radius: 14px;
+  background: var(--bg-panel); color: var(--text); font: inherit; font-size: 14px; cursor: pointer; }
+.avatar-option .avatar { width: 100%; height: auto; aspect-ratio: 1; }
+.avatar-option:hover:not(:disabled) { border-color: var(--hover-line); }
+.avatar-option[aria-pressed="true"] { border-color: var(--brand); box-shadow: 0 0 0 2px var(--brand); }
+.avatar-option[aria-pressed="true"]::after { content: "✓"; position: absolute; top: 4px; right: 4px;
+  width: 28px; height: 28px; border-radius: 50%; background: var(--brand); color: var(--on-brand);
+  display: grid; place-items: center; font-weight: 700; }
+.avatar-state { font-size: 14px; color: var(--muted); }
+.avatar-state.is-saved { color: var(--green); font-weight: 600; }
+.avatar-state.is-error { color: var(--red); font-weight: 600; }
+.avatar-option:disabled { cursor: not-allowed; }
+.avatar-option:disabled .avatar { filter: grayscale(1) brightness(.45); }
+.avatar-lock { position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%);
+  padding: 4px 10px; border-radius: 999px; background: rgba(0, 0, 0, .7); color: #fff;
+  font-size: 13px; font-weight: 600; white-space: nowrap; }
+@media (max-width: 700px) {
+  .avatar-editor { grid-template-columns: 1fr; }
+  .avatar-preview { position: static; }
+  .avatar-preview .avatar { width: 160px; height: 160px; }
+  .avatar-grid { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); }
+}
+
+/* "+5 XP", for a moment, bottom right. */
+.xp-toast { position: fixed; right: 18px; bottom: 18px; z-index: 1000; padding: 10px 16px;
+  border-radius: 999px; background: var(--green); color: var(--on-green); font-weight: 600;
+  box-shadow: 0 4px 14px var(--shadow); opacity: 0; transform: translateY(10px);
+  pointer-events: none; }
+.xp-toast.show { animation: xp-toast 3.2s ease forwards; }
+/* XP from elsewhere says why (xp.js, watch), so it can be long; a penalty
+   is red. */
+.xp-toast { max-width: min(460px, calc(100vw - 36px)); border-radius: 18px; }
+.xp-toast.is-loss { background: var(--red); color: var(--on-red); }
+@keyframes xp-toast {
+  0% { opacity: 0; transform: translateY(10px); }
+  10%, 80% { opacity: 1; transform: none; }
+  100% { opacity: 0; transform: translateY(-6px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .xp-toast.show { animation-duration: 3.2s; animation-timing-function: steps(1, end); }
+}
+
+/* Random events and rewards (class_xp.html, the class page, My XP). */
+.xp-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+.xp-event-btn { font-size: 16px; padding: 10px 18px; }
+.xp-givebar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 14px 0;
+  padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg-panel); }
+.xp-givebar select { max-width: 100%; }
+.xp-check { width: 2em; }
+.xp-check input { width: 18px; height: 18px; accent-color: var(--accent); }
+label.xp-who { cursor: pointer; }
+.xp-events { margin-top: 28px; }
+.xp-event-list { list-style: none; margin: 0; padding: 0; }
+.xp-event-list li { display: flex; align-items: center; gap: 12px; padding: 10px 0;
+  border-bottom: 1px solid var(--line); }
+.xp-event-list li.undone { opacity: .5; }
+.xp-event-body { flex: 1; min-width: 0; }
+.xp-event-icon { font-size: 28px; line-height: 1; }
+.xp-event-overlay { position: fixed; inset: 0; z-index: 900; display: grid; place-items: center;
+  background: rgba(0, 0, 0, .7); padding: 16px; }
+.xp-event-overlay[hidden] { display: none; }
+.xp-event-card { width: min(720px, 100%); text-align: center; padding: 32px 28px; border-radius: 18px;
+  background: var(--bg-panel); border: 1px solid var(--line); border-top: 6px solid var(--brand);
+  box-shadow: 0 20px 60px var(--shadow); }
+.xp-event-big { font-size: 96px; line-height: 1.1; }
+.xp-event-card h2 { font-size: clamp(26px, 4vw, 40px); margin: 10px 0; text-transform: none; color: var(--text); }
+.xp-event-card p { font-size: clamp(17px, 2.2vw, 22px); margin: 0 0 16px; }
+.xp-event-hits { list-style: none; margin: 0 0 20px; padding: 0; display: flex; flex-wrap: wrap;
+  justify-content: center; gap: 8px; font-size: 18px; font-weight: 600; }
+.xp-event-hits li { padding: 4px 12px; border-radius: 999px; background: var(--bg-head); }
+.xp-event-actions { display: flex; justify-content: center; gap: 10px; }
+.xp-latest-event { display: flex; gap: 14px; align-items: flex-start; margin: 0 0 20px; padding: 14px 18px;
+  border: 1px solid var(--line); border-left: 4px solid var(--amber); border-radius: 10px;
+  background: var(--bg-panel); }
+.xp-latest-event p { margin: 4px 0 0; }
+.xp-hits { display: flex; flex-wrap: wrap; gap: 4px 14px; }
+.xp-all { float: right; text-transform: none; letter-spacing: 0; font-weight: 400; }
+.xp-history { max-width: 860px; }
+.xp-table td.num, .xp-table th.num { text-align: right; white-space: nowrap; }
+
+/* Quests, and the leaderboards on a student's home page. */
+.badge-quest { color: var(--amber); border-color: var(--amber); }
+.badge-quest.done { color: #2f9e6b; border-color: #2f9e6b; }
+.kind-quest { color: var(--amber); }
+.xp-sub { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted);
+  margin: 16px 0 8px; }
+.xp-quests { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.xp-quests a { display: flex; gap: 12px; align-items: center; padding: 8px 12px; border-radius: 8px;
+  border: 1px solid var(--line); color: var(--text); text-decoration: none; }
+.xp-quests a:hover { border-color: var(--amber); }
+.xp-quest-xp { flex: none; font-family: var(--mono); font-weight: 600; color: var(--amber); }
+.xp-home-boards { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px; margin: 0 0 28px; }
+.xp-home-board { border: 1px solid var(--line); border-radius: 10px; background: var(--bg-panel);
+  padding: 14px 16px; }
+.xp-home-board-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px;
+  margin-bottom: 10px; }
+.xp-home-board-head h2 { margin: 0; font-size: 17px; text-transform: none; letter-spacing: 0; color: var(--text); }
+.xp-home-board .xp-board-list { background: var(--bg); }
+.xp-board-gap { justify-content: center; color: var(--muted); padding: 2px 0 !important; }
+.xp-home-board-all { display: inline-block; margin-top: 10px; }
+
+/* Students' own photos: uploading one, and the teacher approving it. */
+.avatar-upload { grid-column: 1 / -1; display: flex; gap: 16px; align-items: center; flex-wrap: wrap;
+  padding: 14px 16px; border: 1px dashed var(--hover-line); border-radius: 14px; }
+.avatar-upload .avatar { width: 96px; height: 96px; }
+.avatar-upload-text { flex: 1; min-width: 220px; }
+.avatar-upload-text p { margin: 4px 0 0; }
+.xp-photos { margin: 18px 0; padding: 14px 16px; border: 1px solid var(--amber); border-radius: 10px;
+  background: var(--bg-panel); }
+.xp-photos h2 { margin: 0 0 10px; }
+.xp-photo-list { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 14px; }
+.xp-photo-list li { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 150px;
+  text-align: center; }
+.xp-photo-list img { width: 140px; height: 140px; object-fit: cover; border-radius: 22%; }
+.xp-photo-list .btns { display: flex; gap: 6px; }
+.count-pill { display: inline-block; margin-left: 6px; padding: 0 7px; border-radius: 999px;
+  background: var(--amber); color: #1a1200; font-size: 11px; font-weight: 700; }
+
+/* Tests (autograde.js): the list in the notes, the student's button, and
+   the teacher's results. */
+.btn-check { border-color: var(--green); color: var(--green); }
+.btn-check:hover:not(:disabled) { background: color-mix(in srgb, var(--green) 14%, transparent); }
+.tests-card { margin: 14px 0; padding: 12px 16px; border: 1px solid var(--line);
+  border-left: 4px solid var(--green); border-radius: 8px; background: var(--bg-panel); }
+.tests-head { font-weight: 600; margin-bottom: 6px; }
+.tests-card ul { margin: 0; padding-left: 20px; }
+/* Check my work in the notes (checks_in_notes.js): each test a line —
+   ○ until checked, then ✓ or ✗ with why — and the button under them. */
+.tests-card .tests-lines { list-style: none; padding-left: 0; }
+.tests-card .test-line { display: flex; gap: 8px; align-items: baseline; padding: 2px 0; }
+.tests-card .tests-mark { width: 1.1em; flex: none; text-align: center; color: var(--muted); font-weight: 700; }
+.tests-card .test-line.pass .tests-mark { color: var(--green); }
+.tests-card .test-line.fail .tests-mark { color: var(--red); }
+.tests-card .tests-why { display: block; color: var(--muted); font-size: .9em; }
+.tests-card .tests-why:empty { display: none; }
+.tests-card .tests-foot { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+.tests-card .tests-run[hidden] { display: none; }
+/* `locked: yes`: said on the card while its slide holds the way on. */
+.tests-card .tests-lock { display: none; margin: 8px 0 0; color: var(--amber); }
+.tests-locking .tests-card:not([data-passed]) .tests-lock { display: block; }
+.tests-teacher { margin-top: 10px; }
+.tests-error { color: var(--red); }
+.fb-tests.is-stale { color: var(--amber); }
+.tests-lines { list-style: none; margin: 6px 0; padding: 0; }
+.tests-lines .is-right { color: var(--green); }
+.tests-lines .is-wrong { color: var(--red); }
+
+/* The token shop: the student's shelf and requests, and the teacher's page. */
+a.xp-tokens { color: var(--text); text-decoration: none; }
+.shop { margin: 0 0 28px; }
+.shop-items { list-style: none; margin: 0 0 16px; padding: 0; display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
+.shop-item { display: flex; flex-direction: column; gap: 6px; padding: 14px; border: 1px solid var(--line);
+  border-radius: 10px; background: var(--bg-panel); }
+.shop-item .btn { align-self: flex-start; margin-top: auto; }
+.shop-item.too-dear { opacity: .6; }
+.shop-cost { font-family: var(--mono); font-weight: 600; color: var(--amber); }
+.shop-name { font-weight: 600; }
+.shop-requests { list-style: none; margin: 0; padding: 0; }
+.shop-requests li { padding: 6px 0; border-bottom: 1px solid var(--line); display: flex; gap: 10px;
+  align-items: baseline; flex-wrap: wrap; }
+.shop-status { font-size: 12px; font-weight: 600; padding: 1px 8px; border-radius: 999px;
+  border: 1px solid var(--line); }
+.shop-status.is-pending { color: var(--amber); border-color: var(--amber); }
+.shop-status.is-approved { color: var(--green); border-color: var(--green); }
+.shop-status.is-declined, .shop-status.is-cancelled { color: var(--muted); }
+.shop-table input.field { width: 100%; }
+.shop-table td:nth-child(3) input { width: 5em; }
+.shop-table tr.is-off td { opacity: .5; }
+.xp-requests { border-color: var(--amber); }
+
+/* Editor themes bought in the token shop or unlocked by level (xp.EDITOR_THEMES).
+   Generated from one table so every theme sets the same variables and code
+   colours. After the light block, so a chosen theme wins over the computer's
+   own light setting. Comments are lifted where a classic palette's own grey
+   would be too faint to read, as material-darker's already is above. */
+:root[data-theme="contrast"] {
+  --bg: #000000; --bg-panel: #0a0a0a; --bg-head: #161616; --line: #7a7a7a;
+  --text: #ffffff; --muted: #d6d6d6;
+  --accent: #ffd400; --accent-hover: #ffe866; --on-accent: #000000;
+  --brand: #ffd400; --brand-hover: #ffe866; --on-brand: #000000;
+  --green: #3cff7a; --green-hover: #3cff7a; --on-green: #000000; --red: #ff7070; --on-red: #000000;
+  --amber: #ffd400; --purple: #e0b0ff;
+  --hover-bg: #161616; --hover-line: #d6d6d6; --sprite-hover: #161616;
+  --banner-bg: #161616; --banner-line: #7a7a7a; --banner-text: #ffffff;
+  --chip-game-bg: #0a0a0a; --chip-game-line: #7a7a7a; --check-a: #0a0a0a; --check-b: #161616;
+  --shadow: rgba(0, 0, 0, .5);
+  color-scheme: dark;
+}
+.cm-s-pyide-contrast { background: var(--bg); color: var(--text); }
+.cm-s-pyide-contrast .CodeMirror-gutters { background: var(--bg); border-right-color: var(--line); }
+.cm-s-pyide-contrast .CodeMirror-linenumber { color: var(--muted); }
+.cm-s-pyide-contrast .CodeMirror-cursor { border-left-color: #ffd400; }
+.cm-s-pyide-contrast .CodeMirror-selected, .cm-s-pyide-contrast.CodeMirror-focused .CodeMirror-selected, .cm-s-pyide-contrast .CodeMirror-line::selection { background: #4d4300; }
+.cm-s-pyide-contrast .CodeMirror-activeline-background { background: #161616; }
+.cm-s-pyide-contrast .CodeMirror-matchingbracket { color: #ffd400 !important; text-decoration: underline; }
+.cm-s-pyide-contrast .cm-keyword { color: #ffd400; }
+.cm-s-pyide-contrast .cm-def { color: #7fdbff; }
+.cm-s-pyide-contrast .cm-string { color: #7dff8a; }
+.cm-s-pyide-contrast .cm-string-2 { color: #7dff8a; }
+.cm-s-pyide-contrast .cm-number { color: #ff9ff3; }
+.cm-s-pyide-contrast .cm-comment { color: #d0d0d0; }
+.cm-s-pyide-contrast .cm-builtin { color: #7fdbff; }
+.cm-s-pyide-contrast .cm-variable { color: #ffffff; }
+.cm-s-pyide-contrast .cm-variable-2 { color: #ffffff; }
+.cm-s-pyide-contrast .cm-variable-3 { color: #7fdbff; }
+.cm-s-pyide-contrast .cm-operator { color: #ffd400; }
+.cm-s-pyide-contrast .cm-property { color: #b5e8ff; }
+.cm-s-pyide-contrast .cm-atom { color: #ff9ff3; }
+.cm-s-pyide-contrast .cm-meta { color: #ffd400; }
+.cm-s-pyide-contrast .cm-qualifier { color: #b5e8ff; }
+.cm-s-pyide-contrast .cm-tag { color: #ffd400; }
+.cm-s-pyide-contrast .cm-attribute { color: #7fdbff; }
+.cm-s-pyide-contrast .cm-bracket { color: #ffffff; }
+.cm-s-pyide-contrast .cm-type { color: #7fdbff; }
+.cm-s-pyide-contrast .cm-error { color: #ff7070; }
+:root[data-theme="ocean"] {
+  --bg: #0b1d2e; --bg-panel: #10263b; --bg-head: #14304a; --line: #2a5274;
+  --text: #d9ecff; --muted: #93b6d2;
+  --accent: #2ec4b6; --accent-hover: #5fd8cc; --on-accent: #062a26;
+  --brand: #1f7a8c; --brand-hover: #186373; --on-brand: #ffffff;
+  --green: #2ec4b6; --green-hover: #2ec4b6; --on-green: #0b1d2e; --red: #ff6b6b; --on-red: #0b1d2e;
+  --amber: #f4d35e; --purple: #b39ddb;
+  --hover-bg: #14304a; --hover-line: #93b6d2; --sprite-hover: #14304a;
+  --banner-bg: #14304a; --banner-line: #2a5274; --banner-text: #d9ecff;
+  --chip-game-bg: #10263b; --chip-game-line: #2a5274; --check-a: #10263b; --check-b: #14304a;
+  --shadow: rgba(0, 0, 0, .5);
+  color-scheme: dark;
+}
+.cm-s-pyide-ocean { background: var(--bg); color: var(--text); }
+.cm-s-pyide-ocean .CodeMirror-gutters { background: var(--bg); border-right-color: var(--line); }
+.cm-s-pyide-ocean .CodeMirror-linenumber { color: var(--muted); }
+.cm-s-pyide-ocean .CodeMirror-cursor { border-left-color: #2ec4b6; }
+.cm-s-pyide-ocean .CodeMirror-selected, .cm-s-pyide-ocean.CodeMirror-focused .CodeMirror-selected, .cm-s-pyide-ocean .CodeMirror-line::selection { background: #1e4a6e; }
+.cm-s-pyide-ocean .CodeMirror-activeline-background { background: #14304a; }
+.cm-s-pyide-ocean .CodeMirror-matchingbracket { color: #2ec4b6 !important; text-decoration: underline; }
+.cm-s-pyide-ocean .cm-keyword { color: #4fc3f7; }
+.cm-s-pyide-ocean .cm-def { color: #2ec4b6; }
+.cm-s-pyide-ocean .cm-string { color: #a5e8b8; }
+.cm-s-pyide-ocean .cm-string-2 { color: #a5e8b8; }
+.cm-s-pyide-ocean .cm-number { color: #f4d35e; }
+.cm-s-pyide-ocean .cm-comment { color: #86a8c4; }
+.cm-s-pyide-ocean .cm-builtin { color: #80deea; }
+.cm-s-pyide-ocean .cm-variable { color: #d9ecff; }
+.cm-s-pyide-ocean .cm-variable-2 { color: #d9ecff; }
+.cm-s-pyide-ocean .cm-variable-3 { color: #80deea; }
+.cm-s-pyide-ocean .cm-operator { color: #4fc3f7; }
+.cm-s-pyide-ocean .cm-property { color: #b3e5fc; }
+.cm-s-pyide-ocean .cm-atom { color: #f4d35e; }
+.cm-s-pyide-ocean .cm-meta { color: #4fc3f7; }
+.cm-s-pyide-ocean .cm-qualifier { color: #b3e5fc; }
+.cm-s-pyide-ocean .cm-tag { color: #4fc3f7; }
+.cm-s-pyide-ocean .cm-attribute { color: #2ec4b6; }
+.cm-s-pyide-ocean .cm-bracket { color: #d9ecff; }
+.cm-s-pyide-ocean .cm-type { color: #80deea; }
+.cm-s-pyide-ocean .cm-error { color: #ff6b6b; }
+:root[data-theme="forest"] {
+  --bg: #17201a; --bg-panel: #1d2a21; --bg-head: #233328; --line: #3d5a43;
+  --text: #e6efe2; --muted: #a9bba2;
+  --accent: #8bc34a; --accent-hover: #a6d36f; --on-accent: #142008;
+  --brand: #4e7d32; --brand-hover: #3f6628; --on-brand: #ffffff;
+  --green: #8bc34a; --green-hover: #8bc34a; --on-green: #17201a; --red: #e57373; --on-red: #17201a;
+  --amber: #d4a35a; --purple: #b39ddb;
+  --hover-bg: #233328; --hover-line: #a9bba2; --sprite-hover: #233328;
+  --banner-bg: #233328; --banner-line: #3d5a43; --banner-text: #e6efe2;
+  --chip-game-bg: #1d2a21; --chip-game-line: #3d5a43; --check-a: #1d2a21; --check-b: #233328;
+  --shadow: rgba(0, 0, 0, .5);
+  color-scheme: dark;
+}
+.cm-s-pyide-forest { background: var(--bg); color: var(--text); }
+.cm-s-pyide-forest .CodeMirror-gutters { background: var(--bg); border-right-color: var(--line); }
+.cm-s-pyide-forest .CodeMirror-linenumber { color: var(--muted); }
+.cm-s-pyide-forest .CodeMirror-cursor { border-left-color: #8bc34a; }
+.cm-s-pyide-forest .CodeMirror-selected, .cm-s-pyide-forest.CodeMirror-focused .CodeMirror-selected, .cm-s-pyide-forest .CodeMirror-line::selection { background: #34502f; }
+.cm-s-pyide-forest .CodeMirror-activeline-background { background: #233328; }
+.cm-s-pyide-forest .CodeMirror-matchingbracket { color: #8bc34a !important; text-decoration: underline; }
+.cm-s-pyide-forest .cm-keyword { color: #d4a35a; }
+.cm-s-pyide-forest .cm-def { color: #8bc34a; }
+.cm-s-pyide-forest .cm-string { color: #c5e1a5; }
+.cm-s-pyide-forest .cm-string-2 { color: #c5e1a5; }
+.cm-s-pyide-forest .cm-number { color: #e6b980; }
+.cm-s-pyide-forest .cm-comment { color: #94a789; }
+.cm-s-pyide-forest .cm-builtin { color: #a5d6a7; }
+.cm-s-pyide-forest .cm-variable { color: #e6efe2; }
+.cm-s-pyide-forest .cm-variable-2 { color: #e6efe2; }
+.cm-s-pyide-forest .cm-variable-3 { color: #a5d6a7; }
+.cm-s-pyide-forest .cm-operator { color: #d4a35a; }
+.cm-s-pyide-forest .cm-property { color: #c8d8b0; }
+.cm-s-pyide-forest .cm-atom { color: #e6b980; }
+.cm-s-pyide-forest .cm-meta { color: #d4a35a; }
+.cm-s-pyide-forest .cm-qualifier { color: #c8d8b0; }
+.cm-s-pyide-forest .cm-tag { color: #d4a35a; }
+.cm-s-pyide-forest .cm-attribute { color: #8bc34a; }
+.cm-s-pyide-forest .cm-bracket { color: #e6efe2; }
+.cm-s-pyide-forest .cm-type { color: #a5d6a7; }
+.cm-s-pyide-forest .cm-error { color: #e57373; }
+:root[data-theme="solarized"] {
+  --bg: #002b36; --bg-panel: #073642; --bg-head: #0a3f4c; --line: #2f5d68;
+  --text: #eee8d5; --muted: #a3b0b0;
+  --accent: #2aa198; --accent-hover: #47bdb3; --on-accent: #002b36;
+  --brand: #268bd2; --brand-hover: #1f74b0; --on-brand: #ffffff;
+  --green: #859900; --green-hover: #859900; --on-green: #002b36; --red: #dc322f; --on-red: #002b36;
+  --amber: #b58900; --purple: #6c71c4;
+  --hover-bg: #0a3f4c; --hover-line: #a3b0b0; --sprite-hover: #0a3f4c;
+  --banner-bg: #0a3f4c; --banner-line: #2f5d68; --banner-text: #eee8d5;
+  --chip-game-bg: #073642; --chip-game-line: #2f5d68; --check-a: #073642; --check-b: #0a3f4c;
+  --shadow: rgba(0, 0, 0, .5);
+  color-scheme: dark;
+}
+.cm-s-pyide-solarized { background: var(--bg); color: var(--text); }
+.cm-s-pyide-solarized .CodeMirror-gutters { background: var(--bg); border-right-color: var(--line); }
+.cm-s-pyide-solarized .CodeMirror-linenumber { color: var(--muted); }
+.cm-s-pyide-solarized .CodeMirror-cursor { border-left-color: #2aa198; }
+.cm-s-pyide-solarized .CodeMirror-selected, .cm-s-pyide-solarized.CodeMirror-focused .CodeMirror-selected, .cm-s-pyide-solarized .CodeMirror-line::selection { background: #0f4c5c; }
+.cm-s-pyide-solarized .CodeMirror-activeline-background { background: #0a3f4c; }
+.cm-s-pyide-solarized .CodeMirror-matchingbracket { color: #2aa198 !important; text-decoration: underline; }
+.cm-s-pyide-solarized .cm-keyword { color: #859900; }
+.cm-s-pyide-solarized .cm-def { color: #268bd2; }
+.cm-s-pyide-solarized .cm-string { color: #2aa198; }
+.cm-s-pyide-solarized .cm-string-2 { color: #2aa198; }
+.cm-s-pyide-solarized .cm-number { color: #d33682; }
+.cm-s-pyide-solarized .cm-comment { color: #8a9a9a; }
+.cm-s-pyide-solarized .cm-builtin { color: #b58900; }
+.cm-s-pyide-solarized .cm-variable { color: #eee8d5; }
+.cm-s-pyide-solarized .cm-variable-2 { color: #eee8d5; }
+.cm-s-pyide-solarized .cm-variable-3 { color: #b58900; }
+.cm-s-pyide-solarized .cm-operator { color: #859900; }
+.cm-s-pyide-solarized .cm-property { color: #6c9ec9; }
+.cm-s-pyide-solarized .cm-atom { color: #cb4b16; }
+.cm-s-pyide-solarized .cm-meta { color: #859900; }
+.cm-s-pyide-solarized .cm-qualifier { color: #6c9ec9; }
+.cm-s-pyide-solarized .cm-tag { color: #268bd2; }
+.cm-s-pyide-solarized .cm-attribute { color: #b58900; }
+.cm-s-pyide-solarized .cm-bracket { color: #eee8d5; }
+.cm-s-pyide-solarized .cm-type { color: #b58900; }
+.cm-s-pyide-solarized .cm-error { color: #dc322f; }
+:root[data-theme="dracula"] {
+  --bg: #282a36; --bg-panel: #21222c; --bg-head: #343746; --line: #4d5066;
+  --text: #f8f8f2; --muted: #b0b4c8;
+  --accent: #ff79c6; --accent-hover: #ff9ad5; --on-accent: #282a36;
+  --brand: #bd93f9; --brand-hover: #a77bf3; --on-brand: #1e1f29;
+  --green: #50fa7b; --green-hover: #50fa7b; --on-green: #282a36; --red: #ff5555; --on-red: #282a36;
+  --amber: #f1fa8c; --purple: #bd93f9;
+  --hover-bg: #343746; --hover-line: #b0b4c8; --sprite-hover: #343746;
+  --banner-bg: #343746; --banner-line: #4d5066; --banner-text: #f8f8f2;
+  --chip-game-bg: #21222c; --chip-game-line: #4d5066; --check-a: #21222c; --check-b: #343746;
+  --shadow: rgba(0, 0, 0, .5);
+  color-scheme: dark;
+}
+.cm-s-pyide-dracula { background: var(--bg); color: var(--text); }
+.cm-s-pyide-dracula .CodeMirror-gutters { background: var(--bg); border-right-color: var(--line); }
+.cm-s-pyide-dracula .CodeMirror-linenumber { color: var(--muted); }
+.cm-s-pyide-dracula .CodeMirror-cursor { border-left-color: #ff79c6; }
+.cm-s-pyide-dracula .CodeMirror-selected, .cm-s-pyide-dracula.CodeMirror-focused .CodeMirror-selected, .cm-s-pyide-dracula .CodeMirror-line::selection { background: #44475a; }
+.cm-s-pyide-dracula .CodeMirror-activeline-background { background: #343746; }
+.cm-s-pyide-dracula .CodeMirror-matchingbracket { color: #ff79c6 !important; text-decoration: underline; }
+.cm-s-pyide-dracula .cm-keyword { color: #ff79c6; }
+.cm-s-pyide-dracula .cm-def { color: #50fa7b; }
+.cm-s-pyide-dracula .cm-string { color: #f1fa8c; }
+.cm-s-pyide-dracula .cm-string-2 { color: #f1fa8c; }
+.cm-s-pyide-dracula .cm-number { color: #bd93f9; }
+.cm-s-pyide-dracula .cm-comment { color: #8d98cc; }
+.cm-s-pyide-dracula .cm-builtin { color: #8be9fd; }
+.cm-s-pyide-dracula .cm-variable { color: #f8f8f2; }
+.cm-s-pyide-dracula .cm-variable-2 { color: #f8f8f2; }
+.cm-s-pyide-dracula .cm-variable-3 { color: #8be9fd; }
+.cm-s-pyide-dracula .cm-operator { color: #ff79c6; }
+.cm-s-pyide-dracula .cm-property { color: #8be9fd; }
+.cm-s-pyide-dracula .cm-atom { color: #bd93f9; }
+.cm-s-pyide-dracula .cm-meta { color: #ff79c6; }
+.cm-s-pyide-dracula .cm-qualifier { color: #8be9fd; }
+.cm-s-pyide-dracula .cm-tag { color: #ff79c6; }
+.cm-s-pyide-dracula .cm-attribute { color: #50fa7b; }
+.cm-s-pyide-dracula .cm-bracket { color: #f8f8f2; }
+.cm-s-pyide-dracula .cm-type { color: #8be9fd; }
+.cm-s-pyide-dracula .cm-error { color: #ff5555; }
+:root[data-theme="monokai"] {
+  --bg: #272822; --bg-panel: #1e1f1c; --bg-head: #33342d; --line: #4f4e43;
+  --text: #f8f8f2; --muted: #aaa48a;
+  --accent: #a6e22e; --accent-hover: #bdf05a; --on-accent: #1e1f1c;
+  --brand: #f92672; --brand-hover: #d81b60; --on-brand: #ffffff;
+  --green: #a6e22e; --green-hover: #a6e22e; --on-green: #272822; --red: #f92672; --on-red: #272822;
+  --amber: #e6db74; --purple: #ae81ff;
+  --hover-bg: #33342d; --hover-line: #aaa48a; --sprite-hover: #33342d;
+  --banner-bg: #33342d; --banner-line: #4f4e43; --banner-text: #f8f8f2;
+  --chip-game-bg: #1e1f1c; --chip-game-line: #4f4e43; --check-a: #1e1f1c; --check-b: #33342d;
+  --shadow: rgba(0, 0, 0, .5);
+  color-scheme: dark;
+}
+.cm-s-pyide-monokai { background: var(--bg); color: var(--text); }
+.cm-s-pyide-monokai .CodeMirror-gutters { background: var(--bg); border-right-color: var(--line); }
+.cm-s-pyide-monokai .CodeMirror-linenumber { color: var(--muted); }
+.cm-s-pyide-monokai .CodeMirror-cursor { border-left-color: #a6e22e; }
+.cm-s-pyide-monokai .CodeMirror-selected, .cm-s-pyide-monokai.CodeMirror-focused .CodeMirror-selected, .cm-s-pyide-monokai .CodeMirror-line::selection { background: #49483e; }
+.cm-s-pyide-monokai .CodeMirror-activeline-background { background: #33342d; }
+.cm-s-pyide-monokai .CodeMirror-matchingbracket { color: #a6e22e !important; text-decoration: underline; }
+.cm-s-pyide-monokai .cm-keyword { color: #f92672; }
+.cm-s-pyide-monokai .cm-def { color: #a6e22e; }
+.cm-s-pyide-monokai .cm-string { color: #e6db74; }
+.cm-s-pyide-monokai .cm-string-2 { color: #e6db74; }
+.cm-s-pyide-monokai .cm-number { color: #ae81ff; }
+.cm-s-pyide-monokai .cm-comment { color: #a39e88; }
+.cm-s-pyide-monokai .cm-builtin { color: #66d9ef; }
+.cm-s-pyide-monokai .cm-variable { color: #f8f8f2; }
+.cm-s-pyide-monokai .cm-variable-2 { color: #f8f8f2; }
+.cm-s-pyide-monokai .cm-variable-3 { color: #66d9ef; }
+.cm-s-pyide-monokai .cm-operator { color: #f92672; }
+.cm-s-pyide-monokai .cm-property { color: #66d9ef; }
+.cm-s-pyide-monokai .cm-atom { color: #ae81ff; }
+.cm-s-pyide-monokai .cm-meta { color: #f92672; }
+.cm-s-pyide-monokai .cm-qualifier { color: #66d9ef; }
+.cm-s-pyide-monokai .cm-tag { color: #f92672; }
+.cm-s-pyide-monokai .cm-attribute { color: #a6e22e; }
+.cm-s-pyide-monokai .cm-bracket { color: #f8f8f2; }
+.cm-s-pyide-monokai .cm-type { color: #66d9ef; }
+.cm-s-pyide-monokai .cm-error { color: #f92672; }
+:root[data-theme="synthwave"] {
+  --bg: #241b2f; --bg-panel: #2a2139; --bg-head: #34294f; --line: #55437a;
+  --text: #f4eeff; --muted: #bcb0da;
+  --accent: #ff7edb; --accent-hover: #ff9fe5; --on-accent: #241b2f;
+  --brand: #f92aad; --brand-hover: #d61f93; --on-brand: #ffffff;
+  --green: #72f1b8; --green-hover: #72f1b8; --on-green: #241b2f; --red: #fe4450; --on-red: #241b2f;
+  --amber: #fede5d; --purple: #c792ea;
+  --hover-bg: #34294f; --hover-line: #bcb0da; --sprite-hover: #34294f;
+  --banner-bg: #34294f; --banner-line: #55437a; --banner-text: #f4eeff;
+  --chip-game-bg: #2a2139; --chip-game-line: #55437a; --check-a: #2a2139; --check-b: #34294f;
+  --shadow: rgba(0, 0, 0, .5);
+  color-scheme: dark;
+}
+.cm-s-pyide-synthwave { background: var(--bg); color: var(--text); }
+.cm-s-pyide-synthwave .CodeMirror-gutters { background: var(--bg); border-right-color: var(--line); }
+.cm-s-pyide-synthwave .CodeMirror-linenumber { color: var(--muted); }
+.cm-s-pyide-synthwave .CodeMirror-cursor { border-left-color: #ff7edb; }
+.cm-s-pyide-synthwave .CodeMirror-selected, .cm-s-pyide-synthwave.CodeMirror-focused .CodeMirror-selected, .cm-s-pyide-synthwave .CodeMirror-line::selection { background: #463465; }
+.cm-s-pyide-synthwave .CodeMirror-activeline-background { background: #34294f; }
+.cm-s-pyide-synthwave .CodeMirror-matchingbracket { color: #ff7edb !important; text-decoration: underline; }
+.cm-s-pyide-synthwave .cm-keyword { color: #fede5d; }
+.cm-s-pyide-synthwave .cm-def { color: #36f9f6; }
+.cm-s-pyide-synthwave .cm-string { color: #ff8b39; }
+.cm-s-pyide-synthwave .cm-string-2 { color: #ff8b39; }
+.cm-s-pyide-synthwave .cm-number { color: #f97e72; }
+.cm-s-pyide-synthwave .cm-comment { color: #a99dca; }
+.cm-s-pyide-synthwave .cm-builtin { color: #72f1b8; }
+.cm-s-pyide-synthwave .cm-variable { color: #ff7edb; }
+.cm-s-pyide-synthwave .cm-variable-2 { color: #ff7edb; }
+.cm-s-pyide-synthwave .cm-variable-3 { color: #72f1b8; }
+.cm-s-pyide-synthwave .cm-operator { color: #fede5d; }
+.cm-s-pyide-synthwave .cm-property { color: #36f9f6; }
+.cm-s-pyide-synthwave .cm-atom { color: #f97e72; }
+.cm-s-pyide-synthwave .cm-meta { color: #fede5d; }
+.cm-s-pyide-synthwave .cm-qualifier { color: #36f9f6; }
+.cm-s-pyide-synthwave .cm-tag { color: #72f1b8; }
+.cm-s-pyide-synthwave .cm-attribute { color: #fede5d; }
+.cm-s-pyide-synthwave .cm-bracket { color: #ff7edb; }
+.cm-s-pyide-synthwave .cm-type { color: #72f1b8; }
+.cm-s-pyide-synthwave .cm-error { color: #fe4450; }
+:root[data-theme="retro"] {
+  --bg: #050a05; --bg-panel: #081208; --bg-head: #0d1d0d; --line: #2a6a2a;
+  --text: #39ff14; --muted: #7fd86f;
+  --accent: #39ff14; --accent-hover: #7dff63; --on-accent: #031203;
+  --brand: #1a8f1a; --brand-hover: #157515; --on-brand: #eaffea;
+  --green: #39ff14; --green-hover: #39ff14; --on-green: #050a05; --red: #ff5f5f; --on-red: #050a05;
+  --amber: #ffd166; --purple: #b6ff9e;
+  --hover-bg: #0d1d0d; --hover-line: #7fd86f; --sprite-hover: #0d1d0d;
+  --banner-bg: #0d1d0d; --banner-line: #2a6a2a; --banner-text: #39ff14;
+  --chip-game-bg: #081208; --chip-game-line: #2a6a2a; --check-a: #081208; --check-b: #0d1d0d;
+  --shadow: rgba(0, 0, 0, .5);
+  color-scheme: dark;
+}
+.cm-s-pyide-retro { background: var(--bg); color: var(--text); }
+.cm-s-pyide-retro .CodeMirror-gutters { background: var(--bg); border-right-color: var(--line); }
+.cm-s-pyide-retro .CodeMirror-linenumber { color: var(--muted); }
+.cm-s-pyide-retro .CodeMirror-cursor { border-left-color: #39ff14; }
+.cm-s-pyide-retro .CodeMirror-selected, .cm-s-pyide-retro.CodeMirror-focused .CodeMirror-selected, .cm-s-pyide-retro .CodeMirror-line::selection { background: #134d13; }
+.cm-s-pyide-retro .CodeMirror-activeline-background { background: #0d1d0d; }
+.cm-s-pyide-retro .CodeMirror-matchingbracket { color: #39ff14 !important; text-decoration: underline; }
+.cm-s-pyide-retro .cm-keyword { color: #b6ff9e; }
+.cm-s-pyide-retro .cm-def { color: #39ff14; }
+.cm-s-pyide-retro .cm-string { color: #9dff7a; }
+.cm-s-pyide-retro .cm-string-2 { color: #9dff7a; }
+.cm-s-pyide-retro .cm-number { color: #d4ff8a; }
+.cm-s-pyide-retro .cm-comment { color: #6fcf5f; }
+.cm-s-pyide-retro .cm-builtin { color: #8affc1; }
+.cm-s-pyide-retro .cm-variable { color: #39ff14; }
+.cm-s-pyide-retro .cm-variable-2 { color: #39ff14; }
+.cm-s-pyide-retro .cm-variable-3 { color: #8affc1; }
+.cm-s-pyide-retro .cm-operator { color: #b6ff9e; }
+.cm-s-pyide-retro .cm-property { color: #8affc1; }
+.cm-s-pyide-retro .cm-atom { color: #d4ff8a; }
+.cm-s-pyide-retro .cm-meta { color: #b6ff9e; }
+.cm-s-pyide-retro .cm-qualifier { color: #8affc1; }
+.cm-s-pyide-retro .cm-tag { color: #b6ff9e; }
+.cm-s-pyide-retro .cm-attribute { color: #8affc1; }
+.cm-s-pyide-retro .cm-bracket { color: #39ff14; }
+.cm-s-pyide-retro .cm-type { color: #8affc1; }
+.cm-s-pyide-retro .cm-error { color: #ff5f5f; }
+:root[data-theme="sunset"] {
+  --bg: #2b1b2e; --bg-panel: #33203a; --bg-head: #3e2645; --line: #654268;
+  --text: #ffeedd; --muted: #d6bac0;
+  --accent: #ff9e64; --accent-hover: #ffb989; --on-accent: #2b1b2e;
+  --brand: #e2566f; --brand-hover: #c94860; --on-brand: #ffffff;
+  --green: #9ece6a; --green-hover: #9ece6a; --on-green: #2b1b2e; --red: #ff6b81; --on-red: #2b1b2e;
+  --amber: #ffc777; --purple: #c099ff;
+  --hover-bg: #3e2645; --hover-line: #d6bac0; --sprite-hover: #3e2645;
+  --banner-bg: #3e2645; --banner-line: #654268; --banner-text: #ffeedd;
+  --chip-game-bg: #33203a; --chip-game-line: #654268; --check-a: #33203a; --check-b: #3e2645;
+  --shadow: rgba(0, 0, 0, .5);
+  color-scheme: dark;
+}
+.cm-s-pyide-sunset { background: var(--bg); color: var(--text); }
+.cm-s-pyide-sunset .CodeMirror-gutters { background: var(--bg); border-right-color: var(--line); }
+.cm-s-pyide-sunset .CodeMirror-linenumber { color: var(--muted); }
+.cm-s-pyide-sunset .CodeMirror-cursor { border-left-color: #ff9e64; }
+.cm-s-pyide-sunset .CodeMirror-selected, .cm-s-pyide-sunset.CodeMirror-focused .CodeMirror-selected, .cm-s-pyide-sunset .CodeMirror-line::selection { background: #5a3a5e; }
+.cm-s-pyide-sunset .CodeMirror-activeline-background { background: #3e2645; }
+.cm-s-pyide-sunset .CodeMirror-matchingbracket { color: #ff9e64 !important; text-decoration: underline; }
+.cm-s-pyide-sunset .cm-keyword { color: #ff9e64; }
+.cm-s-pyide-sunset .cm-def { color: #ffc777; }
+.cm-s-pyide-sunset .cm-string { color: #9ece6a; }
+.cm-s-pyide-sunset .cm-string-2 { color: #9ece6a; }
+.cm-s-pyide-sunset .cm-number { color: #ff6b81; }
+.cm-s-pyide-sunset .cm-comment { color: #bb96a5; }
+.cm-s-pyide-sunset .cm-builtin { color: #c099ff; }
+.cm-s-pyide-sunset .cm-variable { color: #ffeedd; }
+.cm-s-pyide-sunset .cm-variable-2 { color: #ffeedd; }
+.cm-s-pyide-sunset .cm-variable-3 { color: #c099ff; }
+.cm-s-pyide-sunset .cm-operator { color: #ff9e64; }
+.cm-s-pyide-sunset .cm-property { color: #ffc777; }
+.cm-s-pyide-sunset .cm-atom { color: #ff6b81; }
+.cm-s-pyide-sunset .cm-meta { color: #ff9e64; }
+.cm-s-pyide-sunset .cm-qualifier { color: #ffc777; }
+.cm-s-pyide-sunset .cm-tag { color: #ff9e64; }
+.cm-s-pyide-sunset .cm-attribute { color: #c099ff; }
+.cm-s-pyide-sunset .cm-bracket { color: #ffeedd; }
+.cm-s-pyide-sunset .cm-type { color: #c099ff; }
+.cm-s-pyide-sunset .cm-error { color: #ff6b81; }
+/* Each editor theme's swatch in the shop (generated with the themes). */
+.theme-swatch-contrast { background: #000000; border-color: #7a7a7a; }
+.theme-swatch-contrast .k { color: #ffd400; } .theme-swatch-contrast .d { color: #7fdbff; } .theme-swatch-contrast .s { color: #7dff8a; } .theme-swatch-contrast .c { color: #d0d0d0; }
+.theme-swatch-ocean { background: #0b1d2e; border-color: #2a5274; }
+.theme-swatch-ocean .k { color: #4fc3f7; } .theme-swatch-ocean .d { color: #2ec4b6; } .theme-swatch-ocean .s { color: #a5e8b8; } .theme-swatch-ocean .c { color: #86a8c4; }
+.theme-swatch-forest { background: #17201a; border-color: #3d5a43; }
+.theme-swatch-forest .k { color: #d4a35a; } .theme-swatch-forest .d { color: #8bc34a; } .theme-swatch-forest .s { color: #c5e1a5; } .theme-swatch-forest .c { color: #94a789; }
+.theme-swatch-solarized { background: #002b36; border-color: #2f5d68; }
+.theme-swatch-solarized .k { color: #859900; } .theme-swatch-solarized .d { color: #268bd2; } .theme-swatch-solarized .s { color: #2aa198; } .theme-swatch-solarized .c { color: #8a9a9a; }
+.theme-swatch-dracula { background: #282a36; border-color: #4d5066; }
+.theme-swatch-dracula .k { color: #ff79c6; } .theme-swatch-dracula .d { color: #50fa7b; } .theme-swatch-dracula .s { color: #f1fa8c; } .theme-swatch-dracula .c { color: #8d98cc; }
+.theme-swatch-monokai { background: #272822; border-color: #4f4e43; }
+.theme-swatch-monokai .k { color: #f92672; } .theme-swatch-monokai .d { color: #a6e22e; } .theme-swatch-monokai .s { color: #e6db74; } .theme-swatch-monokai .c { color: #a39e88; }
+.theme-swatch-synthwave { background: #241b2f; border-color: #55437a; }
+.theme-swatch-synthwave .k { color: #fede5d; } .theme-swatch-synthwave .d { color: #36f9f6; } .theme-swatch-synthwave .s { color: #ff8b39; } .theme-swatch-synthwave .c { color: #a99dca; }
+.theme-swatch-retro { background: #050a05; border-color: #2a6a2a; }
+.theme-swatch-retro .k { color: #b6ff9e; } .theme-swatch-retro .d { color: #39ff14; } .theme-swatch-retro .s { color: #9dff7a; } .theme-swatch-retro .c { color: #6fcf5f; }
+.theme-swatch-sunset { background: #2b1b2e; border-color: #654268; }
+.theme-swatch-sunset .k { color: #ff9e64; } .theme-swatch-sunset .d { color: #ffc777; } .theme-swatch-sunset .s { color: #9ece6a; } .theme-swatch-sunset .c { color: #bb96a5; }
+.theme-cards { list-style: none; margin: 0 0 16px; padding: 0; display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
+.theme-card { display: flex; flex-direction: column; gap: 6px; padding: 12px; border: 1px solid var(--line);
+  border-radius: 10px; background: var(--bg-panel); }
+.theme-card.is-current { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.theme-card.is-locked { opacity: .6; }
+.theme-card .btn { align-self: flex-start; margin-top: auto; }
+.theme-swatch { font-family: var(--mono); font-size: 12px; line-height: 1.5; padding: 8px 10px;
+  border: 1px solid; border-radius: 8px; white-space: pre; overflow: hidden; }
+:root[data-theme="christmas"] {
+  --bg: #0f2a1d; --bg-panel: #13331f; --bg-head: #183d26; --line: #336a45;
+  --text: #fdf6ec; --muted: #c9d8c5;
+  --accent: #e63946; --accent-hover: #ff5c68; --on-accent: #ffffff;
+  --brand: #c1121f; --brand-hover: #9d0e19; --on-brand: #ffffff;
+  --green: #52b788; --green-hover: #52b788; --on-green: #0f2a1d; --red: #ff5c68; --on-red: #0f2a1d;
+  --amber: #f4c430; --purple: #e5b3fe;
+  --hover-bg: #183d26; --hover-line: #c9d8c5; --sprite-hover: #183d26;
+  --banner-bg: #183d26; --banner-line: #336a45; --banner-text: #fdf6ec;
+  --chip-game-bg: #13331f; --chip-game-line: #336a45; --check-a: #13331f; --check-b: #183d26;
+  --shadow: rgba(0, 0, 0, .5);
+  color-scheme: dark;
+}
+.cm-s-pyide-christmas { background: var(--bg); color: var(--text); }
+.cm-s-pyide-christmas .CodeMirror-gutters { background: var(--bg); border-right-color: var(--line); }
+.cm-s-pyide-christmas .CodeMirror-linenumber { color: var(--muted); }
+.cm-s-pyide-christmas .CodeMirror-cursor { border-left-color: #e63946; }
+.cm-s-pyide-christmas .CodeMirror-selected, .cm-s-pyide-christmas.CodeMirror-focused .CodeMirror-selected, .cm-s-pyide-christmas .CodeMirror-line::selection { background: #2d6a4f; }
+.cm-s-pyide-christmas .CodeMirror-activeline-background { background: #183d26; }
+.cm-s-pyide-christmas .CodeMirror-matchingbracket { color: #e63946 !important; text-decoration: underline; }
+.cm-s-pyide-christmas .cm-keyword { color: #ff6b74; }
+.cm-s-pyide-christmas .cm-def { color: #f4c430; }
+.cm-s-pyide-christmas .cm-string { color: #95d5b2; }
+.cm-s-pyide-christmas .cm-string-2 { color: #95d5b2; }
+.cm-s-pyide-christmas .cm-number { color: #ffb4a2; }
+.cm-s-pyide-christmas .cm-comment { color: #a3bcaa; }
+.cm-s-pyide-christmas .cm-builtin { color: #74c69d; }
+.cm-s-pyide-christmas .cm-variable { color: #fdf6ec; }
+.cm-s-pyide-christmas .cm-variable-2 { color: #fdf6ec; }
+.cm-s-pyide-christmas .cm-variable-3 { color: #74c69d; }
+.cm-s-pyide-christmas .cm-operator { color: #ff6b74; }
+.cm-s-pyide-christmas .cm-property { color: #f4c430; }
+.cm-s-pyide-christmas .cm-atom { color: #ffb4a2; }
+.cm-s-pyide-christmas .cm-meta { color: #ff6b74; }
+.cm-s-pyide-christmas .cm-qualifier { color: #f4c430; }
+.cm-s-pyide-christmas .cm-tag { color: #ff6b74; }
+.cm-s-pyide-christmas .cm-attribute { color: #f4c430; }
+.cm-s-pyide-christmas .cm-bracket { color: #fdf6ec; }
+.cm-s-pyide-christmas .cm-type { color: #74c69d; }
+.cm-s-pyide-christmas .cm-error { color: #ff5c68; }
+:root[data-theme="winter"] {
+  --bg: #0e1726; --bg-panel: #121d30; --bg-head: #17243b; --line: #33496b;
+  --text: #eef6ff; --muted: #adc1d9;
+  --accent: #9ad8ff; --accent-hover: #c4e9ff; --on-accent: #0e1726;
+  --brand: #4f8fc0; --brand-hover: #3f77a3; --on-brand: #ffffff;
+  --green: #8fe3cf; --green-hover: #8fe3cf; --on-green: #0e1726; --red: #ff8fa3; --on-red: #0e1726;
+  --amber: #ffe3a3; --purple: #c7b8ff;
+  --hover-bg: #17243b; --hover-line: #adc1d9; --sprite-hover: #17243b;
+  --banner-bg: #17243b; --banner-line: #33496b; --banner-text: #eef6ff;
+  --chip-game-bg: #121d30; --chip-game-line: #33496b; --check-a: #121d30; --check-b: #17243b;
+  --shadow: rgba(0, 0, 0, .5);
+  color-scheme: dark;
+}
+.cm-s-pyide-winter { background: var(--bg); color: var(--text); }
+.cm-s-pyide-winter .CodeMirror-gutters { background: var(--bg); border-right-color: var(--line); }
+.cm-s-pyide-winter .CodeMirror-linenumber { color: var(--muted); }
+.cm-s-pyide-winter .CodeMirror-cursor { border-left-color: #9ad8ff; }
+.cm-s-pyide-winter .CodeMirror-selected, .cm-s-pyide-winter.CodeMirror-focused .CodeMirror-selected, .cm-s-pyide-winter .CodeMirror-line::selection { background: #2a4568; }
+.cm-s-pyide-winter .CodeMirror-activeline-background { background: #17243b; }
+.cm-s-pyide-winter .CodeMirror-matchingbracket { color: #9ad8ff !important; text-decoration: underline; }
+.cm-s-pyide-winter .cm-keyword { color: #9ad8ff; }
+.cm-s-pyide-winter .cm-def { color: #c7b8ff; }
+.cm-s-pyide-winter .cm-string { color: #b8f2e6; }
+.cm-s-pyide-winter .cm-string-2 { color: #b8f2e6; }
+.cm-s-pyide-winter .cm-number { color: #ffe3a3; }
+.cm-s-pyide-winter .cm-comment { color: #93abc8; }
+.cm-s-pyide-winter .cm-builtin { color: #8fe3cf; }
+.cm-s-pyide-winter .cm-variable { color: #eef6ff; }
+.cm-s-pyide-winter .cm-variable-2 { color: #eef6ff; }
+.cm-s-pyide-winter .cm-variable-3 { color: #8fe3cf; }
+.cm-s-pyide-winter .cm-operator { color: #9ad8ff; }
+.cm-s-pyide-winter .cm-property { color: #c4e9ff; }
+.cm-s-pyide-winter .cm-atom { color: #ffe3a3; }
+.cm-s-pyide-winter .cm-meta { color: #9ad8ff; }
+.cm-s-pyide-winter .cm-qualifier { color: #c4e9ff; }
+.cm-s-pyide-winter .cm-tag { color: #9ad8ff; }
+.cm-s-pyide-winter .cm-attribute { color: #c7b8ff; }
+.cm-s-pyide-winter .cm-bracket { color: #eef6ff; }
+.cm-s-pyide-winter .cm-type { color: #8fe3cf; }
+.cm-s-pyide-winter .cm-error { color: #ff8fa3; }
+:root[data-theme="flower"] {
+  --bg: #2a1a24; --bg-panel: #321f2b; --bg-head: #3c2534; --line: #664459;
+  --text: #fff0f5; --muted: #e2c3d2;
+  --accent: #ff8fc8; --accent-hover: #ffb3da; --on-accent: #2a1a24;
+  --brand: #d6589a; --brand-hover: #b84882; --on-brand: #ffffff;
+  --green: #a8e6a3; --green-hover: #a8e6a3; --on-green: #2a1a24; --red: #ff6b8b; --on-red: #2a1a24;
+  --amber: #ffd479; --purple: #d0a8ff;
+  --hover-bg: #3c2534; --hover-line: #e2c3d2; --sprite-hover: #3c2534;
+  --banner-bg: #3c2534; --banner-line: #664459; --banner-text: #fff0f5;
+  --chip-game-bg: #321f2b; --chip-game-line: #664459; --check-a: #321f2b; --check-b: #3c2534;
+  --shadow: rgba(0, 0, 0, .5);
+  color-scheme: dark;
+}
+.cm-s-pyide-flower { background: var(--bg); color: var(--text); }
+.cm-s-pyide-flower .CodeMirror-gutters { background: var(--bg); border-right-color: var(--line); }
+.cm-s-pyide-flower .CodeMirror-linenumber { color: var(--muted); }
+.cm-s-pyide-flower .CodeMirror-cursor { border-left-color: #ff8fc8; }
+.cm-s-pyide-flower .CodeMirror-selected, .cm-s-pyide-flower.CodeMirror-focused .CodeMirror-selected, .cm-s-pyide-flower .CodeMirror-line::selection { background: #5e3d52; }
+.cm-s-pyide-flower .CodeMirror-activeline-background { background: #3c2534; }
+.cm-s-pyide-flower .CodeMirror-matchingbracket { color: #ff8fc8 !important; text-decoration: underline; }
+.cm-s-pyide-flower .cm-keyword { color: #ff8fc8; }
+.cm-s-pyide-flower .cm-def { color: #a8e6a3; }
+.cm-s-pyide-flower .cm-string { color: #ffd479; }
+.cm-s-pyide-flower .cm-string-2 { color: #ffd479; }
+.cm-s-pyide-flower .cm-number { color: #d0a8ff; }
+.cm-s-pyide-flower .cm-comment { color: #c6a2b6; }
+.cm-s-pyide-flower .cm-builtin { color: #8fd6e8; }
+.cm-s-pyide-flower .cm-variable { color: #fff0f5; }
+.cm-s-pyide-flower .cm-variable-2 { color: #fff0f5; }
+.cm-s-pyide-flower .cm-variable-3 { color: #8fd6e8; }
+.cm-s-pyide-flower .cm-operator { color: #ff8fc8; }
+.cm-s-pyide-flower .cm-property { color: #a8e6a3; }
+.cm-s-pyide-flower .cm-atom { color: #d0a8ff; }
+.cm-s-pyide-flower .cm-meta { color: #ff8fc8; }
+.cm-s-pyide-flower .cm-qualifier { color: #a8e6a3; }
+.cm-s-pyide-flower .cm-tag { color: #ff8fc8; }
+.cm-s-pyide-flower .cm-attribute { color: #a8e6a3; }
+.cm-s-pyide-flower .cm-bracket { color: #fff0f5; }
+.cm-s-pyide-flower .cm-type { color: #8fd6e8; }
+.cm-s-pyide-flower .cm-error { color: #ff6b8b; }
+
+/* Each editor theme's swatch in the shop (generated with the themes). */
+.theme-swatch-christmas { background: #0f2a1d; border-color: #336a45; }
+.theme-swatch-christmas .k { color: #ff6b74; } .theme-swatch-christmas .d { color: #f4c430; } .theme-swatch-christmas .s { color: #95d5b2; } .theme-swatch-christmas .c { color: #a3bcaa; }
+.theme-swatch-winter { background: #0e1726; border-color: #33496b; }
+.theme-swatch-winter .k { color: #9ad8ff; } .theme-swatch-winter .d { color: #c7b8ff; } .theme-swatch-winter .s { color: #b8f2e6; } .theme-swatch-winter .c { color: #93abc8; }
+.theme-swatch-flower { background: #2a1a24; border-color: #664459; }
+.theme-swatch-flower .k { color: #ff8fc8; } .theme-swatch-flower .d { color: #a8e6a3; } .theme-swatch-flower .s { color: #ffd479; } .theme-swatch-flower .c { color: #c6a2b6; }
+
+/* An assignment's notes on its page (assignment_notes.js): the lesson
+   page's two panes, in a box of their own height on a page that scrolls. */
+.assignment-notes .notes-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.assignment-notes .notes-head h2 { margin-right: 4px; }
+.assignment-notes .notes-actions { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+.assignment-notes .savestate.is-dirty { color: var(--amber, var(--accent)); }
+.notes-write { height: 560px; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; margin-top: 8px; }
+.notes-preview-scroll { overflow: auto; padding: 4px 16px 16px; }
+@media (max-width: 900px) { .notes-write { height: auto; } .notes-write .editor-wrap { height: 50vh; } }

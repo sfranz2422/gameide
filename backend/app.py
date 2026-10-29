@@ -30,6 +30,8 @@ import classes
 import notes
 import rewards
 import tutorials
+import library
+import grades
 import gamestore
 import publishing
 from gamestore import GameAsset, GameProject, GameVersion
@@ -870,6 +872,75 @@ rewards.init(app, _db, current_user)
 notes.init(app, _db, current_user)
 # Tutorials: built-in and teachers' own, shared, and their XP (tutorials.py).
 tutorials.init(app, _db, current_user, lambda: DIST)
+
+
+# The tutorial library (library.py, the same file as PyIDE's, WebIDE's and
+# FlaskIDE's): every tutorial a teacher has, linked to any number of
+# assignments, and the only place their text is edited. Its page here is
+# React's (#/library); its editor is PresMaker (templates/presmaker.html,
+# made by tools/sync_presmaker.py), drawn with PyIDE's notes.js.
+
+def _write_notes(db, a, text):
+    files = a.file_map()
+    if text.strip():
+        files[grades.NOTES] = text
+    else:
+        files.pop(grades.NOTES, None)
+    a.files = json.dumps(files)
+    a.updated_at = accounts.now()
+    db.commit()
+    notes.store_quiz_keys(db, a, text)
+
+
+_BUILTINS = {}
+
+
+def _known(text):
+    """Notes that ARE a built-in tutorial word for word (an assignment made
+    from one): {origin, title}, so the library links it to the teacher's row
+    for that built-in rather than a copy of its text."""
+    d = tutorials._builtin_dir()
+    stamp = sum(f.stat().st_mtime for f in d.glob("*.md")) if d.exists() else 0
+    if _BUILTINS.get("stamp") != stamp:
+        _BUILTINS.clear()
+        _BUILTINS["stamp"] = stamp
+        for f in d.glob("*.md"):
+            md = f.read_text(encoding="utf-8")
+            _BUILTINS[md] = {"origin": "builtin:" + f.stem, "title": tutorials.meta(md)["title"]}
+    return _BUILTINS.get(text)
+
+
+library.init(
+    app,
+    app_name=APP_NAME,
+    session=_db,
+    current_user=current_user,
+    is_teacher=lambda user: accounts.is_teacher(user.email),
+    is_admin=tutorials._is_admin,
+    notes_of=grades.notes_of,
+    write_notes=_write_notes,
+    known=_known,
+    visibilities=tutorials.VISIBILITIES,
+    page_url="/#/library",
+    assignment_url=lambda a: "/#/assignment/" + a.slug,
+    page=lambda db, user: {"brand": "GameIDE", "logo": "🎮", "ns": "PyIDE", "theme_key": "gameide.theme",
+                           "home_url": "/#/classes", "help_url": "/#/help", "max_tutorial": library.MAX_TUTORIAL,
+                           # Its tutorials gate steps with ```check lines (GameIDE's own words),
+                           # and point at the editor with highlight: lines.
+                           "pm_tests": "lines", "pm_tests_fence": "check", "pm_adapter": "gameide", "no_pictures": True,
+                           "pm_test_examples": ["object Player exists", "Player has event step", "Player.step uses move_and_collide",
+                                                "room Room1 has at least 5 Coin", "game runs 2 seconds without errors",
+                                                "after 1 second holding right, Player.x increased"]},
+)
+
+
+@app.get("/static/<path:filename>", endpoint="static")
+def static_files(filename):
+    """The tutorial editor's files (PresMaker, and PyIDE's notes.js it draws
+    with), from the build's static/ (frontend/public/static)."""
+    r = send_from_directory(DIST / "static", filename)
+    r.headers["Cache-Control"] = "public, max-age=3600"
+    return r
 
 
 if __name__ == "__main__":
