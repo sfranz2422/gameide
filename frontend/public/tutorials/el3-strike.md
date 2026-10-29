@@ -58,9 +58,10 @@ room_restart()
 ```
 
 ```check
-after 1 second, instance_number("Slime") >= 3
-after 1 second, Slime.x changed
+Level.create uses Slime
+Slime.step uses place_free
 Player has event collision with Slime
+game runs 2 seconds without errors
 ```
 
 ---
@@ -98,10 +99,18 @@ effect("hit", other.x, other.y)
 other.destroy()
 ```
 
+```quiz
+Why does a Slash vanish a moment after it's made?
+- [ ] `image_alpha` fades it out
+- [x] Its Alarm 0 goes off 15 steps later and destroys it
+- [ ] It's destroyed as soon as the player stops pressing X
+```
+
 ```check
+Slash has event alarm 0
 Slash has event collision with Slime
-after 0.1 seconds holding x, instance_number("Slash") == 1
-after 1 second holding x, instance_number("Slash") == 0
+Player.step uses Slash
+game runs 2 seconds without errors
 ```
 
 ---
@@ -118,6 +127,14 @@ if friend and point_distance(self.x, self.y, friend.x, friend.y) < 48:
 ```
 
 `instance_nearest` finds the closest Friend, and `point_distance` how far it is. `say` shows a speech box at the bottom of the screen.
+
+```quiz
+type: match
+Match each function to what it does:
+- instance_nearest -> finds the closest instance of an object
+- point_distance -> says how far apart two points are
+- say -> shows a speech box at the bottom of the screen
+```
 
 ```check
 Player.step uses point_distance

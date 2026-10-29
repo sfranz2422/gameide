@@ -358,5 +358,13 @@
   "time": "30 min",
   "starter": "novel",
   "description": "A spooky story on a misty marsh, already working: pictures, characters, words and choices with two endings. Then write your own scenes."
+ },
+ {
+  "key": "phone-play",
+  "title": "Play on a Phone",
+  "level": "Starter Projects",
+  "time": "15 min",
+  "starter": "platformer",
+  "description": "On-screen arrows and buttons, taps as clicks, and playing your published game on a phone."
  }
 ]

@@ -44,6 +44,13 @@ if move_and_collide(self.vx, 0):
 
 `move_and_collide` moves it, but stops it against anything solid — and says whether it hit something.
 
+```quiz
+Why is there an `if` in front of `move_and_collide(self.vx, 0)`?
+- [x] It says whether the player hit something solid, and if it did, the speed goes back to 0
+- [ ] The player only moves when you press a key
+- [ ] Without it, the player would fall through the floor
+```
+
 highlight: add-event
 
 ```check
@@ -84,6 +91,13 @@ if on_ground and keyboard_check_pressed("space"):
 
 `place_free` says whether a spot is empty. One pixel below your feet not being free means you're standing.
 
+```quiz
+Why is the jump `self.vy = -11`, a number below zero?
+- [x] `vy` is how fast it moves down, so below zero moves it up
+- [ ] Below zero makes the jump last longer
+- [ ] It stops gravity while you jump
+```
+
 ```check
 Player.step uses place_free
 Player.step uses keyboard_check_pressed
@@ -112,6 +126,6 @@ Player.collision with Coin uses destroy
 
 You have a platformer. Ideas:
 
-- Face the way you're going: `self.image_xscale = move` when `move != 0`.
+- Face the way you're going: under the line that sets `move`, add `if move != 0:` with `self.image_xscale = move` indented under it.
 - Make the jump higher or the gravity stronger.
 - Add an Enemy that you can jump on.

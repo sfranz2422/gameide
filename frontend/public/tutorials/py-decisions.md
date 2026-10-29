@@ -91,6 +91,13 @@ else:
 
 Python asks each question in order and runs the first one that's True. Play it: **Silver medal**. Then change `85` to `95` and to `50`, and play it each time.
 
+```quiz
+With `points = 95`, both `points >= 90` and `points >= 80` are True. What does it print?
+- [x] Gold medal
+- [ ] Silver medal
+- [ ] Gold medal, then Silver medal
+```
+
 ```check
 Main.create uses elif
 game runs 1 second without errors
@@ -108,6 +115,21 @@ at_door = True
 if has_key and at_door:
     print("The door opens")
 ```
+
+````quiz
+What does this print?
+```py
+has_key = True
+at_door = False
+if has_key or at_door:
+    print("Open")
+else:
+    print("Closed")
+```
+- [x] Open
+- [ ] Closed
+- [ ] Nothing at all
+````
 
 ```check
 Main.create uses and

@@ -480,7 +480,10 @@ export function EditorPage({ store, id }: { store: ProjectStore; id: string }) {
                 <div className="notes-holder" hidden={bottom !== "notes"}>
                   <TutorialPane
                     md={tutorialMd}
-                    progress={project.tutorial ?? { key: tutorialKey, title: "", step: 0, steps: 0 }}
+                    // An assignment's game goes by the assignment (a:<slug>), whatever its
+                    // starter was made from: a teacher's own tutorial (t:<slug>) is theirs
+                    // alone, so steps claimed under it paid the class nothing.
+                    progress={project.tutorial ? (tutorialKey.startsWith("a:") ? { ...project.tutorial, key: tutorialKey } : project.tutorial) : { key: tutorialKey, title: "", step: 0, steps: 0 }}
                     // Their own game only: a game open read only shows how far its owner got.
                     onProgress={store.kind === "view" || assignment?.teacher ? null : (t) => mutate((d) => void (d.tutorial = t), { history: "skip" })}
                     project={project}

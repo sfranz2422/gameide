@@ -37,12 +37,19 @@ if keyboard_check("space") and self.cooldown == 0:
 
 `instance_create(x, y, "Bullet")` makes a new bullet at the player's right edge. The **cooldown** counts down 15 steps between shots, so holding Space fires four bullets a second instead of sixty.
 
+```quiz
+If the cooldown were set to 30 instead of 15, how many bullets a second would holding Space fire?
+answer: 2
+answer: two
+```
+
 highlight: add-objects
 
 ```check
 object Bullet exists
 Player.step uses instance_create
-after 1 second holding space, instance_number("Bullet") >= 1
+Player.create uses cooldown
+game runs 2 seconds without errors
 ```
 
 ---
@@ -59,7 +66,8 @@ It runs once, when the bullet leaves the room.
 
 ```check
 Bullet has event outside room
-after 3 seconds holding space, instance_number("Bullet") <= 5
+Bullet.outside room uses destroy
+game runs 2 seconds without errors
 ```
 
 ---
@@ -77,10 +85,18 @@ global_vars.best = max(global_vars.best, global_vars.score)
 
 The bullet's gone, and the enemy is knocked back to the right.
 
+```quiz
+In the bullet's **Collision with Enemy** event, which instance is `other`?
+- [x] The enemy the bullet hit
+- [ ] The bullet itself
+- [ ] The player who fired it
+```
+
 ```check
 Bullet has event collision with Enemy
 Bullet.collision with Enemy uses destroy
-after 8 seconds holding space, global_vars.best >= 1
+Bullet.collision with Enemy uses score
+game runs 2 seconds without errors
 ```
 
 ---

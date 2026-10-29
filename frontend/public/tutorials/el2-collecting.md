@@ -48,6 +48,13 @@ other.y = random.randint(40, room_height - 40)
 
 The coin isn't destroyed: it jumps somewhere new, so there's always one to chase.
 
+```quiz
+Why does this event set `other.x`, and not `self.x`?
+- [x] `other` is the coin; `self.x` would move the player
+- [ ] `self` is the coin in a collision event
+- [ ] `other.x` moves every coin in the room
+```
+
 ```check
 Player has event collision with Coin
 Player.collision with Coin uses score
@@ -85,13 +92,20 @@ move_to_random_place(other)
 
 `thing` is whatever you pass in: the coin itself, or `other`, the coin the player touched.
 
+```quiz
+In Player's **Collision with Coin** event, `move_to_random_place(other)` runs. Inside the function, what is `thing`?
+- [x] The coin the player touched
+- [ ] The player
+- [ ] Every coin in the room
+```
+
 highlight: folder-scripts
 
 ```check
 script places exists
 Coin.create uses move_to_random_place
 Player.collision with Coin uses move_to_random_place
-after 1 second holding space, 40 <= instances("Coin")[0].x <= room_width - 40
+game runs 2 seconds without errors
 ```
 
 ---

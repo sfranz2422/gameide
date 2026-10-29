@@ -11,7 +11,7 @@ change, and the library reads progress from the games themselves.
 
 Keys name where a tutorial's markdown is:
   builtin:<name>    frontend/public/tutorials/<name>.md
-  t:<slug>          a teacher's, in gameide_tutorials
+  t:<slug>          a teacher's, in the tutorial library (library_items)
   a:<slug>          an assignment made from one: its notes are the tutorial
 
 Assigned to a class, a tutorial is an ordinary assignment whose notes are
@@ -25,7 +25,6 @@ import re
 from pathlib import Path
 
 from flask import Blueprint, abort, jsonify, make_response, request
-from sqlalchemy import func
 
 import accounts
 import checks
@@ -39,7 +38,11 @@ bp = Blueprint("tutorials", __name__)
 
 APP_NAME = "gameide"
 MAX_TUTORIAL = 100_000
-VISIBILITIES = ("private", "classes", "site")
+# "site" is the public Learn page (#/tutorials); everything else is the
+# teacher's own. A class gets a tutorial by having it as an assignment's
+# notes, as in the other editors — so there is no "classes" any more, and
+# rows left at it are made private (migrate).
+VISIBILITIES = ("private", "site")
 
 _db = None
 _current_user = None
@@ -151,22 +154,10 @@ def builtin(name):
     return f.read_text(encoding="utf-8") if f.exists() else None
 
 
-def _teachers_of(db, user):
-    """Ids of the teachers of the GameIDE classes this person is on the roster of."""
-    rows = (db.query(accounts.Course.teacher_id)
-            .join(accounts.Enrollment, accounts.Enrollment.class_id == accounts.Course.id)
-            .filter(accounts.Course.app == APP_NAME, func.lower(accounts.Enrollment.email) == user.email.lower()))
-    return {r.teacher_id for r in rows}
-
-
 def _can_see(db, user, t):
     if t.visibility == "site":
         return True
-    if user is None:
-        return False
-    if t.teacher_id == user.id or _is_admin(user):
-        return True
-    return t.visibility == "classes" and t.teacher_id in _teachers_of(db, user)
+    return user is not None and (t.teacher_id == user.id or _is_admin(user))
 
 
 def markdown_for(db, user, key):
@@ -214,13 +205,19 @@ def migrate(db):
     """Tutorials written before the library (gameide_tutorials) move into it,
     each keeping its slug, so a student's progress (t:<slug>) still finds it.
     Once each: a row already in the library is left alone."""
+    L = accounts.LibraryItem
+    # "Shared with my classes" is gone (VISIBILITIES): those are private now.
+    if db.query(L.id).filter(L.app == APP_NAME, L.visibility == "classes").first() is not None:
+        db.query(L).filter(L.app == APP_NAME, L.visibility == "classes").update({"visibility": "private"})
+        db.commit()
     have = {s for (s,) in db.query(accounts.LibraryItem.slug).filter(accounts.LibraryItem.app == APP_NAME)}
     moved = 0
     for t in db.query(Tutorial).all():
         if t.slug in have:
             continue
         db.add(accounts.LibraryItem(slug=t.slug, app=APP_NAME, teacher_id=t.owner_id, kind="tutorial", title=t.title,
-                                    body=t.markdown, size=len(t.markdown.encode("utf-8")), visibility=t.visibility,
+                                    body=t.markdown, size=len(t.markdown.encode("utf-8")),
+                                    visibility=t.visibility if t.visibility in VISIBILITIES else "private",
                                     created_at=t.created_at, updated_at=t.updated_at))
         moved += 1
     if moved:
@@ -232,19 +229,15 @@ def migrate(db):
 
 @bp.get("/api/tutorials")
 def list_tutorials():
-    """Tutorials beyond the built-in ones: a teacher's own, and those shared
-    with this person — their teachers' "classes" ones, and every "site" one."""
+    """Tutorials beyond the built-in ones on the Learn page: those published
+    for everyone ("site"), and nothing else — a teacher's own are in their
+    library, and their classes get them as assignments."""
     db = _db()
     try:
         user = _current_user(db)
         migrate(db)
         L = accounts.LibraryItem
         rows = db.query(L).filter(L.visibility == "site", *_rows()).all()
-        if user is not None:
-            rows += db.query(L).filter(L.teacher_id == user.id, *_rows()).all()
-            teachers = _teachers_of(db, user)
-            if teachers:
-                rows += db.query(L).filter(L.visibility == "classes", L.teacher_id.in_(teachers), *_rows()).all()
         seen, out = set(), []
         for t in sorted(rows, key=lambda t: t.title.lower()):
             # Plain notes taken in from an assignment aren't tutorials to follow.

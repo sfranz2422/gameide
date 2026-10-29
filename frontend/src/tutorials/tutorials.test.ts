@@ -4,6 +4,8 @@ import { describe, expect, it } from "vitest";
 import { TUTORIAL_STARTERS } from "../store/templates";
 import { isTutorial, parseTutorial, splitHeader, takeHighlight, TARGETS, tutorialProblems, unknownHighlights } from "./tutorial";
 import cases from "../notes/parse-cases.json";
+import { readCheck } from "../checks/checks";
+import { pieces } from "../notes/quiz";
 
 const DIR = join(__dirname, "../../public/tutorials");
 const index = JSON.parse(readFileSync(join(DIR, "index.json"), "utf8")) as { key: string; title: string; level: string; starter: string }[];
@@ -30,6 +32,11 @@ describe("tutorials", () => {
       md: "Press Play.\n```python\nhighlight: not_this\n```",
       highlight: "play",
     });
+    // A question that shows code keeps all of it, fenced longer than the code.
+    const q = "````quiz\nWhat does this print?\n```py\nprint(2 + 2)\n```\n- [x] 4\n- [ ] 22\n````";
+    const kept = takeHighlight("Read it.\n" + q + "\nhighlight: play").md;
+    expect(parseTutorial("---\ntitle: T\n---\n# A\n" + kept).steps[0]!.md).toContain("- [ ] 22");
+    expect(kept).toContain("print(2 + 2)\n```\n- [x] 4\n- [ ] 22\n````");
     expect(unknownHighlights("# A\nhighlight: play\n---\n# B\nhighlight: nowhere")).toEqual(["nowhere"]);
   });
   it("say what's wrong with one: unreadable checks, spotlights on nothing", () => {
@@ -54,6 +61,34 @@ describe("tutorials", () => {
       // Code is shown to type, never handed over.
       expect(md, entry.key).not.toMatch(/copy/i);
     }
+  });
+
+  // The teacher's rule, and a must: students type whatever a check names, so
+  // a check names only what its own step asks them to type — a `uses` word
+  // from the step's own words or code, a Python check built only from the
+  // step's own names — and so can't re-check an earlier step either.
+  // ("game runs N seconds without errors" names nothing, and is welcome.)
+  it("every built-in tutorial's checks name only what their own step asks for", () => {
+    const PY = new Set(["and", "or", "not", "in", "is", "True", "False", "None", "if", "else"]);
+    const problems: string[] = [];
+    for (const entry of index) {
+      const t = parseTutorial(readFileSync(join(DIR, `${entry.key}.md`), "utf8"));
+      t.steps.forEach((step, n) => {
+        // What the step says and shows: its words and code, not its checks or questions.
+        const said = pieces(step.md, ["check"]).map((p) => (p.type === "md" ? p.text : "")).join("\n");
+        const where = `${entry.key} step ${n + 1} "${step.title}"`;
+        for (const { label } of step.checks) {
+          const c = readCheck(label);
+          if (c.kind === "uses" && !said.includes(c.word)) problems.push(`${where}: "${label}" names ${c.word}, which the step never asks for`);
+          if (c.kind === "after-expr") {
+            const names = c.expr.replace(/(["'])(?:(?!\1).)*\1/g, "").match(/[A-Za-z_]\w*/g) ?? [];
+            const extra = [...new Set(names.filter((w) => !PY.has(w) && !said.includes(w)))];
+            if (extra.length) problems.push(`${where}: "${label}" names ${extra.join(", ")}, which the step never asks for`);
+          }
+        }
+      });
+    }
+    expect(problems).toEqual([]);
   });
 
   it("every spotlight target is still in the editor", () => {

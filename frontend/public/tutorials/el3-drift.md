@@ -24,11 +24,18 @@ if keyboard_check("up"):
 
 `cos` says how much of a push at that angle goes across, and `sin` how much goes up. `radians` turns degrees into the units `cos` and `sin` use. The push is 0.2 a step, so speed builds up while you hold Up, and stays when you let go.
 
+```quiz
+Why does the ship keep going after you let go of Up now?
+- [ ] Friction pushes it along
+- [x] Each step's push is added to its speed, and nothing takes it away
+- [ ] keyboard_check("up") stays True for a moment
+```
+
 highlight: code-editor
 
 ```check
 Ship.step uses cos
-after 1 second holding up, instances("Ship")[0].speed > 4
+after 1 second holding up, Ship.hspeed increased
 ```
 
 ---
@@ -61,8 +68,16 @@ if self.speed > 6:
 
 Changing `speed` keeps the direction: the ship still goes the same way, just no faster than 6.
 
+```quiz
+The ship is going faster than 6, and `self.speed = 6` runs. What happens to the way it's going?
+- [x] Nothing: it goes the same way, just no faster
+- [ ] It turns to point right
+- [ ] It turns to the way the ship is pointing
+```
+
 ```check
-after 2 seconds holding up, instances("Ship")[0].speed <= 6
+Ship.step uses speed
+game runs 2 seconds without errors
 ```
 
 ---
@@ -72,7 +87,8 @@ after 2 seconds holding up, instances("Ship")[0].speed <= 6
 Make **Down** slow the ship quickly: while it's held, multiply `self.speed` by 0.9 each step. Put it under the top-speed lines.
 
 ```check
-after 2 seconds holding up and down, instances("Ship")[0].speed < 3
+Ship.step uses 0.9
+game runs 2 seconds without errors
 ```
 
 ---

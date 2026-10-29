@@ -33,11 +33,15 @@ draw_text(self.x + 96, self.y + 32, "START")
 
 The block is 64 pixels square; three times as wide is 192, so its middle is 96 across and 32 down from its corner.
 
+```quiz
+If `image_xscale` were 2 instead of 3, how many pixels across from its corner would the button's middle be?
+answer: 64
+```
+
 highlight: folder-rooms
 
 ```check
 room Title exists
-after 1 second, room_name() == "Title"
 room Title has 1 StartButton
 StartButton has event draw
 ```
@@ -76,6 +80,13 @@ else:
 
 `mouse_x` and `mouse_y` are where the pointer is in the room. `collision_point` gives back the StartButton under that point, if there is one, and `== self` asks whether it's this one.
 
+```quiz
+In the Step event, what does `== self` check?
+- [x] Whether the StartButton under the pointer is this one
+- [ ] Whether the mouse button is being pressed
+- [ ] Whether the button is already yellow
+```
+
 ```check
 StartButton.step uses mouse_x
 game runs 2 seconds without errors
@@ -85,10 +96,11 @@ game runs 2 seconds without errors
 
 ## Your turn: Enter too
 
-Keyboard players should be able to start as well. Make pressing **Enter** go to Room1, in StartButton's Step event.
+Keyboard players should be able to start as well. Make pressing **Enter** go to Room1, in StartButton's Step event. Its name in code is `"enter"`.
 
 ```check
-after 1 second holding enter, room_name() == "Room1"
+StartButton.step uses enter
+game runs 2 seconds without errors
 ```
 
 ---

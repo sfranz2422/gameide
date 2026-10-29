@@ -70,6 +70,13 @@ Python stops: it can't add a number to a string. Turn the number into a string f
 print("Score: " + str(12))
 ```
 
+```quiz
+Why does `print("Score: " + 12)` stop with an error?
+- [x] `+` can't join a string and a number
+- [ ] 12 is too big to print
+- [ ] There must be a space after the colon
+```
+
 ```check
 Main.create uses str
 game runs 1 second without errors
@@ -89,6 +96,17 @@ print(f"{name} has {points} points")
 ```
 
 Play it: **Ana has 12 points**. You can even do sums inside: `{points * 2}`.
+
+````quiz
+What does this print?
+```py
+points = 12
+print(f"{points * 2} points")
+```
+- [x] 24 points
+- [ ] {points * 2} points
+- [ ] 12 * 2 points
+````
 
 ```check
 prints Ana has 12 points

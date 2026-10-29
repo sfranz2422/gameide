@@ -47,6 +47,15 @@ print((2 + 3) * 4)
 
 The first is **14**: times first. The brackets in the second make Python add first, so it's **20**.
 
+````quiz
+What does this print?
+```py
+print(10 - 2 * 3)
+```
+answer: 4
+answer: four
+````
+
 ```check
 prints 14
 prints 20
@@ -100,6 +109,17 @@ print(time // 60, "minutes", time % 60, "seconds")
 ```
 
 Play it: **2 minutes 15 seconds**. Now change `135` to another number and work out the answer before you press Play.
+
+````quiz
+Work it out before you try it: what does this print?
+```py
+time = 200
+print(time // 60, "minutes", time % 60, "seconds")
+```
+- [x] 3 minutes 20 seconds
+- [ ] 3.33 minutes 20 seconds
+- [ ] 3 minutes 2 seconds
+````
 
 ```check
 Main.create uses time

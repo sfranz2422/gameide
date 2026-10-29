@@ -58,6 +58,13 @@ if global_vars.lives <= 0:
     room_goto("GameOver")
 ```
 
+```quiz
+Why does `room_goto("GameOver")` go in two different events?
+- [x] The game can end two ways: the time runs out, or the lives run out
+- [ ] One goes to the room and the other draws the score
+- [ ] Both players need their own way to get there
+```
+
 ```check
 Hud.alarm 0 uses room_goto
 Player.collision with Enemy uses room_goto
@@ -76,7 +83,7 @@ The old "Time's up!" code isn't needed now. In **Hud**:
 
 ```check
 Hud avoids game_over
-Hud avoids game_pause
+Hud avoids ignore_pause
 game runs 2 seconds without errors
 ```
 
@@ -100,6 +107,14 @@ if not hasattr(global_vars, "best"):
 ```
 
 `save_get("best", 0)` gives 0 when nothing's been saved yet.
+
+```quiz
+type: match
+Match each one to what it does:
+- save_set -> keeps a value in the browser for next time
+- save_get -> reads a saved value back
+- room_goto -> moves the game to another room
+```
 
 ```check
 EndScreen.create uses save_set

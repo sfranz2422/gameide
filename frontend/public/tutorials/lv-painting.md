@@ -45,6 +45,15 @@ Then click a plain dirt square in the Tiles tab and paint the row under the gras
 
 Other tools: **Paint** paints where you click or drag, **Fill** fills a space, **Erase** rubs tiles out, and a right-click always erases.
 
+```quiz
+type: match
+Match each tool to what it does:
+- Rectangle -> paints the whole shape you drag out
+- Paint -> paints where you click or drag
+- Fill -> fills a space
+- Erase -> rubs tiles out
+```
+
 highlight: room-tools
 
 ```check
@@ -72,6 +81,13 @@ Scenery is easier to change on a layer of its own. In **Layers**, press **+ Tile
 In **Tiles**, pick a plant (there's a sprout, a bush and a tree near the bottom-left of the sheet) and paint a few of them standing on your grass.
 
 Plants aren't solid, so your hero will walk in front of them. To move a layer in front or behind, use its ↑ and ↓.
+
+```quiz
+Why won't your hero bump into the plants?
+- [ ] Because they're on the Decor layer
+- [x] Because plant tiles aren't solid
+- [ ] Because plants are smaller than the hero
+```
 
 highlight: room-tab-layers
 

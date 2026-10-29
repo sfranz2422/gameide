@@ -30,13 +30,21 @@ other.x = room_width + 12
 
 `other` is the enemy the player touched. Sending it back to the right means it can't take a second life on the very next step.
 
+```quiz
+Why does the collision event send the enemy back to the right?
+- [x] So it can't take another life on the very next step
+- [ ] So the player gets a point for it
+- [ ] So the enemy is destroyed
+```
+
 highlight: add-event
 
 ```check
 Player has event create
 Player has event collision with Enemy
 Player.collision with Enemy uses lives
-after 1 second, global_vars.lives <= 3
+Player.create uses lives
+game runs 2 seconds without errors
 ```
 
 ---
@@ -51,6 +59,13 @@ if global_vars.lives <= 0:
 ```
 
 `room_restart()` builds the room again from the start: the player back at the start, and its Create event giving it 3 lives again.
+
+```quiz
+After `room_restart()`, why does the player have 3 lives again?
+- [x] The room is built again, so Player's Create event runs again
+- [ ] room_restart() always sets lives to 3
+- [ ] Lives can never go below 3
+```
 
 ```check
 Player.collision with Enemy uses room_restart

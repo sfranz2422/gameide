@@ -50,6 +50,13 @@ if keyboard_check("right"):
     self.x += 4
 ```
 
+```quiz
+When you build an event from blocks, what does the game run?
+- [x] The Python the blocks make
+- [ ] The blocks, one at a time
+- [ ] The blocks first, then the Python
+```
+
 highlight: blocks-python
 
 ---
@@ -60,7 +67,6 @@ Press the **Python** tab and say OK. From now on this event is Python.
 
 ```check
 Player.step is written in python
-Player.step uses keyboard_check
 ```
 
 ---
@@ -72,6 +78,13 @@ Add moving left, in Python, under what's there:
 ```python
 if keyboard_check("left"):
     self.x -= 4
+```
+
+```quiz
+Why does moving left use `self.x -= 4`?
+- [x] Taking away from x moves the player left
+- [ ] -= makes the player move faster
+- [ ] x can only go up, so -= turns the player around
 ```
 
 ```check

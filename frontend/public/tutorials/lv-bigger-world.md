@@ -52,6 +52,13 @@ if self.y > room_height:
 
 `room_height` is how tall the room is. Below it, the room starts again.
 
+```quiz
+Why does `self.y > room_height` mean your hero has fallen out of the room?
+- [x] y gets bigger further down, so a y past room_height is below the bottom
+- [ ] room_height is the top of the room, and the hero went above it
+- [ ] self.y counts how many times the hero has fallen
+```
+
 highlight: room-canvas
 
 ```check
@@ -65,6 +72,13 @@ Player.step uses room_restart
 Open **Room1** again, and its **Room** tab. Under **Camera**, tick **Show part of the room**. The dashed box in the room is what the screen shows: 640 by 480, one screen's worth.
 
 Set **Follow** to **Player**.
+
+```quiz
+Your room is 1920 wide. With **Show part of the room** ticked, how much does the screen show at once?
+- [ ] The whole 1920 across, shrunk to fit
+- [x] 640 by 480, one screen's worth, moving with the Player
+- [ ] Only the part of the room you painted tiles on
+```
 
 highlight: folder-rooms
 
@@ -81,7 +95,6 @@ Press **Play** and run right. The view follows you along the whole level.
 highlight: play
 
 ```check
-after 2 seconds holding right, Player.x increased
 game runs 2 seconds without errors
 ```
 

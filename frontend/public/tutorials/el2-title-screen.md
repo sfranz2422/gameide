@@ -19,11 +19,17 @@ Press the **+** beside **Rooms** and call the new room **Title**. Then drag it *
 
 Play it. The window is empty: you're in the Title room, and it has nothing in it yet.
 
+```quiz
+Why does the **Title** room go above **Room1** in the list?
+- [x] The first room in the list is where the game starts
+- [ ] Rooms higher in the list are drawn on top
+- [ ] room_goto can only go to rooms below the one you're in
+```
+
 highlight: folder-rooms
 
 ```check
 room Title exists
-after 1 second, room_name() == "Title"
 ```
 
 ---
@@ -63,23 +69,31 @@ if keyboard_check_pressed("space"):
 
 `keyboard_check_pressed` is True only in the step the key goes down, not all the time it's held. `room_goto` changes room at the end of the step.
 
-Play it. And when the time's up, Space now starts the game again **from the title**: `game_restart()` goes back to the first room.
+Play it. When the time's up, Space starts **Room1** again, not the title: `room_restart()` restarts the room you're in, so the title only shows when the game starts.
+
+```quiz
+You hold Space down for a whole second. In how many steps is `keyboard_check_pressed("space")` True?
+answer: 1
+answer: one
+```
 
 highlight: code-editor
 
 ```check
+TitleScreen.step uses keyboard_check_pressed
 TitleScreen.step uses room_goto
-after 1 second holding space, room_name() == "Room1"
+game runs 2 seconds without errors
 ```
 
 ---
 
 ## Your turn: Enter too
 
-Make the **Enter** key start the game as well as Space.
+Make the **Enter** key start the game as well as Space. Its name in code is `"enter"`.
 
 ```check
-after 1 second holding enter, room_name() == "Room1"
+TitleScreen.step uses enter
+game runs 2 seconds without errors
 ```
 
 ---

@@ -98,7 +98,7 @@ test("Art from the Library: a two-frame hero from Kenney's characters", async ({
   await next.click();
   // Name it hero.
   await rename(page, "pixel-platformer-characters-0", "hero");
-  await pass(2);
+  await pass(1);
   await next.click();
   // A Player wearing it.
   await page.getByTestId("add-objects").click();
@@ -217,7 +217,7 @@ test("Walking on Tiles: gravity, landing on the painted ground, running and jump
   await page.getByTestId("pick-step").click();
   await setCode(page, "self.vy = min(self.vy + 0.5, 10)\nif move_and_collide(0, self.vy):\n    self.vy = 0\n");
   await page.getByTestId("notes-tab").click();
-  await pass(3, 90_000);
+  await pass(4, 90_000);
   await next.click();
   // Running.
   await setCode(page, 'move = keyboard_check("right") - keyboard_check("left")\nmove_and_collide(move * 3, 0)\n\nself.vy = min(self.vy + 0.5, 10)\nif move_and_collide(0, self.vy):\n    self.vy = 0\n');
@@ -272,7 +272,7 @@ test("A Bigger World: a wider room, more ground, a gap that restarts, a camera t
   await pass(1);
   await next.click();
   // Play it.
-  await pass(2, 90_000);
+  await pass(1, 90_000);
   if (SHOTS) {
     await page.getByTestId("play").click();
     await page.getByTestId("game-canvas").click();

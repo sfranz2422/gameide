@@ -40,8 +40,8 @@ rows = [
 ```
 
 ```check
-after 1 second, room_width == 1920
-after 1 second, max(w.x for w in instances("Wall")) > 1800
+room Room1 is at least 1920 wide
+game runs 2 seconds without errors
 ```
 
 ---
@@ -53,7 +53,7 @@ Play it. The window still shows the whole room squashed small. In **Room1**'s se
 highlight: room-camera
 
 ```check
-after 3 seconds holding right, view_x > 0
+room Room1 camera follows Player
 ```
 
 ---
@@ -68,6 +68,12 @@ camera_follow(self, 0.1)
 
 The camera moves a tenth of the way to the player each step: it glides after it instead.
 
+```quiz
+With `camera_follow(self, 0.1)`, the camera is 100 pixels behind the player. How many pixels does it move this step?
+answer: 10
+answer: ten
+```
+
 ```check
 Player.create uses camera_follow
 game runs 2 seconds without errors
@@ -78,6 +84,13 @@ game runs 2 seconds without errors
 ## Your turn: closer
 
 Zoom in, so everything looks bigger: `camera_zoom(1.5)` in the Player's Create event shows a smaller part of the room, one and a half times as big.
+
+```quiz
+After `camera_zoom(1.5)`, how much of the room does the window show?
+- [x] Less of it, with everything bigger
+- [ ] More of it, with everything smaller
+- [ ] The same part, only brighter
+```
 
 ```check
 Player.create uses camera_zoom

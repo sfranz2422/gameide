@@ -295,7 +295,7 @@ export const DODGE: Series = {
         3: {
           code: {
             "Hud.create": "global_vars.time_left = 30\nglobal_vars.game_over = False\nself.alarm[0] = 60\nself.ignore_pause = True\n",
-            "Hud.step": 'if global_vars.game_over and keyboard_check_pressed("space"):\n    game_restart()\n',
+            "Hud.step": 'if global_vars.game_over and keyboard_check_pressed("space"):\n    game_pause(False)\n    room_restart()\n',
           },
         },
         4: { code: { "Hud.draw_gui": HUD_OVER('f"Time\'s up! You scored {global_vars.score}"') } },

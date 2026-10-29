@@ -36,6 +36,13 @@ And show it in the **Draw GUI** event:
 draw_text(10, 70, f"Time: {global_vars.time_left}")
 ```
 
+```quiz
+Why does the Alarm 0 event set `self.alarm[0] = 60` again?
+- [x] So it runs again a second later, every second
+- [ ] So the time goes back to 60
+- [ ] So the alarm stops
+```
+
 highlight: add-event
 
 ```check
@@ -88,15 +95,23 @@ Then give **Hud** a **Step** event:
 
 ```python
 if global_vars.game_over and keyboard_check_pressed("space"):
-    game_restart()
+    game_pause(False)
+    room_restart()
 ```
 
-`game_restart()` starts the whole game again, unpaused.
+`game_pause(False)` lets everything move again, and `room_restart()` starts the room over: the time, the score and the lives go back to how they began. The best score is kept, because `global_vars` stays the same when the room restarts.
+
+```quiz
+Why does Hud need `self.ignore_pause = True`?
+- [x] While the game is paused nothing runs, so Hud's Step couldn't notice Space
+- [ ] Without it the game can't be paused
+- [ ] It makes the "Time's up!" message show
+```
 
 ```check
 Hud.create uses ignore_pause
 Hud has event step
-Hud.step uses game_restart
+Hud.step uses room_restart
 ```
 
 ---

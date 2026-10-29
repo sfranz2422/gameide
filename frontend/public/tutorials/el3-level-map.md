@@ -45,13 +45,18 @@ for row in range(len(rows)):
 
 Play it: there's the level.
 
+```quiz
+type: blank
+Counting rows and columns from 0, a `#` in column 5 of row 2 makes a Wall at x = [[160]] and y = [[64]].
+```
+
 highlight: add-objects
 
 ```check
 object Level exists
 room Room1 has 1 Level
 Level.create uses for
-after 1 second, instance_number("Wall") == 31
+game runs 2 seconds without errors
 ```
 
 ---
@@ -68,7 +73,8 @@ There's a `P` in the map, near the bottom left. Add another choice inside the lo
 `elif` means "otherwise, if": a character can't be both.
 
 ```check
-after 1 second, instance_number("Player") == 1
+Level.create uses elif
+game runs 2 seconds without errors
 ```
 
 ---
@@ -78,7 +84,8 @@ after 1 second, instance_number("Player") == 1
 Put some `c`s in the map where coins should be, then add an `elif` that makes a **Coin** for each `c`. Coins look best in the middle of their square: `col * 32 + 16`, `row * 32 + 16`.
 
 ```check
-after 1 second, instance_number("Coin") >= 3
+Level.create uses Coin
+game runs 2 seconds without errors
 ```
 
 ---

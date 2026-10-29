@@ -37,6 +37,13 @@ if keyboard_check("down"):
 
 Press **Play**, click the game, and try the arrow keys.
 
+```quiz
+Why does going up take away from `self.y`?
+- [ ] The room is upside down
+- [x] Down the screen is bigger y
+- [ ] self.y can't go below 0
+```
+
 highlight: add-event
 
 ```check
@@ -85,10 +92,16 @@ self.y = clamp(self.y, 0, room_height - 24)
 
 `clamp(value, low, high)` keeps a number between two others. The room is `room_width` across and `room_height` down, and the player is 24 pixels wide, so its left edge can go from 0 to `room_width - 24`.
 
+```quiz
+Why is the biggest x `room_width - 24` and not `room_width`?
+- [x] The player is 24 pixels wide, so its left edge has to stop 24 short of the side
+- [ ] The room has a 24 pixel border
+- [ ] The player moves 24 pixels every step
+```
+
 ```check
 Player.step uses clamp
-after 3 seconds holding left, instances("Player")[0].x == 0
-after 3 seconds holding down, instances("Player")[0].y == room_height - 24
+game runs 2 seconds without errors
 ```
 
 ---

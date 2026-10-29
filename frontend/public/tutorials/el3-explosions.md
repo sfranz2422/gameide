@@ -21,6 +21,13 @@ effect("explosion", self.x, self.y)
 
 `effect` draws a ready-made burst of particles. There's also `"sparkle"`, `"smoke"`, `"hit"` and more: look in **Docs** under **Effects**.
 
+```quiz
+When does a Rock's Destroy event run?
+- [ ] Only when a bullet hits the rock
+- [x] Whenever the rock is destroyed, whatever destroyed it
+- [ ] Every step, until the rock is gone
+```
+
 highlight: add-event
 
 ```check
@@ -61,6 +68,13 @@ if self.image_xscale > 1.5:
 ```
 
 The loop runs twice, and each time makes a rock half the size. Each new rock picks its own direction in its Create event, so they fly apart. A half-size rock is too small to break again, so it's gone for good.
+
+```quiz
+The rocks start at an `image_xscale` of 3. Why don't the half-size pieces break up again?
+- [ ] The loop only runs twice
+- [x] Their `image_xscale` is 1.5, and 1.5 > 1.5 is False
+- [ ] A rock made by `instance_create` has no Destroy event
+```
 
 ```check
 Rock.destroy uses for

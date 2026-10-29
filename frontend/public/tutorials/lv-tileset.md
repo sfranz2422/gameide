@@ -41,6 +41,13 @@ The tileset editor shows how the picture is cut into tiles. The library already 
 
 Every tile has a number, counting from 0 along the top row. You won't need the numbers, but your game uses them to remember which tile goes where.
 
+```quiz
+Why does the tileset need to know each tile is **18 × 18** pixels?
+- [x] So it knows where to cut the picture into tiles
+- [ ] So the room is 18 tiles wide
+- [ ] So the hero is the same size as a tile
+```
+
 highlight: tileset-editor
 
 ---
@@ -52,6 +59,14 @@ A **solid** tile is one your player stands on and bumps into. Everything else is
 Under **Solid tiles**, keep **Solid** chosen. Click the four grass blocks in the top-left corner, then the four plain dirt squares beside them (two in the top row, two under those). Each turns red as you click it.
 
 Clicked the wrong one? Click it again.
+
+```quiz
+Which of these should be solid? Pick all that are right.
+- [x] The grass your hero stands on
+- [x] The dirt under the grass
+- [ ] A plant growing on the grass
+- [ ] A sign beside the path
+```
 
 highlight: tileset-solid
 

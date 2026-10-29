@@ -32,7 +32,7 @@ highlight: code-editor
 ```check
 Ship.create uses hp
 Ship.collision with Rock uses hp
-after 1 second, instances("Ship")[0].hp <= 100
+game runs 2 seconds without errors
 ```
 
 ---
@@ -49,6 +49,12 @@ draw_rect(10, 56, 10 + self.hp * 2, 68)
 ```
 
 `draw_rect(x1, y1, x2, y2)` fills the box between two corners. The grey one is the whole bar, 200 wide. The green one is `self.hp * 2` wide: 200 at full health, 0 at none.
+
+```quiz
+When `self.hp` is 50, how many pixels wide is the green bar?
+answer: 100
+answer: one hundred
+```
 
 ```check
 Ship.draw gui uses draw_rect
@@ -88,6 +94,13 @@ draw_rect(self.x - 12, self.y - 22, self.x - 12 + self.hp * 0.24, self.y - 19)
 ```
 
 A Draw event draws **in the room**, so the bar's position comes from the ship's x and y. Draw GUI draws on the window, so its bar stays in the corner.
+
+```quiz
+Why does this bar's position use `self.x` and `self.y`, when the Draw GUI bar's doesn't?
+- [x] A Draw event draws in the room, so the bar has to be placed where the ship is
+- [ ] Draw GUI can't use the ship's variables
+- [ ] `draw_rect` only works with `self.x` and `self.y`
+```
 
 ```check
 Ship has event draw

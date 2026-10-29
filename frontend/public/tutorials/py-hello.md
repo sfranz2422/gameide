@@ -65,6 +65,17 @@ print("My name is Sam")
 
 Play it. Python runs your lines **in order**, top to bottom, so the hello comes first.
 
+````quiz
+What does this print?
+```py
+print("Bye")
+print("Hi")
+```
+- [x] Bye, then Hi on the line under it
+- [ ] Hi, then Bye on the line under it
+- [ ] Only Hi, because it comes last
+````
+
 ```check
 prints My name is
 ```
@@ -79,7 +90,6 @@ Python can't read it, so it tells you which line is wrong. Every programmer sees
 
 ```check
 game runs 1 second without errors
-prints My name is
 ```
 
 ---
@@ -94,6 +104,16 @@ print(3 + 4)
 ```
 
 Play it. Both lines print **7**: Python worked out `3 + 4` before printing it.
+
+````quiz
+This time the sum is inside quotes. What does it print?
+```py
+print("3 + 4")
+```
+- [x] 3 + 4
+- [ ] 7
+- [ ] An error, because 3 + 4 isn't words
+````
 
 ```check
 prints 7
@@ -114,7 +134,6 @@ Play it. Nothing new prints: comments are for people reading the code, not for P
 
 ```check
 game runs 1 second without errors
-prints Hello, world!
 ```
 
 ---

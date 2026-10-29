@@ -35,10 +35,17 @@ That's how many pixels the hero moves each step. Make it **2.5** and play again.
 
 Why not call it `speed`? Because `speed` is GameIDE's own: give an object a speed and it moves by itself, without anyone pressing a key.
 
+```quiz
+Why is the hero's speed called `walk_speed` and not `speed`?
+- [x] `speed` is GameIDE's own: it would make the hero move by itself
+- [ ] Python doesn't let you name a variable `speed`
+- [ ] `speed` can only be a whole number
+```
+
 highlight: object-editor
 
 ```check
-after 1 second, instances("Player")[0].walk_speed > 1.5
+Player.create uses 2.5
 ```
 
 ---
@@ -74,7 +81,7 @@ self.lines = [
 highlight: object-editor
 
 ```check
-after 1 second, len(instances("Wizard")[0].lines) >= 3
+game runs 2 seconds without errors
 ```
 
 ---
@@ -87,7 +94,7 @@ Then open **Slime**'s **Create** event. `self.hspeed` is how fast it slides acro
 
 ```check
 room Village has at least 3 Slime
-after 1 second, abs(instances("Slime")[0].hspeed) > 0.6
+game runs 2 seconds without errors
 ```
 
 ---
@@ -97,6 +104,13 @@ after 1 second, abs(instances("Slime")[0].hspeed) > 0.6
 The map is painted with tiles from the **village** tileset. In the **Village** room, open the **Layers** tab and press **+ Tile layer**: a new layer, for scenery, on top of the ground.
 
 Open the **Tiles** tab, pick flowers, bushes or a tree, and paint. Trees, bushes, roofs and fences are **solid**: the hero can't walk through them. (Open the **village** tileset to see which tiles are solid. They're marked red.)
+
+```quiz
+You painted a bush on the new layer. Can the hero walk through it?
+- [x] No: bushes are solid tiles
+- [ ] Yes: tiles on a new layer are only scenery
+- [ ] Only if it's on the ground layer
+```
 
 highlight: room-tab-tiles
 

@@ -37,6 +37,13 @@ self.y = clamp(self.y, 0, room_height - 24)
 
 Now the keys only decide **which way** (`-1`, `0` or `1`), and the player moves once, at the bottom. It plays the same, but now a stick can decide which way too.
 
+```quiz
+Holding only the left arrow, what happens in one step?
+- [x] move_x is -1, so the player moves 4 pixels left
+- [ ] move_x is -4, so the player moves 16 pixels left
+- [ ] move_x is 1, so the player moves 4 pixels right
+```
+
 highlight: code-editor
 
 ```check
@@ -82,6 +89,15 @@ if keyboard_check("down") or keyboard_check("s") or gamepad_check("down"):
     move_y = 1
 ```
 
+```quiz
+With this code, which of these make the player go left? (Pick all that do.)
+- [x] The left arrow
+- [x] The A key
+- [x] The left of the D-pad
+- [ ] The S key
+- [ ] The right arrow
+```
+
 ```check
 Player.step uses gamepad_check
 after 1 second holding left, Player.x decreased
@@ -99,7 +115,8 @@ if keyboard_check("shift") or gamepad_check("b"):
 ```
 
 ```check
-after 1 second holding right and shift, instances("Player")[0].x > 330
+Player.step uses shift
+game runs 2 seconds without errors
 ```
 
 ---

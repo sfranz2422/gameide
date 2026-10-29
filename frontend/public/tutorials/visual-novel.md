@@ -40,7 +40,7 @@ Each line is **(who, words)**. Change Marrow's first words to something of your 
 highlight: folder-scripts
 
 ```check
-after 1 second, not SCENES["start"]["lines"][0][1].startswith("You're the one with the lantern")
+game runs 2 seconds without errors
 ```
 
 ---
@@ -57,11 +57,17 @@ Give the start scene a third choice. It can go to any scene that's already there
 
 Play, and pick it.
 
+```quiz
+In the choice `("Walk the boardwalk", "reeds")`, what is `"reeds"`?
+- [x] The name of the scene that choice goes to
+- [ ] The words on the choice's button
+- [ ] The name of the character who says it
+```
+
 highlight: code-editor
 
 ```check
-after 1 second, len(SCENES["start"]["choices"]) >= 3
-after 1 second, all(goes in SCENES for s in SCENES.values() for _, goes in (s["choices"] or []))
+game runs 2 seconds without errors
 ```
 
 ---
@@ -89,8 +95,7 @@ The pictures you can use are in the **Sprites** folder: **landing**, **ferry**, 
 highlight: folder-sprites
 
 ```check
-after 1 second, len(SCENES) >= 8
-after 1 second, all(goes in SCENES for s in SCENES.values() for _, goes in (s["choices"] or []))
+game runs 2 seconds without errors
 ```
 
 ---
@@ -117,11 +122,18 @@ Then in the **story** script, inside `play`, just after `global_vars.scene = nam
 
 Play twice: once meeting Pip, once without. The dawn is different.
 
+```quiz
+When does the extra line about Pip show at dawn?
+- [x] Only if the story went through the `"willow"` scene first
+- [ ] Every time you reach the dawn
+- [ ] Only the first time you play
+```
+
 highlight: object-editor
 
 ```check
 Story.create uses met_pip
-after 1 second, global_vars.met_pip == False
+game runs 2 seconds without errors
 uses met_pip
 ```
 

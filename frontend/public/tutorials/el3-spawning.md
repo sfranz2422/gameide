@@ -64,13 +64,20 @@ self.alarm[0] = 120
 
 `random.choice` picks from a list: the left edge or the right. An object with no sprite is invisible, but its code still runs.
 
+```quiz
+Why does the Alarm 0 event set `self.alarm[0] = 120` again at its end?
+- [x] So it goes off again two seconds later, and rocks keep coming
+- [ ] So the new rock waits two seconds before it moves
+- [ ] So the first rock is made sooner
+```
+
 highlight: add-objects
 
 ```check
 object Spawner exists
 room Room1 has 1 Spawner
 Spawner has event alarm 0
-after 5 seconds, instance_number("Rock") >= 4
+game runs 3 seconds without errors
 ```
 
 ---
@@ -98,8 +105,7 @@ self.destroy()
 ```check
 Ship.step uses instance_create
 Bullet has event outside room
-after 0.5 seconds holding space, instance_number("Bullet") == 1
-after 1.5 seconds holding space, instance_number("Bullet") == 0
+game runs 2 seconds without errors
 ```
 
 ---
@@ -114,6 +120,13 @@ self.destroy()
 ```
 
 Both are gone: the rock it hit, and the bullet itself.
+
+```quiz
+In Bullet's Collision with Rock event, what is `other`?
+- [x] The rock the bullet hit
+- [ ] The bullet itself
+- [ ] The ship that fired the bullet
+```
 
 ```check
 Bullet has event collision with Rock

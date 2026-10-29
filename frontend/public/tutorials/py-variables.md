@@ -48,6 +48,17 @@ print(score)
 
 Read the first line right to left: take what's in `score`, add 10, and store the answer back in `score`. Play it: first **0**, then **10**.
 
+````quiz
+What does this print?
+```py
+score = 5
+score = score + 2
+print(score)
+```
+answer: 7
+answer: seven
+````
+
 ```check
 prints 10
 ```
@@ -114,9 +125,15 @@ Python stops: **name 'Lives' is not defined**. Capitals count, so `Lives` and `l
 
 Variable names can use letters, numbers and `_`, can't start with a number, and can't have spaces: `high_score` works, `high score` doesn't.
 
+```quiz
+Which of these can be a variable name?
+- [x] high_score
+- [ ] high score
+- [ ] 2nd_score
+```
+
 ```check
 game runs 1 second without errors
-prints Lives: 3
 ```
 
 ---

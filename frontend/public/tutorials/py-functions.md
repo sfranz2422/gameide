@@ -29,6 +29,13 @@ cheer()
 
 `def` makes a function called `cheer`. The pushed-in line is what it does. Making it doesn't run it: `cheer()`, with brackets, does. Play it: two cheers.
 
+```quiz
+What would happen if you took out both `cheer()` lines and played it?
+- [ ] It would cheer once
+- [ ] It would cheer twice, the same as before
+- [x] Nothing would be printed
+```
+
 highlight: code-editor
 
 ```check
@@ -89,6 +96,15 @@ def area(width, height):
 
 print("Area:", area(3, 4))
 ```
+
+````quiz
+What does this print?
+```py
+print(area(2, 5) + 1)
+```
+answer: 11
+answer: eleven
+````
 
 ```check
 prints Area: 12

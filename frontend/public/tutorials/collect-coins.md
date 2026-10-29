@@ -23,12 +23,19 @@ This event runs when the player touches a coin. `other` is the coin it touched. 
 other.destroy()
 ```
 
+```quiz
+In the **Collision with Coin** event, what is `other`?
+- [x] The coin the player touched
+- [ ] The player
+- [ ] Every coin in the room
+```
+
 highlight: add-event
 
 ```check
 Player has event collision with Coin
 Player.collision with Coin uses destroy
-after 1 second holding right, instance_number("Coin") < 15
+game runs 2 seconds without errors
 ```
 
 ---
@@ -62,6 +69,16 @@ Make a new object called **Hud** (no sprite) and drag it into the room. Give it 
 draw_set_color("white")
 draw_text(8, 452, f"Coins: {global_vars.score}")
 ```
+
+````quiz
+If the player has collected 3 coins, what does this line show?
+```py
+draw_text(8, 452, f"Coins: {global_vars.score}")
+```
+- [x] Coins: 3
+- [ ] Coins: {global_vars.score}
+- [ ] Coins: score
+````
 
 highlight: add-objects
 

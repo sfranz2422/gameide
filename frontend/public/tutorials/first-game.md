@@ -57,6 +57,14 @@ Player has sprite
 
 A **room** is where the game happens. Open **Room1** from the **Rooms** folder, then drag **Player** from the list on the left into the room.
 
+```quiz
+type: match
+Match each word to what it means:
+- sprite -> a picture
+- object -> a thing in your game, with a sprite and code
+- room -> where the game happens
+```
+
 highlight: folder-rooms
 
 ```check
@@ -77,6 +85,15 @@ self.y += (keyboard_check("down") - keyboard_check("up")) * 4
 ```
 
 `keyboard_check("right")` is 1 while the right arrow is held, and 0 when it isn't. So right minus left is 1, -1 or 0 — which way to go — and `* 4` is how fast.
+
+```quiz
+You hold only the left arrow. What is `keyboard_check("right") - keyboard_check("left")`?
+answer: -1
+answer: minus 1
+answer: minus one
+answer: negative 1
+answer: negative one
+```
 
 highlight: add-event
 

@@ -48,6 +48,18 @@ print(backpack[-1])
 
 `.append` puts something on the end. `len` counts the list: **4**. And `[-1]` is the **last** one: **map**.
 
+````quiz
+What does this print?
+```py
+items = ["a", "b"]
+items.append("c")
+print(items[0], items[-1])
+```
+- [x] a c
+- [ ] a b
+- [ ] b c
+````
+
 ```check
 Main.create uses append
 prints map
@@ -96,6 +108,15 @@ print(max(scores), min(scores), sum(scores))
 ```
 
 Play it: **70 20 120**.
+
+```quiz
+type: match
+Match each one to what it gives for a list of numbers:
+- max -> the biggest
+- min -> the smallest
+- sum -> all of them added up
+- len -> how many there are
+```
 
 ```check
 Main.create uses max

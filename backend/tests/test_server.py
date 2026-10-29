@@ -1114,10 +1114,10 @@ OLDT = "---\ntitle: Old tutorial\nlevel: Top-Down\nstarter: empty\n---\n# One\nH
 db.add(gamestore.Tutorial(slug="oldtutor1", owner_id=tid, title="Old tutorial", level="Top-Down", markdown=OLDT, visibility="classes"))
 db.commit()
 db.close()
-check("an old tutorial is in the library, with the slug students' progress names",
-      any(t["slug"] == "oldtutor1" for t in xa.get("/api/tutorials").get_json()["tutorials"])
-      and any(i["slug"] == "oldtutor1" and i["visibility"] == "classes" for i in teacher.get("/api/library").get_json()["items"]))
-check("…and opens by its old key", xa.get("/api/tutorials/oldtutor1").get_json().get("markdown") == OLDT)
+_learn = xa.get("/api/tutorials").get_json()["tutorials"]   # the Learn page moves them (tutorials.migrate)
+check("an old tutorial is in the library, with the slug its progress names; shared with classes, it is private now",
+      "oldtutor1" not in [t["slug"] for t in _learn] and any(i["slug"] == "oldtutor1" and i["visibility"] == "private" for i in teacher.get("/api/library").get_json()["items"]))
+check("…and opens by its old key, for its author", teacher.get("/api/tutorials/oldtutor1").get_json().get("markdown") == OLDT)
 check("…moved once", sum(1 for i in teacher.get("/api/library").get_json()["items"] if i["slug"] == "oldtutor1") == 1)
 r = teacher.get("/teacher/tutorials")
 check("the library's page is GameIDE's own (React)", r.status_code == 302 and r.headers["Location"].endswith("/#/library"))
@@ -1139,22 +1139,38 @@ check("notes without a tutorial's header aren't a tutorial to follow",
       NOHEAD not in [t["slug"] for t in teacher.get("/api/tutorials").get_json()["tutorials"]] and teacher.get(f"/api/tutorials/{NOHEAD}").status_code == 404)
 TS = teacher.post("/api/library", json={"body": TUT}).get_json()["slug"]
 check("only an admin publishes one for everyone", teacher.post(f"/api/library/{TS}", json={"visibility": "site"}).status_code == 400)
-listed = {t["slug"]: t for t in teacher.get("/api/tutorials").get_json()["tutorials"]}
-check("a teacher's tutorial is listed for them, with its steps", listed.get(TS, {}).get("steps") == 3 and listed[TS]["level"] == "Top-Down", listed.get(TS))
-check("…private at first: not for their students", TS not in [t["slug"] for t in xa.get("/api/tutorials").get_json()["tutorials"]]
+check("a teacher's own tutorial isn't on the Learn page, even for them (it's in their library)",
+      TS not in [t["slug"] for t in teacher.get("/api/tutorials").get_json()["tutorials"]]
+      and "Make a ball" in teacher.get(f"/api/tutorials/{TS}").get_json().get("markdown", ""))
+check("…nor for their students, who can't open it either", TS not in [t["slug"] for t in xa.get("/api/tutorials").get_json()["tutorials"]]
       and xa.get(f"/api/tutorials/{TS}").status_code == 404)
-check("only its author changes it", other_teacher.post(f"/api/library/{TS}", json={"visibility": "classes"}).status_code == 404)
-teacher.post(f"/api/library/{TS}", json={"visibility": "classes"})
-check("shared with classes, the author's students see it", TS in [t["slug"] for t in xa.get("/api/tutorials").get_json()["tutorials"]]
-      and "Make a ball" in xa.get(f"/api/tutorials/{TS}").get_json().get("markdown", ""))
-check("…and nobody else", TS not in [t["slug"] for t in bob.get("/api/tutorials").get_json()["tutorials"]] and bob.get(f"/api/tutorials/{TS}").status_code == 404)
+check("only its author changes it", other_teacher.post(f"/api/library/{TS}", json={"visibility": "private"}).status_code == 404)
+check("there's no sharing with classes any more: a class gets it as an assignment",
+      teacher.post(f"/api/library/{TS}", json={"visibility": "classes"}).status_code == 400)
 # A teacher who is an admin publishes their own for everyone (the library
 # edits a teacher's own tutorials only).
 os.environ["ADMIN_EMAILS"] = "admin@example.com,teacher@example.com"
 TADM = teacher.post("/api/library", json={"body": TUT.replace("Bounce", "Bounce for all")}).get_json()["slug"]
-check("an admin can publish it for everyone", teacher.post(f"/api/library/{TADM}", json={"visibility": "site"}).status_code == 200
-      and TADM in [t["slug"] for t in anon.get("/api/tutorials").get_json()["tutorials"]])
+check("an admin can publish it for everyone: on the Learn page, for anyone",
+      teacher.post(f"/api/library/{TADM}", json={"visibility": "site"}).status_code == 200
+      and TADM in [t["slug"] for t in anon.get("/api/tutorials").get_json()["tutorials"]]
+      and TADM in [t["slug"] for t in bob.get("/api/tutorials").get_json()["tutorials"]])
 os.environ["ADMIN_EMAILS"] = "admin@example.com"
+
+# The built-in tutorials ask a question about every 3 or 4 steps (the
+# teacher's ask), and every one marks itself: a block that doesn't read as
+# a question, or has no key, would show a card nobody can get right.
+_short = []
+# The sources, not the build tutmod._builtin_dir() serves, which may be older.
+for _f in sorted((Path(__file__).resolve().parents[2] / "frontend/public/tutorials").glob("*.md")):
+    _md = _f.read_text(encoding="utf-8")
+    _blocks = len(re.findall(r"^ {0,3}`{3,}\s*quiz\s*$", _md, re.M))
+    _keys = quizmod.keys(_md)
+    _steps = len(tutmod.steps_of(_md))
+    if _blocks < max(1, _steps // 4) or len(_keys) != _blocks or not all(k["has_key"] for k in _keys) \
+            or any(k["kind"] == "long" for k in _keys):
+        _short.append("%s (%d steps, %d blocks, %d keyed)" % (_f.stem, _steps, _blocks, sum(k["has_key"] for k in _keys)))
+check("every built-in tutorial has its questions, each marking itself", not _short, _short)
 
 # XP for steps: once each, only steps with checks, and a bonus at the end.
 before = xa.get("/api/me/xp").get_json()["xp"]

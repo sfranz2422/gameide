@@ -56,12 +56,19 @@ if (keyboard_check(self.fire_key) or gamepad_check("a", self.pad)) and self.cool
 
 WASD doesn't move Player 1 any more. That's for Player 2.
 
+```quiz
+Why are the keys kept in variables like `self.left_key`, instead of written into the Step event?
+- [x] So another player can use the same Step event with its own keys
+- [ ] Variables make keyboard_check work faster
+- [ ] keyboard_check only works with a variable
+```
+
 highlight: code-editor
 
 ```check
 Player.create uses left_key
-after 2 seconds holding space and right, instances("Player")[0].x > 300
-after 2 seconds holding space and d, instances("Player")[0].x < 70
+Player.step uses left_key
+game runs 2 seconds without errors
 ```
 
 ---
@@ -87,11 +94,19 @@ self.pad = 1
 
 `super().on_create()` runs Player's Create event first. Then Player 2 changes the keys to its own.
 
+```quiz
+Why is `super().on_create()` the first line of Player2's Create event, before the keys?
+- [x] Player's Create runs first, and then Player 2's lines change the keys to its own
+- [ ] Python needs super() at the top of every event
+- [ ] It puts Player 2 below Player 1 in the room
+```
+
 ```check
 object Player2 exists
 room Room1 has 1 Player2
-after 2 seconds holding space and d, instances("Player2")[0].x > 300
-after 2 seconds holding space and d, instances("Player")[0].x < 70
+Player2.create uses on_create
+Player2.create uses left_key
+game runs 2 seconds without errors
 ```
 
 ---

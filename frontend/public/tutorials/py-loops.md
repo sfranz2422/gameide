@@ -47,6 +47,17 @@ for n in range(1, 4):
 
 That prints **Level 1**, **Level 2**, **Level 3**.
 
+````quiz
+What does this print?
+```py
+for n in range(2, 5):
+    print(n)
+```
+- [x] 2, 3 and 4, one per line
+- [ ] 2, 3, 4 and 5, one per line
+- [ ] 5, 4, 3 and 2, one per line
+````
+
 ```check
 prints Level 3
 ```
@@ -103,6 +114,13 @@ print("Game over")
 Each time round, `lives -= 1` takes one away. When it reaches 0 the question is False, and the loop stops.
 
 Be careful: if nothing ever made the question False, it would never stop.
+
+```quiz
+What would happen if you left out `lives -= 1`?
+- [x] The loop would never stop, because `lives` would stay 3
+- [ ] It would print "Lives left: 3" once, then stop
+- [ ] It would print "Game over" straight away
+```
 
 ```check
 Main.create uses while

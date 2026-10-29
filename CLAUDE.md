@@ -439,6 +439,26 @@ header; steps are `---` slides; ` ```check ` blocks gate Next (strict); a
 - Starting games for tutorials are `TUTORIAL_STARTERS` in templates.ts
   (kept off Create New Game: they're half a game on purpose).
 - **No Copy button on tutorial code**, ever (the teacher's decision).
+- **A check states only what its own step asks students to type** (the
+  teacher's rule, and a must). Students read the check block and type what
+  it mentions: a check naming code the step never asked for had them typing
+  unnecessary code. So no `uses` word, event or name that isn't in the
+  step's own instructions or code; no Python-expression checks (`after 2
+  seconds, instance_number(...)`) built from helpers the step doesn't use —
+  say it in the check language instead; and **no step re-checks earlier
+  steps**, the last one included: no end-of-tutorial check of everything.
+  `game runs N seconds without errors` is always welcome.
+- **Built-in tutorials ask questions** (```quiz, self-marking, practice
+  unless assigned): about one every 3–4 steps, never on the intro step.
+  test_server.py fails on a built-in without them or with a question that
+  has no key. Code inside a question is fenced `py` (the quiz itself fenced
+  with four backticks), never `python`: the lesson tests read every
+  `python` block as code the student types.
+- **The Learn page (#/tutorials) is public**: built-ins and tutorials set to
+  Everyone (`site`, admins only). A teacher's own are "Only me", in their
+  library, which tries them and assigns them; a class gets one as an
+  assignment. An assigned game claims step XP under `a:<slug>`, never the
+  teacher's private `t:<slug>` its starter was made from.
 
 ## XP
 

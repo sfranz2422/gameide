@@ -73,6 +73,32 @@ async function downloadMarkdown(key: string, title: string) {
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
 
+/** Start one: its starting game made in this person's games, and opened. */
+export async function startTutorial(store: ProjectStore, key: string): Promise<void> {
+  const p = await makeStarter(store, key, await tutorialMarkdown(key));
+  location.hash = `#/p/${p.id}`;
+}
+
+/**
+ * Assign one to a class: an assignment whose notes are the tutorial, linked
+ * to its row in the library (which writes it in as the notes and keeps it in
+ * step — the library is the only place notes change). The assignment's page
+ * opens. The Learn page assigns from its cards; the library from its rows,
+ * for a teacher's own tutorials, which aren't on the Learn page.
+ */
+export async function assignTutorial(store: ProjectStore, key: string, title: string, mine: boolean, classId: number): Promise<void> {
+  const tutorial = await libraryRowFor(key, title, mine);
+  const md = await tutorialMarkdown(key);
+  // Made in the teacher's games just long enough for the class's to be taken from it.
+  const p = await makeStarter(store, key, md);
+  try {
+    const r = await api<{ slug: string }>(`/api/classes/${classId}/assignments`, { json: { title, project: p.id, tutorial } });
+    location.hash = `#/assignment/${r.slug}`;
+  } finally {
+    await store.remove(p.id).catch(() => undefined);
+  }
+}
+
 /** The tutorial's starting game, made and saved in this person's games; its id. */
 async function makeStarter(store: ProjectStore, key: string, md: string): Promise<Project> {
   const t = parseTutorial(md);
@@ -132,26 +158,8 @@ export function TutorialsPage() {
       setBusy(false);
     }
   };
-  const start = (e: Entry) =>
-    act(async () => {
-      const p = await makeStarter(store, e.key, await tutorialMarkdown(e.key));
-      location.hash = `#/p/${p.id}`;
-    });
-  const assign = (e: Entry, classId: number) =>
-    act(async () => {
-      // Linked to its row in the library, which writes it in as the notes
-      // and keeps it in step (the library is the only place notes change).
-      const tutorial = await libraryRowFor(e.key, e.title, !!e.mine);
-      const md = await tutorialMarkdown(e.key);
-      // Made in the teacher's games just long enough for the class's copy to be taken from it.
-      const p = await makeStarter(store, e.key, md);
-      try {
-        const r = await api<{ slug: string }>(`/api/classes/${classId}/assignments`, { json: { title: e.title, project: p.id, tutorial } });
-        location.hash = `#/assignment/${r.slug}`;
-      } finally {
-        await store.remove(p.id).catch(() => undefined);
-      }
-    });
+  const start = (e: Entry) => act(() => startTutorial(store, e.key));
+  const assign = (e: Entry, classId: number) => act(() => assignTutorial(store, e.key, e.title, !!e.mine, classId));
 
   const all = [...builtins, ...others];
   const levels = [...LEVELS, ...new Set(all.map((t) => t.level).filter((l) => !LEVELS.includes(l)))];
@@ -185,7 +193,6 @@ export function TutorialsPage() {
                       <span className="muted small">
                         {t.time}
                         {t.owner ? ` · by ${t.owner}` : ""}
-                        {t.mine && t.visibility ? ` · ${t.visibility === "private" ? "only you" : t.visibility === "classes" ? "your classes" : "everyone"}` : ""}
                       </span>
                       <p className="small">{t.description}</p>
                       {status(game) && (

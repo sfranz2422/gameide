@@ -36,10 +36,17 @@ self.text = "The school computer. It takes four minutes to open a picture of a c
 
 Change `self.text` to something Robin would say about the computer. Play, and click it.
 
+```quiz
+Every yellow box is the same **Spot** object. What makes the computer's Spot say something different from the door's?
+- [ ] It has a different sprite
+- [x] Its own Creation code, in the Instance tab
+- [ ] Its own Step event
+```
+
 highlight: room-canvas
 
 ```check
-after 1 second, not any(s.text.startswith("The school computer") for s in instances("Spot"))
+game runs 2 seconds without errors
 ```
 
 ---
@@ -63,7 +70,7 @@ highlight: room-canvas
 
 ```check
 room Newsroom has at least 6 Spot
-after 1 second, any(s.name == "bookshelf" for s in instances("Spot"))
+uses "bookshelf"
 ```
 
 ---
@@ -104,6 +111,15 @@ self.locked = "Locked. The principal never locks his door. Suspicious."
 
 Play: the door says one thing without the key, and another with it.
 
+```quiz
+type: match
+Match each line in a Spot's Creation code to what it does:
+- self.text -> what Robin says about it
+- self.item -> picked up into your things
+- self.needs -> the item it wants before it does anything
+- self.locked -> what Robin says without that item
+```
+
 ```check
 game runs 2 seconds without errors
 ```
@@ -137,7 +153,7 @@ highlight: folder-rooms
 room Cafeteria exists
 room Cafeteria has at least 1 Robin
 room Cafeteria has at least 1 Game
-after 1 second, "Cafeteria" in FLOOR
+uses "Cafeteria"
 ```
 
 ---

@@ -1,9 +1,9 @@
 /**
- * Tutorials with a class, against the real server: a teacher writes one and
- * shares it with their classes; a student finds it in the library, does
- * it — Next waiting for the check — and is paid XP; the teacher assigns a
- * built-in tutorial to the class, and their results say how far each
- * student has got.
+ * Tutorials with a class, against the real server: a teacher writes one —
+ * kept in their library, never on the public Learn page — and assigns it to
+ * a class from there; a student does it — Next waiting for the check — and
+ * is paid XP; the teacher assigns a built-in tutorial to the class, and
+ * their results say how far each student has got.
  */
 import { expect, test, type Browser } from "@playwright/test";
 import { setNotes } from "./helpers";
@@ -37,7 +37,7 @@ object Ball exists
 That's it.
 `;
 
-test("a teacher's tutorial, shared with a class, done by a student; a built-in one assigned, with each student's step", async ({ browser }) => {
+test("a teacher's tutorial, assigned from the library, done by a student; a built-in one assigned, with each student's step", async ({ browser }) => {
   test.setTimeout(180_000);
   const { ctx: tctx, page: teacher } = await signedIn(browser, "teach@example.com");
   await teacher.goto("/#/classes");
@@ -49,20 +49,26 @@ test("a teacher's tutorial, shared with a class, done by a student; a built-in o
   await expect(teacher.getByText("uri@example.com")).toBeVisible();
 
   // Write one, for the class: in the tutorial library (library.py), where
-  // tutorials are written, then shared with their classes from its page.
+  // tutorials are written. Only me: it isn't on the Learn page, for anyone.
   const made = await teacher.request.post("/api/library", { data: { body: MINE } });
   expect(made.status()).toBe(201);
+  await teacher.goto("/#/tutorials");
+  await expect(teacher.getByTestId("tutorial-card").filter({ hasText: "Your First Game" })).toBeVisible();
+  await expect(teacher.getByTestId("tutorial-card").filter({ hasText: "Bouncing ball" })).toHaveCount(0);
   await teacher.goto("/#/library");
   const row = teacher.getByTestId("library-row").filter({ hasText: "Bouncing ball" });
-  await row.getByLabel("Who can follow it on the Tutorials page").selectOption("classes");
-  await expect(row.getByLabel("Who can follow it on the Tutorials page")).toHaveValue("classes");
+  await expect(row.getByRole("option", { name: "My classes" })).toHaveCount(0);
+  // Assigned to the class from its row: an assignment whose notes are the tutorial.
+  await row.getByTestId("library-assign").selectOption({ label: "Tutorials P6" });
+  await teacher.waitForURL(/#\/assignment\/\w+$/);
+  const mineSlug = teacher.url().split("/").pop()!;
 
-  // The student finds it, and does it.
+  // The student doesn't find it on the Learn page; they do it from the assignment.
   const { ctx: sctx, page: uri } = await signedIn(browser, "uri@example.com");
   await uri.goto("/#/tutorials");
-  const card = uri.getByTestId("tutorial-card").filter({ hasText: "Bouncing ball" });
-  await expect(card).toContainText("by Teach");
-  await card.getByTestId("tutorial-start").click();
+  await expect(uri.getByTestId("tutorial-card").filter({ hasText: "Your First Game" })).toBeVisible();
+  await expect(uri.getByTestId("tutorial-card").filter({ hasText: "Bouncing ball" })).toHaveCount(0);
+  await uri.goto(`/a/${mineSlug}`);
   await uri.waitForURL(/#\/p\//);
   await expect(uri.getByTestId("tutorial-next")).toBeDisabled();
   await uri.getByTestId("add-objects").click();
@@ -140,9 +146,11 @@ test("a built-in tutorial copied, a question added, tried as practice, downloade
   await expect(teacher.locator('[data-cmd="save"]')).toHaveText(/✓ Saved/);
   await expect(teacher.locator('[data-cmd="save"]')).toHaveText("Save", { timeout: 5000 });
 
-  // Tried, from the Tutorials page: the question shows in the tutorial and is marked, as practice.
-  await teacher.goto("/#/tutorials");
-  await teacher.getByTestId("tutorial-card").filter({ hasText: "Visual Novel (my copy)" }).getByTestId("tutorial-start").click();
+  // Tried, from its row in the library (it's the teacher's own, so not on
+  // the Learn page): the question shows in the tutorial and is marked, as practice.
+  await teacher.goto("/#/library");
+  const mine = teacher.getByTestId("library-row").filter({ hasText: "Visual Novel (my copy)" });
+  await mine.getByTestId("library-try").click();
   await teacher.waitForURL(/#\/p\//);
   const q = teacher.getByTestId("tutorial-pane").getByTestId("question");
   await expect(q).toContainText('What does "lines" hold');
@@ -154,9 +162,9 @@ test("a built-in tutorial copied, a question added, tried as practice, downloade
   await expect(q.getByTestId("question-result")).toContainText("Practice: ✓ Right");
   await expect(teacher.getByTestId("tutorial-next")).toBeDisabled(); // the step's check still holds Next, not the question
 
-  // Assigned to the class: the student's answer is marked once and counted.
-  await teacher.goto("/#/tutorials");
-  await teacher.getByTestId("tutorial-card").filter({ hasText: "Visual Novel (my copy)" }).getByTestId("tutorial-assign").selectOption({ label: "Questions P2" });
+  // Assigned to the class, from the library: the student's answer is marked once and counted.
+  await teacher.goto("/#/library");
+  await mine.getByTestId("library-assign").selectOption({ label: "Questions P2" });
   await teacher.waitForURL(/#\/assignment\/\w+$/);
   const slug = teacher.url().split("/").pop()!;
   // The assignment's page says which tutorial it is, and that it's the library's to edit.

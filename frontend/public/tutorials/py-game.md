@@ -45,6 +45,11 @@ for i in range(10):
 
 Each time round the loop, `i` is one bigger, so each circle is 64 to the right of the last. Play it.
 
+```quiz
+`i` starts at 0. How far across (its x) is the **third** circle in the row?
+answer: 168
+```
+
 highlight: code-editor
 
 ```check
@@ -88,6 +93,12 @@ if keyboard_check("down") and self.size > 5:
 ```
 
 Play it, click the game, and hold the up and down arrows.
+
+```quiz
+The Step event runs every frame, 60 times a second. Hold up for exactly one second: how much bigger does `self.size` get?
+answer: 120
+answer: 120 pixels
+```
 
 highlight: add-event
 

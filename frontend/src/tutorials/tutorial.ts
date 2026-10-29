@@ -94,6 +94,13 @@ export function splitHeader(md: string): { meta: TutorialMeta; body: string } {
   };
 }
 
+/** A block written back as a fence that nothing inside it can close. */
+function fenced(lang: string, body: string): string {
+  const longest = Math.max(0, ...[...body.matchAll(/^ {0,3}(`{3,})/gm)].map((m) => m[1]!.length));
+  const mark = "`".repeat(Math.max(3, longest + 1));
+  return mark + lang + "\n" + body + "\n" + mark;
+}
+
 /**
  * A step's (or a notes slide's) `highlight:` line taken out: the markdown
  * without it, and the first target named. Lines inside code are left alone.
@@ -102,9 +109,11 @@ export function takeHighlight(md: string): { md: string; highlight: string | nul
   let highlight: string | null = null;
   const kept = pieces(md, ["check", "tests"])
     .map((p) => {
-      if (p.type === "quiz") return "```quiz\n" + p.body + "\n```";
-      if (p.type === "cards") return "```cards\n" + p.body + "\n```";
-      if (p.type === "tests") return "```" + p.kind + "\n" + p.body + "\n```";
+      // Fenced again longer than any fence inside: a question that shows
+      // code (````quiz around ```py) was cut off at its code's first fence.
+      if (p.type === "quiz") return fenced("quiz", p.body);
+      if (p.type === "cards") return fenced("cards", p.body);
+      if (p.type === "tests") return fenced(p.kind, p.body);
       // Inside a code block, a line is code — `highlight: x` there is an example, kept.
       let fence: string | null = null;
       return p.text

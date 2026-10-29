@@ -31,12 +31,18 @@ if move_and_collide(0, self.vy):
 
 `keyboard_check` gives 1 or 0, so right minus left is 1, -1 or 0. `move_and_collide` moves until it bumps into something solid (the walls are ticked **Solid**), and gives back what it bumped into. Gravity adds to `vy` every step; landing on something sets it back to 0.
 
+```quiz
+You hold Left and Right at the same time. What is `move`?
+answer: 0
+answer: zero
+```
+
 highlight: add-event
 
 ```check
 Player has event step
-after 1 second, instances("Player")[0].y == 424
-after 1 second holding right, Player.x increased
+Player.step uses move_and_collide
+game runs 2 seconds without errors
 ```
 
 ---
@@ -53,11 +59,18 @@ if on_ground and keyboard_check("up"):
 
 `place_free(x, y)` asks whether the player could be at (x, y) without touching anything solid. One pixel down not being free means standing on something.
 
+```quiz
+What does `place_free(self.x, self.y + 1)` find out?
+- [ ] It moves the player down one pixel
+- [x] Whether the spot one pixel below the player is empty
+- [ ] Whether the player is touching a wall on either side
+```
+
 highlight: code-editor
 
 ```check
 Player.step uses place_free
-after 1 second holding up, instances("Player")[0].y < 424
+game runs 2 seconds without errors
 ```
 
 ---

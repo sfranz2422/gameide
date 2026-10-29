@@ -23,6 +23,13 @@ self.hspeed = -3
 
 Then open **Room1** and drag three enemies from the list into the room, near its right-hand side.
 
+```quiz
+What does `self.hspeed = -3` do?
+- [x] Moves the enemy 3 pixels to the left every step, all by itself
+- [ ] Moves the enemy 3 pixels to the left once
+- [ ] Moves the enemy 3 pixels to the right every step
+```
+
 highlight: add-event
 
 ```check
@@ -48,7 +55,7 @@ Once an enemy is off the left edge, it jumps back to just past the right edge, a
 
 ```check
 Enemy.step uses randint
-after 8 seconds, all(-13 < e.x < room_width + 13 for e in instances("Enemy"))
+game runs 8 seconds without errors
 ```
 
 ---
@@ -64,6 +71,15 @@ self.hspeed = -random.randint(2, 5)
 
 Each enemy picks its own speed as it appears.
 
+```quiz
+Which of these could `random.randint(2, 5)` give? (Pick all that could.)
+- [x] 2
+- [x] 3
+- [x] 5
+- [ ] 6
+- [ ] 1
+```
+
 highlight: code-editor
 
 ```check
@@ -75,7 +91,7 @@ game runs 2 seconds without errors
 
 ## Your turn: anywhere
 
-The enemies still start at the heights you put them. In **Enemy**'s **Create** event, add a line that gives each one a random height as it appears too, just like the one in the Step event.
+The enemies still start at the heights you put them. In **Enemy**'s **Create** event, add a line that gives each one a random height as it appears too, just like the one in the Step event: a random `self.y` between the top and `room_height`.
 
 ```check
 Enemy.create uses room_height

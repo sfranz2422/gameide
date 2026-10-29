@@ -25,7 +25,7 @@ highlight: code-editor
 
 ```check
 Enemy.step uses hspeed
-after 8 seconds holding space, any(e.hspeed % 1 != 0 for e in instances("Enemy"))
+game runs 2 seconds without errors
 ```
 
 ---
@@ -39,6 +39,12 @@ After a few minutes the enemies would be too fast to see. Add a line under the l
 ```
 
 `max` gives back the bigger of two numbers. -12 is bigger than -13, so once an enemy reaches -12 it can't get any faster.
+
+```quiz
+An enemy's `hspeed` has reached -12.5. What does `max(self.hspeed, -12)` give back?
+answer: -12
+answer: minus 12
+```
 
 ```check
 Enemy.step uses -12
@@ -64,17 +70,24 @@ self.alarm[1] = 300
 
 Each one picks its own speed and height in its Create event, just like the ones in the room.
 
+```quiz
+Why does the **Alarm 1** event set `self.alarm[1] = 300` again at its end?
+- [x] So another enemy comes 5 seconds later, and another after that
+- [ ] To make the new enemy move faster
+- [ ] It doesn't need to: an alarm goes off again by itself
+```
+
 ```check
 Hud has event alarm 1
 Hud.alarm 1 uses instance_create
-after 7 seconds holding space, instance_number("Enemy") >= 4
+game runs 2 seconds without errors
 ```
 
 ---
 
 ## Your turn: fair's fair
 
-More enemies is hard. Make each new one bring 5 more seconds on the clock too.
+More enemies is hard. Make each new one bring 5 more seconds on the clock too: in **Hud**'s **Alarm 1** event, add 5 to `global_vars.time_left`.
 
 ```check
 Hud.alarm 1 uses time_left

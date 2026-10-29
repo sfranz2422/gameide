@@ -31,12 +31,20 @@ if move_and_collide(0, self.vy):
 
 Every frame it falls a bit faster, up to 10. `move_and_collide` moves it, but stops it against anything solid, like your grass, and says whether it hit something. Landing stops the fall.
 
+```quiz
+Why does `self.vy` go back to 0 when `move_and_collide` hits something?
+- [x] The hero has landed, so it should stop falling
+- [ ] It sends the hero back to the top of the room
+- [ ] It turns gravity off for the rest of the game
+```
+
 highlight: add-event
 
 ```check
 Player has event create
+Player.create uses vy
 Player.step uses move_and_collide
-after 2 seconds, instances("Player")[0].vy == 0
+game runs 2 seconds without errors
 ```
 
 ---
@@ -71,6 +79,13 @@ if on_ground and keyboard_check_pressed("space"):
 
 `place_free` says whether a spot is empty. If the spot one pixel under your feet isn't free, you're standing on something.
 
+```quiz
+If `place_free(self.x, self.y + 1)` is True, where is your hero?
+- [ ] Standing on the grass
+- [x] In the air, with nothing just under its feet
+- [ ] Pushed up against a wall
+```
+
 ```check
 Player.step uses place_free
 Player.step uses keyboard_check_pressed
@@ -100,7 +115,7 @@ if move_and_collide(0, self.vy):
 highlight: play
 
 ```check
-after 1 second holding left, Player.x decreased
+game runs 2 seconds without errors
 ```
 
 ---

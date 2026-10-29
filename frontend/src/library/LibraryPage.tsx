@@ -15,7 +15,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../store/api";
 import { useSession } from "../editor/session";
 import { SiteNav } from "../editor/SiteNav";
-import { libraryEditUrl, libraryRowFor } from "../tutorials/TutorialPages";
+import { assignTutorial, libraryEditUrl, libraryRowFor, startTutorial } from "../tutorials/TutorialPages";
 
 interface Use {
   slug: string;
@@ -65,7 +65,8 @@ function asBase64(file: File): Promise<string> {
 }
 
 export function LibraryPage() {
-  const { me } = useSession();
+  const { me, store } = useSession();
+  const [classes, setClasses] = useState<{ id: number; name: string }[]>([]);
   const [items, setItems] = useState<Item[] | null>(null);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [builtins, setBuiltins] = useState<Builtin[]>([]);
@@ -88,6 +89,7 @@ export function LibraryPage() {
     void fetch(new URL("tutorials/index.json", document.baseURI))
       .then((r) => r.json())
       .then((list: Builtin[]) => setBuiltins(list), () => undefined);
+    void api<{ classes: { id: number; name: string; teaching: boolean }[] }>("/api/classes").then((r) => setClasses(r.classes.filter((c) => c.teaching)), () => undefined);
   }, []);
 
   const act = (f: () => Promise<unknown>) => f().catch((e: Error) => setSay({ text: e.message, bad: true }));
@@ -246,16 +248,38 @@ export function LibraryPage() {
                       </button>
                       {r.item && (
                         <>
+                          {/* A teacher's own tutorials aren't on the Learn page (only "Everyone"
+                              ones are), so trying one and assigning it happen here. Notes
+                              without a tutorial's header can't be followed: the server says so. */}
+                          <button className="btn small" onClick={() => void act(() => startTutorial(store, `t:${r.item!.slug}`))} data-testid="library-try"
+                            title="Follow it yourself, in a game of your own, as a student would">
+                            Try it
+                          </button>
+                          {classes.length > 0 && (
+                            <select
+                              className="small-select"
+                              value=""
+                              onChange={(e) => e.target.value && void act(() => assignTutorial(store, `t:${r.item!.slug}`, title, true, Number(e.target.value)))}
+                              aria-label={`Assign ${title} to a class`}
+                              data-testid="library-assign"
+                            >
+                              <option value="">Assign to…</option>
+                              {classes.map((c) => (
+                                <option key={c.id} value={c.id}>
+                                  {c.name}
+                                </option>
+                              ))}
+                            </select>
+                          )}
                           <select
                             className="small-select"
                             value={r.item.visibility}
-                            aria-label="Who can follow it on the Tutorials page"
-                            title="Who can follow it on the Tutorials page"
+                            aria-label="Whether it is on the public Learn page"
+                            title="Everyone: on the public Learn page. Only me: in your library, for your assignments (a class gets it by having it linked)"
                             onChange={(e) => void act(() => api(`/api/library/${r.item!.slug}`, { json: { visibility: e.target.value } }).then(load))}
                           >
                             <option value="private">Only me</option>
-                            <option value="classes">My classes</option>
-                            {(me.user?.admin || r.item.visibility === "site") && <option value="site">Everyone</option>}
+                            {(me.user?.admin || r.item.visibility === "site") && <option value="site">Everyone (Learn page)</option>}
                           </select>
                           <button className="btn small" onClick={() => void act(() => api(`/api/library/${r.item!.slug}/duplicate`, { json: {} }).then(load))}>
                             Duplicate

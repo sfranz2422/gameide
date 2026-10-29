@@ -27,6 +27,13 @@ global_vars.score += 1
 
 An enemy only gets back to the right by flying past the player. One that hits the player is sent back by the collision event instead, so it doesn't score.
 
+```quiz
+Why doesn't an enemy that hits the player add to the score?
+- [x] The collision event sends it back, so it never reaches the line that scores
+- [ ] Enemies that hit the player are destroyed
+- [ ] The score only counts while the player has 3 lives
+```
+
 highlight: code-editor
 
 ```check
@@ -77,6 +84,13 @@ And show it in **Hud**'s **Draw GUI** event:
 
 ```python
 draw_text(10, 50, f"Best: {global_vars.best}")
+```
+
+```quiz
+Why is `global_vars.best = 0` inside `if not hasattr(...)`?
+- [x] Otherwise every restart would set the best back to 0
+- [ ] best has to be made before score
+- [ ] hasattr makes best bigger than score
 ```
 
 ```check

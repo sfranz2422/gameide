@@ -23,6 +23,14 @@ A sprite can have several **frames**: pictures shown one after another, like a f
 
 The library closes and your new sprite opens, with its two frames. Then press **Next**.
 
+```quiz
+type: match
+Match each word to what it means:
+- sheet -> one picture with lots of small pictures on it
+- frame -> one of a sprite's pictures, shown in turn like a flip book
+- public domain -> free for your games to use, share and even sell
+```
+
 highlight: add-sprites
 
 ---
@@ -35,7 +43,6 @@ highlight: folder-sprites
 
 ```check
 sprite hero exists
-sprite hero has 2 frames
 ```
 
 ---
@@ -68,6 +75,13 @@ room Room1 has at least 1 Player
 ## Play it
 
 Press **Play**. The astronaut walks on the spot: its two frames take turns, 8 a second. That's an animation.
+
+```quiz
+Your Player has no code yet. Why does the astronaut look like it's walking?
+- [ ] The library gave it code that moves its legs
+- [x] Its sprite's two frames take turns, 8 a second
+- [ ] The room slides along under it
+```
 
 highlight: play
 

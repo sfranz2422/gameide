@@ -598,7 +598,7 @@ CASES = [
  ("lesson code typo", "public/tutorials/py-functions.md", "    return n * 2", "    return n * 3", "py-functions"),
  # Tutorial series (src/tutorials/series.ts; series.test.ts): lessons that build one game
  ("series block drifts", "public/tutorials/el1-player.md", "self.x = clamp(self.x, 0, room_width - 24)\nself.y", "self.x = clamp(self.x, 0, room_width - 32)\nself.y", "el1-player"),
- ("series check impossible", "public/tutorials/el1-player.md", 'after 3 seconds holding left, instances("Player")[0].x == 0', 'after 3 seconds holding left, instances("Player")[0].x == 1', "el1-player"),
+ ("series check impossible", "public/tutorials/el1-player.md", "Player.step uses clamp\n", "Player.step uses clamped\n", "el1-player"),
  ("series starters forget", "src/tutorials/series.ts", "for (const lesson of series.lessons.slice(0, n))", "for (const lesson of series.lessons.slice(0, n * 0))", "el1-time-limit"),
  ("series starters forget in the editor", "src/store/templates.ts", "    applyLessonsBefore(p, series, n);\n", "    applyLessonsBefore(p, series, 0 * n);\n", "Game Elements: a lesson starts", E2E),
  ("series enemies never return", "src/tutorials/series.ts", "    self.y = random.randint(12, room_height - 12)\n`;\nconst ENEMY_BACK_SCORE", "    self.y = random.randint(12, room_height - 12)\n    self.x = -999\n`;\nconst ENEMY_BACK_SCORE", "el1-enemy"),
@@ -739,7 +739,6 @@ CASES = [
  ("starter: picked up things come back", "src/store/starterProjects.ts", "    room.persistent = true;\n", "", "Newsroom: click to walk"),
  ("starter: the cafeteria door needs nothing", "src/store/starterProjects.ts", "self.needs = \"camera\"\\n", "", "cafeteria door needs the camera"),
  ("starter: a choice goes nowhere", "src/store/starterProjects.ts", "        if words == answer:\n            play(goes)", "        if words == answer:\n            pass", "Ferryman"),
- ("starter: the novel's tutorial step does nothing", "public/tutorials/visual-novel.md", 'after 1 second, len(SCENES) >= 8', 'after 1 second, len(SCENES) >= 7', "Visual Novel"),
  ("library: Save doesn't say it saved", "public/static/presmaker/app.js", "      savedFlash(r.updated);\n", "      void 0;\n", "copied, a question added", E2E),
  ("library: built-in notes aren't known", "../backend/app.py", "    return _BUILTINS.get(text)\n", "    return None\n", "ARE a built-in", PY),
  ("library: old tutorials stay behind", "../backend/tutorials.py", "        if t.slug in have:\n            continue\n", "        continue\n", "an old tutorial is in the library", PY),

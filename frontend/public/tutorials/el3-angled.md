@@ -26,6 +26,14 @@ if keyboard_check("right"):
 
 `image_angle` turns the sprite. Angles go **anticlockwise**, in degrees: 0 points right, 90 up, 180 left. So left adds and right takes away.
 
+```quiz
+type: match
+Match each `image_angle` to the way the ship points:
+- 0 -> right
+- 90 -> up
+- 180 -> left
+```
+
 highlight: add-event
 
 ```check
@@ -52,8 +60,8 @@ else:
 highlight: code-editor
 
 ```check
-after 1 second holding up, Ship.x increased
-after 0.5 seconds holding up and left, Ship.y decreased
+after 1 second holding up, Ship.speed increased
+after 0.5 seconds holding up and left, Ship.direction changed
 ```
 
 ---
@@ -68,6 +76,13 @@ draw_text(10, 10, f"hspeed {self.hspeed:.1f}   vspeed {self.vspeed:.1f}")
 ```
 
 `:.1f` shows one decimal place. Fly about and watch: pointing right is all hspeed; pointing up is all vspeed, negative because up is minus. In between, a bit of each. A speed with a direction is called a **vector**.
+
+```quiz
+The ship points straight up and flies. What does the Draw GUI show?
+- [x] hspeed 0, and vspeed negative
+- [ ] hspeed 0, and vspeed positive
+- [ ] hspeed negative, and vspeed 0
+```
 
 ```check
 Ship has event draw gui
@@ -85,7 +100,8 @@ Fly off one edge and you're lost. Make the ship come back on the opposite side: 
 
 ```check
 Ship.step uses %
-after 3 seconds holding up, 0 <= instances("Ship")[0].x < room_width
+Ship.step uses room_width
+game runs 2 seconds without errors
 ```
 
 ---

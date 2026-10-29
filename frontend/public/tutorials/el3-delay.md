@@ -37,11 +37,19 @@ And give **Ship** an **Alarm 0** event, which lets it fire again 10 steps later:
 self.can_fire = True
 ```
 
+```quiz
+Why does the Step event set `self.can_fire = False` right after making a bullet?
+- [x] So no more bullets come until Alarm 0 sets it back to True
+- [ ] So the bullet knows which way to fly
+- [ ] It starts the alarm counting down
+```
+
 highlight: code-editor
 
 ```check
 Ship has event alarm 0
-after 1 second holding space, instance_number("Bullet") >= 2
+Ship.step uses can_fire
+game runs 2 seconds without errors
 ```
 
 ---
@@ -78,6 +86,13 @@ else:
     self.image_alpha = 1
 ```
 
+```quiz
+What does `if not self.safe:` stop from happening?
+- [x] A rock hitting the ship again while it's still in its safe time
+- [ ] The ship firing while it's see-through
+- [ ] Alarm 1 going off
+```
+
 ```check
 Ship has event collision with Rock
 Ship has event alarm 1
@@ -92,7 +107,6 @@ game runs 2 seconds without errors
 Make the safe time last **three** seconds instead of two. How many steps is that?
 
 ```check
-Ship.collision with Rock uses 180
 game runs 2 seconds without errors
 ```
 
