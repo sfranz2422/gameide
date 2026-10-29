@@ -24,6 +24,7 @@ import os
 import re
 from pathlib import Path
 
+from sqlalchemy.exc import SQLAlchemyError
 from flask import Blueprint, abort, jsonify, make_response, request
 
 import accounts
@@ -204,7 +205,10 @@ def _row(db, slug):
 def migrate(db):
     """Tutorials written before the library (gameide_tutorials) move into it,
     each keeping its slug, so a student's progress (t:<slug>) still finds it.
-    Once each: a row already in the library is left alone."""
+
+    MOVE, not copy: each old row is deleted once it's in the library. It once
+    stayed behind, and a tutorial deleted from the library was put back from
+    it the next time the Learn page loaded — a delete that didn't delete."""
     L = accounts.LibraryItem
     # "Shared with my classes" is gone (VISIBILITIES): those are private now.
     if db.query(L.id).filter(L.app == APP_NAME, L.visibility == "classes").first() is not None:
@@ -212,16 +216,25 @@ def migrate(db):
         db.commit()
     have = {s for (s,) in db.query(accounts.LibraryItem.slug).filter(accounts.LibraryItem.app == APP_NAME)}
     moved = 0
-    for t in db.query(Tutorial).all():
+    old = db.query(Tutorial).all()
+    for t in old:
         if t.slug in have:
+            db.delete(t)      # moved before this deleted them: in the library already
             continue
         db.add(accounts.LibraryItem(slug=t.slug, app=APP_NAME, teacher_id=t.owner_id, kind="tutorial", title=t.title,
                                     body=t.markdown, size=len(t.markdown.encode("utf-8")),
                                     visibility=t.visibility if t.visibility in VISIBILITIES else "private",
                                     created_at=t.created_at, updated_at=t.updated_at))
+        db.delete(t)
         moved += 1
-    if moved:
-        db.commit()
+    if old:
+        # Two workers (gunicorn --workers 2) can move the same rows at once:
+        # the second finds them moved or gone, and leaves it to the first.
+        try:
+            db.commit()
+        except SQLAlchemyError:
+            db.rollback()
+            return 0
     return moved
 
 

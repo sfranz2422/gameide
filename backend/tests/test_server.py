@@ -1159,6 +1159,13 @@ r = teacher.get("/teacher/tutorials/oldtutor1/edit")
 html = r.get_data(as_text=True)
 check("its editor is PresMaker, drawing GameIDE's checks and spotlights",
       r.status_code == 200 and "window.PM_SERVER" in html and "Checks — Next waits for these" in html and re.search(r'"testsFence":\s*"check"', html), r.status_code)
+# Moved, not copied: deleted from the library, it stays deleted. The old row
+# once stayed behind, and the next Learn page put the tutorial back.
+check("the old row is gone once moved", server.SessionLocal().query(gamestore.Tutorial).filter_by(slug="oldtutor1").count() == 0)
+check("deleting a moved tutorial works", teacher.delete("/api/library/oldtutor1").status_code == 200)
+xa.get("/api/tutorials")
+check("…and it stays deleted, however often the Learn page loads",
+      not any(i["slug"] == "oldtutor1" for i in teacher.get("/api/library").get_json()["items"]))
 
 # ---------------------------------------------------------------- tutorials (tutorials.py)
 import tutorials as tutmod  # noqa: E402

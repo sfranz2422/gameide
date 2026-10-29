@@ -330,15 +330,25 @@ export function LibraryPage() {
                           <a className="btn small" href={`/api/library/${r.item.slug}/download`} data-testid="library-download" title="Its markdown, as a file">
                             ⤓
                           </a>
+                          {/* On a built-in made theirs (edited or linked), Delete takes away their
+                              version only: the built-in itself is everyone's and stays, back to a
+                              plain built-in row. Said so, or the one Delete among the built-ins
+                              looked like a way to delete that built-in alone. */}
                           <button
                             className="btn small red"
+                            data-testid="library-delete"
                             onClick={() => {
                               const n = r.item!.uses.length;
-                              if (!confirm(`Delete “${title}” from the library?${n ? ` The ${n} assignment${n === 1 ? "" : "s"} using it keep the notes as they are now, as their own.` : ""}`)) return;
+                              const kept = n ? ` The ${n} assignment${n === 1 ? "" : "s"} using it keep the notes as they are now, as their own.` : "";
+                              const ask = builtin
+                                ? `Delete your version of “${title}”? The built-in tutorial stays as it ships, for you and everyone.${kept}`
+                                : `Delete “${title}” from the library?${kept}`;
+                              if (!confirm(ask)) return;
                               void act(() => api(`/api/library/${r.item!.slug}`, { method: "DELETE" }).then(load));
                             }}
+                            title={builtin ? "Your changes go; the built-in stays" : undefined}
                           >
-                            Delete
+                            {builtin ? "Delete my version" : "Delete"}
                           </button>
                         </>
                       )}
