@@ -438,6 +438,13 @@ header; steps are `---` slides; ` ```check ` blocks gate Next (strict); a
   `data-tutorial` attribute breaks spotlights silently otherwise.
 - Starting games for tutorials are `TUTORIAL_STARTERS` in templates.ts
   (kept off Create New Game: they're half a game on purpose).
+- **"Now you can make…" tutorials** (`make-*.md`) build a whole game from
+  `starter: empty`, with `level: Now You Can Make` and `after: <shelf>`;
+  the Learn page shows them as a band after that shelf, never as a shelf.
+  They are original games in a genre, never a copy of a named game (the
+  teacher asked for "frogger, pong, zelda": they're Busy Road and the like).
+  Each is walked step by step in `makes.test.ts`, its code taken from its
+  own markdown: add a new one there, or its checks are never run.
 - **No Copy button on tutorial code**, ever (the teacher's decision).
 - **A check states only what its own step asks students to type** (the
   teacher's rule, and a must). Students read the check block and type what

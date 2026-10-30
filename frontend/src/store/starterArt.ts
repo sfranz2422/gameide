@@ -197,6 +197,57 @@ export const STARTER_SPRITES: StarterSprite[] = [
       ctx.fill();
     },
   },
+  // For the "Now you can make" tutorials (Bomb Dodge, Busy Road), which start
+  // from an empty game: nothing above is a car or a bomb.
+  {
+    key: "bomb",
+    name: "bomb",
+    width: 16,
+    height: 18,
+    originX: 8,
+    originY: 10,
+    frames: 2,
+    fps: 8,
+    circle: true,
+    paint(ctx, frame) {
+      ctx.fillStyle = "#1f2937";
+      ctx.beginPath();
+      ctx.arc(8, 10, 7, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#6b7280";
+      ctx.fillRect(4, 6, 3, 2); // the shine
+      ctx.fillStyle = "#a16207";
+      ctx.fillRect(9, 1, 2, 3); // the fuse
+      ctx.fillStyle = frame ? "#fde047" : "#f97316";
+      ctx.fillRect(frame ? 10 : 9, 0, 2, 2); // its spark, flickering
+    },
+  },
+  {
+    key: "car",
+    name: "car",
+    width: 40,
+    height: 24,
+    originX: 20,
+    originY: 12,
+    frames: 1,
+    paint(ctx) {
+      ctx.fillStyle = "#111827"; // wheels
+      ctx.fillRect(5, 18, 8, 6);
+      ctx.fillRect(27, 18, 8, 6);
+      ctx.fillStyle = "#dc2626"; // body, facing right
+      ctx.beginPath();
+      ctx.roundRect(1, 9, 38, 11, 3);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.roundRect(9, 2, 20, 10, 3);
+      ctx.fill();
+      ctx.fillStyle = "#bae6fd"; // windows
+      ctx.fillRect(12, 4, 6, 6);
+      ctx.fillRect(20, 4, 6, 6);
+      ctx.fillStyle = "#fde047"; // headlight
+      ctx.fillRect(36, 11, 3, 3);
+    },
+  },
 ];
 
 /** Paints every frame of a starter sprite into PNG blobs. Browser only. */

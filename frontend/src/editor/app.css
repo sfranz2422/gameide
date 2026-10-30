@@ -3965,6 +3965,20 @@ a.btn {
 .tutorial-card p {
   margin: 0;
 }
+/* "Now you can make…": a whole game after a shelf, set apart from the lessons. */
+.make-band {
+  margin: 8px 0 28px;
+  padding: 14px 18px 18px;
+  border-radius: 14px;
+  background: var(--panel-2);
+  border-left: 6px solid var(--go);
+}
+.make-band h2 {
+  margin: 0 0 2px;
+}
+.make-band > p {
+  margin: 0 0 12px;
+}
 .tutorial-card .pill {
   justify-self: start;
 }

@@ -791,6 +791,16 @@ CASES = [
  ("football: the Comets keep it at halftime", FM, '        start_drive("away", 25)    # the Badgers', '        start_drive("home", 25)    # the Badgers', "after halftime", FB),
  ("football: a game with no end", FM, "    if q >= 4:", "    if q >= 5:", "after halftime", FB),
  ("football: the camera stays put", FBUILD, '"follow": P.obj_id("Ball")', '"follow": None', "follows the ball", FB),
+ ("makes: Coin Rush's player can't move", "public/tutorials/make-coin-rush.md", "speed = 5\n", "speed = 0\n", "make-coin-rush: doing what"),
+ ("makes: Coin Rush's clock never runs", "public/tutorials/make-coin-rush.md", "    global_vars.time -= 1\n", "    global_vars.time -= 0\n", "make-coin-rush: doing what"),
+ ("makes: a step whose checks already pass", "public/tutorials/make-coin-rush.md", "object Hud exists\nroom Room1 has 1 Hud\nHud has event draw gui\nHud.draw gui uses draw_text\n", "object Player exists\n", "make-coin-rush: doing what"),
+ ("makes: Bomb Dodge's bombs hang in the air", "public/tutorials/make-bomb-dodge.md", "```python\nself.vspeed = 3\n```", "```python\nself.vspeed = 0\n```", "make-bomb-dodge: doing what"),
+ ("makes: Bomb Dodge makes one bomb", "public/tutorials/make-bomb-dodge.md", '-10, "Bomb")\nself.alarm[0] = 30\n```', '-10, "Bomb")\n```', "make-bomb-dodge: doing what"),
+ ("makes: Busy Road hops the wrong way", "public/tutorials/make-busy-road.md", 'if keyboard_check_pressed("up"):\n    self.y -= 32', 'if keyboard_check_pressed("up"):\n    self.y += 32', "make-busy-road: doing what"),
+ ("makes: the after line not read", "src/tutorials/tutorial.ts", '      after: fields.after || "",', '      after: "",', "listed after a shelf"),
+ ("makes: every band after every shelf", "src/tutorials/TutorialPages.tsx", '(level === null ? !shown.has(t.after ?? "") : t.after === level)', '(level === null ? !shown.has(t.after ?? "") : t.after !== "")', "Now you can make", E2E),
+ ("makes: a shelf of its own", "src/tutorials/TutorialPages.tsx", "!LEVELS.includes(l) && l !== MAKE_LEVEL", "!LEVELS.includes(l)", "Now you can make", E2E),
+ ("makes: the car isn't drawn", "src/store/starterArt.ts", 'ctx.fillStyle = "#dc2626"; // body', 'ctx.fillStyle = "#dc262600"; // body', "Now you can make", E2E),
 ]
 only = sys.argv[1:]
 # A name that matches no case would otherwise run nothing and still say

@@ -189,3 +189,45 @@ test("a tutorial's Python is coloured and marked to type, and Next opens the nex
   await expect(code.locator(".syn-number").first()).toHaveText("0");
   if (SHOTS) await pane.screenshot({ path: `${SHOTS}/tutorial-code.png` });
 });
+
+test("Now you can make: a whole-game tutorial sits just after the shelf it uses, and starts from an empty game", async ({ page }) => {
+  await page.goto("/#/tutorials");
+  const bands = page.getByTestId("make-band");
+  await expect(bands).toHaveCount(2);
+  // Each band follows its shelf: the heading just before it is that shelf's.
+  for (const [shelf, games] of [
+    ["Getting Started", ["Coin Rush"]],
+    ["Game Elements 1: The Basics", ["Bomb Dodge", "Busy Road"]],
+  ] as const) {
+    const band = page.locator(`[data-testid="make-band"][data-after="${shelf}"]`);
+    await expect(band.getByRole("heading")).toHaveText("Now you can make…");
+    await expect(band.getByTestId("tutorial-card")).toHaveText(games.map((g) => new RegExp(g)));
+    expect(await band.evaluate((b) => b.previousElementSibling?.querySelector("h2")?.textContent)).toBe(shelf);
+  }
+  // Not a shelf of its own.
+  await expect(page.getByRole("heading", { name: "Now You Can Make", exact: true })).toHaveCount(0);
+
+  await page.locator('[data-after="Game Elements 1: The Basics"]').getByTestId("tutorial-card").filter({ hasText: "Busy Road" }).getByTestId("tutorial-start").click();
+  await page.waitForURL(/#\/p\//);
+  await expect(page.getByTestId("tutorial-pane")).toContainText("Busy Road");
+  // From nothing: no objects yet. The car the lesson asks for is there to pick, and is drawn.
+  await expect(page.getByTestId("tutorial-step")).toHaveText("Step 1 of 10");
+  await page.getByTestId("add-sprites").click();
+  await expect(page.getByTestId("starter-bomb")).toBeVisible();
+  await page.getByTestId("starter-car").click();
+  // The car is drawn (a ready-made sprite is painted when it's added): read its picture back.
+  const img = page.getByTestId("sprite-canvas").locator("img");
+  await expect(img).toHaveAttribute("alt", "car");
+  const lit = await img.evaluate(async (el: HTMLImageElement) => {
+    await el.decode();
+    const c = new OffscreenCanvas(el.naturalWidth, el.naturalHeight);
+    const x = c.getContext("2d")!;
+    x.drawImage(el, 0, 0);
+    const d = x.getImageData(0, 0, c.width, c.height).data;
+    let n = 0;
+    for (let i = 3; i < d.length; i += 4) if (d[i]! > 0) n++;
+    return [c.width, c.height, n];
+  });
+  expect(lit.slice(0, 2)).toEqual([40, 24]);
+  expect(lit[2]).toBeGreaterThan(300);
+});

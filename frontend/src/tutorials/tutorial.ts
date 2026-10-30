@@ -7,6 +7,7 @@
  *   time: 20 min
  *   starter: coins-start
  *   description: Pick up coins and keep score.
+ *   after: Game Elements 1: The Basics      (only on the shelf "Now You Can Make")
  *   ---
  *   # Coins that disappear
  *   Open **Player** …
@@ -38,6 +39,11 @@ export interface TutorialMeta {
   description: string;
   /** Next waits for each step's checks (true unless the header says `locked: no`). */
   locked: boolean;
+  /**
+   * A "Now You Can Make" tutorial (a whole game, from nothing) names the
+   * shelf whose lessons it uses: the Learn page shows it just after that shelf.
+   */
+  after: string;
 }
 
 export interface Step {
@@ -60,6 +66,13 @@ export interface Tutorial {
  * written in Python, so a student starts with the language and then the
  * editor (2026-10-27, the teacher's call).
  */
+/**
+ * Not a shelf of its own: each of these whole-game tutorials sits after the
+ * shelf it names in `after:`, as "Now you can make…" (the teacher's plan,
+ * 2026-10-30). One whose shelf isn't there goes at the end.
+ */
+export const MAKE_LEVEL = "Now You Can Make";
+
 export const LEVELS = ["Python Basics", "Getting Started", "Game Elements 1: The Basics", "Game Elements 2: Adding to the Fun", "Game Elements 3: Advanced Techniques", "Starter Projects", "Top-Down", "Shooters", "Advanced Python"];
 
 const HEADER = /^\s*---[ \t]*\n([\s\S]*?)\n---[ \t]*(?:\n|$)/;
@@ -89,6 +102,7 @@ export function splitHeader(md: string): { meta: TutorialMeta; body: string } {
       starter: fields.starter || "empty",
       description: fields.description || "",
       locked: !/^(no|false|off)$/i.test(fields.locked ?? ""),
+      after: fields.after || "",
     },
     body: m ? text.slice(m[0].length) : text,
   };

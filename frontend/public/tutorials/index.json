@@ -366,5 +366,32 @@
   "time": "15 min",
   "starter": "platformer",
   "description": "On-screen arrows and buttons, taps as clicks, and playing your published game on a phone."
+ },
+ {
+  "key": "make-coin-rush",
+  "title": "Coin Rush",
+  "level": "Now You Can Make",
+  "after": "Getting Started",
+  "time": "35 min",
+  "starter": "empty",
+  "description": "A whole game from an empty one: grab as many coins as you can in thirty seconds."
+ },
+ {
+  "key": "make-bomb-dodge",
+  "title": "Bomb Dodge",
+  "level": "Now You Can Make",
+  "after": "Game Elements 1: The Basics",
+  "time": "40 min",
+  "starter": "empty",
+  "description": "A whole game from an empty one: bombs rain down faster and faster, and you dodge them for as long as you can."
+ },
+ {
+  "key": "make-busy-road",
+  "title": "Busy Road",
+  "level": "Now You Can Make",
+  "after": "Game Elements 1: The Basics",
+  "time": "45 min",
+  "starter": "empty",
+  "description": "A whole game from an empty one: hop across lanes of traffic, one square at a time, without getting squashed."
  }
 ]

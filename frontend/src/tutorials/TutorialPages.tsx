@@ -20,7 +20,7 @@ import type { ProjectStore, ProjectSummary } from "../store/store";
 import { TUTORIAL_STARTERS } from "../store/templates";
 import { useSession } from "../editor/session";
 import { SiteNav } from "../editor/SiteNav";
-import { LEVELS, parseTutorial } from "./tutorial";
+import { LEVELS, MAKE_LEVEL, parseTutorial } from "./tutorial";
 
 interface Entry {
   key: string;
@@ -34,6 +34,8 @@ interface Entry {
   slug?: string;
   owner?: string;
   visibility?: string;
+  /** On the "Now You Can Make" shelf: the shelf it comes after. */
+  after?: string;
 }
 
 /** A tutorial's markdown, by key: built-in from the editor's own files, a teacher's from the server. */
@@ -133,8 +135,59 @@ export function TutorialsPage() {
   const start = (e: Entry) => act(() => startTutorial(store, e.key));
 
   const all = [...builtins.filter((t) => !hidden.includes(t.key.slice("builtin:".length))), ...others];
-  const levels = [...LEVELS, ...new Set(all.map((t) => t.level).filter((l) => !LEVELS.includes(l)))];
+  const levels = [...LEVELS, ...new Set(all.map((t) => t.level).filter((l) => !LEVELS.includes(l) && l !== MAKE_LEVEL))];
+  // "Now you can make…": whole games, each just after the shelf it uses;
+  // one whose shelf isn't on the page goes at the end.
+  const makes = all.filter((t) => t.level === MAKE_LEVEL);
+  const shown = new Set(levels.filter((l) => all.some((t) => t.level === l)));
+  const makesAfter = (level: string | null) =>
+    makes.filter((t) => (level === null ? !shown.has(t.after ?? "") : t.after === level));
   const byKey = useMemo(() => new Map(games.filter((g) => g.tutorial).map((g) => [g.tutorial!.key, g])), [games]);
+  const card = (t: Entry) => {
+    const game = byKey.get(t.key);
+    return (
+      <div key={t.key} className="tutorial-card" data-testid="tutorial-card">
+        <b>{t.title}</b>
+        <span className="muted small">
+          {t.time}
+          {t.owner ? ` · by ${t.owner}` : ""}
+        </span>
+        <p className="small">{t.description}</p>
+        {status(game) && (
+          <span className="pill" data-testid="tutorial-status">
+            {status(game)}
+          </span>
+        )}
+        <div className="row">
+          {game ? (
+            <a className="btn small go" href={`#/p/${game.id}`} data-testid="tutorial-resume">
+              {game.tutorial!.step >= game.tutorial!.steps ? "Open" : "Resume"}
+            </a>
+          ) : (
+            <button className="btn small go" disabled={busy} onClick={() => void start(t)} data-testid="tutorial-start">
+              Start
+            </button>
+          )}
+          {t.mine && (
+            <a className="btn small" href={libraryEditUrl(t.slug!)}>
+              Edit
+            </a>
+          )}
+        </div>
+      </div>
+    );
+  };
+  const makeBand = (level: string | null) => {
+    const here = makesAfter(level);
+    if (!here.length) return null;
+    return (
+      <section key={`make:${level}`} className="make-band" data-testid="make-band" data-after={level ?? ""}>
+        <h2>Now you can make…</h2>
+        <p className="muted small">A whole game, from an empty one, with what you've just learned.</p>
+        <div className="tutorial-cards">{here.map(card)}</div>
+      </section>
+    );
+  };
   return (
     <div className="site-page">
       <SiteNav at="learn" />
@@ -152,48 +205,15 @@ export function TutorialsPage() {
         {levels.map((level) => {
           const here = all.filter((t) => t.level === level);
           if (!here.length) return null;
-          return (
+          return [
             <section key={level} className="class-section">
               <h2>{level}</h2>
-              <div className="tutorial-cards">
-                {here.map((t) => {
-                  const game = byKey.get(t.key);
-                  return (
-                    <div key={t.key} className="tutorial-card" data-testid="tutorial-card">
-                      <b>{t.title}</b>
-                      <span className="muted small">
-                        {t.time}
-                        {t.owner ? ` · by ${t.owner}` : ""}
-                      </span>
-                      <p className="small">{t.description}</p>
-                      {status(game) && (
-                        <span className="pill" data-testid="tutorial-status">
-                          {status(game)}
-                        </span>
-                      )}
-                      <div className="row">
-                        {game ? (
-                          <a className="btn small go" href={`#/p/${game.id}`} data-testid="tutorial-resume">
-                            {game.tutorial!.step >= game.tutorial!.steps ? "Open" : "Resume"}
-                          </a>
-                        ) : (
-                          <button className="btn small go" disabled={busy} onClick={() => void start(t)} data-testid="tutorial-start">
-                            Start
-                          </button>
-                        )}
-                        {t.mine && (
-                          <a className="btn small" href={libraryEditUrl(t.slug!)}>
-                            Edit
-                          </a>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </section>
-          );
+              <div className="tutorial-cards">{here.map(card)}</div>
+            </section>,
+            makeBand(level),
+          ];
         })}
+        {makeBand(null)}
       </main>
     </div>
   );
