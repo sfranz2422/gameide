@@ -829,6 +829,8 @@ CASES = [
  ("golf: a birdie called a bogey", GP, '-1: "Birdie!", 0: "Par.", 1: "Bogey."', '-1: "Bogey.", 0: "Par.", 1: "Bogey."', "names the scores", GF),
  ("library: the Sports equipment cut at the wrong size", "src/library/library.ts", 'file: k("sports", "equipment.png"), tileWidth: 32, tileHeight: 32', 'file: k("sports", "equipment.png"), tileWidth: 16, tileHeight: 16', "Sports pack", E2E),
  ("football: the keyboard read twice on the title", FB_CTRL, "    return ONE if c == 0 else NO_KEYS", "    return ONE", "picks 2 Players", FB),
+ ("library: a pack's preview broken", "src/library/library.ts", 'preview: k("racing", "preview.png"),', 'preview: k("racing", "previews.png"),', "every pack opens", E2E),
+ ("library: a pack's sheet listed but missing", "src/library/library.ts", 'file: k("tiny-farm", "tiles.png")', 'file: k("tiny-farm", "tile.png")', "has every picture it lists"),
 ]
 only = sys.argv[1:]
 # A name that matches no case would otherwise run nothing and still say

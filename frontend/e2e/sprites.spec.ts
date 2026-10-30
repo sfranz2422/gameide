@@ -206,3 +206,24 @@ test("the free art library's Sports pack: the golf ball as a sprite, the pitch a
   await page.getByTestId("sheet-tileset-Grass pitch").click();
   await expect(page.getByTestId("tileset-count")).toHaveText("13 × 16 = 208 tiles, 0 solid");
 });
+
+test("the free art library: every pack opens, with its preview, and every sheet in it is drawn", async ({ page }) => {
+  test.setTimeout(120_000);
+  const errors = watchErrors(page);
+  await fromTemplate(page, "empty");
+  await page.getByTestId("add-sprites").click();
+  await page.getByTestId("open-library").click();
+  const packs = await page.locator('[data-testid^="library-"]').evaluateAll((els) => els.map((e) => e.getAttribute("data-testid")!));
+  expect(packs.length).toBeGreaterThanOrEqual(16);
+  for (const id of packs) {
+    // Its preview is a real picture, not a broken one.
+    const shown = await page.getByTestId(id).locator("img").evaluate(async (img: HTMLImageElement) => (await img.decode().then(() => true, () => false)) && img.naturalWidth > 0);
+    expect(shown, `${id}'s preview`).toBe(true);
+    await page.getByTestId(id).click();
+    const sheets = page.locator('[data-testid^="sheet-canvas-"]');
+    expect(await sheets.count(), id).toBeGreaterThan(0);
+    for (const s of await sheets.all()) await expect(s, `${id}: ${await s.getAttribute("data-testid")}`).toHaveAttribute("data-ready", "1", { timeout: 20_000 });
+    await page.getByRole("button", { name: "← All packs" }).click();
+  }
+  expect(errors).toEqual([]);
+});

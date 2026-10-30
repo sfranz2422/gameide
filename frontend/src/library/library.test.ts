@@ -40,7 +40,8 @@ describe("the free art library", () => {
     for (const p of LIBRARY) {
       const licence = resolve(PUBLIC, dirname(p.sheets[0]!.file), "License.txt");
       expect(existsSync(licence), licence).toBe(true);
-      expect(readFileSync(licence, "utf8")).toMatch(/Creative Commons Zero, CC0/);
+      // In Kenney's words, or (older packs, like Space Shooter Redux) the CC0 deed's own address.
+      expect(readFileSync(licence, "utf8")).toMatch(/Creative Commons Zero, CC0|creativecommons\.org\/publicdomain\/zero\/1\.0/);
       expect(p.licence).toMatch(/CC0/);
     }
   });
