@@ -82,6 +82,25 @@ export const LIBRARY: LibraryPack[] = [
       { name: "Tiles", file: k("pixel-shmup", "tiles.png"), tileWidth: 16, tileHeight: 16, use: "tiles" },
     ],
   },
+  {
+    // Kenney's Sports Pack: its separate pictures packed into grids by
+    // scripts/make_sports_library.py; its tilesheets are 64-pixel grids already.
+    id: "sports",
+    name: "Sports",
+    author: "Kenney",
+    licence: "CC0 (public domain)",
+    url: "https://kenney.nl/assets/sports-pack",
+    preview: k("sports", "preview.png"),
+    about: "Players seen from above in five team colours (ten looks and an arm each), every kind of ball, flags, a golf club, rackets and bats, and pitches, courts and goals.",
+    sheets: [
+      { name: "Players", file: k("sports", "players.png"), tileWidth: 24, tileHeight: 32, use: "sprites" },
+      { name: "Balls and equipment", file: k("sports", "equipment.png"), tileWidth: 32, tileHeight: 32, use: "sprites" },
+      { name: "Grass pitch", file: k("sports", "pitch.png"), tileWidth: 64, tileHeight: 64, use: "tiles" },
+      { name: "Court", file: k("sports", "court.png"), tileWidth: 64, tileHeight: 64, use: "tiles" },
+      { name: "Tarmac", file: k("sports", "tarmac.png"), tileWidth: 64, tileHeight: 64, use: "tiles" },
+      { name: "Goals and nets", file: k("sports", "goals.png"), tileWidth: 64, tileHeight: 64, use: "tiles" },
+    ],
+  },
 ];
 
 // ---------------------------------------------------------------- cutting

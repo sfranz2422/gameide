@@ -124,6 +124,23 @@ describe.skipIf(!have)("Under the Lights", () => {
     expect(py(g, "PLAY['target'].role")).toBe("WR3");
   });
 
+  it("picks 2 Players on the title with one press of down, and starts a two-player match", () => {
+    py(g, "go_title(g)");
+    step(g, 2);
+    press(g, "down");
+    expect(py(g, "g.menu")).toBe(1); // one press, one step: it was read twice, back to 1 Player
+    press(g, "z");
+    expect(py(g, "g.mode")).toBe("call");
+    expect(py(g, "MATCH['two'] and MATCH['humans'] == {'home': 0, 'away': 1}")).toBe(true);
+    // The Badgers' coach picks with the arrows and P, the Comets' with W, S and C.
+    step(g, 12);
+    press(g, "s");
+    expect(py(g, "MATCH['cursor']['home']")).toBe(1);
+    expect(py(g, "MATCH['cursor']['away']")).toBe(0);
+    press(g, "down");
+    expect(py(g, "MATCH['cursor']['away']")).toBe(1);
+  });
+
   it("follows the ball with the camera", () => {
     setUp(g, "Deep");
     py(g, "g.mode = 'live'");

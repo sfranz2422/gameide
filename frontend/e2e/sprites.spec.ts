@@ -171,3 +171,38 @@ test("the free art library: cells of a sheet become a sprite's frames, and a who
   await page.getByTestId("sheet-tileset-Tiles and characters").click();
   await expect(page.getByTestId("tileset-count")).toHaveText("12 × 11 = 132 tiles, 0 solid");
 });
+
+test("the free art library's Sports pack: the golf ball as a sprite, the pitch as a tileset", async ({ page }) => {
+  await fromTemplate(page, "empty");
+  await page.getByTestId("add-sprites").click();
+  await page.getByTestId("open-library").click();
+  await page.getByTestId("library-sports").click();
+  const sheet = page.getByTestId("sheet-canvas-Balls and equipment");
+  await expect(sheet).toHaveAttribute("data-ready", "1");
+  const box = (await sheet.boundingBox())!;
+  const cell = box.width / 8; // 8 across: the golf ball is the 11th, row 2 column 3
+  await sheet.click({ position: { x: cell * 2.5, y: cell * 1.5 } });
+  await expect(page.getByTestId("sheet-sprite-Balls and equipment")).toHaveText("Add as a sprite (1 frame)");
+  await page.getByTestId("sheet-sprite-Balls and equipment").click();
+  await expect(page.getByTestId("sprite-frames").getByRole("button", { name: /^Frame \d$/ })).toHaveCount(1);
+  // The golf ball, 8 pixels across, in the middle of its 32-pixel cell: drawn there, and nothing round it.
+  const lit = await page.getByTestId("sprite-canvas").locator("img").evaluate(async (el: HTMLImageElement) => {
+    await el.decode();
+    const c = new OffscreenCanvas(el.naturalWidth, el.naturalHeight);
+    const x = c.getContext("2d")!;
+    x.drawImage(el, 0, 0);
+    const d = x.getImageData(0, 0, c.width, c.height).data;
+    let n = 0;
+    for (let i = 3; i < d.length; i += 4) if (d[i]! > 0) n++;
+    return [c.width, c.height, n];
+  });
+  expect(lit.slice(0, 2)).toEqual([32, 32]);
+  expect(lit[2]).toBeGreaterThan(30);
+  expect(lit[2]).toBeLessThan(80);
+
+  await page.getByTestId("add-sprites").click();
+  await page.getByTestId("open-library").click();
+  await page.getByTestId("library-sports").click();
+  await page.getByTestId("sheet-tileset-Grass pitch").click();
+  await expect(page.getByTestId("tileset-count")).toHaveText("13 × 16 = 208 tiles, 0 solid");
+});

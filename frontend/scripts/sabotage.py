@@ -30,7 +30,10 @@ E2E = "e2e"  # a sixth item: run the Playwright test of that name instead of Vit
 GM = "greymire"  # …or Greymire's playtest, after building the game from the sabotaged source (and again after)
 MM = "mystery"   # …or Mystery Meat's playtest, rebuilt the same way
 FB = "football"  # …or Under the Lights' playtest, rebuilt the same way
+GF = "golf"      # …or Greenside's
+GB, GC, GP = "../showcase/golf/game/_2ball.py", "../showcase/golf/game/_1course.py", "../showcase/golf/game/_3play.py"
 FP, FM, FBUILD = "../showcase/football/game/_2play.py", "../showcase/football/game/_3match.py", "../showcase/football/build.py"
+FB_CTRL = "../showcase/football/game/_4controls.py"
 PY = "py"    # …or the server's checks (backend/tests/test_server.py); caught = that check prints FAIL
 APP = "../backend/app.py"
 RO, RE = "src/editor/rooms/roomOps.ts", "src/editor/rooms/RoomEditor.tsx"
@@ -812,6 +815,20 @@ CASES = [
  ("makes: Moonwell's gaps lead nowhere", "public/tutorials/make-moonwell.md", "    room_goto(RIGHT[room_name()])", "    room_goto(room_name())", "make-moonwell: doing what"),
  ("makes: Moonwell's ledge in reach of one jump", "public/tutorials/make-moonwell.md", '        "#........####......#",\n        "#..................#",\n        "#..................#",\n        "#...................",', '        "#..................#",\n        "#..................#",\n        "#........####......#",\n        "#...................",', "make-moonwell: doing what"),
  ("makes: no band at a shelf's end", "src/tutorials/TutorialPages.tsx", "            makeBand(level),\n", "            null,\n", "Now you can make", E2E),
+ ("golf: a ball lands rolling in sand", GC, '"sand": 0.0}', '"sand": 1.0}', "lands dead in sand", GF),
+ ("golf: sand grips like grass", GC, '"rough": 0.90, "sand": 0.70}', '"rough": 0.90, "sand": 0.955}', "lands dead in sand", GF),
+ ("golf: no putt is too hard", GB, "        ball.x, ball.y = cx + ball.vx / s * (CUP_RADIUS + 1), cy + ball.vy / s * (CUP_RADIUS + 1)\n", "", "lips out", GF),
+ ("golf: water costs nothing", GP, "        ROUND[\"strokes\"][i] += 1                     # a penalty stroke", "        pass                                         # a penalty stroke", "water", GF),
+ ("golf: water leaves the ball in it", GP, "        b.x, b.y = b.last\n", "", "water", GF),
+ ("golf: trees let balls through", GB, "        if d < r * 0.8 and ball.z < 40:", "        if False:", "off a tree", GF),
+ ("golf: the nearest plays next", GP, "    return max(left, key=lambda i:", "    return min(left, key=lambda i:", "furthest from the pin", GF),
+ ("golf: clubs too short for the course", GC, '{"name": "Driver", "carry": 380,', '{"name": "Driver", "carry": 150,', "played round all nine holes", GF),
+ ("golf: the best round not kept", "../showcase/golf/game/Game.py", '                    save_set("best", total(0))', '                    pass', "played round all nine holes", GF),
+ ("golf: a cup off its green builds", "../showcase/golf/build.py", '        if ball["ground"](h, *h["cup"]) != "green":', '        if False:', "won't build a course", GF),
+ ("golf: a par any length builds", "../showcase/golf/build.py", "        if not fits[0] <= d <= fits[1]:", "        if False:", "won't build a course", GF),
+ ("golf: a birdie called a bogey", GP, '-1: "Birdie!", 0: "Par.", 1: "Bogey."', '-1: "Bogey.", 0: "Par.", 1: "Bogey."', "names the scores", GF),
+ ("library: the Sports equipment cut at the wrong size", "src/library/library.ts", 'file: k("sports", "equipment.png"), tileWidth: 32, tileHeight: 32', 'file: k("sports", "equipment.png"), tileWidth: 16, tileHeight: 16', "Sports pack", E2E),
+ ("football: the keyboard read twice on the title", FB_CTRL, "    return ONE if c == 0 else NO_KEYS", "    return ONE", "picks 2 Players", FB),
 ]
 only = sys.argv[1:]
 # A name that matches no case would otherwise run nothing and still say
@@ -846,7 +863,7 @@ for name, f, old, new, test, *extra in CASES:
             failed = any(l.startswith("FAIL") and test in l for l in out.splitlines())
             ran = "ok   " in out or "FAIL " in out
         else:
-            if runner in ([GM], [MM], [FB]):
+            if runner in ([GM], [MM], [FB], [GF]):
                 subprocess.run(["python3", str(ROOT.parent / f"showcase/{runner[0]}/build.py")], capture_output=True)
             cmd = ["npx", "playwright", "test", "-g", test] if runner == [E2E] else ["npx", "vitest", "run", "-t", test]
             r = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True)
@@ -857,6 +874,6 @@ for name, f, old, new, test, *extra in CASES:
         if not failed: bad.append(name)
     finally:
         p.write_text(src)
-        if runner in ([GM], [MM], [FB]):
+        if runner in ([GM], [MM], [FB], [GF]):
             subprocess.run(["python3", str(ROOT.parent / f"showcase/{runner[0]}/build.py")], capture_output=True)
 print("ALL SABOTAGES CAUGHT" if not bad else f"NOT CAUGHT: {bad}")

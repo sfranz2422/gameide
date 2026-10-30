@@ -14,8 +14,17 @@ TWO = [
 PAD = ["a", "b", "x"]
 
 
+NO_KEYS = {"left": [], "right": [], "up": [], "down": [], "buttons": [[], [], []], "names": ["A", "B", "X"]}
+
+
 def keys_for(c):
-    return TWO[c] if MATCH.get("two") else ONE
+    """Controller c's keys. Outside a two-player match the keyboard is
+    controller 0's alone, and controller 1 is just its gamepad: given the
+    same keys, the title menu read every press twice and stepped over
+    "2 Players" back to where it was."""
+    if MATCH.get("two"):
+        return TWO[c]
+    return ONE if c == 0 else NO_KEYS
 
 
 def held(keys):
