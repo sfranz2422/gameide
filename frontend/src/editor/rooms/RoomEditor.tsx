@@ -19,6 +19,7 @@ import { find, newId, newInstance, tilesetGrid, type Project, type RoomInstance,
 import {
   autotileErase,
   autotilePaint,
+  cellsBetween,
   erase as eraseTiles,
   fillRect,
   floodCells,
@@ -542,7 +543,9 @@ export function RoomEditor({ roomId, focus }: { roomId: string; focus: { instanc
       const k = `${c},${r}`;
       if (k === drag.last) return;
       setDrag({ ...drag, last: k });
-      return setTiles((t) => dab(t, c, r, drag.erasing));
+      // Every cell the stroke crossed since the last move, not just where the pointer landed.
+      const [lc, lr] = drag.last.split(",").map(Number) as [number, number];
+      return setTiles((t) => cellsBetween(lc, lr, c, r).reduce((acc, [cc, rr]) => dab(acc, cc, rr, drag.erasing), t));
     }
     if (drag.kind === "erase") return erase(p);
     if (drag.kind === "paint") {

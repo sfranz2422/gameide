@@ -49,6 +49,8 @@ describe("the shelves", () => {
   it("start with Python Basics: every game lesson is written in Python", () => {
     expect(LEVELS[0]).toBe("Python Basics");
     expect(LEVELS[1]).toBe("Getting Started");
+    // Then making art work: their own sheets, slicing, autotiling, a town (2026-10-30).
+    expect(LEVELS[2]).toBe("Art and Tiles");
   });
   it("put a tutorial that names no shelf on Getting Started, not Python Basics", () => {
     expect(parseTutorial("---\ntitle: T\n---\n# A\nhi").meta.level).toBe("Getting Started");

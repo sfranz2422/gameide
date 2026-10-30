@@ -494,6 +494,57 @@ function levelsStart(n: number) {
   };
 }
 
+/**
+ * The Art and Tiles lessons' pictures (public/tutorials/art/, made by
+ * scripts/make_tutorial_art.py from Kenney's CC0 packs), and the tiles the
+ * lessons and their tests name: row × 57 + column in Kenney's town sheet.
+ */
+export const ART = {
+  garden: { file: "tutorials/art/garden.png", width: 128, height: 48, tile: 16, grass: 16, flowers: 17, bush: 18, pond: 19 },
+  town: { file: "tutorials/art/town.png", width: 968, height: 526, tile: 16, spacing: 1, grass: 5, road: 6, water: 0, tree: 583, pine: 586, bush: 533 },
+};
+
+async function artTileset(name: string, art: { file: string; width: number; height: number; tile: number; spacing?: number }, assets: Map<string, Blob>) {
+  const blob = await (await fetch(art.file)).blob(); // relative: from the page's base, as the library's pictures are
+  const id = newId();
+  assets.set(id, blob);
+  return {
+    ...newTileset(name),
+    image: id,
+    imageWidth: art.width,
+    imageHeight: art.height,
+    tileWidth: art.tile,
+    tileHeight: art.tile,
+    spacingX: art.spacing ?? 0,
+    spacingY: art.spacing ?? 0,
+  };
+}
+
+/** Autotiling (lesson 3): the garden tileset, and a room covered in grass. */
+async function artGarden(): Promise<Built> {
+  const p = blankProject("My garden");
+  const assets = new Map<string, Blob>();
+  const ts = await artTileset("garden", ART.garden, assets);
+  p.tilesets.push(ts);
+  const room = p.rooms[0]!;
+  const grass: Record<string, number> = {};
+  for (let c = 0; c < room.width / ART.garden.tile; c++) for (let r = 0; r < room.height / ART.garden.tile; r++) grass[`${c},${r}`] = ART.garden.grass;
+  room.layers.push({ id: newId(), name: "Grass", kind: "tiles", depth: 100, visible: true, locked: false, tileset: ts.id, tiles: grass });
+  return { project: p, assets };
+}
+
+/** A Town from Tiles (lesson 4): the town tileset as lesson 2 cut it, and a Player in an empty room. */
+async function artTown(): Promise<Built> {
+  const p = blankProject("My town");
+  const assets = new Map<string, Blob>();
+  p.tilesets.push(await artTileset("town", ART.town, assets));
+  const sprite = await addStarterSprite(p, assets, "player");
+  const player = obj(p, "Player", sprite);
+  const room = p.rooms[0]!;
+  room.instances.push(newInstance(room, player.id, 320, 240));
+  return { project: p, assets };
+}
+
 /** Templates for tutorials only, by their `starter:` name. */
 export const TUTORIAL_STARTERS: Record<string, () => Promise<Built>> = {
   ...Object.fromEntries(SERIES.flatMap((s) => s.lessons.map((_, n) => [`${s.name}-${n}`, seriesStart(s, n)]))),
@@ -509,6 +560,8 @@ export const TUTORIAL_STARTERS: Record<string, () => Promise<Built>> = {
   pointclick,
   novel,
   ...Object.fromEntries([0, 1, 2, 3, 4].map((n) => [`levels-${n}`, levelsStart(n)])),
+  "art-garden": artGarden,
+  "art-town": artTown,
 };
 
 export const TEMPLATES: { key: string; label: string; description: string; build: () => Promise<Built> }[] = [

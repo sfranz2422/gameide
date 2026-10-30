@@ -211,7 +211,7 @@ export function TilesetEditor({ tilesetId }: { tilesetId: string }) {
   return (
     <div className="tileset-editor" data-tutorial="tileset-editor">
       <div className="tileset-props">
-        <button className="btn" onClick={choose} data-testid="tileset-image">
+        <button className="btn" onClick={choose} data-testid="tileset-image" data-tutorial="tileset-picture">
           {tileset.image ? "Replace picture…" : "Choose a picture…"}
         </button>
         {problem && <p className="banner error">{problem}</p>}
@@ -220,7 +220,7 @@ export function TilesetEditor({ tilesetId }: { tilesetId: string }) {
             {notice}
           </p>
         )}
-        <fieldset>
+        <fieldset data-tutorial="tileset-cut">
           <legend>Tiles</legend>
           {num("Width", "tileWidth", 1)}
           {num("Height", "tileHeight", 1)}

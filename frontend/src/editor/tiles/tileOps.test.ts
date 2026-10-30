@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { autotileErase, autotilePaint, erase, fillRect, floodFill, paint, pick, rectCells, single, stampFromPalette, type AutotileSet } from "./tileOps";
+import { autotileErase, autotilePaint, cellsBetween, erase, fillRect, floodFill, paint, pick, rectCells, single, stampFromPalette, type AutotileSet } from "./tileOps";
 import { transformStamp } from "./tileOps";
 import { TILE_FLIP_X, TILE_FLIP_Y, TILE_TURN } from "../../engine/game";
 
@@ -107,5 +107,28 @@ describe("flipping and turning a brush", () => {
     expect(transformStamp(transformStamp(twice, "turn"), "turn").tiles).toEqual([5]); // a whole turn is nothing
     expect(transformStamp(transformStamp(one, "turn"), "flipX").tiles).toEqual([5 | T | Y]); // a turned tile flipped across flips down
     expect(transformStamp(single(-1), "turn").tiles).toEqual([-1]); // empty stays empty
+  });
+});
+
+describe("a stroke between two pointer moves", () => {
+  it("paints every cell it crosses, each sharing a side with the one before, ending where the pointer is", () => {
+    expect(cellsBetween(0, 0, 4, 0)).toEqual([[1, 0], [2, 0], [3, 0], [4, 0]]);
+    expect(cellsBetween(2, 5, 2, 2)).toEqual([[2, 4], [2, 3], [2, 2]]);
+    expect(cellsBetween(3, 3, 3, 3)).toEqual([]);
+    for (const [c1, r1] of [[7, 3], [-5, 2], [2, -9], [-4, -4], [1, 6]] as const) {
+      const cells = cellsBetween(0, 0, c1, r1);
+      expect(cells.at(-1)).toEqual([c1, r1]);
+      expect(cells).toHaveLength(Math.abs(c1) + Math.abs(r1));
+      let [pc, pr] = [0, 0];
+      for (const [c, r] of cells) {
+        expect(Math.abs(c - pc) + Math.abs(r - pr), `${c1},${r1}`).toBe(1); // never a diagonal step
+        [pc, pr] = [c, r];
+      }
+      // And it keeps close to the straight line: no cell more than a cell away from it.
+      for (const [c, r] of cells) {
+        const off = Math.abs(c * r1 - r * c1) / Math.hypot(c1, r1);
+        expect(off).toBeLessThan(1);
+      }
+    }
   });
 });

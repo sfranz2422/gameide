@@ -87,6 +87,32 @@ describe("checks of the project", () => {
     expect(run("room Level1 has at least 1 Coin")?.ok).toBe(true);
     expect(run("Player has sprite")).toEqual({ ok: false, detail: "Player doesn't have a sprite yet." });
   });
+  it("how pictures are cut: a tileset's tile size and spacing, its autotile sets, a sprite's frame size", () => {
+    const q = game();
+    q.sprites.push({ id: "s1", name: "robot", width: 96, height: 128, originX: 48, originY: 127, frames: ["a"] });
+    const town = { ...newTileset("town"), tileWidth: 16, tileHeight: 16, spacingX: 1, spacingY: 1 };
+    q.tilesets.push(town);
+    const run = (line: string) => checkProject(q, readCheck(line));
+    expect(run("tileset town is cut 16 × 16 with spacing 1")?.ok).toBe(true);
+    expect(run("tileset town is cut 16 x 16")?.ok).toBe(true);
+    expect(run("tileset town is cut 16 × 16 with spacing 0")?.ok).toBe(false);
+    town.spacingY = 0; // both ways, or it isn't spaced 1
+    expect(run("tileset town is cut 16 × 16 with spacing 1")).toEqual({
+      ok: false,
+      detail: "town's tiles are 16 × 16 with spacing 1 across and 0 down, not 16 × 16 with spacing 1. Set them in the tileset's Tiles box.",
+    });
+    expect(run("tileset town is cut 32 × 32")?.ok).toBe(false);
+    expect(run("tileset town has an autotile set")?.ok).toBe(false);
+    town.autotiles.push({ id: "a", name: "path", tiles: [...new Array(15).fill(3), -1] });
+    expect(run("tileset town has an autotile set")?.ok).toBe(false); // a slot still empty
+    town.autotiles[0]!.tiles[15] = 4;
+    expect(run("tileset town has an autotile set")?.ok).toBe(true);
+    expect(run("tileset town has at least 2 autotile sets")?.ok).toBe(false);
+    expect(run("sprite robot is 96 × 128")?.ok).toBe(true);
+    expect(run("sprite robot is 96 x 96")).toEqual({ ok: false, detail: "robot's frames are 96 × 128, not 96 × 96." });
+    expect(run("tileset nowhere is cut 16 × 16")).toEqual({ ok: false, detail: "There's no tileset called nowhere yet." });
+  });
+
   it("what the editor makes: frames, solid tiles, painted tiles, layers, room size, camera", () => {
     const q = game();
     q.sprites.push({ id: "s1", name: "hero", width: 24, height: 24, originX: 12, originY: 12, frames: ["a", "b"] });

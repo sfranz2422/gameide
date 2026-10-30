@@ -46,7 +46,9 @@ export function renderMarkdown(md: string): string {
   );
   const html = colourCode(markPauses(popBoxes(DOMPurify.sanitize(raw, SANITIZE) as string)));
   // Links open in a new tab, and can't reach back into this one.
-  return html.replace(/<a /g, '<a target="_blank" rel="noopener noreferrer" ');
+  // A lesson's pictures (tutorials/art/) are for importing: the link saves the
+  // file, where a plain link opened it in a tab to be saved by hand.
+  return html.replace(/<a href="(tutorials\/art\/[^"]+)"/g, '<a download href="$1"').replace(/<a /g, '<a target="_blank" rel="noopener noreferrer" ');
 }
 
 /**

@@ -64,6 +64,38 @@
   "description": "A room wider than the screen, more ground to run on, a gap to fall through, and a camera that follows the hero."
  },
  {
+  "key": "art-sprite-sheet",
+  "title": "1. Your Own Sprite Sheet",
+  "level": "Art and Tiles",
+  "time": "15 min",
+  "starter": "empty",
+  "description": "Download a sheet of a robot walking, cut it into frames on a grid, and make the robot walk the way you press."
+ },
+ {
+  "key": "art-slicing-tileset",
+  "title": "2. Slicing a Tileset",
+  "level": "Art and Tiles",
+  "time": "15 min",
+  "starter": "empty",
+  "description": "Download a whole town's worth of tiles as Kenney ships them, cut the picture into tiles yourself, and choose which ones are solid."
+ },
+ {
+  "key": "art-autotiling",
+  "title": "3. Autotiling",
+  "level": "Art and Tiles",
+  "time": "15 min",
+  "starter": "art-garden",
+  "description": "Paths that draw their own corners and edges as you paint, from 16 pieces in the order GameIDE reads them."
+ },
+ {
+  "key": "art-town",
+  "title": "4. A Town from Tiles",
+  "level": "Art and Tiles",
+  "time": "25 min",
+  "starter": "art-town",
+  "description": "Paint a town seen from above in layers, with trees and water you can't walk through, a player who walks it, and a camera."
+ },
+ {
   "key": "py-hello",
   "title": "1. Hello, Python",
   "level": "Python Basics",

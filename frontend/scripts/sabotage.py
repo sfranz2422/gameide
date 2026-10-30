@@ -831,6 +831,13 @@ CASES = [
  ("football: the keyboard read twice on the title", FB_CTRL, "    return ONE if c == 0 else NO_KEYS", "    return ONE", "picks 2 Players", FB),
  ("library: a pack's preview broken", "src/library/library.ts", 'preview: k("racing", "preview.png"),', 'preview: k("racing", "previews.png"),', "every pack opens", E2E),
  ("library: a pack's sheet listed but missing", "src/library/library.ts", 'file: k("tiny-farm", "tiles.png")', 'file: k("tiny-farm", "tile.png")', "has every picture it lists"),
+ ("art: a stroke paints only where the pointer lands", "src/editor/tiles/tileOps.ts", "    out.push([c, r]);\n  }\n  return out;\n}\n", "    out.push([c, r]);\n  }\n  return out.slice(-1);\n}\n", "join up", E2E),
+ ("art: a stroke paints only its end (unit)", "src/editor/tiles/tileOps.ts", "    out.push([c, r]);\n  }\n  return out;\n}\n", "    out.push([c, r]);\n  }\n  return out.slice(-1);\n}\n", "every cell it crosses"),
+ ("art: the cut check ignores spacing", "src/checks/checks.ts", "      const gaps = c.spacing === null || (ts.spacingX === c.spacing && ts.spacingY === c.spacing);", "      const gaps = c.spacing === null || ts.spacingX === c.spacing;", "how pictures are cut"),
+ ("art: an autotile set half filled counts", "src/checks/checks.ts", "      const n = ts.autotiles.filter((a) => a.tiles.every((t) => t >= 0)).length;", "      const n = ts.autotiles.filter((a) => a.tiles.some((t) => t >= 0)).length;", "how pictures are cut"),
+ ("art: lesson pictures open in a tab", "src/notes/NotesPane.tsx", """'<a download href="$1"'""", """'<a href="$1"'""", "Your Own Sprite Sheet", E2E),
+ ("art: the town starts uncut", "src/store/templates.ts", "    spacingX: art.spacing ?? 0,", "    spacingX: 0,", "A Town from Tiles", E2E),
+ ("art: the shelf at the end", "src/tutorials/tutorial.ts", '"Getting Started", "Art and Tiles", ', '"Getting Started", ', "start with Python Basics"),
 ]
 only = sys.argv[1:]
 # A name that matches no case would otherwise run nothing and still say

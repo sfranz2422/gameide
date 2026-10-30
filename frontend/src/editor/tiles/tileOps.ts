@@ -240,3 +240,25 @@ export function rectCells(c0: number, r0: number, c1: number, r1: number): [numb
   for (let r = Math.min(r0, r1); r <= Math.max(r0, r1); r++) for (let c = Math.min(c0, c1); c <= Math.max(c0, c1); c++) out.push([c, r]);
   return out;
 }
+
+/**
+ * The cells a stroke crosses from one cell to the next, the start left out
+ * (it was painted already) and the end in. The pointer can jump several
+ * cells between two moves, and painting only where it landed left a dotted
+ * line, each dot an island to an autotile set. Each step is across or down,
+ * never diagonal: autotiling joins cells that share a side, so a diagonal
+ * step would break the path in two.
+ */
+export function cellsBetween(c0: number, r0: number, c1: number, r1: number): [number, number][] {
+  const out: [number, number][] = [];
+  const dc = Math.abs(c1 - c0), dr = Math.abs(r1 - r0);
+  const sc = Math.sign(c1 - c0), sr = Math.sign(r1 - r0);
+  let c = c0, r = r0, ic = 0, ir = 0;
+  while (ic < dc || ir < dr) {
+    // Step along whichever way the straight line crosses into a new cell first.
+    if (ir >= dr || (ic < dc && (ic + 0.5) / dc < (ir + 0.5) / dr)) (c += sc), ic++;
+    else (r += sr), ir++;
+    out.push([c, r]);
+  }
+  return out;
+}

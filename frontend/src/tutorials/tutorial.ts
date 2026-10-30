@@ -73,7 +73,7 @@ export interface Tutorial {
  */
 export const MAKE_LEVEL = "Now You Can Make";
 
-export const LEVELS = ["Python Basics", "Getting Started", "Game Elements 1: The Basics", "Game Elements 2: Adding to the Fun", "Game Elements 3: Advanced Techniques", "Starter Projects", "Top-Down", "Shooters", "Advanced Python"];
+export const LEVELS = ["Python Basics", "Getting Started", "Art and Tiles", "Game Elements 1: The Basics", "Game Elements 2: Adding to the Fun", "Game Elements 3: Advanced Techniques", "Starter Projects", "Top-Down", "Shooters", "Advanced Python"];
 
 const HEADER = /^\s*---[ \t]*\n([\s\S]*?)\n---[ \t]*(?:\n|$)/;
 const HIGHLIGHT = /^highlight\s*:\s*([\w-]+)\s*$/i;
@@ -195,7 +195,7 @@ export const TARGETS = [
   "object-editor", "object-sprite", "object-properties", "object-parent", "object-depth", "event-list", "add-event", "code-editor",
   "tab-blocks", "tab-sheet", "blocks-workspace", "blocks-python", "event-sheet", "sheet-python", "generated-class",
   "sprite-editor", "sprite-origin-tool", "sprite-mask", "sprite-mask-tool", "room-editor", "room-canvas", "room-layers", "room-camera",
-  "tileset-editor", "tileset-solid", "tile-palette", "room-tools", "add-tile-layer", "room-size", "open-library", "autotile-sets", "autotile-brushes", "sound-editor", "font-editor",
+  "tileset-editor", "tileset-solid", "tileset-picture", "tileset-cut", "import-picture", "tile-palette", "room-tools", "add-tile-layer", "room-size", "open-library", "autotile-sets", "autotile-brushes", "sound-editor", "font-editor",
   "play", "stop", "game-pane", "game-canvas", "fullscreen", "debug-toggle", "console", "docs", "docs-tab", "notes-tab",
   "project-name", "publish", "game-settings", "editor-tabs",
 ] as const;

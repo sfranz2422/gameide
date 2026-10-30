@@ -40,7 +40,7 @@ export function SpritePicker({
     <div className="modal-back" onPointerDown={onClose}>
       <div className="modal" role="dialog" aria-label="Add a sprite" onPointerDown={(e) => e.stopPropagation()}>
         <h3>Add a sprite</h3>
-        <button className="import-own" onClick={onImport} data-testid="import-picture">
+        <button className="import-own" onClick={onImport} data-testid="import-picture" data-tutorial="import-picture">
           <b>Import your own picture…</b>
           <span className="muted small">PNG, JPG or GIF — one picture, a sprite sheet, or an animated GIF. You can also drop a picture anywhere in the editor, or paste one.</span>
         </button>

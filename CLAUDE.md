@@ -438,6 +438,11 @@ header; steps are `---` slides; ` ```check ` blocks gate Next (strict); a
   `data-tutorial` attribute breaks spotlights silently otherwise.
 - Starting games for tutorials are `TUTORIAL_STARTERS` in templates.ts
   (kept off Create New Game: they're half a game on purpose).
+- **Art and Tiles** lessons hand students real files: `public/tutorials/art/`
+  (made by `scripts/make_tutorial_art.py` from Kenney's CC0 packs). A link
+  to one there downloads it (NotesPane adds `download`). A lesson that opens
+  a dialog (the importer) must give every instruction for it on one step:
+  the dialog covers the tutorial pane.
 - **"Now you can make…" tutorials** (`make-*.md`) build a whole game from
   `starter: empty`, with `level: Now You Can Make` and `after:` the lesson
   whose skills it needs (its key, e.g. `el3-strike`) or a shelf's name. The

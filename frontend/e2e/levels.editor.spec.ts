@@ -26,7 +26,8 @@ const STEP_CODE = [
 
 async function startLesson(page: Page, title: string) {
   await page.goto("/#/tutorials");
-  await page.getByTestId("tutorial-card").filter({ hasText: title }).getByTestId("tutorial-start").click();
+  // By its exact title: "A Tileset" is inside "2. Slicing a Tileset" too.
+  await page.getByTestId("tutorial-card").filter({ has: page.getByText(title, { exact: true }) }).getByTestId("tutorial-start").click();
   await page.waitForURL(/#\/p\//);
   await expect(page.getByTestId("tutorial-pane")).toBeVisible();
   const next = page.getByTestId("tutorial-next");

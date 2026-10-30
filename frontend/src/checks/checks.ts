@@ -10,6 +10,9 @@
  *   room Level1 has 3 Coin                  or "has at least 3 Coin"
  *   sprite hero has at least 2 frames       or "has 2 frames"
  *   tileset ground has at least 4 solid tiles
+ *   tileset town is cut 16 × 16 with spacing 1   (x or ×; "with spacing" may be left off)
+ *   tileset garden has an autotile set      or "has at least 2 autotile sets"
+ *   sprite robot is 96 × 128                its frames' size
  *   room Level1 has at least 30 tiles       painted, on any tile layer ("tiles" isn't an object here)
  *   room Level1 has at least 2 tile layers  or "has a tile layer using ground"
  *   room Level1 is at least 1600 wide       or "tall"
@@ -110,6 +113,9 @@ export type Check =
   | { kind: "count"; room: string; atLeast: boolean; n: number; object: string }
   | { kind: "frames"; sprite: string; atLeast: boolean; n: number }
   | { kind: "solid"; tileset: string; atLeast: boolean; n: number }
+  | { kind: "cut"; tileset: string; w: number; h: number; spacing: number | null }
+  | { kind: "autotiles"; tileset: string; atLeast: boolean; n: number }
+  | { kind: "sprite-size"; sprite: string; w: number; h: number }
   | { kind: "tiles"; room: string; atLeast: boolean; n: number }
   | { kind: "tile-layers"; room: string; atLeast: boolean; n: number }
   | { kind: "tile-layer-using"; room: string; tileset: string }
@@ -146,6 +152,12 @@ export function readCheck(line: string): Check {
     return { kind: "frames", sprite: m[1]!, atLeast: !!m[2], n: Number(m[3]) };
   if ((m = new RegExp(String.raw`^tileset\s+${NAME}\s+has\s+(at least\s+)?(\d+)\s+solid\s+tiles?$`, "i").exec(s)))
     return { kind: "solid", tileset: m[1]!, atLeast: !!m[2], n: Number(m[3]) };
+  if ((m = new RegExp(String.raw`^tileset\s+${NAME}\s+is\s+cut\s+(\d+)\s*[x×]\s*(\d+)(?:\s+with\s+spacing\s+(\d+))?$`, "i").exec(s)))
+    return { kind: "cut", tileset: m[1]!, w: Number(m[2]), h: Number(m[3]), spacing: m[4] === undefined ? null : Number(m[4]) };
+  if ((m = new RegExp(String.raw`^tileset\s+${NAME}\s+has\s+(?:an|(at least\s+)?(\d+))\s+autotile\s+sets?$`, "i").exec(s)))
+    return { kind: "autotiles", tileset: m[1]!, atLeast: m[3] === undefined || !!m[2], n: m[3] === undefined ? 1 : Number(m[3]) };
+  if ((m = new RegExp(String.raw`^sprite\s+${NAME}\s+is\s+(\d+)\s*[x×]\s*(\d+)$`, "i").exec(s)))
+    return { kind: "sprite-size", sprite: m[1]!, w: Number(m[2]), h: Number(m[3]) };
   if ((m = new RegExp(String.raw`^room\s+${NAME}\s+has\s+(at least\s+)?(\d+)\s+tiles?$`, "i").exec(s)))
     return { kind: "tiles", room: m[1]!, atLeast: !!m[2], n: Number(m[3]) };
   if ((m = new RegExp(String.raw`^room\s+${NAME}\s+has\s+(at least\s+)?(\d+)\s+tile\s+layers?$`, "i").exec(s)))
@@ -269,6 +281,33 @@ export function checkProject(p: Project, c: Check): { ok: boolean; detail: strin
       return (c.atLeast ? n >= c.n : n === c.n)
         ? { ok: true, detail: "" }
         : { ok: false, detail: `${ts.name} has ${n} solid tile${n === 1 ? "" : "s"}, not ${c.atLeast ? "at least " : ""}${c.n}. Click tiles in its picture to make them solid (red).` };
+    }
+    case "cut": {
+      const ts = p.tilesets.find((x) => same(x.name, c.tileset));
+      if (!ts) return { ok: false, detail: `There's no tileset called ${c.tileset} yet.` };
+      const size = ts.tileWidth === c.w && ts.tileHeight === c.h;
+      const gaps = c.spacing === null || (ts.spacingX === c.spacing && ts.spacingY === c.spacing);
+      if (size && gaps) return { ok: true, detail: "" };
+      return {
+        ok: false,
+        detail: `${ts.name}'s tiles are ${ts.tileWidth} × ${ts.tileHeight} with spacing ${ts.spacingX} across and ${ts.spacingY} down, not ${c.w} × ${c.h}${c.spacing === null ? "" : ` with spacing ${c.spacing}`}. Set them in the tileset's Tiles box.`,
+      };
+    }
+    case "autotiles": {
+      const ts = p.tilesets.find((x) => same(x.name, c.tileset));
+      if (!ts) return { ok: false, detail: `There's no tileset called ${c.tileset} yet.` };
+      // A set with a slot still empty can't draw every join: it doesn't count yet.
+      const n = ts.autotiles.filter((a) => a.tiles.every((t) => t >= 0)).length;
+      return (c.atLeast ? n >= c.n : n === c.n)
+        ? { ok: true, detail: "" }
+        : { ok: false, detail: `${ts.name} has ${n} autotile set${n === 1 ? "" : "s"} with all 16 slots filled, not ${c.atLeast ? "at least " : ""}${c.n}. Make one under Autotile sets, and fill its slots.` };
+    }
+    case "sprite-size": {
+      const sp = p.sprites.find((x) => same(x.name, c.sprite));
+      if (!sp) return { ok: false, detail: `There's no sprite called ${c.sprite} yet.` };
+      return sp.width === c.w && sp.height === c.h
+        ? { ok: true, detail: "" }
+        : { ok: false, detail: `${sp.name}'s frames are ${sp.width} × ${sp.height}, not ${c.w} × ${c.h}.` };
     }
     case "tiles":
     case "tile-layers":
