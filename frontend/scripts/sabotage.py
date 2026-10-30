@@ -29,6 +29,8 @@ CG, PJ, HOST, UP = "src/python/codegen.ts", "src/store/project.ts", "src/editor/
 E2E = "e2e"  # a sixth item: run the Playwright test of that name instead of Vitest
 GM = "greymire"  # …or Greymire's playtest, after building the game from the sabotaged source (and again after)
 MM = "mystery"   # …or Mystery Meat's playtest, rebuilt the same way
+FB = "football"  # …or Under the Lights' playtest, rebuilt the same way
+FP, FM, FBUILD = "../showcase/football/game/_2play.py", "../showcase/football/game/_3match.py", "../showcase/football/build.py"
 PY = "py"    # …or the server's checks (backend/tests/test_server.py); caught = that check prints FAIL
 APP = "../backend/app.py"
 RO, RE = "src/editor/rooms/roomOps.ts", "src/editor/rooms/RoomEditor.tsx"
@@ -772,6 +774,23 @@ CASES = [
  ("calendar: drifts from PyIDE's", "src/editor/calendarWeek.ts", r'  return { title: title.join("\n").trim(), days };', r'  return { title: title.join(" ").trim(), days };', "exactly as PyIDE's"),
  ("calendar: posts to classes not theirs", CL, "        if any(i not in mine for i in also):", "        if False:", "refuses the whole save", PY),
  ("calendar: students aren't sent it", CL, 'items=out, calendar=course.calendar or "",', 'items=out, calendar="",', "students are sent it", PY),
+ ("football: passes led in a straight line", FP, "    if not r.route:\n        return r.x + r.vx * steps", "    if True:\n        return r.x + r.vx * steps", "leads a pass", FB),
+ ("football: the runner leaves his route for the handoff", FP, '    return not (car.role == "QB" and not PLAY["handed"] and not PLAY["scramble"])', "    return True", "runs the running back", FB),
+ ("football: pursuers blocked from behind", FP, '                if car is not None and runner_free() and (d.x - car.x) * fwd(PLAY["off"]) < -4:', "                if False:", "never blocks a defender", FB),
+ ("football: every tackle sure", FP, "        if random.random() > sure:", "        if False:", "misses some tackles", FB),
+ ("football: the throw buttons crossed", FP, "                if button_pressed(c, i):", "                if button_pressed(c, 2 - i):", "is played from the keyboard", FB),
+ ("football: the quarterback never ours", FP, '(car.role != "QB" or OFFENSE[PLAY["call"]]["kind"] == "pass")', '(car.role != "QB")', "is played from the keyboard", FB),
+ ("football: a touchdown only at the back of the end zone", FP, "    if (d > 0 and car.x >= GOAL_R)", "    if (d > 0 and car.x >= END_R)", "scores a touchdown", FB),
+ ("football: the kick meter ignored", FP, '    k["good"] = abs(k["phase"]) <= k["allowed"]', '    k["good"] = True', "field goal in the green", FB),
+ ("football: a touchdown is six", FM, "        score(off, 7)", "        score(off, 6)", "scores a touchdown", FB),
+ ("football: the marker set before the spot", FM, '            start_drive(deff, x=x, y=y)\n        return "incomplete"', '            start_drive(deff, 25)\n            spot_ball(x, y)\n        return "incomplete"', "first-down marker", FB),
+ ("football: no safeties", FM, '    if how in ("tackle", "sack", "out") and in_own_end:', "    if False:", "a safety, and a touchback", FB),
+ ("football: a punt's touchback at the 25", FM, "        if own <= 0:\n            start_drive(deff, 20)", "        if own <= 0:\n            start_drive(deff, 25)", "a safety, and a touchback", FB),
+ ("football: five downs", FM, '    if MATCH["down"] > 4:', '    if MATCH["down"] > 5:', "counts downs", FB),
+ ("football: a field goal from anywhere", FM, '    return [i for i, p in enumerate(OFFENSE) if p["kind"] != "kick" or can_kick()]', "    return list(range(len(OFFENSE)))", "field goal in the green", FB),
+ ("football: the Comets keep it at halftime", FM, '        start_drive("away", 25)    # the Badgers', '        start_drive("home", 25)    # the Badgers', "after halftime", FB),
+ ("football: a game with no end", FM, "    if q >= 4:", "    if q >= 5:", "after halftime", FB),
+ ("football: the camera stays put", FBUILD, '"follow": P.obj_id("Ball")', '"follow": None', "follows the ball", FB),
 ]
 only = sys.argv[1:]
 # A name that matches no case would otherwise run nothing and still say
@@ -806,7 +825,7 @@ for name, f, old, new, test, *extra in CASES:
             failed = any(l.startswith("FAIL") and test in l for l in out.splitlines())
             ran = "ok   " in out or "FAIL " in out
         else:
-            if runner in ([GM], [MM]):
+            if runner in ([GM], [MM], [FB]):
                 subprocess.run(["python3", str(ROOT.parent / f"showcase/{runner[0]}/build.py")], capture_output=True)
             cmd = ["npx", "playwright", "test", "-g", test] if runner == [E2E] else ["npx", "vitest", "run", "-t", test]
             r = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True)
@@ -817,6 +836,6 @@ for name, f, old, new, test, *extra in CASES:
         if not failed: bad.append(name)
     finally:
         p.write_text(src)
-        if runner in ([GM], [MM]):
+        if runner in ([GM], [MM], [FB]):
             subprocess.run(["python3", str(ROOT.parent / f"showcase/{runner[0]}/build.py")], capture_output=True)
 print("ALL SABOTAGES CAUGHT" if not bad else f"NOT CAUGHT: {bad}")
