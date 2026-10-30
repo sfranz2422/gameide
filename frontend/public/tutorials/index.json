@@ -470,5 +470,14 @@
   "time": "55 min",
   "starter": "empty",
   "description": "A whole metroidvania from an empty one: rooms to walk between, a power-up that lets you reach a ledge you couldn't before, and the gem up there."
+ },
+ {
+  "key": "make-robots-garden",
+  "title": "Robot's Garden",
+  "level": "Now You Can Make",
+  "after": "art-town",
+  "time": "50 min",
+  "starter": "empty",
+  "description": "A whole game from an empty one: a garden you cut, autotile and paint yourself, a robot from a sprite sheet, quicker on the paths, collecting every seed before the clock runs out."
  }
 ]

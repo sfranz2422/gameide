@@ -1,5 +1,9 @@
 # Progress
 
+## Robot's Garden: the "Now you can make…" game after Art and Tiles (2026-10-30)
+- **A whole game from an empty one**, right after 4. A Town from Tiles. Students download and cut the garden tileset with its path autotile set, and paint a garden bigger than the screen: grass, autotiled paths, hedges and ponds marked solid. Then they import the robot's walking sheet, shrink it to a quarter to suit 16-pixel tiles, and walk it top-down. `tile_at(self.x, self.y, "Paths")` makes it quicker on the paths. After that come a camera, ten seeds to collect, and a sixty-second clock that stops with the last seed.
+- Tests: `makes.test.ts` walks it step by step. Its steps can now add tilesets and painted layers by hand (`also`), since `Edit` has neither. It plays what the checks can't see: quicker on a path than on grass, a bush stopping the robot, and the clock stopping with the last seed. `tutorials.editor.spec.ts` checks its place on the Learn page. 3 sabotage cases, all caught. The XP test's token count failed once in a full run (read 0 for 1); it passed three times alone and in the next full run, and nothing here touches XP.
+
 ## Art and Tiles: a new shelf on using art, Kenney's included (2026-10-30, waiting for review)
 - **A new shelf after Getting Started**, four lessons on making art work, where the library lessons let the library do the cutting:
   1. **Your Own Sprite Sheet**: download Kenney's robot walking (8 frames, 96 × 128, 2 pixels apart) from the lesson, import it with the **Grid** cut (frame size and spacing), and make it walk the way you press, flipped with `image_xscale`, animated only while it moves.

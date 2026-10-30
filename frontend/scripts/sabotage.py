@@ -838,6 +838,9 @@ CASES = [
  ("art: lesson pictures open in a tab", "src/notes/NotesPane.tsx", """'<a download href="$1"'""", """'<a href="$1"'""", "Your Own Sprite Sheet", E2E),
  ("art: the town starts uncut", "src/store/templates.ts", "    spacingX: art.spacing ?? 0,", "    spacingX: 0,", "A Town from Tiles", E2E),
  ("art: the shelf at the end", "src/tutorials/tutorial.ts", '"Getting Started", "Art and Tiles", ', '"Getting Started", ', "start with Python Basics"),
+ ("makes: Robot's Garden asks the wrong layer", "public/tutorials/make-robots-garden.md", 'if tile_at(self.x, self.y, "Paths") is not None:', 'if tile_at(self.x, self.y, "Path") is not None:', "make-robots-garden: doing what"),
+ ("makes: Robot's Garden no quicker on paths", "public/tutorials/make-robots-garden.md", "    speed = 3\n```", "    speed = 2\n```", "make-robots-garden: doing what"),
+ ("makes: Robot's Garden's clock runs on", "public/tutorials/make-robots-garden.md", 'if global_vars.time > 0 and instance_number("Seed") > 0:', "if global_vars.time > 0:", "make-robots-garden: doing what"),
 ]
 only = sys.argv[1:]
 # A name that matches no case would otherwise run nothing and still say

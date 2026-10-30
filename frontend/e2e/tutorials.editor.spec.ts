@@ -197,6 +197,7 @@ test("Now you can make: a whole-game tutorial sits just after the lesson it buil
   for (const [lesson, title, games] of [
     ["collect-coins", "Collect the Coins", ["Coin Rush"]],
     ["el1-time-limit", "6. Time Limit", ["Busy Road"]],
+    ["art-town", "4. A Town from Tiles", ["Robot's Garden"]],
     ["el2-difficulty", "4. Increasing Difficulty", ["Bomb Dodge"]],
     ["el2-multiplayer", "5. Multiplayer", ["Paddle Duel"]],
     ["el3-camera", "11. Scrolling Camera", ["Ledge Runner"]],

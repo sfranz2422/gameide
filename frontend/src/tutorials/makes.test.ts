@@ -18,7 +18,8 @@ import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { checkGame, checkProject, readCheck, type Check } from "../checks/checks";
 import { addStarterSprite, TUTORIAL_STARTERS } from "../store/templates";
-import type { Project } from "../store/project";
+import { newId, newTileset, type Project } from "../store/project";
+import { autotilePaint, rectCells } from "../editor/tiles/tileOps";
 import { nodeRunner } from "./nodeRunner";
 import { KEY_CODE } from "../engine/input";
 import { PythonGame } from "../python/bridge";
@@ -43,7 +44,8 @@ function contains(code: string, block: string) {
   return false;
 }
 
-type MakeStep = Edit & { sprites?: string[] };
+/** What a step does: an Edit, ready-made sprites to add, and anything else (tilesets, painted tiles) by hand. */
+type MakeStep = Edit & { sprites?: string[]; also?: (p: Project) => void };
 /** For each tutorial, step number → what it does, given that step's python blocks and the game so far. */
 type Steps = Record<number, (b: string[], code: (where: string) => string) => MakeStep>;
 
@@ -309,11 +311,97 @@ const MAKES: Record<string, Steps> = {
   },
 };
 
+/** Robot's Garden: the garden as a student paints it, 60 × 45 tiles of 16. */
+const GARDEN = { cols: 60, rows: 45, grass: 16, bush: 18, pond: 19 };
+const gardenSet = { id: "path", name: "path", tiles: Array.from({ length: 16 }, (_, i) => i) };
+const layer = (p: Project, name: string, tiles: Record<string, number>) =>
+  p.rooms[0]!.layers.push({ id: newId(), name, kind: "tiles", depth: 100 - p.rooms[0]!.layers.length, visible: true, locked: false, tileset: p.tilesets[0]!.id, tiles });
+const loop = [...rectCells(5, 5, 50, 5), ...rectCells(50, 5, 50, 35), ...rectCells(5, 35, 50, 35), ...rectCells(5, 5, 5, 35), ...rectCells(28, 5, 28, 35)];
+MAKES["make-robots-garden"] = {
+  1: () => ({
+    also: (p) =>
+      // A picture id, as a student's has (the game leaves out the tile layers of a tileset with none).
+      void p.tilesets.push({ ...newTileset("garden"), image: newId(), imageWidth: 128, imageHeight: 48, tileWidth: 16, tileHeight: 16, autotiles: [gardenSet] }),
+  }),
+  2: () => ({
+    roomSettings: { Room1: { width: 960, height: 720 } },
+    also: (p) => {
+      layer(p, "Grass", Object.fromEntries(rectCells(0, 0, GARDEN.cols - 1, GARDEN.rows - 1).map(([c, r]) => [`${c},${r}`, GARDEN.grass])));
+      layer(p, "Paths", autotilePaint({}, loop, gardenSet, { columns: GARDEN.cols, rows: GARDEN.rows }));
+    },
+  }),
+  3: () => ({
+    also: (p) => {
+      const things: Record<string, number> = {};
+      for (let c = 8; c < 26; c += 2) things[`${c},7`] = GARDEN.bush; // a hedge inside the loop's top
+      things["40,20"] = things["41,20"] = things["40,21"] = GARDEN.pond;
+      things["30,20"] = GARDEN.bush; // the one the play-check walks into
+      layer(p, "Things", things);
+      p.tilesets[0]!.solid = [GARDEN.bush, GARDEN.pond];
+    },
+  }),
+  4: ([create, step]) => ({
+    objects: [{ name: "Robot", sprite: null }], // its sprite is made below, then given to it
+    place: [{ object: "Robot", x: 200, y: 400 }],
+    code: { "Robot.create": create!, "Robot.step": step! },
+    also: (p) => {
+      // The robot as the importer makes it: 8 frames of 96 × 128, its feet the origin, its box round the body.
+      const robot = { id: newId(), name: "robot", width: 96, height: 128, originX: 48, originY: 127, frames: Array.from({ length: 8 }, newId), fps: 10,
+        mask: { kind: "rect" as const, left: 26, top: 14, right: 70, bottom: 128 } };
+      p.sprites.push(robot);
+      p.objects.find((o) => o.name === "Robot")!.sprite = robot.id;
+    },
+  }),
+  5: ([faster], code) => {
+    expect(code("Robot.step")).toMatch(/^speed = 2\n/);
+    return { code: { "Robot.step": code("Robot.step").replace(/^speed = 2\n/, faster!) } };
+  },
+  6: () => ({ roomSettings: { Room1: { camera: { enabled: true, follow: "Robot" } } } }),
+  7: ([take, draw]) => ({
+    sprites: ["coin"],
+    objects: [{ name: "Seed", sprite: "coin" }, { name: "Hud", sprite: null }],
+    place: [
+      ...[[100, 100], [820, 100], [100, 600], [820, 600], [460, 300], [700, 450], [300, 650], [600, 150], [880, 350], [60, 350]].map(([x, y]) => ({ object: "Seed", x: x!, y: y! })),
+      { object: "Hud", x: 0, y: 0 },
+    ],
+    code: { "Robot.collision Seed": take!, "Hud.draw_gui": draw! },
+  }),
+  8: ([create, alarm, shown, top], code) => ({
+    code: {
+      "Hud.create": create!,
+      "Hud.alarm 0": alarm!,
+      "Hud.draw_gui": code("Hud.draw_gui") + shown!,
+      "Robot.step": top! + code("Robot.step"),
+    },
+  }),
+};
+
 /**
  * What each finished game must do that its tutorial's checks can't see:
  * played in the real Pyodide, after the last step.
  */
 const PLAYS: Record<string, (g: PythonGame) => void> = {
+  // Quicker on a path than on grass; a bush in the way stops it; the clock stops with the last seed.
+  "make-robots-garden": (g) => {
+    const walk = (x: number, y: number) => {
+      run(g, `r = instances('Robot')[0]\nr.x, r.y = ${x}, ${y}`);
+      step(g);
+      const from = run(g, "r.x");
+      g.engine.input.keyDown(KEY_CODE.get("right")!);
+      step(g, 30);
+      g.engine.input.keyUp(KEY_CODE.get("right")!);
+      return run(g, "r.x") - from;
+    };
+    const onPath = walk(8 * 16, 35 * 16 + 12); // along the loop's bottom
+    const onGrass = walk(8 * 16, 25 * 16 + 12);
+    expect(onPath, "quicker on the path").toBeGreaterThan(onGrass * 1.3);
+    expect(walk(27 * 16, 20 * 16 + 12), "a bush at column 30 stops it").toBeLessThan(50); // free, it goes 60 or more
+    run(g, "for s in instances('Seed'): s.destroy()");
+    step(g, 2);
+    const left = run(g, "global_vars.time");
+    step(g, 150);
+    expect(run(g, "global_vars.time"), "the clock stops with the last seed").toBe(left);
+  },
   // Paddle2 is a Paddle only through its parent: the ball must bounce off it too.
   "make-paddle-duel": (g) => {
     run(g, "b = instances('Ball')[0]\np2 = instances('Paddle2')[0]\nb.x, b.y, b.hspeed, b.vspeed = p2.x - 30, p2.y + 32, 4, 0");
@@ -419,6 +507,7 @@ describe("Now You Can Make", () => {
           const edit = make(blocks(step), (where) => codeOf(project, where));
           for (const sprite of edit.sprites ?? []) await addStarterSprite(project, new Map(), sprite);
           applyEdit(project, edit);
+          edit.also?.(project);
         }
         const code = [...project.objects.flatMap((o) => o.events.map((e) => e.code)), ...project.scripts.map((x) => x.code)].join("\n\n");
         for (const block of blocks(step)) expect(contains(code, block), `${key} step ${s + 1} shows code the game doesn't have:\n${block}`).toBe(true);
