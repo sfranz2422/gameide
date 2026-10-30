@@ -797,10 +797,21 @@ CASES = [
  ("makes: Bomb Dodge's bombs hang in the air", "public/tutorials/make-bomb-dodge.md", "```python\nself.vspeed = 3\n```", "```python\nself.vspeed = 0\n```", "make-bomb-dodge: doing what"),
  ("makes: Bomb Dodge makes one bomb", "public/tutorials/make-bomb-dodge.md", '-10, "Bomb")\nself.alarm[0] = 30\n```', '-10, "Bomb")\n```', "make-bomb-dodge: doing what"),
  ("makes: Busy Road hops the wrong way", "public/tutorials/make-busy-road.md", 'if keyboard_check_pressed("up"):\n    self.y -= 32', 'if keyboard_check_pressed("up"):\n    self.y += 32', "make-busy-road: doing what"),
- ("makes: the after line not read", "src/tutorials/tutorial.ts", '      after: fields.after || "",', '      after: "",', "listed after a shelf"),
- ("makes: every band after every shelf", "src/tutorials/TutorialPages.tsx", '(level === null ? !shown.has(t.after ?? "") : t.after === level)', '(level === null ? !shown.has(t.after ?? "") : t.after !== "")', "Now you can make", E2E),
+ ("makes: the after line not read", "src/tutorials/tutorial.ts", '      after: fields.after || "",', '      after: "",', "listed after a lesson"),
+ ("makes: every band after every lesson", "src/tutorials/TutorialPages.tsx", '(place === null ? !shown.has(t.after ?? "") : t.after === place)', '(place === null ? !shown.has(t.after ?? "") : t.after !== "")', "Now you can make", E2E),
+ ("makes: the shelf not carried on after a band", "src/tutorials/TutorialPages.tsx", "            if (makesAfter(bare(t.key)).length) runs.push([]);", "            if (makesAfter(bare(t.key)).length) runs.push(runs.pop()!);", "Now you can make", E2E),
  ("makes: a shelf of its own", "src/tutorials/TutorialPages.tsx", "!LEVELS.includes(l) && l !== MAKE_LEVEL", "!LEVELS.includes(l)", "Now you can make", E2E),
  ("makes: the car isn't drawn", "src/store/starterArt.ts", 'ctx.fillStyle = "#dc2626"; // body', 'ctx.fillStyle = "#dc262600"; // body', "Now you can make", E2E),
+ ("makes: Paddle Duel's ball goes through the right paddle", "public/tutorials/make-paddle-duel.md", "if other.x < room_width / 2:", "if other.x > room_width / 2:", "make-paddle-duel: doing what"),
+ ("makes: Paddle2 keeps Paddle's keys", "public/tutorials/make-paddle-duel.md", 'self.down_key = "down"', 'self.down_key = "s"', "make-paddle-duel: doing what"),
+ ("makes: Ledge Runner can't jump", "public/tutorials/make-ledge-runner.md", "    self.vy = -9\n", "    self.vy = 0\n", "make-ledge-runner: doing what"),
+ ("makes: Ledge Runner's crawlers stand still", "public/tutorials/make-ledge-runner.md", "```python\nself.hspeed = 1\n```", "```python\nself.hspeed = 0\n```", "make-ledge-runner: doing what"),
+ ("makes: Crypt doors open without keys", "public/tutorials/make-crypt-of-keys.md", "if door and global_vars.keys > 0 and point_distance", "if door and point_distance", "make-crypt-of-keys: doing what"),
+ ("makes: Alley Brawl's thugs don't come", "public/tutorials/make-alley-brawl.md", "    self.x = approach(self.x, gx, 1.5)", "    self.x = approach(self.x, gx, 0)", "make-alley-brawl: doing what"),
+ ("makes: Moonwell's orb gives nothing", "public/tutorials/make-moonwell.md", "    elif global_vars.double_jump and self.air_jumps == 0:", "    elif global_vars.double_jump and self.air_jumps == 1:", "make-moonwell: doing what"),
+ ("makes: Moonwell's gaps lead nowhere", "public/tutorials/make-moonwell.md", "    room_goto(RIGHT[room_name()])", "    room_goto(room_name())", "make-moonwell: doing what"),
+ ("makes: Moonwell's ledge in reach of one jump", "public/tutorials/make-moonwell.md", '        "#........####......#",\n        "#..................#",\n        "#..................#",\n        "#...................",', '        "#..................#",\n        "#..................#",\n        "#........####......#",\n        "#...................",', "make-moonwell: doing what"),
+ ("makes: no band at a shelf's end", "src/tutorials/TutorialPages.tsx", "            makeBand(level),\n", "            null,\n", "Now you can make", E2E),
 ]
 only = sys.argv[1:]
 # A name that matches no case would otherwise run nothing and still say

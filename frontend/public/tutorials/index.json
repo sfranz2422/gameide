@@ -371,27 +371,72 @@
   "key": "make-coin-rush",
   "title": "Coin Rush",
   "level": "Now You Can Make",
-  "after": "Getting Started",
+  "after": "collect-coins",
   "time": "35 min",
   "starter": "empty",
   "description": "A whole game from an empty one: grab as many coins as you can in thirty seconds."
  },
  {
+  "key": "make-busy-road",
+  "title": "Busy Road",
+  "level": "Now You Can Make",
+  "after": "el1-time-limit",
+  "time": "45 min",
+  "starter": "empty",
+  "description": "A whole game from an empty one: hop across lanes of traffic, one square at a time, without getting squashed."
+ },
+ {
   "key": "make-bomb-dodge",
   "title": "Bomb Dodge",
   "level": "Now You Can Make",
-  "after": "Game Elements 1: The Basics",
+  "after": "el2-difficulty",
   "time": "40 min",
   "starter": "empty",
   "description": "A whole game from an empty one: bombs rain down faster and faster, and you dodge them for as long as you can."
  },
  {
-  "key": "make-busy-road",
-  "title": "Busy Road",
+  "key": "make-paddle-duel",
+  "title": "Paddle Duel",
   "level": "Now You Can Make",
-  "after": "Game Elements 1: The Basics",
+  "after": "el2-multiplayer",
   "time": "45 min",
   "starter": "empty",
-  "description": "A whole game from an empty one: hop across lanes of traffic, one square at a time, without getting squashed."
+  "description": "A whole game from an empty one, for two players on one keyboard: knock the ball past each other, first to five wins."
+ },
+ {
+  "key": "make-ledge-runner",
+  "title": "Ledge Runner",
+  "level": "Now You Can Make",
+  "after": "el3-camera",
+  "time": "50 min",
+  "starter": "empty",
+  "description": "A whole platformer from an empty one: a level drawn as text, running and jumping, coins, crawlers to stomp, and a flag at the end."
+ },
+ {
+  "key": "make-crypt-of-keys",
+  "title": "Crypt of Keys",
+  "level": "Now You Can Make",
+  "after": "el3-strike",
+  "time": "55 min",
+  "starter": "empty",
+  "description": "A whole top-down adventure from an empty one: find keys to open locked doors, fight slimes with a sword, and escape with the gem."
+ },
+ {
+  "key": "make-alley-brawl",
+  "title": "Alley Brawl",
+  "level": "Now You Can Make",
+  "after": "el3-strike",
+  "time": "50 min",
+  "starter": "empty",
+  "description": "A whole beat 'em up from an empty one: walk a long street, punch the thugs that close in from both sides, and clear it before your health runs out."
+ },
+ {
+  "key": "make-moonwell",
+  "title": "Moonwell",
+  "level": "Now You Can Make",
+  "after": "Starter Projects",
+  "time": "55 min",
+  "starter": "empty",
+  "description": "A whole metroidvania from an empty one: rooms to walk between, a power-up that lets you reach a ledge you couldn't before, and the gem up there."
  }
 ]

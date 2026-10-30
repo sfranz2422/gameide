@@ -190,24 +190,34 @@ test("a tutorial's Python is coloured and marked to type, and Next opens the nex
   if (SHOTS) await pane.screenshot({ path: `${SHOTS}/tutorial-code.png` });
 });
 
-test("Now you can make: a whole-game tutorial sits just after the shelf it uses, and starts from an empty game", async ({ page }) => {
+test("Now you can make: a whole-game tutorial sits just after the lesson it builds on, and starts from an empty game", async ({ page }) => {
   await page.goto("/#/tutorials");
-  const bands = page.getByTestId("make-band");
-  await expect(bands).toHaveCount(2);
-  // Each band follows its shelf: the heading just before it is that shelf's.
-  for (const [shelf, games] of [
-    ["Getting Started", ["Coin Rush"]],
-    ["Game Elements 1: The Basics", ["Bomb Dodge", "Busy Road"]],
+  // Each band follows its lesson, in the middle of the shelf: the card just
+  // before it is that lesson, and the shelf carries on after it.
+  for (const [lesson, title, games] of [
+    ["collect-coins", "Collect the Coins", ["Coin Rush"]],
+    ["el1-time-limit", "6. Time Limit", ["Busy Road"]],
+    ["el2-difficulty", "4. Increasing Difficulty", ["Bomb Dodge"]],
+    ["el2-multiplayer", "5. Multiplayer", ["Paddle Duel"]],
+    ["el3-camera", "11. Scrolling Camera", ["Ledge Runner"]],
+    ["el3-strike", "12. Strike and Interact", ["Crypt of Keys", "Alley Brawl"]],
+    // After a whole shelf: Moonwell needs all of Starter Projects.
+    ["Starter Projects", "Play on a Phone", ["Moonwell"]],
   ] as const) {
-    const band = page.locator(`[data-testid="make-band"][data-after="${shelf}"]`);
+    const band = page.locator(`[data-testid="make-band"][data-after="${lesson}"]`);
     await expect(band.getByRole("heading")).toHaveText("Now you can make…");
     await expect(band.getByTestId("tutorial-card")).toHaveText(games.map((g) => new RegExp(g)));
-    expect(await band.evaluate((b) => b.previousElementSibling?.querySelector("h2")?.textContent)).toBe(shelf);
+    expect(await band.evaluate((b) => [...(b.previousElementSibling?.querySelectorAll("[data-testid=tutorial-card] b") ?? [])].pop()?.textContent)).toBe(title);
   }
+  // Collect the Coins isn't Getting Started's last lesson: the shelf goes on after the band, under no new heading.
+  const after = page.locator('[data-after="collect-coins"] + [data-testid="shelf"]');
+  await expect(after).toHaveAttribute("data-shelf", "Getting Started");
+  await expect(after.getByRole("heading")).toHaveCount(0);
+  await expect(after.getByTestId("tutorial-card").first()).toContainText("Blocks to Python");
   // Not a shelf of its own.
   await expect(page.getByRole("heading", { name: "Now You Can Make", exact: true })).toHaveCount(0);
 
-  await page.locator('[data-after="Game Elements 1: The Basics"]').getByTestId("tutorial-card").filter({ hasText: "Busy Road" }).getByTestId("tutorial-start").click();
+  await page.locator('[data-after="el1-time-limit"]').getByTestId("tutorial-card").filter({ hasText: "Busy Road" }).getByTestId("tutorial-start").click();
   await page.waitForURL(/#\/p\//);
   await expect(page.getByTestId("tutorial-pane")).toContainText("Busy Road");
   // From nothing: no objects yet. The car the lesson asks for is there to pick, and is drawn.

@@ -1,7 +1,7 @@
 ---
 title: Busy Road
 level: Now You Can Make
-after: Game Elements 1: The Basics
+after: el1-time-limit
 time: 45 min
 starter: empty
 description: A whole game from an empty one: hop across lanes of traffic, one square at a time, without getting squashed.

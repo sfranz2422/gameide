@@ -136,12 +136,17 @@ export function TutorialsPage() {
 
   const all = [...builtins.filter((t) => !hidden.includes(t.key.slice("builtin:".length))), ...others];
   const levels = [...LEVELS, ...new Set(all.map((t) => t.level).filter((l) => !LEVELS.includes(l) && l !== MAKE_LEVEL))];
-  // "Now you can make…": whole games, each just after the shelf it uses;
-  // one whose shelf isn't on the page goes at the end.
+  // "Now you can make…": whole games spaced through the lessons, each just
+  // after the lesson whose skills it needs (`after:` a lesson's key), or at
+  // the end of a shelf (`after:` its name). Bunched at shelves' ends, the
+  // first came 17 lessons down and the rest all after the last shelf (the
+  // teacher's complaint, 2026-10-30). One whose place isn't on the page goes
+  // at the end.
   const makes = all.filter((t) => t.level === MAKE_LEVEL);
-  const shown = new Set(levels.filter((l) => all.some((t) => t.level === l)));
-  const makesAfter = (level: string | null) =>
-    makes.filter((t) => (level === null ? !shown.has(t.after ?? "") : t.after === level));
+  const bare = (key: string) => key.slice(key.indexOf(":") + 1);
+  const shown = new Set([...levels.filter((l) => all.some((t) => t.level === l)), ...all.filter((t) => t.level !== MAKE_LEVEL).map((t) => bare(t.key))]);
+  const makesAfter = (place: string | null) =>
+    makes.filter((t) => (place === null ? !shown.has(t.after ?? "") : t.after === place));
   const byKey = useMemo(() => new Map(games.filter((g) => g.tutorial).map((g) => [g.tutorial!.key, g])), [games]);
   const card = (t: Entry) => {
     const game = byKey.get(t.key);
@@ -177,11 +182,11 @@ export function TutorialsPage() {
       </div>
     );
   };
-  const makeBand = (level: string | null) => {
-    const here = makesAfter(level);
+  const makeBand = (place: string | null) => {
+    const here = makesAfter(place);
     if (!here.length) return null;
     return (
-      <section key={`make:${level}`} className="make-band" data-testid="make-band" data-after={level ?? ""}>
+      <section key={`make:${place}`} className="make-band" data-testid="make-band" data-after={place ?? ""}>
         <h2>Now you can make…</h2>
         <p className="muted small">A whole game, from an empty one, with what you've just learned.</p>
         <div className="tutorial-cards">{here.map(card)}</div>
@@ -205,11 +210,24 @@ export function TutorialsPage() {
         {levels.map((level) => {
           const here = all.filter((t) => t.level === level);
           if (!here.length) return null;
+          // The shelf in runs of lessons, cut wherever a game comes after one.
+          const runs: Entry[][] = [[]];
+          for (const t of here) {
+            runs[runs.length - 1]!.push(t);
+            if (makesAfter(bare(t.key)).length) runs.push([]);
+          }
           return [
-            <section key={level} className="class-section">
-              <h2>{level}</h2>
-              <div className="tutorial-cards">{here.map(card)}</div>
-            </section>,
+            ...runs.flatMap((run, i) =>
+              run.length
+                ? [
+                    <section key={`${level}:${i}`} className={i ? "class-section shelf-more" : "class-section"} data-testid="shelf" data-shelf={level}>
+                      {i === 0 && <h2>{level}</h2>}
+                      <div className="tutorial-cards">{run.map(card)}</div>
+                    </section>,
+                    makeBand(bare(run[run.length - 1]!.key)),
+                  ]
+                : [],
+            ),
             makeBand(level),
           ];
         })}

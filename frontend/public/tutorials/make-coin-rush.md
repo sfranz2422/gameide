@@ -1,7 +1,7 @@
 ---
 title: Coin Rush
 level: Now You Can Make
-after: Getting Started
+after: collect-coins
 time: 35 min
 starter: empty
 description: A whole game from an empty one: grab as many coins as you can in thirty seconds.

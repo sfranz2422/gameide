@@ -1,14 +1,14 @@
 ---
 title: Bomb Dodge
 level: Now You Can Make
-after: Game Elements 1: The Basics
+after: el2-difficulty
 time: 40 min
 starter: empty
 description: A whole game from an empty one: bombs rain down faster and faster, and you dodge them for as long as you can.
 ---
 # Bomb Dodge
 
-You've made a player, enemies, collisions, a score, lives and a timer. Now put them together into a game of your own, from an empty one.
+You've made a player, collisions, a score, lives, alarms, and a spawner that makes enemies faster and faster. Now put them together into a game of your own, from an empty one.
 
 In **Bomb Dodge**, bombs fall from the sky. Every bomb you dodge is a point, every bomb that hits you is a life, and the bombs come faster the better you do.
 

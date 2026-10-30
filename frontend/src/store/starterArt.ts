@@ -248,6 +248,144 @@ export const STARTER_SPRITES: StarterSprite[] = [
       ctx.fillRect(36, 11, 3, 3);
     },
   },
+  // For Paddle Duel, the platformer, the dungeon, the brawler and the metroidvania.
+  {
+    key: "paddle",
+    name: "paddle",
+    width: 12,
+    height: 64,
+    originX: 0,
+    originY: 0,
+    frames: 1,
+    paint(ctx) {
+      ctx.fillStyle = "#e2e8f0";
+      ctx.beginPath();
+      ctx.roundRect(0, 0, 12, 64, 4);
+      ctx.fill();
+      ctx.fillStyle = "#94a3b8";
+      ctx.fillRect(8, 4, 2, 56);
+    },
+  },
+  {
+    key: "flag",
+    name: "flag",
+    width: 24,
+    height: 32,
+    originX: 0,
+    originY: 0,
+    frames: 2,
+    fps: 4,
+    paint(ctx, frame) {
+      ctx.fillStyle = "#e5e7eb"; // the pole
+      ctx.fillRect(2, 0, 3, 32);
+      ctx.fillStyle = "#22c55e"; // the flag, flapping
+      ctx.beginPath();
+      ctx.moveTo(5, 2);
+      ctx.lineTo(23, frame ? 6 : 8);
+      ctx.lineTo(5, 15);
+      ctx.closePath();
+      ctx.fill();
+    },
+  },
+  {
+    key: "key",
+    name: "key",
+    width: 16,
+    height: 16,
+    originX: 8,
+    originY: 8,
+    frames: 1,
+    paint(ctx) {
+      ctx.fillStyle = "#facc15";
+      ctx.beginPath();
+      ctx.arc(5, 8, 4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillRect(8, 7, 8, 3);
+      ctx.fillRect(12, 10, 2, 3);
+      ctx.fillStyle = "#713f12";
+      ctx.fillRect(4, 7, 2, 2);
+    },
+  },
+  {
+    key: "door",
+    name: "door",
+    width: 32,
+    height: 32,
+    originX: 0,
+    originY: 0,
+    frames: 1,
+    paint(ctx) {
+      ctx.fillStyle = "#78350f";
+      ctx.fillRect(0, 0, 32, 32);
+      ctx.fillStyle = "#92400e";
+      for (let x = 2; x < 32; x += 10) ctx.fillRect(x, 2, 8, 28); // planks
+      ctx.fillStyle = "#facc15"; // the keyhole's plate
+      ctx.fillRect(13, 13, 6, 8);
+      ctx.fillStyle = "#111";
+      ctx.fillRect(15, 15, 2, 4);
+    },
+  },
+  {
+    key: "slash",
+    name: "slash",
+    width: 24,
+    height: 24,
+    originX: 12,
+    originY: 12,
+    frames: 1,
+    paint(ctx) {
+      ctx.strokeStyle = "#f8fafc";
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.arc(4, 12, 16, -Math.PI / 3, Math.PI / 3);
+      ctx.stroke();
+      ctx.strokeStyle = "#7dd3fc";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(2, 12, 16, -Math.PI / 4, Math.PI / 4);
+      ctx.stroke();
+    },
+  },
+  {
+    key: "orb",
+    name: "orb",
+    width: 16,
+    height: 16,
+    originX: 8,
+    originY: 8,
+    frames: 2,
+    fps: 4,
+    circle: true,
+    paint(ctx, frame) {
+      ctx.fillStyle = frame ? "#c084fc" : "#a855f7";
+      ctx.beginPath();
+      ctx.arc(8, 8, frame ? 7 : 6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#f5d0fe";
+      ctx.fillRect(5, 4, 3, 3);
+    },
+  },
+  {
+    key: "gem",
+    name: "gem",
+    width: 16,
+    height: 16,
+    originX: 8,
+    originY: 8,
+    frames: 1,
+    paint(ctx) {
+      ctx.fillStyle = "#22d3ee";
+      ctx.beginPath();
+      ctx.moveTo(8, 1);
+      ctx.lineTo(15, 6);
+      ctx.lineTo(8, 15);
+      ctx.lineTo(1, 6);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = "#cffafe";
+      ctx.fillRect(5, 4, 3, 2);
+    },
+  },
 ];
 
 /** Paints every frame of a starter sprite into PNG blobs. Browser only. */

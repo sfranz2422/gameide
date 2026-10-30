@@ -439,8 +439,11 @@ header; steps are `---` slides; ` ```check ` blocks gate Next (strict); a
 - Starting games for tutorials are `TUTORIAL_STARTERS` in templates.ts
   (kept off Create New Game: they're half a game on purpose).
 - **"Now you can make…" tutorials** (`make-*.md`) build a whole game from
-  `starter: empty`, with `level: Now You Can Make` and `after: <shelf>`;
-  the Learn page shows them as a band after that shelf, never as a shelf.
+  `starter: empty`, with `level: Now You Can Make` and `after:` the lesson
+  whose skills it needs (its key, e.g. `el3-strike`) or a shelf's name. The
+  Learn page puts a band right after that lesson, splitting its shelf there,
+  never a shelf of its own: spaced through the lessons, the teacher's ask
+  (at shelves' ends they all bunched up after the last one).
   They are original games in a genre, never a copy of a named game (the
   teacher asked for "frogger, pong, zelda": they're Busy Road and the like).
   Each is walked step by step in `makes.test.ts`, its code taken from its
