@@ -168,8 +168,29 @@ window.PyIDETests = (function () {
     "class _AgNoInput(Exception): pass",
     "class _AgTimeUp(Exception): pass",
     "",
-    "def _ag_run(source, inputs, seconds):",
+    "def _ag_turns_begin(kind):",
+    "    '''A Pi (or turtle) or block-world program: its packages fresh, on a",
+    "    page of its own with no one watching (_ag_new_page, from run() in",
+    "    autograde.js). None for any other program.'''",
+    "    if kind not in ('pi', 'world'):",
+    "        return None",
+    "    import importlib",
+    "    packages = _PI_PACKAGES if kind == 'pi' else ('mcpi',)",
+    "    for name in [n for n in _ag_sys.modules if n.split('.')[0] in packages]:",
+    "        del _ag_sys.modules[name]",
+    "    w = importlib.import_module('_pyide_pi' if kind == 'pi' else 'mcpi._pyide')",
+    "    w.use_page(_ag_new_page())",
+    "    w.begin(0)",
+    "    return w",
+    "",
+    "def _ag_run(source, inputs, seconds, turns=''):",
     "    '''Run main.py once, typing `inputs`. (output, problem, scope).'''",
+    "    w = _ag_turns_begin(turns)",
+    "    # A Pi or world program that is still going (its `while True:`) is",
+    "    # stopped as Stop would stop it, and checked on what it did by then.",
+    "    stops = (w.WorldStopped, w.StopNow) if w else ()",
+    "    if w:",
+    "        seconds = min(seconds, 3)",
     "    feed = list(inputs)",
     "    out = _ag_io.StringIO()",
     "    def fake_input(prompt=''):",
@@ -189,6 +210,12 @@ window.PyIDETests = (function () {
     "    problem = None",
     "    real_input = _ag_b.input",
     "    _ag_b.input = fake_input",
+    "    import threading as _ag_threading",
+    "    real_sleep, real_exit, real_start = _ag_time.sleep, _ag_os._exit, _ag_threading.Thread.start",
+    "    if w:",
+    "        _ag_time.sleep = w.sleep",
+    "        _ag_os._exit = _pyide_exit",
+    "        _ag_threading.Thread.start = _pyide_no_thread",
     "    try:",
     "        code = compile(source, 'main.py', 'exec')",
     "        with _ag_ctx.redirect_stdout(out):",
@@ -199,8 +226,11 @@ window.PyIDETests = (function () {
     "                _ag_sys.settrace(None)",
     "    except _AgNoInput:",
     "        problem = 'It asked for more input than this test types (%d).' % len(inputs)",
+    "    except stops:",
+    "        pass",
     "    except _AgTimeUp:",
-    "        problem = 'Still running after %d seconds. Is there a loop that never ends?' % seconds",
+    "        if not w:",
+    "            problem = 'Still running after %d seconds. Is there a loop that never ends?' % seconds",
     "    except SystemExit:",
     "        pass",
     "    except SyntaxError as e:",
@@ -209,6 +239,7 @@ window.PyIDETests = (function () {
     "        problem = '%s: %s' % (type(e).__name__, e)",
     "    finally:",
     "        _ag_b.input = real_input",
+    "        _ag_time.sleep, _ag_os._exit, _ag_threading.Thread.start = real_sleep, real_exit, real_start",
     "    return out.getvalue(), problem, scope",
     "",
     "def _ag_norm(text):",
@@ -227,13 +258,17 @@ window.PyIDETests = (function () {
     "             'if': (_ag_ast.If, _ag_ast.IfExp), 'def': (_ag_ast.FunctionDef,),",
     "             'function': (_ag_ast.FunctionDef,), 'return': (_ag_ast.Return,),",
     "             'try': (_ag_ast.Try,), 'class': (_ag_ast.ClassDef,),",
-    "             'list': (_ag_ast.List, _ag_ast.ListComp), 'dict': (_ag_ast.Dict, _ag_ast.DictComp)}",
+    "             'list': (_ag_ast.List, _ag_ast.ListComp), 'dict': (_ag_ast.Dict, _ag_ast.DictComp),",
+    "             'pass': (_ag_ast.Pass,), 'break': (_ag_ast.Break,), 'continue': (_ag_ast.Continue,),",
+    "             'global': (_ag_ast.Global,), 'nonlocal': (_ag_ast.Nonlocal,), 'del': (_ag_ast.Delete,),",
+    "             'with': (_ag_ast.With,), 'lambda': (_ag_ast.Lambda,)}",
     "",
     "_AG_OPS = {'+': (_ag_ast.Add, _ag_ast.UAdd), '-': (_ag_ast.Sub, _ag_ast.USub), '*': (_ag_ast.Mult,),",
     "           '/': (_ag_ast.Div,), '//': (_ag_ast.FloorDiv,), '%': (_ag_ast.Mod,), '**': (_ag_ast.Pow,),",
     "           '==': (_ag_ast.Eq,), '!=': (_ag_ast.NotEq,), '<': (_ag_ast.Lt,), '<=': (_ag_ast.LtE,),",
     "           '>': (_ag_ast.Gt,), '>=': (_ag_ast.GtE,), 'and': (_ag_ast.And,), 'or': (_ag_ast.Or,),",
-    "           'not': (_ag_ast.Not,), 'in': (_ag_ast.In, _ag_ast.NotIn)}",
+    "           'not': (_ag_ast.Not,), 'in': (_ag_ast.In, _ag_ast.NotIn), 'not in': (_ag_ast.NotIn,),",
+    "           'is': (_ag_ast.Is, _ag_ast.IsNot)}",
     "",
     "def _ag_uses(trees, word):",
     "    w = word.strip()",
@@ -258,6 +293,15 @@ window.PyIDETests = (function () {
     "    # An operator (uses +, uses ==, uses and): found in the code's tree,",
     "    # so a + inside a string doesn't count. Read as a name it could never",
     "    # be found, and the check failed on code that plainly used it.",
+    "    # These were never found, and teachers kept writing them: a",
+    "    # += (uses +=), a finally, a keyword argument (uses sep, uses",
+    "    # text_colour) and pass, global, del, not in (in the tables above).",
+    "    if low.endswith('=') and _AG_OPS.get(low[:-1]) and low[:-1] not in ('=', '!', '<', '>'):",
+    "        aug = _AG_OPS[low[:-1]]",
+    "        return any(isinstance(n, _ag_ast.AugAssign) and isinstance(n.op, aug)",
+    "                   for tree in trees for n in _ag_ast.walk(tree))",
+    "    if low == 'finally':",
+    "        return any(isinstance(n, _ag_ast.Try) and n.finalbody for tree in trees for n in _ag_ast.walk(tree))",
     "    ops = _AG_OPS.get(low)",
     "    if ops:",
     "        return any(isinstance(n, ops) for tree in trees for n in _ag_ast.walk(tree))",
@@ -267,11 +311,12 @@ window.PyIDETests = (function () {
     "            if kinds and isinstance(n, kinds):",
     "                return True",
     "            if not kinds and ((isinstance(n, _ag_ast.Name) and n.id == w) or",
-    "                              (isinstance(n, _ag_ast.Attribute) and n.attr == w)):",
+    "                              (isinstance(n, _ag_ast.Attribute) and n.attr == w) or",
+    "                              (isinstance(n, _ag_ast.keyword) and n.arg == w)):",
     "                return True",
     "    return False",
     "",
-    "def _pyide_autograde(files_json, tests_json, seconds=5):",
+    "def _pyide_autograde(files_json, tests_json, seconds=5, turns=''):",
     "    files = _ag_json.loads(files_json)",
     "    tests = _ag_json.loads(tests_json)",
     "    _ag_os.makedirs(PROJECT_DIR, exist_ok=True)",
@@ -298,7 +343,7 @@ window.PyIDETests = (function () {
     "            if unreadable:",
     "                detail = unreadable",
     "            elif t['kind'] == 'output':",
-    "                out, problem, _ = _ag_run(source, t['inputs'], seconds)",
+    "                out, problem, _ = _ag_run(source, t['inputs'], seconds, turns)",
     "                if problem:",
     "                    detail = problem",
     "                elif t['exact']:",
@@ -309,7 +354,7 @@ window.PyIDETests = (function () {
     "                if not ok and not detail:",
     "                    detail = 'It printed: ' + (_ag_short(out) or '(nothing)')",
     "            elif t['kind'] == 'call':",
-    "                _, _, scope = _ag_run(source, [], seconds)",
+    "                _, _, scope = _ag_run(source, [], seconds, turns)",
     "                deadline = _ag_time.monotonic() + seconds",
     "                def guard(frame, event, arg):",
     "                    if _ag_time.monotonic() > deadline:",
@@ -356,6 +401,63 @@ window.PyIDETests = (function () {
 
   var ready = typeof WeakSet === "function" ? new WeakSet() : null;
 
+  /* A Pi (or turtle) program, or a block-world one, is checked on a page of
+     its own with no one watching: a headless Pi with the project's own
+     wiring (circuit.pi) — the student's, in the teacher's Check all — or a
+     block world made from its world.mcpi. Without these the checks in a Pi
+     or world assignment all failed with "No module named gpiozero". Pages
+     that don't load pi.js / world_model.js check as before. */
+  var bundles = typeof WeakMap === "function" ? new WeakMap() : null;
+  function loadBundle(pyodide, url, under) {
+    var done = bundles && bundles.get(pyodide) || {};
+    if (!done[url]) {
+      done[url] = fetch(url).then(function (r) {
+        if (!r.ok) throw new Error("Couldn't load " + url + " (" + r.status + ")");
+        return r.json();
+      }).then(function (files) {
+        Object.keys(files).forEach(function (rel) {
+          var path = under + rel;
+          pyodide.FS.mkdirTree(path.split("/").slice(0, -1).join("/"));
+          pyodide.FS.writeFile(path, files[rel]);
+        });
+        pyodide.runPython("import sys\nif '/lib' not in sys.path:\n    sys.path.insert(0, '/lib')\n");
+      });
+      done[url].catch(function () { delete done[url]; });
+      if (bundles) bundles.set(pyodide, done);
+    }
+    return done[url];
+  }
+  async function turnsFor(pyodide, source, files) {
+    var paths = window.PyIDEPaths || {};
+    var M = window.PyIDEWorldModel;
+    if (M && M.looksLikeWorld(source)) {
+      await loadBundle(pyodide, paths.mcpiBundle || "/static/py/mcpi_bundle.json", "/lib/mcpi/");
+      // One world for the whole check, built once: making one is the slow part.
+      // Every run of the program starts from it as it was built, with the
+      // player at the spawn: a check runs the program once per test, and a
+      // run that moved the player or placed blocks made the next run's
+      // checks fail on a right program.
+      var world = await M.decode(files["world.mcpi"] || null, null);
+      var ids0 = world.ids().slice(), data0 = world.datas().slice();
+      var bridge = M.makeBridge(world, function (cb) { setTimeout(cb, 0); });
+      pyodide.globals.set("_ag_new_page", function () {
+        world.ids().set(ids0);
+        world.datas().set(data0);
+        world.spawn();
+        return bridge;
+      });
+      return "world";
+    }
+    if (window.PyIDEPi && window.PyIDEPi.looksLikePi(source)) {
+      await loadBundle(pyodide, paths.piBundle || "/static/py/pi_bundle.json", "/lib/");
+      var circuit = files["circuit.pi"] || "";
+      // A fresh Pi for every run of the program, so no LED is left on by the one before.
+      pyodide.globals.set("_ag_new_page", function () { return window.PyIDEPi.headless(circuit); });
+      return "pi";
+    }
+    return "";
+  }
+
   /* Run `tests` against `files` (name → text) in `pyodide`, which has had
      runtime.js's BOOTSTRAP. Resolves {results, earned, possible}. Imports the
      packages the program needs first, as Run does. */
@@ -368,9 +470,11 @@ window.PyIDETests = (function () {
     if (window.PyIDERuntime && window.PyIDERuntime.loadImports) {
       try { await window.PyIDERuntime.loadImports(pyodide, source, files); } catch (e) {}
     }
+    var turns = "";
+    try { turns = await turnsFor(pyodide, source, files); } catch (e) { turns = ""; }
     pyodide.globals.set("_ag_files", JSON.stringify(files));
     pyodide.globals.set("_ag_tests", JSON.stringify(tests));
-    var out = await pyodide.runPythonAsync("_pyide_autograde(_ag_files, _ag_tests)");
+    var out = await pyodide.runPythonAsync("_pyide_autograde(_ag_files, _ag_tests, 5, " + JSON.stringify(turns) + ")");
     return JSON.parse(out);
   }
 

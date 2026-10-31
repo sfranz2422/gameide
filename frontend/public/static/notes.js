@@ -107,9 +107,9 @@ window.PyIDENotes = (function () {
   var THEMES = ["ocean", "sunset", "forest", "chalkboard", "arcade",
                 "notebook", "space",
                 // The seasons, for the year's calendar.
-                "halloween", "fall", "winter", "christmas", "spring", "summer"];
+                "halloween", "fall", "thanksgiving", "winter", "christmas", "spring", "summer"];
   // The ones whose headings use a display face (themeFonts).
-  var FONT_THEMES = ["chalkboard", "arcade", "notebook", "halloween", "christmas"];
+  var FONT_THEMES = ["chalkboard", "arcade", "notebook", "halloween", "thanksgiving", "christmas"];
   var THEME_LINE = /^[ \t]*theme[ \t]*:[ \t]*([a-z]+)[ \t]*$/i;
 
   /* `animate: words` (or `animate: type`) beside the theme line: the notes
@@ -185,7 +185,7 @@ window.PyIDENotes = (function () {
     link.rel = "stylesheet";
     link.href = "https://fonts.googleapis.com/css2?family=Caveat:wght@600;700" +
                 "&family=Patrick+Hand&family=Press+Start+2P&family=Creepster" +
-                "&family=Mountains+of+Christmas:wght@700&display=swap";
+                "&family=Mountains+of+Christmas:wght@700&family=Berkshire+Swash&display=swap";
     document.head.appendChild(link);
   }
 
@@ -1217,6 +1217,11 @@ window.PyIDENotes = (function () {
     // it stays the code block it was, which still says the same.
     if (window.PyIDETests) {
       try { window.PyIDETests.renderBlocks(root); } catch (e) { /* left as code */ }
+    }
+    // ```lab blocks, where lab_notes.js is loaded (an A+ lab's page): the
+    // ticket's tasks for that step, ticked as the machine passes them.
+    if (window.PyIDELabNotes) {
+      try { window.PyIDELabNotes.renderBlocks(root); } catch (e) { /* left as code */ }
     }
     // ```python run blocks, where snippets.js is loaded (the editor and the
     // live page); elsewhere they stay code to read.
