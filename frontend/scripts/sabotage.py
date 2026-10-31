@@ -34,6 +34,15 @@ GF = "golf"      # …or Greenside's
 GB, GC, GP = "../showcase/golf/game/_2ball.py", "../showcase/golf/game/_1course.py", "../showcase/golf/game/_3play.py"
 FP, FM, FBUILD = "../showcase/football/game/_2play.py", "../showcase/football/game/_3match.py", "../showcase/football/build.py"
 FB_CTRL = "../showcase/football/game/_4controls.py"
+FR, FF = "../showcase/football/game/_1rules.py", "../showcase/football/game/_6flow.py"
+FSN, FSC, FGM = "../showcase/football/game/_7season.py", "../showcase/football/game/_5screen.py", "../showcase/football/game/Game.py"
+BB = "baseball"  # …or Moonshot's playtest, rebuilt the same way
+BBP, BBF, BBI = "../showcase/baseball/game/_2pitch.py", "../showcase/baseball/game/_3flight.py", "../showcase/baseball/game/_5innings.py"
+BBD, BBC, BBW = "../showcase/baseball/game/_4derby.py", "../showcase/baseball/game/_6cpu.py", "../showcase/baseball/game/_8flow.py"
+BBK, BBUILD = "../showcase/baseball/game/_7controls.py", "../showcase/baseball/build.py"
+HC = "hillclimb"  # …or Ridgeline Rally's, rebuilt the same way
+HCS, HCC, HCR = "../showcase/hillclimb/game/_1stages.py", "../showcase/hillclimb/game/_2car.py", "../showcase/hillclimb/game/_3run.py"
+HCG, HCF, HCB = "../showcase/hillclimb/game/_4garage.py", "../showcase/hillclimb/game/_6flow.py", "../showcase/hillclimb/build.py"
 PY = "py"    # …or the server's checks (backend/tests/test_server.py); caught = that check prints FAIL
 APP = "../backend/app.py"
 RO, RE = "src/editor/rooms/roomOps.ts", "src/editor/rooms/RoomEditor.tsx"
@@ -785,13 +794,13 @@ CASES = [
  ("football: the quarterback never ours", FP, '(car.role != "QB" or OFFENSE[PLAY["call"]]["kind"] == "pass")', '(car.role != "QB")', "is played from the keyboard", FB),
  ("football: a touchdown only at the back of the end zone", FP, "    if (d > 0 and car.x >= GOAL_R)", "    if (d > 0 and car.x >= END_R)", "scores a touchdown", FB),
  ("football: the kick meter ignored", FP, '    k["good"] = abs(k["phase"]) <= k["allowed"]', '    k["good"] = True', "field goal in the green", FB),
- ("football: a touchdown is six", FM, "        score(off, 7)", "        score(off, 6)", "scores a touchdown", FB),
+ ("football: a touchdown is five", FR, "TOUCHDOWN = 6", "TOUCHDOWN = 5", "scores a touchdown", FB),
  ("football: the marker set before the spot", FM, '            start_drive(deff, x=x, y=y)\n        return "incomplete"', '            start_drive(deff, 25)\n            spot_ball(x, y)\n        return "incomplete"', "first-down marker", FB),
  ("football: no safeties", FM, '    if how in ("tackle", "sack", "out") and in_own_end:', "    if False:", "a safety, and a touchback", FB),
  ("football: a punt's touchback at the 25", FM, "        if own <= 0:\n            start_drive(deff, 20)", "        if own <= 0:\n            start_drive(deff, 25)", "a safety, and a touchback", FB),
  ("football: five downs", FM, '    if MATCH["down"] > 4:', '    if MATCH["down"] > 5:', "counts downs", FB),
  ("football: a field goal from anywhere", FM, '    return [i for i, p in enumerate(OFFENSE) if p["kind"] != "kick" or can_kick()]', "    return list(range(len(OFFENSE)))", "field goal in the green", FB),
- ("football: the Comets keep it at halftime", FM, '        start_drive("away", 25)    # the Badgers', '        start_drive("home", 25)    # the Badgers', "after halftime", FB),
+ ("football: the Comets keep it at halftime", FM, '        set_kickoff(other(MATCH["first_kicker"]))', '        set_kickoff(MATCH["first_kicker"])', "after halftime", FB),
  ("football: a game with no end", FM, "    if q >= 4:", "    if q >= 5:", "after halftime", FB),
  ("football: the camera stays put", FBUILD, '"follow": P.obj_id("Ball")', '"follow": None', "follows the ball", FB),
  ("makes: Coin Rush's player can't move", "public/tutorials/make-coin-rush.md", "speed = 5\n", "speed = 0\n", "make-coin-rush: doing what"),
@@ -841,6 +850,144 @@ CASES = [
  ("makes: Robot's Garden asks the wrong layer", "public/tutorials/make-robots-garden.md", 'if tile_at(self.x, self.y, "Paths") is not None:', 'if tile_at(self.x, self.y, "Path") is not None:', "make-robots-garden: doing what"),
  ("makes: Robot's Garden no quicker on paths", "public/tutorials/make-robots-garden.md", "    speed = 3\n```", "    speed = 2\n```", "make-robots-garden: doing what"),
  ("makes: Robot's Garden's clock runs on", "public/tutorials/make-robots-garden.md", 'if global_vars.time > 0 and instance_number("Seed") > 0:', "if global_vars.time > 0:", "make-robots-garden: doing what"),
+ # The ball carrier's moves.
+ ("football: a move never breaks a tackle", FP, '        if car.move is not None and random.random() < MOVES[car.move]["break"]:', "        if False:", "gives the ball carrier", FB),
+ ("football: a move as often as you like", FP, '    if name in PLAY["moves"] or p.move is not None', "    if p.move is not None", "gives the ball carrier", FB),
+ ("football: the juke doesn't cut", FP, '        p.vy = (1 if ay > 0 else -1) * m["cut"]', "        p.vy = 0 * ay", "gives the ball carrier", FB),
+ ("football: the bot's carrier can't make a move", FP, "        elif car is not None and car.human == c:\n            for name, m in MOVES.items():", "        elif False:\n            for name, m in MOVES.items():", "a bot plays a whole game", FB),
+ # Diving catches.
+ ("football: a dive reaches no further", FR, "DIVE_REACH = 32", "DIVE_REACH = 18", "dive for a ball", FB),
+ ("football: a diving catch never held", FP, "    elif vd < DIVE_REACH and random.random() < DIVE_CATCH:", "    elif False:", "dive for a ball", FB),
+ # The new plays.
+ ("football: the option never pitched", FP, '            lateral(man)\n            announce("pitch")', "            pass", "runs every new play", FB),
+ ("football: the reverse never handed on", FP, "    elif dist(car, man) < 14:\n        give(man)", "    elif False:\n        give(man)", "runs every new play", FB),
+ ("football: the second man leaves his route", FP, " and not second_man(p)):", "):", "runs every new play", FB),
+ ("football: the screen's first look ignored", FP, '    if look and t >= 26 and openness(by_role(PLAY["off"], look)) >= 12:', "    if False:", "runs every new play", FB),
+ ("football: a play's targets ignored", FP, '    out = [by_role(off, r) for r in PLAY["play"].get("targets", ["WR1", "WR2", "WR3"])]', '    out = [by_role(off, r) for r in ["WR1", "WR2", "WR3"]]', "runs every new play", FB),
+ ("football: nobody bites on play-action", FP, '    if PLAY["faking"] and p.kind in ("LB", "S"):', "    if False:", "runs every new play", FB),
+ ("football: the sneaking quarterback isn't yours", FP, '(PLAY["handed"] or (car.role != "QB" or OFFENSE[PLAY["call"]]["kind"] == "pass"))', '((car.role != "QB" or OFFENSE[PLAY["call"]]["kind"] == "pass"))', "runs every new play", FB),
+ # The chalkboard draws from the data.
+ ("football: the chalkboard draws one leg of a route", FSC, "        for (ax, ay), (bx, by) in zip(pts, pts[1:]):", "        for (ax, ay), (bx, by) in zip(pts[:2], pts[1:2]):", "draws every play", FB),
+ ("football: the chalkboard numbers two receivers", FSC, "        if role in targets:", "        if role in targets[:2]:", "draws every play", FB),
+ ("football: the chalkboard has no zones", FSC, '        elif job[0] == "zone":\n            draw_circle(', '        elif False:\n            draw_circle(', "draws every play", FB),
+ # The computer's coaches.
+ ("football: never goes for it on fourth down", FM, '    if left <= 2 and goal <= 55:\n        return "go"', '    if False:\n        return "go"', "coaches by", FB),
+ ("football: punts when behind at the end", FM, '        return "kick" if can_kick() and lead(off) >= -3 else "go"', '        return "punt"', "coaches by", FB),
+ ("football: the coach never hurries", FM, '    if late() and lead(off) < 0:\n        tags.append("hurry")', '    if False:\n        tags.append("hurry")', "coaches by", FB),
+ ("football: the coach never runs the clock", FM, '    if MATCH["quarter"] >= 4 and lead(off) > 0:\n        tags.append("clock")', '    if False:\n        tags.append("clock")', "coaches by", FB),
+ ("football: the coach ignores the situation", FM, '        w *= play.get("use", {}).get(tag, 1)', "        w *= 1", "coaches by", FB),
+ ("football: never goes for two", FM, "    return MATCH[\"quarter\"] >= 3 and lead(team) in GO_FOR_TWO", "    return False", "decides the try", FB),
+ ("football: onside whenever behind late", FM, "    return late() and MATCH[\"clock\"] <= ONSIDE_WHEN_SECONDS and -ONSIDE_WHEN_BEHIND <= lead(kicker) < 0", "    return late() and lead(kicker) < 0", "decides the try", FB),
+ # Team strengths.
+ ("football: speed is the same for everyone", FP, '    s = SPEED[p.kind] * p.pace * TEAMS[p.team]["speed"]', "    s = SPEED[p.kind] * p.pace", "changes how a team plays", FB),
+ ("football: tackling is the same for everyone", FP, '        sure = min(0.97, sure * TEAMS[d.team]["tackle"])', "        sure = min(0.97, sure)", "changes how a team plays", FB),
+ ("football: every arm is the same", FP, ' * THROW_ERROR / TEAMS[qb.team]["arm"] + ', " * THROW_ERROR + ", "changes how a team plays", FB),
+ # The try.
+ ("football: a press goes for two", FF, "        choose_try(game, game.try_cursor == 1)", "        choose_try(game, game.try_cursor == 0)", "scores a touchdown", FB),
+ ("football: the extra point is worth two", FM, "        score(scorer, 1)", "        score(scorer, 2)", "scores a touchdown", FB),
+ ("football: two points for any try", FM, '    elif how == "touchdown" and res.get("kind") in ("run", "pass"):', '    elif how != "field goal":', "scores a touchdown", FB),
+ ("football: no kickoff after the try", FM, "    set_kickoff(scorer)\n    return signal", "    start_drive(other(scorer), 25)\n    return signal", "scores a touchdown", FB),
+ ("football: the extra point's green is narrow", FP, "            allowed = max(allowed, PAT_ALLOWED)", "            allowed = allowed", "scores a touchdown", FB),
+ ("football: the two-point try from the 25", FM, '            MATCH["los"], MATCH["ball_y"] = at_yards(scorer, TRY_YARDS), MID', '            MATCH["los"], MATCH["ball_y"] = at_yards(scorer, 25), MID', "scores a touchdown", FB),
+ # Kickoffs.
+ ("football: no touchbacks on kickoffs", FP, "    in_end_zone = (fwd(rec) > 0 and x < GOAL_L) or (fwd(rec) < 0 and x > GOAL_R)", "    in_end_zone = False", "kicks off", FB),
+ ("football: the returner isn't yours", FP, '        elif car is None and PLAY["play"]["kind"] == "kickoff":\n            PLAY["target"].human = c', '        elif car is None and PLAY["play"]["kind"] == "kickoff":\n            pass', "kicks off", FB),
+ ("football: a touchback at the 20", FR, "TOUCHBACK = 25", "TOUCHBACK = 20", "kicks off", FB),
+ ("football: a returner downed in his end zone is spotted there", FM, '    if how == "touchback" or in_own_end:', '    if how == "touchback":', "kicks off", FB),
+ ("football: the kickoff goes the wrong way", FP, '        back = -fwd(PLAY["off"])', '        back = fwd(PLAY["off"])', "kicks off", FB),
+ ("football: an onside kick is always theirs", FP, '        team = PLAY["deff"] if random.random() < ONSIDE_RECOVER else rec', "        team = rec", "kicks onside", FB),
+ ("football: an onside kick goes deep", FP, "            yards = random.uniform(*ONSIDE_YARDS)", "            yards = random.uniform(*KICKOFF_YARDS)", "kicks onside", FB),
+ ("football: the toss's winner kicks", FF, '        kicker = toss["winner"] if toss["choice"] == "KICK" else other(toss["winner"])', '        kicker = toss["winner"]', "tosses a coin", FB),
+ # The replay and the celebration.
+ ("football: no replay", FF, '    game.replay_next = res["how"] == "touchdown" and not was_try and len(REPLAY["frames"]) > 30', "    game.replay_next = False", "replays a touchdown", FB),
+ ("football: the replay at full speed", FF, "REPLAY_SPEED = 0.4", "REPLAY_SPEED = 1.0", "replays a touchdown", FB),
+ ("football: nobody celebrates", FF, "        p.cheer = True", "        p.cheer = False", "replays a touchdown", FB),
+ # A season.
+ ("football: a schedule with repeats", FSN, "        ids = [ids[0], ids[-1]] + ids[1:-1]", "        ids = ids[-1:] + ids[:-1]", "schedules a season", FB),
+ ("football: standings by points scored", FSN, '    rank = lambda tid: (-(2 * table[tid]["w"] + table[tid]["t"]), -(table[tid]["pf"] - table[tid]["pa"]),', '    rank = lambda tid: (-table[tid]["pf"], -(table[tid]["pf"] - table[tid]["pa"]),', "a bot plays a season", FB),
+ ("football: our score recorded backwards", FSN, "            record(us, them, mine, theirs)", "            record(us, them, theirs, mine)", "a bot plays a season", FB),
+ ("football: the championship's last two", FSN, '        SEASON["final"] = standings()[:2]', '        SEASON["final"] = standings()[-2:]', "a bot plays a season", FB),
+ ("football: the season not saved after a game", FSN, "    save_season()\n\n\ndef season_words", "    pass\n\n\ndef season_words", "a bot plays a season", FB),
+ ("football: a championship can end tied", FM, '        if MATCH["score"]["home"] != MATCH["score"]["away"] or not MATCH["no_ties"]:', "        if True:", "sudden-death", FB),
+ ("football: overtime isn't sudden death", FM, '    if MATCH["quarter"] > 4 and lead(team) > 0:\n        MATCH["over"] = True', '    if False:\n        MATCH["over"] = True', "sudden-death", FB),
+ # The screen and the build.
+ ("football: the title forgets the juke", FSC, '"With the ball: Z spin, X juke, C stiff-arm"', '"With the ball: Z spin"', "shows the controls", FB),
+ ("football: a hint too wide for the screen", FGM, 'draw_hint(f"{button_name(d, 0)} to kick it deep, {button_name(d, 1)} to kick onside")', 'draw_hint(f"{button_name(d, 0)} to kick it deep, {button_name(d, 1)} to kick it short and onside, and hope your team gets it back")', "a bot plays a whole game", FB),
+ ("football: a sound left out of the build", FBUILD, 'P.sound("juke", ', 'P.sound("jook", ', "has every sound", FB),
+ ("football: a team without its moves", FBUILD, '        P.sprite(f"{t[\'id\']}_moves", moves(own["ball"], own["poses"]), feet)', '        if t["id"] == "comets":\n            P.sprite(f"{t[\'id\']}_moves", moves(own["ball"], own["poses"]), feet)', "has every sound", FB),
+ ("baseball: the zone a little wider", BBP, "    return abs(x) <= PLATE_HALF and", "    return abs(x) <= PLATE_HALF + 0.1 and", "knows the strike zone", BB),
+ ("baseball: a foul can be strike three", BBI, '        if GAME["strikes"] < 2:            # a foul is a strike, but never the third', '        if True:                           # a foul is a strike, but never the third', "counts balls and strikes", BB),
+ ("baseball: four strikes and you're out", BBI, '            if GAME["strikes"] >= 3:', '            if GAME["strikes"] >= 4:', "counts balls and strikes", BB),
+ ("baseball: ball four isn't a walk", BBI, '        if GAME["balls"] >= 4:', '        if GAME["balls"] >= 5:', "walks on ball four", BB),
+ ("baseball: a walk pushes every runner", BBI, '    b, runs = GAME["bases"], 0\n    if b[0]:', '    b, runs = GAME["bases"], 0\n    if True:', "walks on ball four", BB),
+ ("baseball: runners never score on a hit", BBI, "            if b + n >= 3:\n                runs += 1", "            if b + n >= 3:\n                runs += 0", "moves runners on hits", BB),
+ ("baseball: runners frozen on a ground out", BBI, '        if not GAME["half_over"] and play["words"].startswith("Ground"):', "        if False:", "counts outs", BB),
+ ("baseball: a run scores on the third out", BBI, '        if not GAME["half_over"] and play["words"].startswith("Ground"):', '        if play["words"].startswith("Ground"):', "counts outs", BB),
+ ("baseball: four outs an inning", BBI, '    if GAME["outs"] >= 3:', '    if GAME["outs"] >= 4:', "counts outs", BB),
+ ("baseball: the home team bats when it's already won", BBI, '        if GAME["inning"] >= INNINGS and s["home"] > s["away"]:', "        if False:", "ends the game after three innings", BB),
+ ("baseball: no walk-offs", BBI, '    if last and GAME["half"] == "bottom" and GAME["score"]["home"] > GAME["score"]["away"]:', "    if False:", "ends the game after three innings", BB),
+ ("baseball: a tie ends after three", BBI, '    if GAME["inning"] >= INNINGS and s["home"] != s["away"]:', '    if GAME["inning"] >= INNINGS:', "ends the game after three innings", BB),
+ ("baseball: pitches miss where they're aimed", BBP, '    x = rx + (pitch["x"] - mx - rx) * s + mx * s * s', '    x = rx + (pitch["x"] - rx) * s + mx * s * s', "throws pitches that end where", BB),
+ ("baseball: pitches don't bend", BBP, '    mx, mz = PITCHES[pitch["kind"]]["move"]', "    mx, mz = 0, 0", "throws pitches that end where", BB),
+ ("baseball: every pitch one speed", BBP, '    feet_a_second = PITCHES[kind]["mph"] * 5280 / 3600', "    feet_a_second = 88 * 5280 / 3600", "throws pitches that end where", BB),
+ ("baseball: timing doesn't matter", BBP, "    if abs(late) > TIMING_WINDOW or abs(dz) > BAT_REACH", "    if abs(dz) > BAT_REACH", "hits a ball by the swing", BB),
+ ("baseball: early and late go the same way", BBP, "    spray = late * SPRAY + x * INSIDE", "    spray = abs(late) * SPRAY + x * INSIDE", "hits a ball by the swing", BB),
+ ("baseball: the bat lifts nothing", BBP, "    launch = LAUNCH + dz * LIFT + random.uniform(-2, 2)", "    launch = LAUNCH + random.uniform(-2, 2)", "hits a ball by the swing", BB),
+ ("baseball: no ball clears the fence", BBF, "            if z > FENCE_HIGH and landed is None:", "            if False:", "flies a hit", BB),
+ ("baseball: the fence 330 everywhere", BBF, "    return FENCE_CENTRE - (FENCE_CENTRE - FENCE_LINE) * k ** 1.6", "    return FENCE_LINE + 0 * k", "flies a hit", BB),
+ ("baseball: every bounce slows a grounder like the first", BBF, "            keep = ROLL if landed is None else 0.95", "            keep = ROLL", "fields a hit", BB),
+ ("baseball: nobody catches anything", BBF, "        if time_to(f, x, y) > t:\n            continue", "        if True:\n            continue", "fields a hit", BB),
+ ("baseball: the batter always beats the throw", BBF, "        if throw_in < batter_at_first:", "        if False:", "fields a hit", BB),
+ ("baseball: every hit a single", BBF, "    while bases < 3 and RUN_START + (bases + 1) * 90 / RUN <= back:", "    while False:", "fields a hit", BB),
+ ("baseball: a Derby that never ends", BBD, '    return DERBY["outs"] >= DERBY_OUTS', '    return DERBY["outs"] >= DERBY_OUTS * 3', "whole Home Run Derby", BB),
+ ("baseball: the Derby's longest not kept", BBD, '        DERBY["longest"] = max(DERBY["longest"], play["feet"])', '        DERBY["longest"] = max(DERBY["longest"], 0)', "counts a Derby", BB),
+ ("baseball: a worse round overwrites the record", BBD, '    if DERBY["homers"] > best:\n        save_set', "    if True:\n        save_set", "whole Home Run Derby", BB),
+ ("baseball: a pitch let go is an out in the Derby", BBW, '        AB["words"] = derby_swing(AB["play"]) if swung else "Taken.  No out."', '        AB["words"] = derby_swing(AB["play"])', "counts a Derby", BB),
+ ("baseball: up and down don't move the swing", BBW, '    MATCH["aim"] = clamp(MATCH["aim"] - up_down * BAT_MOVE, BAT_LOW, BAT_HIGH)', '    MATCH["aim"] = clamp(MATCH["aim"], BAT_LOW, BAT_HIGH)', "whole Home Run Derby", BB),
+ ("baseball: the bat meets the ball late", BBW, '        hit = contact(p["x"], p["z"], AB["aim"], t - p["steps"])', '        hit = contact(p["x"], p["z"], AB["aim"], t - p["steps"] + 5)', "whole Home Run Derby", BB),
+ ("baseball: X doesn't change the pitch", BBW, '        AB["kind"] = (AB["kind"] + 1) % len(PITCHES)', '        AB["kind"] = AB["kind"]', "lets a person pitch", BB),
+ ("baseball: the target won't move", BBW, "TARGET_MOVE = 0.05 ", "TARGET_MOVE = 0.0  ", "lets a person pitch", BB),
+ ("baseball: three outs and the same side bats on", BBW, '        if GAME["half_over"] and not GAME["over"]:\n            end_half()', '        if GAME["half_over"] and not GAME["over"]:\n            GAME["half_over"] = False', "switches who bats", BB),
+ ("baseball: no touch buttons for one player", BBW, '    touch_controls(not two and not demo, ("z", "x"))', '    touch_controls(False, ("z", "x"))', "shows touch buttons", BB),
+ ("baseball: two players share one set of keys", BBK, '    if MATCH.get("two"):\n        return TWO[c]', "    if False:\n        return TWO[c]", "switches who bats", BB),
+ ("baseball: the computer never swings", BBC, "    swing = looks_good and not take and random.random() > 0.08", "    swing = False", "computer against itself", BB),
+ ("baseball: the ballpark painted from its own camera", BBUILD, '    B, H, F = R["CAM_BACK"], R["CAM_HIGH"], R["CAM_FOCAL"]', '    B, H, F = R["CAM_BACK"], 6, R["CAM_FOCAL"]', "paints the ballpark", BB),
+ ("baseball: the map's fence where the rules' isn't", BBUILD, '    return R["FENCE_CENTRE"] - (R["FENCE_CENTRE"] - R["FENCE_LINE"]) * k ** 1.6', '    return R["FENCE_CENTRE"] - 12 - (R["FENCE_CENTRE"] - R["FENCE_LINE"]) * k ** 1.6', "paints the ballpark", BB),
+ ("hillclimb: the gas burns nothing", HCC, '        car.fuel = max(0.0, car.fuel - car.stats["burn"])', '        car.fuel = max(0.0, car.fuel - 0 * car.stats["burn"])', "burns fuel only on the gas", HC),
+ ("hillclimb: fuel burns standing still", HCC, '    if gas:\n        car.fuel = max(0.0,', '    if True:\n        car.fuel = max(0.0,', "burns fuel only on the gas", HC),
+ ("hillclimb: an empty tank still drives", HCC, "    if car.fuel <= 0:\n        gas = False", "    if False:\n        gas = False", "burns fuel only on the gas", HC),
+ ("hillclimb: a can doesn't fill the tank", HCR, '            car.fuel = car.stats["tank"]', '            car.fuel = car.fuel', "burns fuel only on the gas", HC),
+ ("hillclimb: out of fuel never ends", HCR, '            RUN["end"] = "fuel"', '            pass', "runs out of fuel with every can", HC),
+ ("hillclimb: a coin is worth one", HCR, '            RUN["got"] += stage["coin_value"]', '            RUN["got"] += 1', "picks up coins worth", HC),
+ ("hillclimb: a coin picked up twice", HCR, "            c[2] = False\n", "", "picks up coins worth", HC),
+ ("hillclimb: the finish pays nothing", HCR, '        RUN["got"] += bonus\n        RUN["words"].append([f"Finish!', '        RUN["words"].append([f"Finish!', "picks up coins worth", HC),
+ ("hillclimb: coins never banked", HCF, '    add_coins(RUN["got"])', '    pass', "is driven up the whole Countryside", HC),
+ ("hillclimb: the engine upgrade does nothing", HCC, '"engine":     {"stat": "power",  "step": 0.12,', '"engine":     {"stat": "power",  "step": 0.0,', "sells upgrades in the garage", HC),
+ ("hillclimb: tyres bought, never fitted", HCC, '    grip = s["grip"] * stage["grip"]', '    grip = VEHICLES[car.kind]["grip"] * stage["grip"]', "sells upgrades in the garage", HC),
+ ("hillclimb: the tyres never slip", HCC, "        push = max(-most, min(most, push))", "        push = max(-most * 9, min(most * 9, push))", "sells upgrades in the garage", HC),
+ ("hillclimb: stiffer springs not fitted", HCC, '        f_down = -s["spring"] * down', '        f_down = -VEHICLES[car.kind]["spring"] * down', "sells upgrades in the garage", HC),
+ ("hillclimb: the bigger tank starts at the old size", HCC, '        self.fuel = s["tank"]', '        self.fuel = VEHICLES[kind]["tank"]', "sells upgrades in the garage", HC),
+ ("hillclimb: upgrades cost nothing", HCG, '    save_set("coins", wallet() - price)', '    save_set("coins", wallet())', "sells upgrades in the garage", HC),
+ ("hillclimb: bought with no coins", HCG, "    if wallet() < price:\n        return False", "    if False:\n        return False", "sells upgrades in the garage", HC),
+ # (0.15, not Earth's 0.22: with that the build refuses the moon's hills as too steep, the old
+ # project.json stays, and the test passes on it — the harness doesn't see a build refuse.)
+ ("hillclimb: the moon nearly Earth's gravity", HCS, '"gravity": 0.075,', '"gravity": 0.15,', "moon's low gravity", HC),
+ ("hillclimb: every stage falls like the first", HCC, '    g = stage["gravity"]', '    g = STAGES[0]["gravity"]', "moon's low gravity", HC),
+ ("hillclimb: gas tips the car forward", HCC, "    if gas:\n        car.w -= lean * dt", "    if gas:\n        car.w += lean * dt", "tips the car in the air", HC),
+ ("hillclimb: a flip needs two turns", HCR, "        flips = int((abs(car.air_spin) + 0.6) / (2 * math.pi))", "        flips = int((abs(car.air_spin) + 0.6) / (4 * math.pi))", "tips the car in the air", HC),
+ ("hillclimb: the head never touches", HCC, "        car.head_hit = True", "        car.head_hit = car.head_hit", "ends the run on the driver's head", HC),
+ ("hillclimb: the head never touches (the moon)", HCC, "        car.head_hit = True", "        car.head_hit = car.head_hit", "flooring a big engine", HC),
+ ("hillclimb: a head hit goes on driving", HCR, '    if car.head_hit:\n        RUN["end"] = "head"', '    if car.head_hit:\n        pass', "ends the run on the driver's head", HC),
+ ("hillclimb: the body sinks through the road", HCC, "        if dig > 0:\n            body_bounce(car, px, py, dig, road)", "        if False:\n            body_bounce(car, px, py, dig, road)", "ends the run on the driver's head", HC),
+ ("hillclimb: the best never kept", HCG, '    save_set("best", b)', '    pass', "is driven up the whole Countryside", HC),
+ ("hillclimb: no ghost recorded", HCR, "    if RUN[\"steps\"] % GHOST_EVERY == 0:", "    if False:", "is driven up the whole Countryside", HC),
+ ("hillclimb: the finish flag ends nothing", HCR, '    elif car.x >= road["finish"]:', '    elif car.x >= road["finish"] * 9:', "is driven up the whole Countryside", HC),
+ ("hillclimb: a jeep too slow for its fuel", HCC, '"top": 7.0,', '"top": 3.0,', "is driven up the whole Countryside", HC),
+ ("hillclimb: the wheels push only half the time", HCC, "        if d >= w.r + TOUCH and not below:", "        if d >= w.r and not below:", "sells upgrades in the garage", HC),
+ ("hillclimb: the garage's rows can't be picked", "../showcase/hillclimb/game/Game.py", "        self.row = (self.row + step) % len(ROWS)", "        self.row = self.row + 0 * step", "is driven up the whole Countryside", HC),
+ ("hillclimb: a stage bought isn't kept", HCG, '    save_set("stages", owned_stages() + [name])', '    pass', "keeps coins, upgrades", HC),
+ ("hillclimb: a cliff builds", HCB, "                if math.sin(slope) > most:", "                if False:", "won't build a stage", HC),
+ ("hillclimb: a stage longer than the room builds", HCB, '        if len(hs) * GAME["STEP"] > ROOM_W - VIEW_W:', '        if False:', "won't build a stage", HC),
 ]
 only = sys.argv[1:]
 # A name that matches no case would otherwise run nothing and still say
@@ -875,7 +1022,7 @@ for name, f, old, new, test, *extra in CASES:
             failed = any(l.startswith("FAIL") and test in l for l in out.splitlines())
             ran = "ok   " in out or "FAIL " in out
         else:
-            if runner in ([GM], [MM], [FB], [GF]):
+            if runner in ([GM], [MM], [FB], [GF], [BB], [HC]):
                 subprocess.run(["python3", str(ROOT.parent / f"showcase/{runner[0]}/build.py")], capture_output=True)
             cmd = ["npx", "playwright", "test", "-g", test] if runner == [E2E] else ["npx", "vitest", "run", "-t", test]
             r = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True)
@@ -886,6 +1033,6 @@ for name, f, old, new, test, *extra in CASES:
         if not failed: bad.append(name)
     finally:
         p.write_text(src)
-        if runner in ([GM], [MM], [FB], [GF]):
+        if runner in ([GM], [MM], [FB], [GF], [BB], [HC]):
             subprocess.run(["python3", str(ROOT.parent / f"showcase/{runner[0]}/build.py")], capture_output=True)
 print("ALL SABOTAGES CAUGHT" if not bad else f"NOT CAUGHT: {bad}")

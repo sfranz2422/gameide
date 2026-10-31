@@ -291,6 +291,20 @@ code (the harness turns bytecode caching off for that reason), or a
 mistyped case name ran nothing and still reported success (the harness now
 refuses unknown names).
 
+**The showcase games' runners** (`GM`, `MM`, `FB`, `GF`, `BB`, `HC`) rebuild
+that game from the sabotaged source before its playtest and again after. A
+build that **refuses** (Greenside's course checks, Ridgeline Rally's stage
+checks) leaves the old `out/project.json`, and the test passes on it: a
+sabotage of something the build checks must break the game without breaking
+the build. Three of the games' playtests play through the keys with a bot
+written in Python inside the test: football (a whole game and a whole
+season, reloaded from its `save_set`), Moonshot (a Derby and a game) and
+Ridgeline Rally (a whole stage). Each game draws from the same numbers it
+plays by — football's teams are `LEAGUE` (other teams are the Comets
+repainted, `repaint` in its build), Moonshot's ballpark is painted from its
+rules' camera and fence, Ridgeline Rally's cars from `VEHICLES` — so change
+those numbers in the rules file only.
+
 Server tests are plain scripts, as in PyIDE: `backend/tests/test_server.py`
 prints ok/FAIL per check and exits non-zero. Browser tests use Playwright in
 two projects: `editor` (the build alone) and `account` (served by Flask with

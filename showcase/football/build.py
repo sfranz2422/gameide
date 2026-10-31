@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
 Builds the fourth showcase game, "Under the Lights", as a GameIDE project
-zip: an arcade American football game, 7 on 7, the Comets against the
-Badgers on a Friday night.
+zip: an arcade American football game, 7 on 7, on a Friday night: a quick
+game (the Comets against the Badgers) or a season in a league of six.
 
     python3 showcase/football/build.py              # → showcase/football/out/Football.zip
     python3 showcase/football/build.py --assets DIR # where the pictures are
@@ -17,10 +17,16 @@ Gemini's pictures are made pixels again exactly as Mystery Meat's are (its
 build.py does the cutting: magenta away, figures found by the gaps between
 them, shrunk, a small palette, feet lined up).
 
-The game is game/*.py: _1rules.py (the field, the teams, the playbook as
+Only the Comets and the Badgers have pictures of their own. The other four
+teams in the LEAGUE (_1rules.py) are the Comets repainted in their colours
+(`repaint`), and three poses no sheet has — a juke, a stiff-arm and a
+diving catch — are made from frames every team does have (`moves`).
+
+The game is game/*.py: _1rules.py (the field, the league, the playbook as
 data), _2play.py (one play, snap to whistle), _3match.py (downs, score,
-clock, the computer's coach), _4controls.py, _5screen.py (drawing),
-_6flow.py (between plays), and the objects Game, Player, Ball, Referee.
+kickoffs, the try, the clock, the computer's coaches), _4controls.py,
+_5screen.py (drawing), _6flow.py (between plays), _7season.py, and the
+objects Game, Player, Ball, Referee.
 """
 import argparse
 import importlib.util
@@ -89,6 +95,57 @@ def badgers(im):
                 continue
             px[x, y] = (int(nr * 255), int(ng * 255), int(nb * 255), a)
     return out
+
+
+def repaint(im, t):
+    """A Comets figure in another team's colours: the navy jersey turns the
+    team's colour and the gold helmet and pants its trim, each pixel keeping
+    its own shading (its brightness against the Comets' own). Skin,
+    outlines, socks and the face mask stay as they are."""
+    import colorsys
+    jh, js, jv = colorsys.rgb_to_hsv(*(c / 255 for c in rgb(t["color"])))
+    th, ts, tv = colorsys.rgb_to_hsv(*(c / 255 for c in rgb(t["trim"])))
+    out = im.copy()
+    px = out.load()
+    for y in range(out.height):
+        for x in range(out.width):
+            r, g, b, a = px[x, y]
+            if not a:
+                continue
+            h, s, v = colorsys.rgb_to_hsv(r / 255, g / 255, b / 255)
+            if 0.55 < h < 0.75 and s > 0.25 and v > 0.12:          # navy: jersey, helmet stripe
+                nr, ng, nb = colorsys.hsv_to_rgb(jh, js, min(1, v / 0.6 * max(jv, 0.3)))
+            elif 0.085 < h < 0.2 and s > 0.35:                      # gold, and its brown shading (skin is redder)
+                nr, ng, nb = colorsys.hsv_to_rgb(th, ts * min(1, s / 0.75), min(1, v / 0.9 * max(tv, 0.3)))
+            else:
+                continue
+            px[x, y] = (int(nr * 255), int(ng * 255), int(nb * 255), a)
+    return out
+
+
+def lean(im, degrees, size=None):
+    """A frame leaned about his feet (positive leans him back)."""
+    size = size or im.size
+    feet = (size[0] // 2, size[1] - 1)
+    return im.rotate(degrees, resample=Image.NEAREST, center=feet)
+
+
+def lay_out(im, degrees):
+    """A frame turned nearly flat — a dive — and set down with his lowest pixel on the ground."""
+    box = im.getbbox()
+    fig = im.crop(box).rotate(degrees, resample=Image.NEAREST, expand=True)
+    fig = fig.crop(fig.getbbox())
+    c = Image.new("RGBA", im.size, (0, 0, 0, 0))
+    c.paste(fig, ((im.width - fig.width) // 2 + 4, im.height - 1 - fig.height), fig)
+    return c
+
+
+def moves(carry, poses):
+    """Three poses no sheet has, made from ones every team has: a juke (a
+    carrying stride leaned back as he plants a foot to cut), a stiff-arm (the
+    arm-out pose after a throw, leaning into it) and a diving catch (reaching
+    up for the ball, laid out flat)."""
+    return [lean(carry[2], 14), lean(poses[3], -10), lay_out(poses[4], -72)]
 
 
 def rgb(hex_):
@@ -261,13 +318,8 @@ def field():
     d.rectangle((0, TOP - 8, ROOM_W, ROOM_H), fill=(22, 72, 34))                  # the grass beyond the lines
     for i, x in enumerate(range(GOAL_L, GOAL_R, 5 * YD)):                          # mowed stripes, 5 yards each
         d.rectangle((x, TOP, x + 5 * YD - 1, BOT), fill=(46, 128, 56) if i % 2 else (52, 140, 62))
-    for x0, team in ((END_L, "home"), (GOAL_R, "away")):                           # the end zones, striped
-        col = rgb(RULES["TEAMS"][team]["color"])
-        ez = Image.new("RGBA", (10 * YD, BOT - TOP + 1), col + (255,))
-        e = ImageDraw.Draw(ez)
-        for k in range(-ez.height, ez.width, 14):
-            e.line((k, ez.height, k + ez.height, 0), fill=tuple(min(255, v + 18) for v in col), width=4)
-        im.paste(ez, (x0, TOP))
+    for x0 in (END_L, GOAL_R):                                                      # the end zones (each team's
+        d.rectangle((x0, TOP, x0 + 10 * YD, BOT), fill=(40, 110, 50))              # colours go over them: end_zone)
     white = (245, 245, 240)
     d.rectangle((END_L, TOP, END_R, TOP + 1), fill=white)                         # sidelines
     d.rectangle((END_L, BOT - 1, END_R, BOT), fill=white)
@@ -285,14 +337,6 @@ def field():
         x = GOAL_L + yd * YD - len(n) * font.CELL_W
         draw_text(im, x, TOP + 12, n, white)
         draw_text(im, x, BOT - 34, n, white)
-    for x0, team in ((END_L, "home"), (GOAL_R, "away")):
-        t = RULES["TEAMS"][team]
-        name = t["name"]
-        draw_text(im, x0 + (10 * YD - len(name) * font.CELL_W * 2) // 2, MID - 10, name, rgb(t["trim"]))
-    cx = GOAL_L + 50 * YD                                                           # the Comets' badge at midfield
-    d.ellipse((cx - 16, MID - 12, cx + 16, MID + 12), fill=(43, 74, 168), outline=(242, 194, 48), width=2)
-    d.polygon([(cx - 26, MID - 6), (cx - 6, MID - 4), (cx - 6, MID + 4), (cx - 26, MID + 8)], fill=(242, 160, 40))
-    d.ellipse((cx - 8, MID - 7, cx + 8, MID + 7), fill=(242, 194, 48))
     gold = (250, 210, 40)
     for x in (END_L, END_R):                                                        # the goalposts
         d.line((x, MID, x, MID - 26), fill=gold, width=2)
@@ -300,6 +344,44 @@ def field():
         d.line((x, MID - 48, x, MID - 80), fill=gold, width=2)
         d.line((x, MID - 4, x, MID - 36), fill=gold, width=2)
     d.rectangle((0, BOT + 6, ROOM_W, ROOM_H), fill=(30, 34, 46))                  # the track
+    return im
+
+
+# Each team's end zone, drawn by the Game over the field's: inside the
+# lines (2 pixels in from the end line and the sidelines, 1 from the goal line).
+END_ZONE = (10 * YD - 3, BOT - TOP - 3)
+BADGE = (60, 28)
+
+
+def end_zone(t):
+    """A team's end zone: its colour, striped, its name across the middle in its trim."""
+    col = rgb(t["color"])
+    ez = Image.new("RGBA", END_ZONE, col + (255,))
+    e = ImageDraw.Draw(ez)
+    for k in range(-ez.height, ez.width, 14):
+        e.line((k, ez.height, k + ez.height, 0), fill=tuple(min(255, v + 18) for v in col), width=4)
+    name = t["name"]
+    trim = rgb(t["trim"])
+    if sum(trim) < 200:                         # a dark trim (the Rockets' navy) wouldn't read on the stripes
+        trim = (240, 240, 240)
+    draw_text(ez, (END_ZONE[0] - len(name) * font.CELL_W * 2) // 2, MID - 10 - (TOP + 2), name, trim)
+    return ez
+
+
+def badge(t):
+    """The home team's badge at midfield: the Comets' comet, or anyone else's initial on a disc."""
+    im = Image.new("RGBA", BADGE, (0, 0, 0, 0))
+    d = ImageDraw.Draw(im)
+    cx, cy = BADGE[0] // 2, BADGE[1] // 2
+    col, trim = rgb(t["color"]), rgb(t["trim"])
+    d.ellipse((cx - 16, cy - 12, cx + 16, cy + 12), fill=col, outline=trim, width=2)
+    if t["id"] == "comets":
+        d.polygon([(cx - 26, cy - 6), (cx - 6, cy - 4), (cx - 6, cy + 4), (cx - 26, cy + 8)], fill=(242, 160, 40))
+        d.ellipse((cx - 8, cy - 7, cx + 8, cy + 7), fill=trim)
+    else:
+        if sum(trim) < 200:
+            trim = (240, 240, 240)
+        draw_text(im, cx - font.CELL_W, cy - 10, t["name"][0], trim)
     return im
 
 
@@ -376,6 +458,46 @@ def fixed_canvas(frames, size):
     return out
 
 
+# ---------------------------------------------------------------- the crowd
+
+def crowd(seconds, vol, seed):
+    """A stadium murmur that loops without a seam: soft noise, low-passed,
+    swelling a little now and then, its end faded into its start."""
+    import math
+    import random
+    rate = _tw.RATE
+    r = random.Random(seed)
+    n = int(seconds * rate)
+    y1 = y2 = 0.0
+    out = []
+    for i in range(n):
+        y1 += 0.08 * (r.random() * 2 - 1 - y1)
+        y2 += 0.02 * (r.random() * 2 - 1 - y2)
+        swell = 0.75 + 0.25 * math.sin(i / n * 2 * math.pi * 3)    # whole waves, so the loop's ends meet
+        out.append((y1 * 1.6 + y2 * 3.0) * vol * swell)
+    fade = rate // 4
+    for i in range(fade):                       # cross-fade the end into the start
+        k = i / fade
+        out[i] = out[i] * k + out[n - fade + i] * (1 - k)
+    return out[: n - fade]
+
+
+def swell(seconds, vol, seed):
+    """The crowd on its feet: noise that rises fast and dies away slowly."""
+    import random
+    rate = _tw.RATE
+    r = random.Random(seed)
+    n = int(seconds * rate)
+    y = 0.0
+    out = []
+    for i in range(n):
+        t = i / n
+        y += 0.15 * (r.random() * 2 - 1 - y)
+        env = min(1, t / 0.12) * (1 - t) ** 1.2
+        out.append(y * 2.2 * vol * env)
+    return out
+
+
 def build(assets_dir, out):
     A = Path(assets_dir).expanduser()
     P = _mm.Adventure("Under the Lights")
@@ -384,8 +506,10 @@ def build(assets_dir, out):
     feet = (CANVAS[0] // 2, CANVAS[1] - 1)
 
     home_poses = None
-    for team in ("home", "away"):
+    sheets = {}                      # "comets"/"badgers" → {"run": frames, "ball": ..., "poses": ...}
+    for team, tid in (("home", "comets"), ("away", "badgers")):
         run, carry, poses = stand_in_players(team)
+        sheets[tid] = {}
         for key, stand in ((f"p-{team}-run", run), (f"p-{team}-ball", carry), (f"p-{team}-poses", poses)):
             real = cut(A, key, HEIGHTS["player"], len(stand), each=key.endswith(("-run", "-ball")),
                        ref=1 if key.endswith("-poses") else None)
@@ -396,8 +520,14 @@ def build(assets_dir, out):
                 for i in fill:
                     real[i] = badgers(home_poses[i])
             made.append(key if real else None)
-            frames = fixed_canvas(real, CANVAS) if real else stand
-            P.sprite(f"{team}_{key.split('-')[2]}", frames, feet)
+            sheets[tid][key.split("-")[2]] = fixed_canvas(real, CANVAS) if real else stand
+    for t in RULES["LEAGUE"]:
+        own = sheets.get(t["id"]) or {k: [repaint(f, t) for f in v] for k, v in sheets["comets"].items()}
+        for kind in ("run", "ball", "poses"):
+            P.sprite(f"{t['id']}_{kind}", own[kind], feet)
+        P.sprite(f"{t['id']}_moves", moves(own["ball"], own["poses"]), feet)
+        P.sprite(f"endzone_{t['id']}", [end_zone(t)], (0, 0))
+        P.sprite(f"badge_{t['id']}", [badge(t)], (BADGE[0] // 2, BADGE[1] // 2))
 
     ref = cut(A, "p-referee", HEIGHTS["referee"], 5)
     made.append("p-referee" if ref else None)
@@ -458,6 +588,12 @@ def build(assets_dir, out):
     P.sound("tackle", mix(lowpass(tone(0.25, 0, 0, "noise", 0.8, seed=44), 0.15, 0.03), tone(0.2, 90, 45, "sine", 0.5)))
     P.sound("spin", tone(0.2, 300, 900, "tri", 0.2))
     P.sound("dive", lowpass(tone(0.15, 0, 0, "noise", 0.4, seed=45), 0.4, 0.1))
+    P.sound("juke", lowpass(tone(0.18, 0, 0, "noise", 0.45, seed=48), 0.6, 0.15))
+    P.sound("stiff", mix(lowpass(tone(0.16, 0, 0, "noise", 0.6, seed=49), 0.2, 0.05), tone(0.14, 130, 70, "square", 0.25)))
+    P.sound("coin", join(tone(0.08, 1568, 1568, "sine", 0.25), tone(0.4, 2093, 2093, "sine", 0.25)))
+    P.sound("horn", mix(tone(0.9, 233, 228, "square", 0.18), tone(0.9, 294, 290, "square", 0.14)))
+    P.sound("crowd", crowd(4.0, 0.22, seed=50), volume=0.6)
+    P.sound("roar", swell(2.2, 0.75, seed=51))
     P.sound("cheer", mix(lowpass(tone(1.8, 0, 0, "noise", 0.6, seed=46), 0.35, 0.2),
                          lowpass(tone(1.8, 0, 0, "noise", 0.4, seed=47), 0.08, 0.05)))
     # A fight song for the band in the stands: brassy, on the beat.

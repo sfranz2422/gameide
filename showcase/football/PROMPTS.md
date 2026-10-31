@@ -81,6 +81,25 @@ The away team, the **Badgers**: attach each home sheet in turn.
 | `win` | 16:9 | Navy-and-gold football players lifting a teammate onto their shoulders on the field at night, confetti falling, the floodlights behind them. |
 | `lose` | 16:9 | A navy-and-gold football player sitting alone on the bench at night, helmet in his hands, the empty stadium lights still on behind him, rain falling. |
 
+## The other four teams, and three poses: made by the build, no pictures needed
+
+The league has six teams (`LEAGUE` in `game/_1rules.py`). Only the Comets
+and the Badgers have sheets of their own; the **Gators, Storm, Rockets and
+Pirates** are the Comets' three sheets repainted by the build in their
+colours (`repaint` in build.py: the navy turns the team's colour and the gold
+its trim, keeping every pixel's shading). Change a team's colours in the
+rules and rebuild.
+
+Three poses no sheet has are made from frames every team has (`moves`):
+
+| Pose | Made from |
+|---|---|
+| juke | the 3rd frame of `p-*-ball`, leaned back 14° about his feet, planting to cut |
+| stiff-arm | pose 4 of `p-*-poses` (arm forward after a throw), leaning into it |
+| diving catch | pose 5 of `p-*-poses` (both arms up to catch), turned flat |
+
+No new pictures are needed for any of this.
+
 ## When they're in
 
 Tell me, and the build cuts and shrinks them to the game's real size (a

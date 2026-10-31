@@ -13,9 +13,13 @@ self.spin = 0
 self.depth = -int(self.y) - 2
 
 # === draw
-car = PLAY.get("carrier")
-in_air = PLAY.get("ball") in ("air", "kick")
-if car is not None and car.sprite.endswith("_ball"):
+if REPLAY["on"]:
+    in_air, hidden = REPLAY["ball"] or (False, True)
+else:
+    car = PLAY.get("carrier")
+    in_air = PLAY.get("ball") in ("air", "kick")
+    hidden = ball_tucked(car)
+if hidden:
     return                       # the runner's own picture has the ball tucked in
 if in_air:
     self.spin += 1
@@ -24,6 +28,7 @@ if in_air:
     draw_ellipse(self.x - 4, self.y - 1, self.x + 4, self.y + 1)
     draw_set_alpha(1)
 frame = (self.spin // 3) % 4 if in_air else 0
-if PLAY.get("kick") is not None and not in_air:
+on_tee = PLAY.get("kick") is not None or (PLAY.get("play", {}).get("kind") == "kickoff" and not PLAY.get("snapped"))
+if on_tee and not in_air and not REPLAY["on"]:
     frame = 4
 draw_sprite("ball", frame, self.x, self.y - self.z)

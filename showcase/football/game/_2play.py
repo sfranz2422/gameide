@@ -9,6 +9,7 @@ import random
 PLAYERS = []        # all fourteen, made once by the Game
 PLAY = {}           # the play being run (line_up fills it)
 BALL = []           # [the Ball instance]
+ANNOUNCE = {"text": "", "t": 0}     # what the announcer just said, and how long it stays up
 
 
 def team_of(team):
@@ -27,26 +28,49 @@ def fwd(team):
     return TEAMS[team]["dir"]
 
 
+def ball_tucked(car):
+    """True when the carrier's own picture has the ball in it (running with
+    it, or the juke made from that), so the Ball isn't drawn twice."""
+    if car is None:
+        return False
+    look = str(car.sprite)
+    return look.endswith("_ball") or (look.endswith("_moves") and car.image_index == 0)
+
+
+def announce(key):
+    """The announcer's caption for a big moment (the words are CALLS, in rules)."""
+    ANNOUNCE["text"], ANNOUNCE["t"] = CALLS[key], 110
+    PLAY.setdefault("called", []).append(key)
+
+
 # ---------------------------------------------------------------- lining up
 
-def line_up(off, deff, call, dcall, los, ball_y):
-    """Everyone to their place for a play, and PLAY made ready for the snap."""
+def line_up(off, deff, call, dcall, los, ball_y, play=None):
+    """Everyone to their place for a play, and PLAY made ready for the snap.
+    call and dcall are the plays' places in OFFENSE and DEFENSE; a kickoff
+    passes play=KICKOFF instead, with off the team that will catch it."""
     PLAY.clear()
-    PLAY.update(t=0, off=off, deff=deff, call=call, dcall=dcall, los=los, ball_y=ball_y, snapped=False,
-                carrier=None, ball="held", thrown=False, handed=False, scramble=False, result=None,
-                target=None, flight=None, kick=None, spun=False)
+    REPLAY["frames"] = []                        # the replay only ever shows this play
+    play = play or OFFENSE[call]
+    kickoff = play["kind"] == "kickoff"
+    PLAY.update(t=0, off=off, deff=deff, call=call, dcall=dcall, play=play, los=los, ball_y=ball_y,
+                snapped=False, carrier=None, ball="held", thrown=False, handed=False, scramble=False,
+                result=None, target=None, flight=None, kick=None, moves=[], second_done=False,
+                diver=None, onside=False, caught_x=None, called=[], faking=False)
     d = fwd(off)
-    play, dplay = OFFENSE[call], DEFENSE[dcall]
+    dplay = {"jobs": {}} if kickoff else DEFENSE[dcall]
+    spots = KICKOFF_LINEUP if kickoff else LINEUP
     for team, roles, sign in ((off, OFFENSE_ROLES, -1), (deff, DEFENSE_ROLES, 1)):
         for p in team_of(team):
             p.role = roles[p.num]
             p.kind = kind_of(p.role)
-            back, across = LINEUP[p.role]
+            back, across = spots[p.role]
             p.x, p.y = los + sign * d * back, clamp(ball_y + across, TOP + 8, BOT - 8)
             p.home_x, p.home_y = p.x, p.y
             p.vx = p.vy = 0
             p.face = d if team == off else -d
-            p.down_t = p.dive_t = p.catch_t = p.throw_t = p.spin_t = p.shed = p.hold_t = p.stumble = 0
+            p.down_t = p.dive_t = p.catch_t = p.throw_t = p.move_t = p.shed = p.hold_t = p.stumble = 0
+            p.move = None
             p.held_by = p.blocking = None
             p.cheer = False
             p.pace = random.uniform(0.95, 1.05)      # no two plays quite the same
@@ -58,24 +82,29 @@ def line_up(off, deff, call, dcall, los, ball_y):
                 if p.route and p.role != "QB":
                     p.job = "route"
             p.human = None
-    qb = by_role(off, "QB")
-    PLAY["carrier"] = qb
     ball = BALL[0]
     ball.x, ball.y, ball.z = los, ball_y, 0
+    if kickoff:
+        PLAY["target"] = by_role(off, "RB")       # the returner
+    else:
+        PLAY["carrier"] = by_role(off, "QB")
     pick_humans()
 
 
 def pick_humans():
     """Who each person playing controls: the quarterback on a pass, the
-    runner on a run (once he has the ball), a linebacker on defence."""
+    runner on a run (once he has the ball), the returner on a kickoff, a
+    linebacker on defence."""
     for p in PLAYERS:
         p.human = None
     off, deff = PLAY["off"], PLAY["deff"]
     c = MATCH["humans"].get(off)
     if c is not None:
         car = PLAY["carrier"]
-        if car is not None and (car.role != "QB" or OFFENSE[PLAY["call"]]["kind"] == "pass"):
+        if car is not None and (PLAY["handed"] or (car.role != "QB" or OFFENSE[PLAY["call"]]["kind"] == "pass")):
             car.human = c
+        elif car is None and PLAY["play"]["kind"] == "kickoff":
+            PLAY["target"].human = c
     c = MATCH["humans"].get(deff)
     if c is not None:
         mine = MATCH.get("picked", {}).get(deff)
@@ -99,16 +128,32 @@ def switch_defender(team):
 
 # ---------------------------------------------------------------- the snap
 
-def snap():
+def snap(onside=False):
     PLAY["snapped"] = True
-    kind = OFFENSE[PLAY["call"]]["kind"]
+    kind = PLAY["play"]["kind"]
     sound_play("hike", volume=0.7)
     if kind == "punt":
         kick_ball(PLAY["los"] + fwd(PLAY["off"]) * PUNT_YARDS * YD, PLAY["ball_y"], 70, 70)
     elif kind == "kick":
         yards = round(to_goal(PLAY["off"], PLAY["los"])) + 17     # the posts are 10 back, the holder 7
-        PLAY["kick"] = {"yards": yards, "allowed": clamp(0.95 - 0.013 * yards, 0.15, 0.8), "phase": 0,
+        allowed = clamp(0.95 - 0.013 * yards, 0.15, 0.8)
+        if MATCH.get("try"):
+            allowed = max(allowed, PAT_ALLOWED)
+        PLAY["kick"] = {"yards": yards, "allowed": allowed, "phase": 0,
                         "wait": choose([0.05, 0.3, 0.5, 0.75]), "good": None}
+    elif kind == "kickoff":
+        # The ball goes back toward the receiving team's own goal.
+        back = -fwd(PLAY["off"])
+        if onside:
+            yards = random.uniform(*ONSIDE_YARDS)
+            PLAY["onside"] = True
+            kick_ball(PLAY["los"] + back * yards * YD, PLAY["ball_y"] + choose([-1, 1]) * random.uniform(20, 60), 34, 8)
+            announce("onside")
+        else:
+            yards = random.uniform(*KICKOFF_YARDS)
+            kick_ball(PLAY["los"] + back * yards * YD, MID + random.uniform(-50, 50), KICKOFF_HANG, 90)
+    elif PLAY["play"].get("fake"):
+        PLAY["faking"] = True
 
 
 def kick_step():
@@ -142,15 +187,21 @@ def holding_to_throw():
     """True while the quarterback still has the ball behind the line on a pass play."""
     car = PLAY["carrier"]
     return (car is not None and car.role == "QB" and car.team == PLAY["off"] and not PLAY["thrown"]
-            and not PLAY["scramble"] and OFFENSE[PLAY["call"]]["kind"] == "pass")
+            and not PLAY["scramble"] and PLAY["play"]["kind"] == "pass")
 
 
 def receivers():
-    """The players a pass can go to, in the order of their numbers on screen."""
+    """The players a pass can go to: the play's targets first (receivers 1,
+    2 and 3 on screen), then any other receiver, and the back while he's
+    still running a route."""
     off = PLAY["off"]
-    out = [by_role(off, r) for r in ("WR1", "WR2", "WR3")]
+    out = [by_role(off, r) for r in PLAY["play"].get("targets", ["WR1", "WR2", "WR3"])]
+    for r in ("WR1", "WR2", "WR3"):
+        p = by_role(off, r)
+        if p not in out:
+            out.append(p)
     rb = by_role(off, "RB")
-    if rb.route:
+    if rb.route and rb not in out:
         out.append(rb)
     return out
 
@@ -179,9 +230,10 @@ def throw_to(r):
         tx, ty = where_after(r, t)
         t = point_distance(qb.x, qb.y, tx, ty) / PASS_SPEED
     if not PLAY.get("toss"):
-        # Nobody throws perfectly: further, and with a defender in his face, is wilder.
+        # Nobody throws perfectly: further, and with a defender in his face, is
+        # wilder. A strong arm (the team's "arm") is truer.
         rushed = any(dist(qb, d) < 24 for d in team_of(PLAY["deff"]) if d.held_by is None)
-        miss = point_distance(qb.x, qb.y, tx, ty) * THROW_ERROR + (10 if rushed else 0)
+        miss = point_distance(qb.x, qb.y, tx, ty) * THROW_ERROR / TEAMS[qb.team]["arm"] + (10 if rushed else 0)
         a = random.uniform(0, 6.283)
         k = random.uniform(0, 1) ** 0.5 * miss
         tx, ty = tx + math.cos(a) * k, ty + math.sin(a) * k
@@ -196,34 +248,46 @@ def throw_to(r):
     sound_play("throw", volume=0.6)
 
 
+def lateral(p):
+    """A pitch or a lateral to p: tossed, so never wild."""
+    PLAY["toss"] = True
+    PLAY["second_done"] = True
+    throw_to(p)
+
+
 # ---------------------------------------------------------------- every step
 
 def live_step():
     """One step of a play that has been snapped."""
     PLAY["t"] += 1
-    if PLAY["ball"] == "kick":
+    play = PLAY["play"]
+    if PLAY["ball"] == "kick" and play["kind"] != "kickoff":
         fly()                    # a punt or a field goal: everyone watches the ball
         return
     if PLAY["kick"] is not None:
         return                   # the kicker is lining up (the Game runs the meter)
     off = PLAY["off"]
-    run = OFFENSE[PLAY["call"]]
     car = PLAY["carrier"]
     # A run: the quarterback hands off (or tosses) to the runner.
-    if run["kind"] == "run" and not PLAY["handed"] and car is not None and car.role == "QB":
-        rb = by_role(off, run["carrier"])
-        if run.get("toss") and PLAY["t"] >= 4:
+    if play["kind"] == "run" and not PLAY["handed"] and car is not None and car.role == "QB":
+        rb = by_role(off, play["carrier"])
+        if play.get("toss") and PLAY["t"] >= 4:
             PLAY["toss"] = True
             throw_to(rb)
-        elif not run.get("toss") and (dist(car, rb) < 12 or PLAY["t"] >= 30):
+        elif not play.get("toss") and (dist(car, rb) < 12 or PLAY["t"] >= 30):
             give(rb)
         PLAY["handed"] = PLAY["handed"] or PLAY.get("toss", False)
+    second_ball_handler()
+    if PLAY["t"] >= 30:
+        PLAY["faking"] = False
     car = PLAY["carrier"]
     # The quarterback past the line can't throw any more: he's a runner now.
     if holding_to_throw() and (car.x - PLAY["los"]) * fwd(off) > 2:
         PLAY["scramble"] = True
     if holding_to_throw() and MATCH["humans"].get(off) is None:
         cpu_throw(car)
+    if PLAY["ball"] == "air" and not PLAY.get("toss") and MATCH["humans"].get(off) is None:
+        cpu_dive()
     for p in PLAYERS:
         think(p)
     for p in PLAYERS:
@@ -237,6 +301,31 @@ def live_step():
         check_tackle()
     if PLAY["result"] is None:
         check_lines()
+    if PLAY["result"] is None:
+        call_the_run()
+
+
+def second_ball_handler():
+    """An option's pitch and a reverse's handoff: the ball goes on from the
+    carrier to a second man."""
+    play, car = PLAY["play"], PLAY["carrier"]
+    second = play.get("pitch") or play.get("reverse")
+    if not second or PLAY["second_done"] or car is None or not PLAY["handed"] or car.role != play["carrier"]:
+        return
+    man = by_role(PLAY["off"], second)
+    if play.get("pitch"):
+        # The computer's quarterback pitches it as a tackler closes in (yours: the first button).
+        if car.human is None and any(dist(car, d) < 26 for d in team_of(PLAY["deff"])
+                                     if d.down_t == 0 and d.held_by is None):
+            lateral(man)
+            announce("pitch")
+    elif dist(car, man) < 14:
+        give(man)
+        PLAY["second_done"] = True
+        announce("reverse")
+    elif PLAY["t"] >= 60:
+        lateral(man)
+        announce("reverse")
 
 
 def give(p):
@@ -271,8 +360,10 @@ def think(p):
         p.catch_t -= 1
     if p.throw_t > 0:
         p.throw_t -= 1
-    if p.spin_t > 0:
-        p.spin_t -= 1
+    if p.move_t > 0:
+        p.move_t -= 1
+        if p.move_t == 0:
+            p.move = None
     if p.human is not None:
         p.wx, p.wy = pad_axis(p.human)
         return
@@ -301,17 +392,27 @@ def runner_free():
     return not (car.role == "QB" and not PLAY["handed"] and not PLAY["scramble"])
 
 
+def second_man(p):
+    """True for an option's pitch man or a reverse's receiver, until he has had his chance."""
+    play = PLAY["play"]
+    return p.role == (play.get("pitch") or play.get("reverse")) and not PLAY["second_done"]
+
+
 def think_offense(p):
     car = PLAY["carrier"]
     if p is car:
-        if p.role == "QB" and OFFENSE[PLAY["call"]]["kind"] == "pass" and not PLAY["scramble"]:
+        if p.role == "QB" and PLAY["play"]["kind"] == "pass" and not PLAY["scramble"]:
             follow_route(p)
         elif p.role == "QB" and not PLAY["handed"]:
             follow_route(p)
         else:
             cpu_run(p)
         return
-    if p.route and (p.job == "route" or p.role == "QB") and not (runner_free() and p.role != "QB"):
+    if car is None and p is PLAY["target"] and PLAY["ball"] == "kick":
+        f = PLAY["flight"]                      # the returner gets under the kick
+        p.wx, p.wy = toward(p, f["x1"], f["y1"])
+        return
+    if p.route and (p.job == "route" or p.role == "QB") and not (runner_free() and p.role != "QB" and not second_man(p)):
         follow_route(p)
         return
     if p.role == "QB":
@@ -335,7 +436,7 @@ def block(p):
         return
     if p.job == "settle" and not runner_free():
         return
-    car = PLAY["carrier"] or by_role(PLAY["off"], "QB")
+    car = PLAY["carrier"] or PLAY["target"] or by_role(PLAY["off"], "QB")
     foes = [d for d in team_of(PLAY["deff"]) if d.down_t == 0 and d.held_by is None and d.shed == 0
             and point_distance(p.x, p.y, d.x, d.y) < 90]
     if not foes:
@@ -357,6 +458,11 @@ def think_defense(p):
         if p.kind != "DL" and f["t"] > 10 and point_distance(p.x, p.y, r.x, r.y) < 60:
             p.wx, p.wy = toward(p, r.x, r.y)
             return
+    if PLAY["faking"] and p.kind in ("LB", "S"):
+        # Play-action: the linebackers and the safety bite on the fake handoff.
+        who = by_role(off, PLAY["play"]["fake"])
+        p.wx, p.wy = toward(p, who.x, who.y)
+        return
     if car is not None and runner_free() and car.team == off:
         pursue(p, car)
         return
@@ -393,12 +499,14 @@ def pursue(p, car):
 
 def cpu_run(p):
     """The computer's ball carrier: through the hole the play was drawn for,
-    then for the goal, swerving from tacklers in front of him and the sidelines."""
+    then for the goal, swerving from tacklers in front of him and the
+    sidelines, and trying a move when one closes in."""
     ahead = (p.x - PLAY["los"]) * fwd(p.team)
     if p.route and ahead < 16 and p.catch_t == 0:
         follow_route(p)
         return
     gx, gy = fwd(p.team), 0
+    close = False
     for d in team_of(other(p.team)):
         if d.down_t or d.held_by is not None:
             continue
@@ -408,6 +516,11 @@ def cpu_run(p):
             push = (50 - r) / 50
             gx += (p.x - d.x) / r * push * 0.6
             gy += (p.y - d.y) / r * push * 1.4
+            close = close or r < 20
+    if close and p.move is None and random.random() < CPU_MOVE_CHANCE:
+        left = [m for m in MOVES if m not in PLAY["moves"]]
+        if left:
+            do_move(p, choose(left))
     if p.y < TOP + 24:
         gy += (TOP + 24 - p.y) / 24
     if p.y > BOT - 24:
@@ -417,14 +530,38 @@ def cpu_run(p):
     p.wx, p.wy = gx / n, gy / n
 
 
+def do_move(p, name):
+    """The ball carrier's spin, juke or stiff-arm: each once a play. True if he did it."""
+    if name in PLAY["moves"] or p.move is not None or p.catch_t > 0 or p is not PLAY["carrier"]:
+        return False
+    m = MOVES[name]
+    PLAY["moves"].append(name)
+    p.move, p.move_t = name, m["steps"]
+    if name == "juke":
+        # Cut the way the stick points, or away from the nearest tackler.
+        ay = pad_axis(p.human)[1] if p.human is not None else 0
+        if ay == 0:
+            foes = [d for d in team_of(other(p.team)) if d.down_t == 0]
+            near = min(foes, key=lambda d: dist(p, d)) if foes else None
+            ay = 1 if near is None or near.y < p.y else -1
+        p.vy = (1 if ay > 0 else -1) * m["cut"]
+    sound_play(name, volume=0.6)
+    return True
+
+
 def openness(r):
     return min(point_distance(r.x, r.y, d.x, d.y) for d in team_of(PLAY["deff"]) if d.kind != "DL")
 
 
 def cpu_throw(qb):
-    """The computer's quarterback: the open man furthest downfield, before the rush arrives."""
+    """The computer's quarterback: the play's first look if he's open, else
+    the open man furthest downfield, before the rush arrives."""
     t = PLAY["t"]
     if t < 24:
+        return
+    look = PLAY["play"].get("look")
+    if look and t >= 26 and openness(by_role(PLAY["off"], look)) >= 12:
+        throw_to(by_role(PLAY["off"], look))
         return
     worth = lambda r: min(openness(r), 40) + 0.2 * (r.x - PLAY["los"]) * fwd(PLAY["off"])
     best = max(receivers(), key=worth)
@@ -433,16 +570,39 @@ def cpu_throw(qb):
         throw_to(best)
 
 
+def dive_for_it(r):
+    """The receiver the ball is going to lays out for it."""
+    f = PLAY["flight"]
+    if r.dive_t or r.down_t or PLAY["diver"] is not None:
+        return
+    dx, dy = f["x1"] - r.x, f["y1"] - r.y
+    n = max(0.01, (dx * dx + dy * dy) ** 0.5)
+    r.dive_x, r.dive_y, r.dive_t = dx / n, dy / n, DIVE_STEPS
+    r.face = 1 if dx > 0 else -1
+    PLAY["diver"] = r
+    sound_play("dive", volume=0.5)
+
+
+def cpu_dive():
+    """The computer's receiver dives when the ball is coming down just out of his reach."""
+    f, r = PLAY["flight"], PLAY["target"]
+    if f["steps"] - f["t"] != 8 or r.team != PLAY["off"]:
+        return
+    ahead = point_distance(r.x, r.y, f["x1"], f["y1"]) - SPEED[r.kind] * 8
+    if CATCH_REACH * 0.8 < ahead < DIVE_REACH + 10:
+        dive_for_it(r)
+
+
 def move(p):
-    s = SPEED[p.kind] * p.pace
+    s = SPEED[p.kind] * p.pace * TEAMS[p.team]["speed"]
     if p.human is not None:
         s += 0.06
     if p is PLAY["carrier"]:
         s *= CARRY_PACE
     if p.held_by is not None:
         s *= 0.15
-    if p.spin_t > 0:
-        s *= 0.7
+    if p.move is not None:
+        s *= MOVES[p.move]["pace"]
     if p.stumble > 0:
         p.stumble -= 1
         s *= 0.6
@@ -499,43 +659,84 @@ def fly():
 
 
 def pass_arrives():
-    """The ball comes down: caught, intercepted, knocked away, or on the grass."""
+    """The ball comes down: caught, intercepted, knocked away, caught on a
+    dive, or on the grass."""
     ball = BALL[0]
+    diver = PLAY["diver"]
+    # A receiver who dove is still in the air, or has only just landed, as it
+    # comes down: if he gets it, it's caught on the grass (below), never on his feet.
+    laid_out = diver is not None and (diver.dive_t > 0 or diver.down_t > 20)
+    vd = point_distance(diver.x, diver.y, ball.x, ball.y) if laid_out else 999
     near = lambda team, kinds: [p for p in team_of(team) if p.kind in kinds and p.down_t == 0]
-    catchers = sorted(near(PLAY["off"], ("WR", "RB")), key=lambda p: point_distance(p.x, p.y, ball.x, ball.y))
+    catchers = sorted([p for p in near(PLAY["off"], ("WR", "RB")) if not (laid_out and p is diver)],
+                      key=lambda p: point_distance(p.x, p.y, ball.x, ball.y))
     hawks = sorted(near(PLAY["deff"], ("LB", "CB", "S")), key=lambda p: point_distance(p.x, p.y, ball.x, ball.y))
     rd = point_distance(catchers[0].x, catchers[0].y, ball.x, ball.y) if catchers else 999
     dd = point_distance(hawks[0].x, hawks[0].y, ball.x, ball.y) if hawks else 999
-    if dd < 14 and dd < rd - 2:
+    if dd < 14 and dd < min(rd, vd) - 2:
         if dd < 6:
             p = hawks[0]
             p.catch_t = 10
+            announce("pick")
             end_play("interception", p.x, p.y, p)
         else:
             end_play("broken up", ball.x, ball.y)
-    elif rd < 18 and dd < 18 and random.random() < 0.4:
+    elif min(rd, vd) < 18 and dd < 18 and random.random() < 0.4:
         end_play("broken up", ball.x, ball.y)       # a defender right there gets a hand to it
-    elif rd < 18:
+    elif rd < CATCH_REACH and rd <= vd:
         p = catchers[0]
         p.catch_t = 10
         give(p)
         sound_play("catch", volume=0.6)
+    elif vd < DIVE_REACH and random.random() < DIVE_CATCH:
+        # Caught at full stretch: he's on the grass with it, and that's where the play ends.
+        PLAY["carrier"] = diver
+        diver.down_t, diver.dive_t = 999, 0
+        PLAY["dove_catch"] = True
+        announce("dive")
+        sound_play("catch", volume=0.6)
+        sound_play("roar", volume=0.6)
+        end_play("tackle", diver.x, diver.y)
     else:
         end_play("incomplete", ball.x, ball.y)
 
 
 def kick_landed():
-    kind = OFFENSE[PLAY["call"]]["kind"]
+    kind = PLAY["play"]["kind"]
     ball = BALL[0]
     if kind == "punt":
         end_play("punt", ball.x, ball.y)
+    elif kind == "kickoff":
+        kickoff_lands(ball.x, ball.y)
     else:
         end_play("field goal" if PLAY["kick"]["good"] else "missed kick", ball.x, ball.y)
 
 
+def kickoff_lands(x, y):
+    """A kickoff comes down: into the end zone is a touchback; an onside kick
+    is scrambled for; anything else the nearest of the receiving team fields
+    and runs back."""
+    rec = PLAY["off"]
+    in_end_zone = (fwd(rec) > 0 and x < GOAL_L) or (fwd(rec) < 0 and x > GOAL_R)
+    if PLAY["onside"]:
+        team = PLAY["deff"] if random.random() < ONSIDE_RECOVER else rec
+        end_play("recovered", x, y, team=team)
+    elif in_end_zone:
+        end_play("touchback", x, y)
+    else:
+        free = [p for p in team_of(rec) if p.down_t == 0]
+        p = min(free, key=lambda p: point_distance(p.x, p.y, x, y))
+        p.x, p.y = approach(p.x, x, CATCH_REACH), approach(p.y, y, CATCH_REACH)
+        p.catch_t = 10
+        PLAY["caught_x"] = x
+        give(p)
+        announce("return")
+        sound_play("catch", volume=0.6)
+
+
 def check_tackle():
     car = PLAY["carrier"]
-    if car is None or car.spin_t > 0:
+    if car is None:
         return
     for d in team_of(other(car.team)):
         if d.down_t or d.held_by is not None:
@@ -546,16 +747,29 @@ def check_tackle():
         sure = TACKLE_CHANCE["dive"] if d.dive_t > 0 else TACKLE_CHANCE[d.kind]
         if holding_to_throw():
             sure = TACKLE_CHANCE["QB"]
+        sure = min(0.97, sure * TEAMS[d.team]["tackle"])
+        if car.move is not None and random.random() < MOVES[car.move]["break"]:
+            # His move beats the tackle: the tackler is left on the grass.
+            d.down_t, d.dive_t = MOVES[car.move]["floors"], 0
+            if car.move not in PLAY["called"]:
+                announce(car.move)
+                sound_play("roar", volume=0.5)
+            continue
         if random.random() > sure:
             d.down_t, d.dive_t = 30, 0           # he missed, and stumbles to the grass
             car.stumble = 10
             sound_play("dive", volume=0.4)
             continue
         car.down_t = 999
+        dove = d.dive_t > 0
         d.down_t = 999 if d.dive_t else 0        # a diving tackle ends on the grass too
         d.dive_t = 0
         sound_play("tackle", volume=0.8)
         camera_shake(2, 8)
+        if holding_to_throw():
+            announce("sack")
+        elif dove:
+            announce("hit")
         end_play("sack" if holding_to_throw() else "tackle", car.x, car.y, d)
         return
 
@@ -572,8 +786,25 @@ def check_lines():
         end_play("out", car.x, clamp(car.y, TOP, BOT))
 
 
-def end_play(how, x, y, who=None):
-    PLAY["result"] = {"how": how, "x": x, "y": y, "who": who, "team": PLAY["carrier"].team if PLAY["carrier"] else None}
+def call_the_run():
+    """The announcer, when a runner breaks into the open."""
+    car = PLAY["carrier"]
+    if car is None or not runner_free() or car.team != PLAY["off"]:
+        return
+    returning = PLAY["caught_x"] is not None
+    start = PLAY["caught_x"] if returning else PLAY["los"]
+    if (car.x - start) * fwd(car.team) > (LOOSE_RETURN if returning else LOOSE_YARDS) * YD and "loose" not in PLAY["called"]:
+        announce("loose")
+        sound_play("roar", volume=0.5)
+    elif to_goal(car.team, car.x) < 25 and "loose" in PLAY["called"] and "gone" not in PLAY["called"]:
+        if all(dist(car, d) > 40 for d in team_of(other(car.team)) if d.down_t == 0):
+            announce("gone")
+
+
+def end_play(how, x, y, who=None, team=None):
+    team = team or (PLAY["carrier"].team if PLAY["carrier"] else None)
+    PLAY["result"] = {"how": how, "x": x, "y": y, "who": who, "team": team, "kind": PLAY["play"]["kind"],
+                      "from": PLAY["caught_x"]}
     for p in PLAYERS:
         p.vx = p.vy = 0
         p.wx = p.wy = 0
@@ -584,10 +815,11 @@ def end_play(how, x, y, who=None):
 # ---------------------------------------------------------------- what the people playing press
 
 def human_buttons():
-    """Throws, spins, dives and switching player, for whoever is playing."""
+    """Throws, pitches, moves, dives and switching player, for whoever is playing."""
     off, deff = PLAY["off"], PLAY["deff"]
     c = MATCH["humans"].get(off)
     car = PLAY["carrier"]
+    play = PLAY["play"]
     if c is not None and PLAY["kick"] is None:
         if holding_to_throw():
             rs = receivers()
@@ -595,9 +827,17 @@ def human_buttons():
                 if button_pressed(c, i):
                     throw_to(r)
                     break
-        elif car is not None and car.human == c and button_pressed(c, 0) and not PLAY["spun"] and car.catch_t == 0:
-            car.spin_t, PLAY["spun"] = 24, True
-            sound_play("spin", volume=0.5)
+        elif PLAY["ball"] == "air" and not PLAY.get("toss") and button_pressed(c, 0):
+            dive_for_it(PLAY["target"])
+        elif (car is not None and car.human == c and play.get("pitch") and car.role == play["carrier"]
+              and not PLAY["second_done"] and button_pressed(c, 0)):
+            lateral(by_role(off, play["pitch"]))
+            announce("pitch")
+        elif car is not None and car.human == c:
+            for name, m in MOVES.items():
+                if button_pressed(c, m["button"]):
+                    do_move(car, name)
+                    break
     c = MATCH["humans"].get(deff)
     if c is not None and PLAY["kick"] is None:
         mine = next((p for p in team_of(deff) if p.human == c), None)
