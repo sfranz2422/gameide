@@ -629,12 +629,14 @@ check("Sync roster drops a student who left", [s["email"] for s in teacher.get(f
 put(teacher, "lvl2", project("lvl2", "Maze"), 0)
 C = teacher.post(f"/api/classes/{CR}/assignments", json={"title": "Maze", "project": "lvl2"}).get_json()["slug"]
 check("posting needs points first", teacher.post(f"/api/assignments/{C}/classroom/post").status_code == 400)
-teacher.post(f"/api/assignments/{C}", json={"outOf": 20, "dueAt": "2031-01-01T04:59"})
+# Due in the past on purpose: last week's work is posted to send its grades,
+# and refusing a past date locked the teacher out.
+teacher.post(f"/api/assignments/{C}", json={"outOf": 20, "dueAt": "2020-01-01T04:59"})
 r = teacher.post(f"/api/assignments/{C}/classroom/post", json={"draft": False})
 made = [c for c in calls if c[0] == "POST" and c[1].endswith("/courseWork")]
 check("posting makes Classroom coursework with the assignment's link, points and due date", r.status_code == 200
       and made[-1][2]["materials"][0]["link"]["url"].endswith("/a/" + C) and made[-1][2]["maxPoints"] == 20
-      and made[-1][2].get("dueDate") == {"year": 2031, "month": 1, "day": 1}, r.get_json())
+      and made[-1][2].get("dueDate") == {"year": 2020, "month": 1, "day": 1}, r.get_json())
 check("…in the class's own course", made[-1][1].endswith("/courses/555/courseWork"))
 dana.post(f"/api/assignments/{C}/start")
 teacher.post(f"/api/assignments/{C}/score", json={"student": dana.get("/api/me").get_json()["user"]["id"], "score": 18})

@@ -1528,9 +1528,9 @@ def classroom_post(slug):
         g = _game_of(db, a)
         due = {}
         if g and g.due_at:
+            # A date already past is sent too: last week's work is posted to
+            # send its grades, and refusing it locked the teacher out.
             when = g.due_at
-            if when <= datetime.now(timezone.utc).replace(tzinfo=None):
-                return err("Its due date has already passed. Change it first.", 400)
             due = {"dueDate": {"year": when.year, "month": when.month, "day": when.day},
                    "dueTime": {"hours": when.hour, "minutes": when.minute}}
         link = url_for("classes.assignment_link", slug=a.slug, _external=True, _scheme=_scheme())
