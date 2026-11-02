@@ -135,7 +135,8 @@ export type DrawCommand =
   | ["circle", number, number, number, number, number, number, number] // depth, x, y, r, color, outline, alpha
   | ["ellipse", number, number, number, number, number, number, number, number] // depth, x1, y1, x2, y2, color, outline, alpha
   | ["tri", number, number, number, number, number, number, number, number, number, number] // depth, 3 points, color, outline, alpha
-  | ["grad", number, number, number, number, number, number, number, number, number]; // depth, x1, y1, x2, y2, color1, color2, vertical, alpha
+  | ["grad", number, number, number, number, number, number, number, number, number] // depth, x1, y1, x2, y2, color1, color2, vertical, alpha
+  | ["floor", number, number, number, number, number, number, number, number, number, number]; // depth, sprite, frame, x, y, angle, height, horizon, focal, outside colour
 
 export type Halign = "left" | "center" | "right";
 export type Valign = "top" | "middle" | "bottom";

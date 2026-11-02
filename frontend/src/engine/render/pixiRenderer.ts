@@ -15,7 +15,7 @@
  * so a bullet never briefly appears with the last bullet's frame.
  */
 import { Application, ColorMatrixFilter, Container, FillGradient, Filter, Graphics, Rectangle, Sprite, Text, Texture, TilingSprite } from "pixi.js";
-import { flashFilter, LightLayer, outlineFilter, ParticleLayer, screenFilter, setFlash, setOutline } from "./feel";
+import { FloorMesh, flashFilter, LightLayer, outlineFilter, ParticleLayer, screenFilter, setFlash, setOutline } from "./feel";
 import type { DrawCommand, Engine } from "../engine";
 import { TILE_FLIP_X, TILE_FLIP_Y, TILE_TURN, tileNumber, type BackgroundDef, type GameDefinition, type SpriteDef, type TilesetDef } from "../game";
 import { BLEND_MODES, F, G, HANDLES, STRIDE } from "../layout";
@@ -91,6 +91,10 @@ class DrawLayer {
     private readonly fonts: ReadonlySet<number>,
   ) {}
 
+  /** Where this layer's view is, for what fills it (a floor). The room layer's moves with the camera. */
+  view = { x: 0, y: 0, w: 0, h: 0 };
+  private readonly floors: FloorMesh[] = [];
+
   // The Graphics the shapes being drawn now go into, while nothing else comes between them.
   private open: Graphics | null = null;
   private openDepth = 0;
@@ -117,6 +121,7 @@ class DrawLayer {
   render(list: DrawCommand[]) {
     let ti = 0;
     let si = 0;
+    let fi = 0;
     this.gi = 0;
     this.open = null;
     this.order = 0;
@@ -211,8 +216,28 @@ class DrawLayer {
           sp.visible = true;
           break;
         }
+        case "floor": {
+          const [, depth, sprite, frame, x, y, angle, height, horizon, focal, outside] = cmd;
+          const frames = this.frames[sprite];
+          if (!frames) break;
+          const picture = frames[((Math.floor(frame) % frames.length) + frames.length) % frames.length]!;
+          let mesh = this.floors[fi];
+          if (!mesh) {
+            mesh = new FloorMesh(picture);
+            this.floors.push(mesh);
+            this.into.addChild(mesh);
+          }
+          fi++;
+          mesh.set(picture, x, y, angle, height, horizon, focal, outside, this.view.w, this.view.h);
+          mesh.position.set(this.view.x, this.view.y);
+          mesh.zIndex = -depth + this.order * CALL_ORDER;
+          this.open = null;
+          mesh.visible = true;
+          break;
+        }
       }
     }
+    for (let i = fi; i < this.floors.length; i++) this.floors[i]!.visible = false;
     for (let i = this.gi; i < this.graphics.length; i++) {
       this.graphics[i]!.clear();
       this.graphics[i]!.visible = false;
@@ -593,6 +618,11 @@ export class PixiRenderer {
     this.lights.draw(this.app.renderer, this.engine.effects, vx, vy, cam.w, cam.h, cam.zoom);
     this.applyScreen(cam.w, cam.h);
 
+    // Without the shake's offset: the room moves under a still view when the
+    // camera shakes, and a floor pinned to the shaken view would stay put while
+    // everything standing on it shook.
+    this.worldDraw.view = { x: Math.round(cam.x), y: Math.round(cam.y), w: cam.w, h: cam.h };
+    this.guiDraw.view = { x: 0, y: 0, w: cam.w, h: cam.h };
     this.worldDraw.render(this.engine.drawList);
     this.guiDraw.render(this.engine.guiList);
     this.drawOverlay(st, n);

@@ -110,6 +110,7 @@ __all__ = [
     "draw_self", "draw_sprite", "draw_text", "draw_rect", "draw_set_color", "draw_set_font",
     "draw_sprite_ext", "draw_line", "draw_circle", "draw_ellipse", "draw_triangle", "draw_rect_gradient",
     "draw_set_halign", "draw_set_valign", "string_width", "string_height", "string_wrap",
+    "draw_floor", "floor_point",
     # small maths
     "clamp", "lerp", "approach", "sign", "choose",
     # rooms and the game
@@ -184,6 +185,7 @@ _lists = {}
 
 _cur = None          # the instance whose event is running (for place_meeting(...))
 _in_draw = False
+_in_gui = False
 _draw_depth = 0.0
 _draw = []           # draw commands this frame, in the room
 _gui = []            # …and on the screen, from Draw GUI events (not moved by the camera)
@@ -934,6 +936,44 @@ def draw_rect_gradient(x1, y1, x2, y2, color1, color2, vertical=True):
 
 _halign = "left"
 _valign = "top"
+
+
+# The camera of the last draw_floor, for floor_point: x, y, forward x, forward y,
+# height, horizon, focal, the layer's left and top, and the view's width.
+_floor_camera = None
+
+
+def draw_floor(sprite, frame, x, y, angle, height=32, horizon=120, focal=320, outside="black"):
+    """A picture laid flat and seen from just above it, like the road in an old kart racer."""
+    global _floor_camera
+    if not _check_draw("draw_floor"):
+        return
+    fn = "draw_floor"
+    x, y, angle = _num(x, fn, "x"), _num(y, fn, "y"), _num(angle, fn, "angle")
+    height, horizon, focal = _num(height, fn, "height"), _num(horizon, fn, "horizon"), _num(focal, fn, "focal")
+    if height <= 0 or focal <= 0:
+        raise ValueError(f"draw_floor wants a height and a focal above 0, not height={height}, focal={focal}: the camera has to be above the floor.")
+    a = math.radians(angle)
+    left, top = (0, 0) if _in_gui else (view_x, view_y)
+    _floor_camera = (x, y, math.cos(a), -math.sin(a), height, horizon, focal, left, top, view_width or room_width)
+    _draw_list.append(["floor", _draw_depth, _sprite_of(sprite), frame, x, y, angle, height, horizon, focal, _parse_color(outside, fn)])
+
+
+def floor_point(x, y):
+    """Where (x, y) on the last draw_floor's picture is on screen: (screen x, screen y, scale),
+    or None if it's behind the camera. Scale is how many screen pixels one picture pixel
+    covers there, so a sprite drawn at that scale sits on the floor at the right size."""
+    if _floor_camera is None:
+        raise ValueError("floor_point needs a draw_floor first: it answers for the floor drawn last.")
+    cx, cy, fx, fy, height, horizon, focal, left, top, w = _floor_camera
+    dx, dy = _num(x, "floor_point", "x") - cx, _num(y, "floor_point", "y") - cy
+    dist = dx * fx + dy * fy
+    if dist < 1:
+        return None
+    side = dx * -fy + dy * fx
+    scale = focal / dist
+    # See FLOOR_FRAGMENT in engine/render/feel.ts: the same sum, the other way round.
+    return (left + w / 2 + side * scale, top + horizon + height * scale, scale)
 
 
 def draw_set_halign(align):
@@ -2075,12 +2115,13 @@ def _input_events(paused=False):
 
 def _draw_events():
     """Draw, into the room, then Draw GUI, onto the screen over everything."""
-    global _in_draw, _draw_depth, _cur, _color, _draw_list, _alpha, _halign, _valign
+    global _in_draw, _in_gui, _draw_depth, _cur, _color, _draw_list, _alpha, _halign, _valign
     for name, target in (("on_draw", _draw), ("on_draw_gui", _gui)):
         lst = _lists[name]
         if not lst:
             continue
         _in_draw = True
+        _in_gui = name == "on_draw_gui"
         _draw_list = target
         _color = 0xFFFFFF
         _alpha = 1.0

@@ -41,6 +41,9 @@ BBP, BBF, BBI = "../showcase/baseball/game/_2pitch.py", "../showcase/baseball/ga
 BBD, BBC, BBW = "../showcase/baseball/game/_4derby.py", "../showcase/baseball/game/_6cpu.py", "../showcase/baseball/game/_8flow.py"
 BBK, BBUILD = "../showcase/baseball/game/_7controls.py", "../showcase/baseball/build.py"
 HC = "hillclimb"  # …or Ridgeline Rally's, rebuilt the same way
+KT = "kart"       # …or Zoomtown Cup's, rebuilt the same way
+KTT, KTK, KTR = "../showcase/kart/game/_1tracks.py", "../showcase/kart/game/_2kart.py", "../showcase/kart/game/_3race.py"
+KTS, KTF, KTB = "../showcase/kart/game/_4screen.py", "../showcase/kart/game/_5flow.py", "../showcase/kart/build.py"
 HCS, HCC, HCR = "../showcase/hillclimb/game/_1stages.py", "../showcase/hillclimb/game/_2car.py", "../showcase/hillclimb/game/_3run.py"
 HCG, HCF, HCB = "../showcase/hillclimb/game/_4garage.py", "../showcase/hillclimb/game/_6flow.py", "../showcase/hillclimb/build.py"
 PY = "py"    # …or the server's checks (backend/tests/test_server.py); caught = that check prints FAIL
@@ -953,6 +956,45 @@ CASES = [
  ("baseball: the computer never swings", BBC, "    swing = looks_good and not take and random.random() > 0.08", "    swing = False", "computer against itself", BB),
  ("baseball: the ballpark painted from its own camera", BBUILD, '    B, H, F = R["CAM_BACK"], R["CAM_HIGH"], R["CAM_FOCAL"]', '    B, H, F = R["CAM_BACK"], 6, R["CAM_FOCAL"]', "paints the ballpark", BB),
  ("baseball: the map's fence where the rules' isn't", BBUILD, '    return R["FENCE_CENTRE"] - (R["FENCE_CENTRE"] - R["FENCE_LINE"]) * k ** 1.6', '    return R["FENCE_CENTRE"] - 12 - (R["FENCE_CENTRE"] - R["FENCE_LINE"]) * k ** 1.6', "paints the ballpark", BB),
+ # The floor, and Zoomtown Cup
+ ("floor: the shader's angle runs the wrong way", "src/engine/render/feel.ts", "u.uForward[1] = -Math.sin(a);", "u.uForward[1] = Math.sin(a);", "the floor is drawn where floor_point says", E2E),
+ ("floor: the shader's left and right swapped", "src/engine/render/feel.ts", "vec2 right = vec2(-uForward.y, uForward.x);", "vec2 right = vec2(uForward.y, -uForward.x);", "the floor is drawn where floor_point says", E2E),
+ ("floor: the shader's camera too high", "src/engine/render/feel.ts", "u.uHeight = height;", "u.uHeight = height * 1.5;", "the floor is drawn where floor_point says", E2E),
+ ("floor: drawn over the sky too", "src/engine/render/feel.ts", "if (below <= 0.0) discard;", "if (below <= 0.0) below = 1.0;", "the floor is drawn where floor_point says", E2E),
+ ("floor_point: left and right swapped", "src/python/runtime.py", "side = dx * -fy + dy * fx", "side = dx * fy - dy * fx", "draw_floor sends its camera"),
+ ("floor_point: the wrong scale", "src/python/runtime.py", "scale = focal / dist\n", "scale = focal / (dist + 10)\n", "draw_floor sends its camera"),
+ ("floor_point: answers behind the camera", "src/python/runtime.py", "    if dist < 1:\n        return None\n", "", "draw_floor sends its camera"),
+ ("draw_floor: a camera under the floor allowed", "src/python/runtime.py", "if height <= 0 or focal <= 0:", "if False:", "draw_floor and floor_point say"),
+ ("draw_floor: floor_point guesses with no floor", "src/python/runtime.py", '        raise ValueError("floor_point needs a draw_floor first: it answers for the floor drawn last.")', "        return None", "draw_floor and floor_point say"),
+ ("kart: the race never ends", KTR, 'if kart.progress >= laps * n and kart.done is None:', 'if kart.progress >= laps * n * 9 and kart.done is None:', "is driven through a whole race", KT),
+ ("kart: the best time never kept", KTF, 'if best is None or steps < best:', 'if False:', "is driven through a whole race", KT),
+ ("kart: a slower time replaces the best", KTF, 'if best is None or steps < best:', 'if best is None or steps > best:', "is driven through a whole race", KT),
+ ("kart: a kart's own lap never timed", KTR, 'r["lap_times"].append(r["steps"] - r["lap_began"])', 'pass', "is driven through a whole race", KT),
+ ("kart: the top speed twice as high", KTK, '"top": 4.2,', '"top": 8.4,', "is driven through a whole race", KT),
+ ("kart: backing over the line keeps the lap", KTR, 'kart.lap = max(0, int(kart.progress // n) + 1)', 'kart.lap = max(kart.lap, int(kart.progress // n) + 1)', "a lap is the whole road", KT),
+ ("kart: backing up never counts against you", KTK, '    kart.progress += step\n', '    kart.progress += max(0, step)\n', "a lap is the whole road", KT),
+ ("kart: any stretch of road counts as near", KTK, 'for k in range(-14, 15):', 'for k in range(-400, 400):', "can't jump to another stretch", KT),
+ ("kart: no grass", KTK, 'kart.on_grass = kart.off > track["half"]', 'kart.on_grass = False', "the grass slows you", KT),
+ ("kart: the grass doesn't slow you", KTK, 'top = s["grass_top"] if kart.on_grass else s["top"]', 'top = s["top"]', "the grass slows you", KT),
+ ("kart: the hedge doesn't stop you", KTK, 'kart.hit = kart.off > wall', 'kart.hit = False', "the grass slows you", KT),
+ ("kart: a hedge costs no speed", KTK, 'kart.v *= s["bump"]', 'pass', "the grass slows you", KT),
+ ("kart: a drift pays with no time spent", KTK, 'elif drift is False and kart.charge >= SPARK_1:', 'elif drift is False:', "drifting earns a boost", KT),
+ ("kart: a small drift never pays", KTK, 'elif drift is False and kart.charge >= SPARK_1:', 'elif False:', "drifting earns a boost", KT),
+ ("kart: a long drift pays no more", KTK, 'kart.boost = BOOST_2', 'kart.boost = BOOST_1', "drifting earns a boost", KT),
+ ("kart: no drifting at all", KTK, 'if kart.drift == 0 and drift and abs(steer) > 0.1', 'if False and abs(steer) > 0.1', "drifting earns a boost", KT),
+ ("kart: a boost goes no faster", KTK, 'kart.v = min(s["boost_top"], kart.v + 0.15)', 'kart.v = min(s["top"], kart.v + 0.15)', "drifting earns a boost", KT),
+ ("kart: a boost has no limit", KTK, 'kart.v = min(s["boost_top"], kart.v + 0.15)', 'kart.v = kart.v + 0.15', "drifting earns a boost", KT),
+ ("kart: a boost never wears off", KTK, 'kart.v -= s["grass_drag"] if kart.on_grass and kart.boost <= 0 else 0.05', 'pass', "drifting earns a boost", KT),
+ ("kart: the countdown doesn't hold the karts", KTR, 'happened.append("beep")\n        return happened', 'happened.append("beep")', "nothing moves before the lights", KT),
+ ("kart: quick drivers stuck behind slow ones", KTR, 'if abs(across) < 22 and o.v <= kart.v + 0.2:', 'if False:', "the computer's drivers finish", KT),
+ ("kart: every computer driver the same speed", KTR, 'gas = kart.v < STATS["top"] * skill * (', 'gas = kart.v < STATS["top"] * 0.95 * (', "the computer's drivers finish", KT),
+ ("kart: computer drivers never slow for bends", KTR, '(0.74 if bend > 42 else 1.0)', '(1.4 if bend > 42 else 1.0)', "a computer driver lifts for a sharp bend", KT),
+ ("kart: the views turn the wrong way", KTS, '((kart.a - seen) % 360)', '((seen - kart.a) % 360)', "the views of a kart", KT),
+ ("kart: the road painted narrower than it's driven", KTB, 'quad(d, line[i], line[(i + 1) % n], half, rgb(look["road"]', 'quad(d, line[i], line[(i + 1) % n], half - 20, rgb(look["road"]', "the picture is the road", KT),
+ ("kart: the grass painted past the hedge", KTB, 'quad(md, line[i], line[(i + 1) % n], wall, 255)', 'quad(md, line[i], line[(i + 1) % n], wall + 30, 255)', "the picture is the road", KT),
+ ("kart: a road off the picture allowed", KTT, 'if min(x, y) < wall + 16 or max(x, y) > size - wall - 16:', 'if False:', "the build refuses a track", KT),
+ ("kart: a bend too sharp allowed", KTT, 'if turn > 1.15:', 'if False:', "the build refuses a track", KT),
+ ("kart: a road passing itself allowed", KTT, 'if math.hypot(line[i][0] - line[j][0], line[i][1] - line[j][1]) < apart:', 'if False:', "the build refuses a track", KT),
  ("hillclimb: the gas burns nothing", HCC, '        car.fuel = max(0.0, car.fuel - car.stats["burn"])', '        car.fuel = max(0.0, car.fuel - 0 * car.stats["burn"])', "burns fuel only on the gas", HC),
  ("hillclimb: fuel burns standing still", HCC, '    if gas:\n        car.fuel = max(0.0,', '    if True:\n        car.fuel = max(0.0,', "burns fuel only on the gas", HC),
  ("hillclimb: an empty tank still drives", HCC, "    if car.fuel <= 0:\n        gas = False", "    if False:\n        gas = False", "burns fuel only on the gas", HC),
@@ -1022,7 +1064,7 @@ for name, f, old, new, test, *extra in CASES:
             failed = any(l.startswith("FAIL") and test in l for l in out.splitlines())
             ran = "ok   " in out or "FAIL " in out
         else:
-            if runner in ([GM], [MM], [FB], [GF], [BB], [HC]):
+            if runner in ([GM], [MM], [FB], [GF], [BB], [HC], [KT]):
                 subprocess.run(["python3", str(ROOT.parent / f"showcase/{runner[0]}/build.py")], capture_output=True)
             cmd = ["npx", "playwright", "test", "-g", test] if runner == [E2E] else ["npx", "vitest", "run", "-t", test]
             r = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True)
@@ -1033,6 +1075,6 @@ for name, f, old, new, test, *extra in CASES:
         if not failed: bad.append(name)
     finally:
         p.write_text(src)
-        if runner in ([GM], [MM], [FB], [GF], [BB], [HC]):
+        if runner in ([GM], [MM], [FB], [GF], [BB], [HC], [KT]):
             subprocess.run(["python3", str(ROOT.parent / f"showcase/{runner[0]}/build.py")], capture_output=True)
 print("ALL SABOTAGES CAUGHT" if not bad else f"NOT CAUGHT: {bad}")

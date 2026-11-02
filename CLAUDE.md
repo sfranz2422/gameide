@@ -291,7 +291,7 @@ code (the harness turns bytecode caching off for that reason), or a
 mistyped case name ran nothing and still reported success (the harness now
 refuses unknown names).
 
-**The showcase games' runners** (`GM`, `MM`, `FB`, `GF`, `BB`, `HC`) rebuild
+**The showcase games' runners** (`GM`, `MM`, `FB`, `GF`, `BB`, `HC`, `KT`) rebuild
 that game from the sabotaged source before its playtest and again after. A
 build that **refuses** (Greenside's course checks, Ridgeline Rally's stage
 checks) leaves the old `out/project.json`, and the test passes on it: a
@@ -432,6 +432,12 @@ and fades are plain Python drawn with ordinary draw commands).
   so nothing before them moves.
 - Names Python checks against (effects, weather, screen effects, blend
   modes) come from the engine through `layoutForPython`, never retyped.
+- **`draw_floor` and `floor_point` are one projection written twice**:
+  `FLOOR_FRAGMENT` (GLSL, feel.ts) goes screen → floor, `floor_point`
+  (runtime.py) goes floor → screen. "the floor is drawn where floor_point says"
+  pins them together by reading pixels back; change one and change both. The
+  floor mesh sits at the camera without its shake (`worldDraw.view`), so it
+  shakes with the room rather than staying put under what stands on it.
 
 ## Tutorials
 

@@ -45,6 +45,33 @@ describe("drawing", () => {
     ]);
   });
 
+  it("draw_floor sends its camera, and floor_point answers from it", async () => {
+    const { game } = await drawing(`        draw_floor("big", 0, 100, 200, 90, 40, 80, 320, "#112233")
+        global_vars.ahead = floor_point(100, 100)
+        global_vars.right = floor_point(150, 100)
+        global_vars.behind = floor_point(100, 300)
+`);
+    run(game);
+    const floor = game.engine.drawList.find((c) => c[0] === "floor")!;
+    expect(floor.slice(3)).toEqual([0, 100, 200, 90, 40, 80, 320, 0x112233]);
+    // Facing up the screen (angle 90), 100 ahead: scale 320 / 100, in the middle, height * scale below the horizon.
+    const view = py(game, "view_width or room_width") as number;
+    const ahead = py(game, "list(global_vars.ahead)") as number[];
+    expect(ahead[0]!).toBeCloseTo(view / 2);
+    expect(ahead[1]!).toBeCloseTo(80 + 40 * 3.2);
+    expect(ahead[2]!).toBeCloseTo(3.2);
+    // Facing up the screen, what's further along x is on the right.
+    expect((py(game, "list(global_vars.right)") as number[])[0]!).toBeCloseTo(view / 2 + 50 * 3.2);
+    expect(py(game, "global_vars.behind is None")).toBe(true);
+  });
+
+  it("draw_floor and floor_point say what's wrong, in words", async () => {
+    const low = await drawing(`        draw_floor("big", 0, 0, 0, 0, 0)\n`);
+    expect(() => run(low.game)).toThrow(/above the floor/);
+    const first = await load({ code: { A: "class A(GameObject):\n    def on_create(self):\n        floor_point(1, 2)\n" }, instances: [{ object: "A", x: 0, y: 0 }] });
+    expect(first.error?.message ?? "").toMatch(/needs a draw_floor first/);
+  });
+
   it("text alignment goes with the text, and lasts for one event only", async () => {
     const { game } = await drawing(`        draw_set_halign("center")
         draw_set_valign("bottom")

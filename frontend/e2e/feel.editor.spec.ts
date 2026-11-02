@@ -205,3 +205,28 @@ test("at one depth, what's drawn last is on top: a shape over a picture over a s
   expect(near(blue!, [0, 0, 255])).toBe(true); // the blue drawn over the wall
   expect(near(words!, [255, 255, 255])).toBe(true); // the words over the red
 });
+
+test("the floor is drawn where floor_point says", async ({ page }) => {
+  await fromTemplate(page, "coins");
+  await treeItem(page, "Player").click();
+  await page.getByTestId("add-event").click();
+  await page.getByTestId("pick-draw").click();
+  // Red past the picture's edges, so where the edge really is can be read back.
+  // The camera is off to one side and turned, so a sum with the wrong sign puts
+  // these points somewhere else entirely.
+  const POINTS = "(-3, 14), (35, 14), (14, -3), (14, 35), (14, 14), (3, 3), (28, 26)";
+  await setCode(page, [
+    'draw_floor("wall", 0, -46, 52, 28, 48, 60, 320, "red")',
+    `global_vars.pts = [floor_point(*p) for p in [${POINTS}]]`,
+  ].join("\n") + "\n");
+  await page.getByTestId("play").click();
+  await expect(page.getByTestId("fps")).toBeVisible({ timeout: 60_000 });
+  await page.waitForTimeout(500);
+  const pts = (await page.evaluate(() => (window as any).__gameide.host.evalPython("[[round(v) for v in p[:2]] for p in global_vars.pts]"))) as [number, number][];
+  const seen = await pixels(page, pts);
+  const red = seen.map((c) => near(c, [255, 0, 0], 40));
+  expect(red).toEqual([true, true, true, true, false, false, false]);
+  // Above the horizon is not floor: the room still shows.
+  const [sky] = await pixels(page, [[320, 40]]);
+  expect(near(sky!, [255, 0, 0], 40)).toBe(false);
+});

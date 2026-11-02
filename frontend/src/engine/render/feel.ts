@@ -8,11 +8,12 @@
  *   outlineFilter   a sprite's outline or glow (outline / glow properties)
  *   flashFilter     a sprite drawn as one colour (flash())
  *   screenFilter    a look for the whole screen (screen_effect())
+ *   FloorMesh       a picture laid flat and seen from just above it (draw_floor)
  *
  * The shaders are WebGL only: the renderer asks Pixi for WebGL
  * (pixiRenderer.ts, `preference`), and every school Chromebook has it.
  */
-import { ColorMatrixFilter, Container, Filter, GlProgram, Graphics, Particle, ParticleContainer, RenderTexture, Sprite, Texture, type Renderer } from "pixi.js";
+import { ColorMatrixFilter, Container, Filter, GlProgram, Graphics, Mesh, MeshGeometry, Particle, ParticleContainer, RenderTexture, Shader, Sprite, Texture, UniformGroup, type Renderer } from "pixi.js";
 import type { Effects } from "../effects";
 
 const VERTEX = `in vec2 aPosition;
@@ -38,6 +39,102 @@ const program = (fragment: string, name: string) =>
   GlProgram.from({ vertex: VERTEX, fragment, name, preferredVertexPrecision: "highp", preferredFragmentPrecision: "highp" });
 
 const rgb = (c: number) => [((c >> 16) & 255) / 255, ((c >> 8) & 255) / 255, (c & 255) / 255];
+
+// ---------------------------------------------------------------- the floor
+
+const FLOOR_VERTEX = `in vec2 aPosition;
+out vec2 vPixel;
+uniform mat3 uProjectionMatrix;
+uniform mat3 uWorldTransformMatrix;
+uniform mat3 uTransformMatrix;
+void main(void) {
+  mat3 mvp = uProjectionMatrix * uWorldTransformMatrix * uTransformMatrix;
+  gl_Position = vec4((mvp * vec3(aPosition, 1.0)).xy, 0.0, 1.0);
+  vPixel = aPosition;
+}`;
+
+/**
+ * Every pixel below the horizon is a point on the floor: the further up the
+ * screen, the further away. This sum and floor_point in runtime.py are the
+ * two directions of one projection; "the floor is drawn where floor_point
+ * says" (e2e/feel.editor.spec.ts) pins them together. Change one, change both.
+ *
+ * Four samples a pixel, spread over the patch of floor it covers: with one,
+ * the far road sparkles as it moves, a distant pixel covering dozens of the
+ * picture's.
+ */
+const FLOOR_FRAGMENT = `in vec2 vPixel;
+out vec4 finalColor;
+uniform sampler2D uTexture;
+uniform vec2 uCamera;
+uniform vec2 uForward;
+uniform vec2 uPicture;
+uniform vec3 uOutside;
+uniform float uHeight;
+uniform float uHorizon;
+uniform float uFocal;
+uniform float uCentre;
+vec4 at(vec2 p) {
+  vec2 uv = p / uPicture;
+  if (uv.x < 0.0 || uv.y < 0.0 || uv.x >= 1.0 || uv.y >= 1.0) return vec4(uOutside, 1.0);
+  return texture(uTexture, uv);
+}
+void main() {
+  float below = vPixel.y - uHorizon;
+  if (below <= 0.0) discard;
+  float dist = uHeight * uFocal / below;
+  float side = (vPixel.x - uCentre) * dist / uFocal;
+  vec2 right = vec2(-uForward.y, uForward.x);
+  vec2 p = uCamera + uForward * dist + right * side;
+  vec2 across = right * (dist / uFocal) * 0.25;
+  vec2 along = uForward * (dist * dist / (uHeight * uFocal)) * 0.25;
+  finalColor = (at(p - across - along) + at(p + across - along) + at(p - across + along) + at(p + across + along)) * 0.25;
+}`;
+
+/** One draw_floor: a rectangle the size of the view, painted by the shader above. */
+export class FloorMesh extends Mesh {
+  private readonly values: UniformGroup;
+
+  constructor(picture: Texture) {
+    const values = new UniformGroup({
+      uCamera: { value: new Float32Array(2), type: "vec2<f32>" },
+      uForward: { value: new Float32Array(2), type: "vec2<f32>" },
+      uPicture: { value: new Float32Array(2), type: "vec2<f32>" },
+      uOutside: { value: new Float32Array(3), type: "vec3<f32>" },
+      uHeight: { value: 1, type: "f32" },
+      uHorizon: { value: 0, type: "f32" },
+      uFocal: { value: 1, type: "f32" },
+      uCentre: { value: 0, type: "f32" },
+    });
+    const glProgram = GlProgram.from({ vertex: FLOOR_VERTEX, fragment: FLOOR_FRAGMENT, name: "gameide-floor", preferredVertexPrecision: "highp", preferredFragmentPrecision: "highp" });
+    const geometry = new MeshGeometry({ positions: new Float32Array(8), uvs: new Float32Array(8), indices: new Uint32Array([0, 1, 2, 0, 2, 3]) });
+    // Pixi types a mesh's shader as one with its own texture; ours sets it through resources.
+    super({ geometry, shader: new Shader({ glProgram, resources: { uTexture: picture.source, values } }) as never });
+    this.values = values;
+  }
+
+  set(picture: Texture, x: number, y: number, angle: number, height: number, horizon: number, focal: number, outside: number, w: number, h: number) {
+    const a = (angle * Math.PI) / 180;
+    const u = this.values.uniforms as Record<"uCamera" | "uForward" | "uPicture" | "uOutside", Float32Array> & Record<"uHeight" | "uHorizon" | "uFocal" | "uCentre", number>;
+    u.uCamera[0] = x;
+    u.uCamera[1] = y;
+    u.uForward[0] = Math.cos(a);
+    u.uForward[1] = -Math.sin(a); // anticlockwise degrees, with y down the screen
+    u.uPicture[0] = picture.source.width;
+    u.uPicture[1] = picture.source.height;
+    u.uOutside.set(rgb(outside));
+    u.uHeight = height;
+    u.uHorizon = horizon;
+    u.uFocal = focal;
+    u.uCentre = w / 2;
+    this.shader!.resources.uTexture = picture.source;
+    const p = this.geometry.positions as Float32Array;
+    if (p[2] !== w || p[5] !== h) {
+      p.set([0, 0, w, 0, w, h, 0, h]);
+      this.geometry.getBuffer("aPosition").update();
+    }
+  }
+}
 
 // ---------------------------------------------------------------- one sprite
 
