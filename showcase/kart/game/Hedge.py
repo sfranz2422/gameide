@@ -1,5 +1,5 @@
 # object: Hedge
-# sprite: bush
+# sprite: bush_0
 # parent: Scenery
 # The edge of the track. Karts stop against its box (move_and_collide in Kart's
 # Step), which lies along the road: it's turned with image_angle as it's placed.

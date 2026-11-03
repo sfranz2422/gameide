@@ -37,4 +37,8 @@ for track in B.TRACKS:
             hx, hy = ax + nx * side * (wall + 10), ay + ny * side * (wall + 10)
             if min((hx - p[0]) ** 2 + (hy - p[1]) ** 2 for p in line) > (wall + 2) ** 2 and at(wall + 10) in lawn:
                 bad.append(f"{track['name']} point {i}: lawn past the hedge")
+    # A boost pad's orange is where the BoostPad object stands.
+    for x, y, a in B.GAME["pad_places"](track):
+        if im.getpixel((round(x), round(y))) not in ((255, 150, 30), (255, 240, 150)):
+            bad.append(f"{track['name']}: no pad painted at ({x:.0f}, {y:.0f})")
 print("ok" if not bad else "\n".join(bad[:12]))

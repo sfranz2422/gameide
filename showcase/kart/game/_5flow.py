@@ -5,11 +5,57 @@ import math
 ENGINE_SOUNDS = ["engine_0", "engine_1", "engine_2", "engine_3"]   # idle, then low to high
 
 
-def new_race(game, player):
+MODES = ["Cup", "Time trial"]
+PATH_EVERY = 4         # a time trial notes where you are this often, for your ghost
+
+
+def menu_rows(game):
+    """The menu's rows: only a time trial asks which track."""
+    return ["mode", "racer", "track", "go"] if MODES[game.mode_i] == "Time trial" else ["mode", "racer", "go"]
+
+
+def new_race(track_i, player=None, rivals=True):
     camera = RACE.get("camera")
-    start_race(0, player)
+    start_race(track_i, player, rivals)
     RACE["camera"] = camera
     move_camera(RACE["karts"][0], snap=True)
+    if player is not None and not rivals:
+        # A time trial: three turbos, and the ghost of your best run if there is one.
+        RACE["karts"][0].turbos = 3
+        path = save_get("ghost_" + RACE["track"]["name"])
+        if path:
+            instance_create(path[0][0], path[0][1], "Ghost").path = path
+
+
+def cup_table(game):
+    """The racers, most points first."""
+    return sorted(range(len(RACERS)), key=lambda w: -game.cup_points[w])
+
+
+def finish_race(game):
+    """The player crossed the line: fix the order, pay the points, and keep a best time and its ghost."""
+    you = RACE["karts"][0]
+    order = sorted(RACE["karts"], key=lambda c: c.place)
+    RACE["final"] = order
+    name = RACE["track"]["name"]
+    if RACE["rivals"]:
+        for p, kart in enumerate(order):
+            game.cup_points[kart.who] += POINTS[p]
+        game.cup_race += 1
+        game.new_best = keep_best(name, you.done)
+    else:
+        game.new_best = keep_best(name, you.done)
+        if game.new_best:
+            save_set("ghost_" + name, RACE["path"])
+    game.best = save_get("best_" + name)
+
+
+def end_cup(game):
+    """A cup's end: the best place kept between visits."""
+    place = cup_table(game).index(game.racer) + 1
+    best = save_get("cup_best")
+    if best is None or place < best:
+        save_set("cup_best", place)
 
 
 def move_camera(kart, snap=False):

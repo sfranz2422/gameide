@@ -22,6 +22,14 @@ self.place = 1
 self.gas, self.brake, self.drifting = False, False, False
 self.steer = 0.0          # -1 (left) to 1 (right)
 self.player = self.object_name == "PlayerKart"
+self.top_k, self.accel_k, self.turn_k = 1.0, 1.0, 1.0   # this racer's (RACERS)
+self.item = None          # what it's holding
+self.turbos = 0           # in a time trial: turbos instead of item boxes
+self.use = False          # pressed "use it" this step
+self.item_wait = 0        # how long a computer driver holds an item
+self.spin = 0             # steps left spinning out
+self.spin_a = 0           # how far round the picture has spun
+self.shield = 0           # steps left shielded
 # The picture is big, but on the track a kart is KART_WORLD wide: this scales its collision circle too.
 self.image_xscale = self.image_yscale = KART_WORLD / KART_W
 self.image_speed = 0
@@ -30,13 +38,27 @@ self.image_speed = 0
 if RACE["count"] > 0:
     return
 s = STATS
-top = s["grass_top"] if self.on_grass else s["top"]
+if self.shield > 0:
+    self.shield -= 1
+if self.spin > 0:
+    # Spun out: no keys work, and it slows, until it's facing front again.
+    self.spin -= 1
+    self.spin_a = (self.spin_a + 24) % 360
+    self.v *= 0.96
+    self.gas, self.brake, self.drifting, self.use = False, False, False, False
+    self.steer = 0.0
+    self.drift = 0
+else:
+    self.spin_a = 0
+if self.use:
+    use_item(self)
+top = s["grass_top"] if self.on_grass else s["top"] * self.top_k
 
 if self.boost > 0:
     self.boost -= 1
     self.v = min(s["boost_top"], self.v + 0.15)
 elif self.gas:
-    self.v += s["accel"] * (1.15 - self.v / s["top"]) * 2
+    self.v += s["accel"] * self.accel_k * (1.15 - self.v / (s["top"] * self.top_k)) * 2
 elif self.brake:
     self.v -= s["brake"]
 else:
@@ -74,11 +96,11 @@ if self.drift:
             kart_sound(self, "spark")
 if not self.drift and abs(self.v) > 0.1:
     # Pressing right turns it clockwise, which is down the angles.
-    self.a -= self.steer * s["turn"] * min(1.0, abs(self.v) / 1.5) * (1 if self.v > 0 else -1)
+    self.a -= self.steer * s["turn"] * self.turn_k * min(1.0, abs(self.v) / 1.5) * (1 if self.v > 0 else -1)
 self.a %= 360
 
 # It goes the way it points, slowly on a drift: that's the slide.
-self.move_a = (self.move_a + angle_diff(self.a, self.move_a) * (0.05 if self.drift else 0.32)) % 360
+self.move_a = (self.move_a + angle_diff(self.a, self.move_a) * (0.05 if self.drift else 0.32) * RACE["track"]["grip"]) % 360
 r = math.radians(self.move_a)
 hit = self.move_and_collide(math.cos(r) * self.v, -math.sin(r) * self.v, "Hedge")
 if hit:
@@ -142,6 +164,11 @@ draw_set_alpha(1)
 hop = -scale * 0.6 if self.on_grass and self.v > 0.6 and RACE["steps"] % 6 < 3 else 0
 cam = RACE["camera"]
 draw_sprite_ext(self.sprite, kart_frame(self, cam["x"], cam["y"]), sx, sy + hop, k, k)
+if self.shield > 0:
+    draw_set_alpha(0.35 if self.shield > 60 or self.shield % 10 < 5 else 0.12)
+    draw_set_color("#7fd8ff")
+    draw_circle(sx, sy - 7 * scale, 13 * scale)
+    draw_set_alpha(1)
 # Sparks from the back wheels: a drift's colour says the boost it has earned.
 if self.drift and self.charge >= SPARK_1:
     draw_set_color("#ff9a2e" if self.charge >= SPARK_2 else "#58c8ff")

@@ -5,8 +5,9 @@ kart racer seen from just behind the kart, on a track laid flat (draw_floor).
 
     python3 showcase/kart/build.py      # → showcase/kart/out/Kart.zip
 
-THE GAME IS OBJECTS: Kart with its children PlayerKart and ComputerKart, Hedge
-and Tree under Scenery, and Game, the referee and the view. The room is the track,
+THE GAME IS OBJECTS: Kart with its children PlayerKart and ComputerKart; Hedge,
+Tree, ItemBox, OilSlick and Bolt under Scenery; BoostPad, Ghost, and Game, the
+referee and the view. The room is the track,
 in the track's own pixels, so instances stand where they do on the picture and
 the engine's collisions work as in any other game. Only draw_floor's view differs.
 
@@ -44,12 +45,13 @@ MAP_INNER = 110
 
 GAME = {}
 # Every script only defines things at its top level, so the build can read their numbers.
-for f in ("_1tracks.py", "_2kart.py", "_3race.py", "_4screen.py"):
+for f in ("_1tracks.py", "_2kart.py", "_3race.py", "_4screen.py", "_6items.py"):
     exec((HERE / "game" / f).read_text(), GAME)
 TRACKS, RACERS, STEP = GAME["TRACKS"], GAME["RACERS"], GAME["STEP"]
 centre_line = GAME["centre_line"]
 VIEW_W, VIEW_H, HORIZON, KART_W, BUSH_W, TREE_W, SKY_W = (GAME[k] for k in ("VIEW_W", "VIEW_H", "HORIZON", "KART_W", "BUSH_W", "TREE_W", "SKY_W"))
 KART_H = 72
+PAD_LONG, PAD_WIDE = 44, 28   # a boost pad on the track, and its object's box
 S = 4                  # pictures are painted 4 times bigger, then shrunk: smooth edges
 
 
@@ -128,6 +130,15 @@ def paint_track(track):
         m = math.hypot(dx, dy) or 1
         nx, ny = -dy / m * 1.5, dx / m * 1.5
         d.polygon([(a[0] + nx, a[1] + ny), (b[0] + nx, b[1] + ny), (b[0] - nx, b[1] - ny), (a[0] - nx, a[1] - ny)], fill=rgb(look["line"]))
+    # Boost pads, from the same places the game puts its BoostPad objects: chevrons along the road.
+    for x, y, a in GAME["pad_places"](track):
+        r = math.radians(a)
+        fx, fy = math.cos(r), -math.sin(r)
+        nx, ny = -fy, fx
+        P = lambda u, v: (x + fx * u + nx * v, y + fy * u + ny * v)
+        d.polygon([P(-PAD_LONG / 2, -PAD_WIDE / 2), P(PAD_LONG / 2, -PAD_WIDE / 2), P(PAD_LONG / 2, PAD_WIDE / 2), P(-PAD_LONG / 2, PAD_WIDE / 2)], fill=(255, 150, 30))
+        for u in range(-PAD_LONG // 2, PAD_LONG // 2 - 4, 10):
+            d.polygon([P(u, -PAD_WIDE / 2 + 2), P(u + 5, -PAD_WIDE / 2 + 2), P(u + 10, 0), P(u + 5, PAD_WIDE / 2 - 2), P(u, PAD_WIDE / 2 - 2), P(u + 5, 0)], fill=(255, 240, 150))
     # The start line: a chequered band across the road at point 0.
     a, b = line[0], line[1]
     tx, ty = (b[0] - a[0]) / STEP, (b[1] - a[1]) / STEP
@@ -164,7 +175,12 @@ def paint_sky(track, seed):
         t = y / (h - 1)
         d.line((0, y, w, y), fill=tuple(round(top[i] + (low[i] - top[i]) * t) for i in range(3)) + (255,))
     rnd = random.Random(seed)
-    for _ in range(9):
+    if look["stars"]:
+        for _ in range(160):
+            x, y = rnd.randrange(w), rnd.randrange(h - 24)
+            v = rnd.randrange(150, 256)
+            d.rectangle((x, y, x + (v > 225), y + (v > 225)), fill=(v, v, 255, 255))
+    for _ in range(0 if look["stars"] else 9):
         x, y, r = rnd.randrange(w), rnd.randrange(10, 60), rnd.randrange(12, 26)
         for dx in (-w, 0, w):
             for k in range(5):
@@ -173,8 +189,8 @@ def paint_sky(track, seed):
                 d.ellipse((x + dx + ox - rr, y - rr * 0.6, x + dx + ox + rr, y + rr * 0.6), fill=(255, 255, 255, 225))
     far = lambda x: h - 26 - 12 * math.sin(x * 2 * math.pi * 3 / w + 1) - 6 * math.sin(x * 2 * math.pi * 7 / w)
     near = lambda x: h - 12 - 7 * math.sin(x * 2 * math.pi * 5 / w) - 3 * math.sin(x * 2 * math.pi * 11 / w + 2)
-    d.polygon([(0, h)] + [(x, far(x)) for x in range(0, w + 1, 4)] + [(w, h)], fill=(120, 170, 190, 255))
-    d.polygon([(0, h)] + [(x, near(x)) for x in range(0, w + 1, 4)] + [(w, h)], fill=(70, 140, 80, 255))
+    d.polygon([(0, h)] + [(x, far(x)) for x in range(0, w + 1, 4)] + [(w, h)], fill=rgb(look["hill_far"]) + (255,))
+    d.polygon([(0, h)] + [(x, near(x)) for x in range(0, w + 1, 4)] + [(w, h)], fill=rgb(look["hill_near"]) + (255,))
     return im
 
 
@@ -288,6 +304,75 @@ def tree(seed):
     return im.resize((w, h), Image.LANCZOS)
 
 
+def restyle(im, scene):
+    """The meadow's hedges and trees for another place: only their greens change."""
+    hue, sat, val = {"desert": (0.075, 0.62, 0.95), "snow": (0.58, 0.14, 1.28), "night": (0.68, 0.7, 0.5)}[scene]
+    out = im.copy()
+    px = out.load()
+    for y in range(out.height):
+        for x in range(out.width):
+            r, g, b, a = px[x, y]
+            if not a:
+                continue
+            h, s, v = colorsys.rgb_to_hsv(r / 255, g / 255, b / 255)
+            if 0.2 < h < 0.5 and s > 0.2:
+                r2, g2, b2 = colorsys.hsv_to_rgb(hue, s * sat, min(1, v * val))
+                px[x, y] = (round(r2 * 255), round(g2 * 255), round(b2 * 255), a)
+    return out
+
+
+# ---------------------------------------------------------------- items
+
+def item_icon(k):
+    """The four items, as the display and box show them: turbo, oil, bolt, shield."""
+    w = 48
+    im = Image.new("RGBA", (w * S, w * S), (0, 0, 0, 0))
+    d = ImageDraw.Draw(im)
+    P = lambda *a: [v * S for v in a]
+    ink = (30, 24, 40, 255)
+    if k == 0:      # a turbo: a flame
+        d.polygon(P(24, 3, 39, 26, 34, 42, 14, 42, 9, 26, 17, 19, 19, 27), fill=(255, 120, 30, 255), outline=ink, width=2 * S)
+        d.polygon(P(24, 20, 31, 32, 28, 40, 20, 40, 17, 32), fill=(255, 225, 90, 255))
+    elif k == 1:    # oil: a dark drop
+        d.ellipse(P(10, 18, 38, 45), fill=(46, 40, 66, 255), outline=ink, width=2 * S)
+        d.polygon(P(24, 3, 36, 26, 12, 26), fill=(46, 40, 66, 255))
+        d.ellipse(P(16, 24, 22, 32), fill=(150, 140, 200, 255))
+    elif k == 2:    # a bolt of lightning
+        d.polygon(P(29, 2, 10, 27, 22, 27, 17, 46, 39, 19, 26, 19), fill=(255, 225, 60, 255), outline=ink, width=2 * S)
+    else:           # a shield
+        d.polygon(P(24, 4, 41, 10, 39, 28, 24, 45, 9, 28, 7, 10), fill=(80, 180, 240, 255), outline=ink, width=2 * S)
+        d.polygon(P(24, 10, 35, 14, 33, 27, 24, 38), fill=(180, 228, 255, 255))
+    return im.resize((w, w), Image.LANCZOS)
+
+
+def box_picture():
+    """An item box: a bright crate with a star on it, standing on the road."""
+    w = 64
+    im = Image.new("RGBA", (w * S, w * S), (0, 0, 0, 0))
+    d = ImageDraw.Draw(im)
+    P = lambda *a: [v * S for v in a]
+    ink = (40, 30, 60, 255)
+    d.rounded_rectangle(P(6, 6, 58, 62), radius=8 * S, fill=(255, 200, 40, 255), outline=ink, width=3 * S)
+    d.rounded_rectangle(P(13, 13, 51, 55), radius=5 * S, fill=(255, 225, 110, 255))
+    pts = []
+    for i in range(10):
+        r = 18 if i % 2 == 0 else 8
+        a = -math.pi / 2 + i * math.pi / 5
+        pts += [32 + math.cos(a) * r, 34 + math.sin(a) * r]
+    d.polygon(P(*pts), fill=(240, 90, 60, 255), outline=ink, width=S)
+    return im.resize((w, w), Image.LANCZOS)
+
+
+def slick_picture():
+    w, h = 96, 34
+    im = Image.new("RGBA", (w * S, h * S), (0, 0, 0, 0))
+    d = ImageDraw.Draw(im)
+    for x, y, rx, ry in ((48, 20, 44, 12), (22, 22, 18, 9), (72, 16, 20, 9)):
+        d.ellipse(((x - rx) * S, (y - ry) * S, (x + rx) * S, (y + ry) * S), fill=(36, 30, 54, 255))
+    d.ellipse((34 * S, 13 * S, 58 * S, 19 * S), fill=(120, 100, 190, 255))
+    return im.resize((w, h), Image.LANCZOS)
+
+
 # ---------------------------------------------------------------- sounds
 
 def engine_loop(f, rough, seconds=0.5):
@@ -322,6 +407,10 @@ def make_sounds(P):
     P.sound("boost", mix(tone(0.5, 180, 620, "square", 0.22), lowpass(tone(0.5, 0, 0, "noise", 0.35, seed=4), 0.4, 0.1)))
     P.sound("bump", mix(tone(0.16, 130, 60, "sine", 0.7), lowpass(tone(0.12, 0, 0, "noise", 0.45, seed=5), 0.3, 0.05)))
     P.sound("click", tone(0.03, 900, 700, "square", 0.12))
+    P.sound("pickup", join(*[tone(0.05, f, f, "square", 0.16) for f in (660, 880, 1100, 1320)]))
+    P.sound("throw", tone(0.18, 900, 300, "tri", 0.3))
+    P.sound("spin", mix(tone(0.6, 700, 180, "square", 0.16), lowpass(tone(0.5, 0, 0, "noise", 0.3, seed=6), 0.35, 0.1)))
+    P.sound("shield", join(tone(0.08, 1000, 1400, "tri", 0.3), tone(0.2, 1400, 1800, "tri", 0.25)))
 
 
 # ---------------------------------------------------------------- the project
@@ -342,9 +431,22 @@ def build(out):
         P.sprite(f"sky_{n}", [picture(f"sky_{n}", paint_sky(track, n + 1))], (0, 0))
     # The hedge's box lies along the road, reaching this far either side of where it stands.
     reach = 22 * BUSH_W / GAME["HEDGE_LONG"]
-    P.sprite("bush", [picture(f"bush_{k}", bush(k)) for k in range(3)], (BUSH_W // 2, 122),
-             mask=(0, 122 - reach, BUSH_W, 122 + reach))
-    P.sprite("tree", [picture(f"tree_{k}", tree(k)) for k in range(3)], (TREE_W // 2, 170))
+    bushes = [picture(f"bush_{k}", bush(k)) for k in range(3)]
+    trees = [picture(f"tree_{k}", tree(k)) for k in range(3)]
+    for n, track in enumerate(TRACKS):
+        scene = track["look"]["scene"]
+        P.sprite(f"bush_{n}", [restyle(b, scene) if scene else b for b in bushes], (BUSH_W // 2, 122),
+                 mask=(0, 122 - reach, BUSH_W, 122 + reach))
+        P.sprite(f"tree_{n}", [restyle(t, scene) if scene else t for t in trees], (TREE_W // 2, 170))
+    P.sprite("items", [picture(f"item_{name}", item_icon(k)) for k, name in enumerate(GAME["ITEMS"])], (0, 0))
+    s = P.sprite("item_box", [picture("item_box", box_picture())], (32, 62))
+    s["mask"] = {"kind": "circle", "cx": 32, "cy": 62, "r": 32}
+    s = P.sprite("oil_slick", [picture("oil_slick", slick_picture())], (48, 30))
+    s["mask"] = {"kind": "circle", "cx": 48, "cy": 30, "r": 36}
+    s = P.sprite("bolt", [picture("item_bolt", item_icon(2))], (24, 46))
+    s["mask"] = {"kind": "circle", "cx": 24, "cy": 46, "r": 18}
+    # Only the box matters: the picture of it is painted on the track, not drawn by the object.
+    P.sprite("pad", [Image.new("RGBA", (PAD_LONG, PAD_WIDE), (0, 0, 0, 0))], (PAD_LONG // 2, PAD_WIDE // 2), mask=(0, 0, PAD_LONG, PAD_WIDE))
     make_sounds(P)
 
     for f in sorted((HERE / "game").glob("_*.py")):
@@ -353,7 +455,7 @@ def build(out):
     files = sorted(f for f in (HERE / "game").glob("*.py") if not f.name.startswith("_"))
     parsed = {f.stem: _tw.read_code(f) for f in files}
     for name, (head, _) in parsed.items():
-        P.obj(name, depth=int(head.get("depth", 0)))
+        P.obj(name, depth=int(head.get("depth", 0)), visible=head.get("visible", "yes") == "yes")
     for name, (head, events) in parsed.items():
         o = next(x for x in P.p["objects"] if x["name"] == name)
         if head.get("sprite"):
@@ -365,7 +467,7 @@ def build(out):
 
     lid = _tw.new_id()
     P.p["rooms"].append({
-        "id": _tw.new_id(), "name": "Race", "width": TRACKS[0]["size"], "height": TRACKS[0]["size"], "background": "#3f9be8",
+        "id": _tw.new_id(), "name": "Race", "width": GAME["ROOM_SIZE"], "height": GAME["ROOM_SIZE"], "background": "#3f9be8",
         "gridWidth": 32, "gridHeight": 32, "snap": True,
         "layers": [{"id": lid, "name": "Instances", "kind": "instances", "depth": 0, "visible": True, "locked": False}],
         # The room is the track, with every instance at its place on it. The view stays

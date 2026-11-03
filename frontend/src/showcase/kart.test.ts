@@ -54,6 +54,11 @@ function press(g: PythonGame, key: string) {
 async function racing(save: Record<string, unknown> = {}) {
   const g = await start(save);
   press(g, "space");
+  expect(py(g, "g.mode")).toBe("menu");
+  step(g, 12);
+  press(g, "down");
+  press(g, "down");
+  press(g, "space");
   expect(py(g, "g.mode")).toBe("race");
   step(g, 182);
   return g;
@@ -71,11 +76,12 @@ def bot_keys(look=7):
     return ("right" if d < -3 else "left" if d > 3 else "")
 `;
 
-/** Drives by holding keys, a person's way, until the game says so. */
-function driveBot(g: PythonGame, until: () => boolean, most = 20000) {
+/** Drives by holding keys, a person's way, until the game says so, using any item it holds. */
+function driveBot(g: PythonGame, until: () => boolean, most = 30000) {
   let held = "";
   hold(g, "up", true);
   for (let i = 0; i < most && !until(); i++) {
+    if (i % 50 === 0 && py(g, "bool(RACE['karts'][0].item or RACE['karts'][0].turbos)")) press(g, "space");
     const want = py(g, "bot_keys()") as string;
     if (want !== held) {
       if (held) hold(g, held, false);
@@ -96,7 +102,9 @@ describe.runIf(have)("Zoomtown Cup", () => {
     expect(py(g, "instance_number('ComputerKart')")).toBe(7);
     expect(py(g, "instance_number('Hedge')")).toBeGreaterThan(150);
     expect(py(g, "instance_number('Tree')")).toBeGreaterThan(10);
-    expect(py(g, "instance_number('Scenery') == instance_number('Hedge') + instance_number('Tree')")).toBe(true);
+    expect(py(g, "instance_number('ItemBox')")).toBe(16);   // four rows of four
+    expect(py(g, "instance_number('BoostPad')")).toBe(2);
+    expect(py(g, "instance_number('Scenery') == instance_number('Hedge') + instance_number('Tree') + instance_number('ItemBox')")).toBe(true);
   }, 60_000);
 
   it("is driven through a whole race, from the title to the results", async () => {
@@ -117,20 +125,28 @@ describe.runIf(have)("Zoomtown Cup", () => {
     expect(py(g, `keep_best("Sunny Meadow", ${steps - 10})`)).toBe(true);
     step(g, 45);
     press(g, "space");
-    expect(py(g, "g.mode")).toBe("title");
-    expect(py(g, "instance_number('PlayerKart')")).toBe(0);
+    expect(py(g, "g.mode")).toBe("standings");
+    // One race of a cup paid its points, by place.
+    expect(py(g, "sum(g.cup_points)")).toBe(39);
+    expect(py(g, "g.cup_race")).toBe(1);
+    step(g, 45);
+    press(g, "space");
+    expect(py(g, "g.mode")).toBe("race");
+    expect(py(g, "RACE['track']['name']")).toBe("Cactus Canyon");
   }, 240_000);
 
   it("the computer's drivers finish the race on their own, faster ones first", async () => {
     const g = await start();
     // Off the title, whose demo starts again as soon as anyone finishes.
-    py(g, "g.mode = 'watching'\nnew_race(g, False)\nRACE['count'] = 0");
+    // With no items or pads: this is about their skill, and a bolt in the back isn't.
+    py(g, "g.mode = 'watching'\nnew_race(0)\nRACE['count'] = 0\nfor b in instances('ItemBox') + instances('BoostPad'):\n    b.destroy()");
     for (let i = 0; i < 12000 && !py(g, "all(c.done for c in RACE['karts'])"); i++) step(g);
     expect(py(g, "all(c.done for c in RACE['karts'])")).toBe(true);
     // Nobody stuck in a hedge: each took about what the fastest took.
     expect(py(g, "max(c.done for c in RACE['karts']) < 1.25 * min(c.done for c in RACE['karts'])")).toBe(true);
     // Skill decides it: best beats worst, over three laps.
-    expect(py(g, "RACE['karts'][1].done < RACE['karts'][7].done")).toBe(true);
+    // Rosie and Gus have the same top speed, and Gus starts in front: only skill can do it.
+    expect(py(g, "next(c for c in RACE['karts'] if c.who == 0).done < next(c for c in RACE['karts'] if c.who == 7).done")).toBe(true);
   }, 240_000);
 
   it("a computer driver lifts for a sharp bend coming, not on a straight", async () => {
@@ -205,9 +221,12 @@ def beside(k):
     hold(g, "up", false);
   }, 60_000);
 
-  it("the hedges hold all the way round: no kart gets through, on either side", async () => {
+  it.each([0, 1, 2, 3])("the hedges hold all the way round track %i: no kart gets through, on either side", async (t) => {
     const g = await racing();
-    py(g, `you = RACE['karts'][0]
+    py(g, `g.mode = 'watching'
+new_race(${t}, 0)
+RACE['count'] = 0
+you = RACE['karts'][0]
 line = RACE['line']
 n = len(line)
 wall = RACE['track']['half'] + RACE['track']['verge']
@@ -223,10 +242,13 @@ def aim(i, side):
     you.a = you.move_a = math.degrees(math.atan2(-ny, nx))
     you.v = 4.0
     you.boost = 0
+    you.spin = 0
+for b in instances('BoostPad') + instances('ItemBox'):
+    b.destroy()
 worst = 0`);
     hold(g, "up", true);
     const points = py(g, "n") as number;
-    for (let i = 0; i < points; i += 3) {
+    for (let i = 0; i < points; i += 5) {
       for (const side of [-1, 1]) {
         py(g, `aim(${i}, ${side})`);
         for (let k = 0; k < 40; k++) {
@@ -328,6 +350,244 @@ run(59)`);
     step(g, 40);
     expect(py(g, "RACE['karts'][0].v")).toBeGreaterThan(0);
     hold(g, "up", false);
+  }, 60_000);
+
+  it("every track can be raced: the computer's drivers finish each, items and all", async () => {
+    const g = await start();
+    py(g, "g.mode = 'watching'");
+    for (let t = 0; t < 4; t++) {
+      py(g, `new_race(${t})\nRACE['count'] = 0`);
+      for (let i = 0; i < 16000 && !py(g, "all(c.done for c in RACE['karts'])"); i++) step(g);
+      expect(py(g, "RACE['track']['name']")).toBe(py(g, `TRACKS[${t}]['name']`));
+      expect(py(g, "all(c.done for c in RACE['karts'])")).toBe(true);
+      // An item can cost a driver a few seconds; a driver stuck somewhere costs far more.
+      expect(py(g, "max(c.done for c in RACE['karts']) < 1.35 * min(c.done for c in RACE['karts'])")).toBe(true);
+    }
+  }, 400_000);
+
+  it("a cup is four races, and its result is kept", async () => {
+    const g = await start();
+    py(g, "g.cup_points = [0] * 8\ng.racer = 2\ng.cup_race = 0\nnew_race(0, 2)\ng.mode = 'race'");
+    for (let t = 0; t < 4; t++) {
+      expect(py(g, "RACE['track_i']")).toBe(t);
+      expect(py(g, "g.mode")).toBe("race");
+      py(g, "RACE['count'] = 0\nRACE['karts'][0].progress = RACE['track']['laps'] * len(RACE['line'])");
+      step(g, 2);
+      expect(py(g, "g.mode")).toBe("results");
+      step(g, 45);
+      press(g, "space");
+      expect(py(g, "g.mode")).toBe("standings");
+      step(g, 45);
+      if (t < 3) press(g, "space");
+    }
+    // Finished first in every one, by the shortcut above.
+    expect(py(g, "g.cup_points[2]")).toBe(40);
+    expect(g.saved()).toMatchObject({ cup_best: 1 });
+    expect(py(g, "cup_table(g)[0]")).toBe(2);
+    press(g, "space");
+    expect(py(g, "g.mode")).toBe("title");
+    expect(py(g, "instance_number('PlayerKart')")).toBe(0);
+  }, 120_000);
+
+  it("the menu picks the racer, the mode and a time trial's track", async () => {
+    const g = await start();
+    press(g, "space");
+    step(g, 12);
+    expect(py(g, "menu_rows(g)")).toEqual(["mode", "racer", "go"]);
+    press(g, "right");                // Time trial
+    expect(py(g, "MODES[g.mode_i]")).toBe("Time trial");
+    expect(py(g, "menu_rows(g)")).toEqual(["mode", "racer", "track", "go"]);
+    press(g, "down");
+    press(g, "right");
+    press(g, "right");
+    expect(py(g, "RACERS[g.racer]['name']")).toBe("Juniper");
+    press(g, "down");
+    press(g, "right");
+    expect(py(g, "TRACKS[g.track_i]['name']")).toBe("Cactus Canyon");
+    press(g, "down");
+    press(g, "space");
+    expect(py(g, "g.mode")).toBe("race");
+    expect(py(g, "RACE['track']['name']")).toBe("Cactus Canyon");
+    expect(py(g, "RACE['karts'][0].who")).toBe(2);
+    expect(py(g, "RACE['karts'][0].sprite")).toBe("kart_2");
+    expect(py(g, "instance_number('Kart')")).toBe(1);      // alone
+    expect(py(g, "RACE['karts'][0].turbos")).toBe(3);
+    // Each track's scenery is its own.
+    expect(py(g, "instances('Hedge')[0].sprite")).toBe("bush_1");
+  }, 60_000);
+
+  it("racers drive differently: their numbers reach the kart", async () => {
+    const g = await start();
+    const run = (who: number) => {
+      py(g, `new_race(0, ${who}, False)\nRACE['count'] = 0\ny = RACE['karts'][0]\ny.gas, y.steer, y.drifting = True, 0, False\ny.x, y.y = RACE['line'][20]\ny.i = 20\ny.a = y.move_a = 90\nfor _ in range(60):\n    y.x, y.y = RACE['line'][20]\n    y.on_step()`);
+      return py(g, "y.v") as number;
+    };
+    expect(run(6)).toBeGreaterThan(run(1));          // Pepper picks up quicker than Otto
+    const turn = (who: number) => {
+      py(g, `new_race(0, ${who}, False)\nRACE['count'] = 0\ny = RACE['karts'][0]\ny.v = 4.0\ny.gas, y.steer, y.drifting = True, 1, False\nb = y.a\ny.x, y.y = RACE['line'][20]\ny.on_step()`);
+      return Math.abs(py(g, "angle_diff(y.a, b)") as number);
+    };
+    expect(turn(4)).toBeGreaterThan(turn(3));        // Wren turns tighter than Mack
+    expect(py(g, "RACE['karts'][0].top_k")).toBe(py(g, "RACERS[3]['top']"));
+  }, 60_000);
+
+  it("ice slides: on Frostbite Pass a kart takes longer to go where it points", async () => {
+    const g = await start();
+    const lag = (t: number) => {
+      py(g, `new_race(${t}, 0, False)\nRACE['count'] = 0\ny = RACE['karts'][0]\ny.gas, y.steer, y.drifting = True, 0, False\ny.v = 4.0\ny.x, y.y = RACE['line'][20]\ny.a = 90\ny.move_a = 60\ny.on_step()`);
+      return Math.abs(py(g, "angle_diff(y.a, y.move_a)") as number);
+    };
+    expect(lag(2)).toBeGreaterThan(lag(0));
+  }, 60_000);
+
+  it("an item box gives one item, only to a hand that's empty, and comes back", async () => {
+    const g = await racing();
+    py(g, `you = RACE['karts'][0]
+box = instances('ItemBox')[0]
+for c in RACE['karts'][1:]:
+    c.x, c.y = 10, 10`);
+    const onBox = () => {
+      // Told where it is on the road too: a kart far from where it thinks it is gets put back.
+      py(g, "you.x, you.y = box.x, box.y\nyou.i = min(range(len(RACE['line'])), key=lambda i: math.hypot(RACE['line'][i][0] - box.x, RACE['line'][i][1] - box.y))");
+      step(g);
+    };
+    onBox();
+    expect(py(g, "you.item in ITEMS")).toBe(true);
+    expect(py(g, "box.ready")).toBe(false);
+    const had = py(g, "you.item");
+    // Away from it, and everyone else too, or the box goes again the moment it's back.
+    py(g, "far = (you.i + 60) % len(RACE['line'])");
+    for (let i = 0; i < 250; i++) {
+      py(g, "for c in RACE['karts']:\n    c.i = (far + c.who * 2) % len(RACE['line'])\n    c.x, c.y = RACE['line'][c.i]\n    c.v = 0");
+      step(g);
+    }
+    expect(py(g, "box.ready")).toBe(true);
+    onBox();
+    expect(py(g, "you.item")).toBe(had);     // a full hand keeps what it has
+    expect(py(g, "box.ready")).toBe(false);  // and the box is still used up
+  }, 60_000);
+
+  it("what you get depends on where you are", async () => {
+    const g = await racing();
+    py(g, `you = RACE['karts'][0]
+def picks(place):
+    you.place = place
+    return set(pick_item(you) for _ in range(200))`);
+    expect(py(g, "'bolt' in picks(1)")).toBe(false);
+    expect(py(g, "'bolt' in picks(8)")).toBe(true);
+    expect(py(g, "'oil' in picks(8)")).toBe(false);
+    expect(py(g, "'oil' in picks(1)")).toBe(true);
+  }, 60_000);
+
+  it("each item does its job: a turbo, a shield, a slick and a bolt", async () => {
+    const g = await racing();
+    py(g, `you = RACE['karts'][0]
+them = RACE['karts'][1]
+for c in RACE['karts'][2:]:
+    c.x, c.y = 10, 10
+def open_road():
+    you.x, you.y = RACE['line'][60]
+    you.i = 60
+    you.spin = you.boost = you.shield = 0
+    them.spin = them.boost = them.shield = 0
+    them.x, them.y = RACE['line'][66]
+    them.i = 66
+    you.v = them.v = 0`);
+    py(g, "open_road()\nyou.item = 'turbo'");
+    press(g, "space");
+    expect(py(g, "you.boost")).toBeGreaterThan(0);
+    expect(py(g, "you.item is None")).toBe(true);
+    py(g, "open_road()\nyou.item = 'shield'");
+    press(g, "space");
+    expect(py(g, "you.shield")).toBeGreaterThan(0);
+    // A shield takes the hit, once.
+    expect(py(g, "spin_out(you)")).toBe(false);
+    expect(py(g, "you.spin")).toBe(0);
+    expect(py(g, "spin_out(you)")).toBe(true);
+    expect(py(g, "you.spin")).toBeGreaterThan(0);
+    // Spun out, the keys do nothing and it slows.
+    py(g, "open_road()\nyou.v = 4.0\nspin_out(you)");
+    py(g, "you.spin, you.v, you.gas = 30, 1.0, True\nyou.on_step()");
+    expect(py(g, "you.v")).toBeLessThan(1);          // the gas would speed it up
+    expect(py(g, "you.gas")).toBe(false);
+    // A slick spares the kart that dropped it, for a moment, and stops whoever's next.
+    py(g, "open_road()\nyou.item = 'oil'");
+    press(g, "space");
+    expect(py(g, "instance_number('OilSlick')")).toBe(1);
+    expect(py(g, "you.spin")).toBe(0);
+    py(g, "slick = instances('OilSlick')[0]\nyou.x, you.y = slick.x, slick.y");
+    step(g);
+    expect(py(g, "you.spin")).toBe(0);
+    py(g, "them.x, them.y = slick.x, slick.y");
+    step(g, 2);
+    expect(py(g, "them.spin")).toBeGreaterThan(0);
+    expect(py(g, "instance_number('OilSlick')")).toBe(0);
+    // A bolt spares the kart that fired it, even right on top of it.
+    py(g, "open_road()\nown = instance_create(you.x, you.y, 'Bolt')\nown.owner = you\nown.i = you.i");
+    step(g);
+    expect(py(g, "you.spin")).toBe(0);
+    expect(py(g, "instance_number('Bolt')")).toBe(1);
+    py(g, "own.destroy()");
+    step(g);
+    // A bolt goes for the kart ahead, not the kart that fired it.
+    py(g, "open_road()\nyou.progress, them.progress = 60.0, 66.0\nyou.place, them.place = 2, 1\nfor c in RACE['karts'][2:]:\n    c.place = 8\nyou.item = 'bolt'");
+    hold(g, "space", true);
+    step(g);
+    hold(g, "space", false);
+    expect(py(g, "instance_number('Bolt')")).toBe(1);
+    expect(py(g, "instances('Bolt')[0].target is them")).toBe(true);
+    for (let i = 0; i < 80 && py(g, "instance_number('Bolt')"); i++) {
+      py(g, "them.x, them.y = RACE['line'][66]\nthem.v = 0\nthem.i = 66\nyou.x, you.y = RACE['line'][60]\nyou.v = 0\nyou.i = 60");
+      step(g);
+    }
+    expect(py(g, "instance_number('Bolt')")).toBe(0);
+    expect(py(g, "them.spin")).toBeGreaterThan(0);
+    expect(py(g, "you.spin")).toBe(0);
+  }, 60_000);
+
+  it("a computer driver uses what it picks up", async () => {
+    const g = await racing();
+    py(g, "them = RACE['karts'][3]\nthem.item = 'turbo'\nthem.item_wait = 5");
+    step(g, 10);
+    expect(py(g, "them.item is None")).toBe(true);
+    expect(py(g, "them.boost")).toBeGreaterThan(0);
+  }, 60_000);
+
+  it("a boost pad boosts whoever drives over it, where the picture shows it", async () => {
+    const g = await racing();
+    py(g, "you = RACE['karts'][0]\npad = instances('BoostPad')[0]\nx, y, a = pad_places(RACE['track'])[0]");
+    expect(py(g, "(round(pad.x), round(pad.y))")).toEqual(py(g, "(round(x), round(y))"));
+    py(g, "you.x, you.y = pad.x, pad.y\nyou.i = min(range(len(RACE['line'])), key=lambda i: math.hypot(RACE['line'][i][0] - pad.x, RACE['line'][i][1] - pad.y))\nyou.boost = 0\nyou.spin = 0");
+    step(g);
+    expect(py(g, "you.boost")).toBeGreaterThan(0);
+  }, 60_000);
+
+  it("a time trial keeps your best run, and it drives beside you next time", async () => {
+    const g = await start();
+    py(g, "g.mode, g.mode_i = 'race', 1\nnew_race(0, 0, False)\nRACE['count'] = 0");
+    expect(py(g, "instance_number('Ghost')")).toBe(0);
+    hold(g, "up", true);
+    step(g, 200);
+    hold(g, "up", false);
+    py(g, "RACE['karts'][0].progress = 3.0 * len(RACE['line'])");
+    step(g, 2);
+    expect(py(g, "g.mode")).toBe("results");
+    const saved = g.saved() as Record<string, [number, number, number][]>;
+    const path = saved["ghost_Sunny Meadow"]!;
+    expect(path.length).toBeGreaterThan(40);
+    // A second run: the ghost is there, and goes where the first run went.
+    py(g, "g.mode = 'race'\nnew_race(0, 0, False)\nRACE['count'] = 0");
+    expect(py(g, "instance_number('Ghost')")).toBe(1);
+    step(g, 60);
+    const at = (py(g, "RACE['steps'] // PATH_EVERY") as number);
+    expect(py(g, "instances('Ghost')[0].x")).toBeCloseTo(path[at]![0], 1);
+    expect(py(g, "instances('Ghost')[0].y")).toBeCloseTo(path[at]![1], 1);
+    // A slower run leaves the ghost alone.
+    py(g, "g.best = None");
+    step(g, 400);
+    py(g, "RACE['karts'][0].progress = 3.0 * len(RACE['line'])");
+    step(g, 2);
+    expect((g.saved() as Record<string, unknown[]>)["ghost_Sunny Meadow"]!.length).toBe(path.length);
   }, 60_000);
 
   it("the views of a kart: from behind when it faces away, the side when across", async () => {

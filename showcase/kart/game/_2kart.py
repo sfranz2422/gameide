@@ -84,5 +84,5 @@ def computer_keys(kart, skill):
     # How much the road turns further on: a sharp bend means slowing down first.
     far = line[(kart.i + ahead + 10) % n]
     bend = abs(angle_diff(math.degrees(math.atan2(-(far[1] - ty), far[0] - tx)), want))
-    gas = kart.v < STATS["top"] * skill * (0.74 if bend > 42 else 1.0)
+    gas = kart.v < STATS["top"] * kart.top_k * skill * (0.74 if bend > 42 else 1.0)
     return gas, steer

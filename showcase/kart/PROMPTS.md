@@ -74,7 +74,22 @@ Fill the picture's width: bushes join up into a hedge.
   a short brown trunk, the trunk's foot in the middle of the bottom edge."* Three
   versions, a little different.
 
+## Items (optional: stand-ins are drawn by the build)
+
+- **`item_turbo`, `item_oil`, `item_bolt`, `item_shield`** — 48 × 48, on flat magenta:
+  *"A chunky game icon of a flame"*, *"…a dark oil drop"*, *"…a yellow lightning
+  bolt"*, *"…a blue shield"*, in the style above.
+- **`item_box`** — 64 × 64. *"A bright golden crate with a red star on its front,
+  seen straight on, on flat magenta."*
+- **`oil_slick`** — 96 × 34. *"A dark, shiny puddle of oil, seen from low down, on
+  flat magenta."*
+
+The other tracks' hedges and trees are the meadow's, recoloured by the build. Their
+own pictures would be a Gemini job later if wanted.
+
 ## The sky
+
+The other three (`sky_1` desert, `sky_2` snow, `sky_3` night) have stand-ins too.
 
 - **`sky_0`** — 1024 × 118, no magenta. *"Seamless horizontally tiling, so its left
   and right edges join up: a bright blue summer sky with puffy cartoon clouds,

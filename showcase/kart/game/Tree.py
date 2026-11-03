@@ -1,5 +1,5 @@
 # object: Tree
-# sprite: tree
+# sprite: tree_0
 # parent: Scenery
 # Behind the hedge, for the look of it.
 
