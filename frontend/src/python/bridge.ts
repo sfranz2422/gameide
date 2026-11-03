@@ -56,6 +56,8 @@ export interface GameCallbacks {
   sounds?: (orders: SoundOrder[]) => void;
   /** The game's whole save data, after it changed. */
   save?: (data: Record<string, unknown>) => void;
+  /** A better score from high_score(). */
+  score?: (score: number) => void;
   /** touch_controls(): what to show on the screen, or null to hide it. */
   touch?: (spec: TouchSpec | null) => void;
 }
@@ -242,6 +244,7 @@ export class PythonGame {
     for (const w of cmds?.warnings ?? []) this.callbacks.warning?.(w);
     if (cmds?.sounds) this.callbacks.sounds?.(cmds.sounds);
     if (cmds?.save) this.callbacks.save?.(cmds.save);
+    if (cmds?.score !== undefined) this.callbacks.score?.(cmds.score);
     if (cmds && cmds.touch !== undefined) this.callbacks.touch?.(cmds.touch);
     return this.engine.endStep(cmds);
   }

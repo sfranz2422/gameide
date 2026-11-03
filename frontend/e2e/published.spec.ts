@@ -4,6 +4,7 @@
  * that plays offline once installed (its service worker).
  */
 import { devices, expect, test, webkit, type Browser, type Page } from "@playwright/test";
+import { strToU8, zipSync } from "fflate";
 import { existsSync } from "node:fs";
 import { chooseTemplate, playAndWait, watchErrors } from "./helpers";
 
@@ -202,5 +203,77 @@ test("a published game can be installed as an app: it has a manifest", async ({ 
   expect(manifest).toMatchObject({ name: "Uma's App", display: "standalone", start_url: link });
   const icon = await play.evaluate(async (src) => (await fetch(src)).status, manifest.icons[0].src);
   expect(icon).toBe(200);
+  await ctx.close();
+});
+
+// The board beside a game: a real game calling high_score(), played by students
+// of two schools. The game's Create event scores 5, so the board has a reason to show.
+test("the school's high scores: either side of the game, first names only, your own school only", async ({ browser }) => {
+  const project = {
+    format: "gameide-project", schemaVersion: 8, id: "scorezip", name: "Scoring", created: "2026-01-01T00:00:00Z", modified: "2026-01-01T00:00:00Z",
+    settings: { stepsPerSecond: 60 }, sprites: [], tilesets: [], scripts: [], sounds: [], fonts: [],
+    objects: [{ id: "o1", name: "Scorer", sprite: null, visible: true, solid: false, persistent: false, depth: 0, parent: null,
+      events: [{ id: "e1", key: { type: "create" }, mode: "python", code: "high_score(5)\n" }] }],
+    rooms: [{ id: "r1", name: "Room1", width: 320, height: 180, background: "#223344", gridWidth: 16, gridHeight: 16, snap: true,
+      layers: [{ id: "L", name: "Instances", kind: "instances", depth: 0, visible: true, locked: false }],
+      camera: { enabled: false, width: 320, height: 180, follow: null, smoothing: 1 },
+      instances: [{ id: "i1", object: "o1", layer: "L", x: 0, y: 0, scaleX: 1, scaleY: 1, angle: 0, code: "" }] }],
+  };
+  const zip = Buffer.from(zipSync({ "project.json": strToU8(JSON.stringify(project)), "assets/index.json": strToU8("{}") }));
+  const M = "mohawk.k12.pa.us";
+
+  const owner = await signedIn(browser, `tess@${M}`);
+  await owner.page.goto("/#/games");
+  await owner.page.getByTestId("import-file").setInputFiles({ name: "s.zip", mimeType: "application/zip", buffer: zip });
+  await owner.page.waitForURL(/#\/p\//, { timeout: 30_000 });
+  await expect(owner.page.getByTestId("save-status")).toHaveText("Saved", { timeout: 30_000 });
+  const url = await publish(owner.page, "Scoring", "unlisted");
+
+  const play = async (email: string, score: number) => {
+    const { ctx, page } = await signedIn(browser, email);
+    await page.goto(url);
+    await expect(page.getByTestId("scores-left")).toContainText("No scores yet").catch(() => undefined);
+    await page.getByTestId("player-start").click({ timeout: 60_000 });
+    await expect(page.locator("canvas[data-testid=game-canvas]")).toBeVisible();
+    await page.waitForFunction(() => (window as any).__gameide.host.state === "running", null, { timeout: 30_000 });
+    await page.evaluate((n) => (window as any).__gameide.host.evalPython(`high_score(${n})`), score);
+    return { ctx, page };
+  };
+  const amy = await play(`amy@${M}`, 1234);
+  await expect(amy.page.getByTestId("scores-right")).toContainText("1,234", { timeout: 15_000 });
+  await expect(amy.page.getByTestId("scores-left")).toContainText("Amy");
+  const carl = await play("carl@other.example", 7777);
+  await expect(carl.page.getByTestId("scores-left")).toContainText("Carl", { timeout: 15_000 });
+  await expect(carl.page.getByTestId("scores-left")).not.toContainText("Amy");
+  const ben = await play(`ben@${M}`, 2000);
+  const left = ben.page.getByTestId("scores-left");
+  await expect(left).toContainText("Ben", { timeout: 15_000 });
+  await expect(left).toContainText("Amy");
+  await expect(left).not.toContainText("Carl");
+  await expect(left).not.toContainText("@");
+
+  // Beside the game, not over it or under it.
+  const [l, g, r] = await Promise.all([left.boundingBox(), ben.page.getByTestId("player-stage").boundingBox(), ben.page.getByTestId("scores-right").boundingBox()]);
+  expect(l!.x + l!.width).toBeLessThanOrEqual(g!.x);
+  expect(g!.x + g!.width).toBeLessThanOrEqual(r!.x);
+  expect(Math.abs(l!.y - g!.y)).toBeLessThan(2);
+  expect(g!.width).toBeGreaterThan(500);
+
+  // Signed out: the game plays, and nobody's name shows.
+  const stranger = await browser.newContext();
+  const out = await stranger.newPage();
+  await out.goto(url);
+  await expect(out.getByTestId("scores-left")).toContainText("Sign in to see");
+  await expect(out.getByTestId("scores-left")).not.toContainText("Ben");
+  await Promise.all([owner.ctx, amy.ctx, carl.ctx, ben.ctx, stranger].map((c) => c.close()));
+});
+
+test("a game that never calls high_score has no boards", async ({ browser }) => {
+  const { ctx, page } = await signedIn(browser, "noboard@mohawk.k12.pa.us");
+  await newGame(page);
+  const url = await publish(page, "No boards", "unlisted");
+  await page.goto(url);
+  await expect(page.getByTestId("player-start")).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByTestId("scores-left")).toHaveCount(0);
   await ctx.close();
 });

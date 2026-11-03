@@ -36,6 +36,8 @@ export interface HostEvents {
   stats: (s: WorkerStats | null) => void;
   /** Python is loaded and Play will be quick. */
   ready: (ready: boolean) => void;
+  /** A better score from high_score(): only the published player listens. */
+  score?: (score: number) => void;
 }
 
 /** Where a game keeps what it saves (save_set), in this browser. */
@@ -226,6 +228,9 @@ export class GameHost {
         break;
       case "touch":
         this.showTouch(m.spec);
+        break;
+      case "score":
+        this.events.score?.(m.score);
         break;
       case "save":
         if (this.saveId)

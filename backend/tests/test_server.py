@@ -1669,6 +1669,75 @@ server.gamestore.create_all(old)
 from sqlalchemy import inspect as _inspect
 check("an old database gains the showcase column", "showcase" in {c["name"] for c in _inspect(old).get_columns("gameide_published")})
 
+# High scores: first names, students only, and only your own school.
+M = "mohawk.k12.pa.us"
+_amy, _ben, _pat = client(f"amy@{M}"), client(f"ben@{M}"), client(f"pat@{M}")
+_far = client("carl@other.example")
+_look = client(f"dee@x{M}")
+_mail1, _mail2 = client("gail@gmail.com"), client("gus@gmail.com")
+_sdb = server.SessionLocal()
+for _email, _first, _last in ((f"amy@{M}", "Amy", "Zebrowski"), (f"ben@{M}", "Ben", "Yoder")):
+    _u = _sdb.query(accounts.User).filter_by(email=_email).first()
+    _u.first_name, _u.last_name, _u.name = _first, _last, f"{_first} {_last}"
+_sdb.commit()
+put(_amy, "hs1", project("hs1", "Scores"), 0)
+HS = _amy.post("/api/projects/hs1/publish", json={"title": "Scores", "visibility": "unlisted"}).get_json()["published"]["id"]
+def _score(c, n, slug=None):
+    return c.post(f"/api/play/{slug or HS}/score", json={"score": n})
+def _board(c, slug=None):
+    return c.get(f"/api/play/{slug or HS}/scores").get_json()
+_names = lambda c: [(r["name"], r["score"]) for r in _board(c)["scores"]]
+check("high scores: signing in comes first", _score(client(), 10).status_code == 401)
+check("high scores: signed out shows no names", _board(client()) == {"signedIn": False, "school": False, "scores": [], "mine": None})
+check("high scores: a score is a number above zero", all(_score(_amy, v).status_code == 400 for v in ("100", True, None, 0, -5, 10 ** 13, [1])))
+check("high scores: a first score counts", _score(_amy, 100).get_json() == {"kept": True})
+_score(_ben, 300)
+_score(_far, 900)
+_score(_look, 800)
+_score(_mail1, 700)
+check("high scores: only your own school, best first", _names(_pat) == [("Ben", 300), ("Amy", 100)], _names(_pat))
+check("high scores: a look-alike domain isn't your school", ("Dee", 800) not in _names(_pat) and _names(_look) == [("Dee", 800)], _names(_look))
+check("high scores: another school sees only its own", _names(_far) == [("Carl", 900)], _names(_far))
+_text_board = _ben.get(f"/api/play/{HS}/scores").get_data(as_text=True)
+check("high scores: a first name only, never a last name", "Yoder" not in _text_board and "Zebrowski" not in _text_board, _text_board)
+check("high scores: no email goes out", "@" not in _text_board and M not in _text_board, _text_board)
+check("high scores: a personal address has no school", _board(_mail2)["school"] is False and _board(_mail2)["scores"] == [] and _board(_mail1)["mine"] is None)
+check("high scores: only your best stays", _score(_amy, 50).get_json() == {"kept": False} and dict(_names(_pat))["Amy"] == 100)
+_score(_amy, 500)
+check("high scores: a better one takes its place", _names(_pat)[0] == ("Amy", 500), _names(_pat))
+check("high scores: you can find yourself", _board(_ben)["mine"] == {"score": 300, "rank": 2} and [r["me"] for r in _board(_ben)["scores"]] == [False, True])
+_tm = client("teacher@example.com")
+check("high scores: a teacher plays as practice", _score(_tm, 99999).get_json() == {"kept": False} and _board(_tm)["mine"] is None)
+# At the same school, or the domain rule alone would hide them and prove nothing.
+_miss = client(f"miss@{M}")
+_score(_miss, 9999)
+check("high scores: …a student's score shows", ("Miss", 9999) in _names(_pat), _names(_pat))
+_te = os.environ["TEACHER_EMAILS"]
+os.environ["TEACHER_EMAILS"] = _te + f",miss@{M}"
+check("high scores: students only, even a teacher who once played", all(r["score"] != 9999 for r in _board(_pat)["scores"]), _names(_pat))
+os.environ["TEACHER_EMAILS"] = _te
+_sdb.query(server.gamestore.HighScore).filter_by(score=9999).delete()
+_sdb.commit()
+for _k in range(25):
+    _score(client(f"kid{_k}@{M}"), 1000 + _k)
+_all = _board(_pat)["scores"]
+check("high scores: the top twenty", len(_all) == 20 and _all[0]["score"] == 1024, len(_all))
+check("high scores: past twenty you still know your place", _board(_ben)["mine"]["rank"] == 27 and all(not r["me"] for r in _board(_ben)["scores"]), _board(_ben)["mine"])
+_kc = accounts.Course(teacher_id=_sdb.query(accounts.User).filter_by(email="teacher@example.com").first().id, name="Scores class", app="gameide")
+_sdb.add(_kc)
+_sdb.flush()
+_sdb.add(accounts.Enrollment(class_id=_kc.id, email=f"amy@{M}", name="amy"))
+_sdb.commit()
+put(_amy, "hs2", project("hs2", "Class only"), 0)
+_cg = _amy.post("/api/projects/hs2/publish", json={"title": "Class only", "visibility": "class", "classId": _kc.id}).get_json()["published"]["id"]
+check("high scores: a class game's board is only for its class", _pat.get(f"/api/play/{_cg}/scores").status_code == 403 and _score(_pat, 5, _cg).status_code == 403)
+_pid = _sdb.query(server.gamestore.Published).filter_by(slug=HS).first().id
+_sdb.close()
+_sdb = server.SessionLocal()
+check("high scores: unpublishing takes the scores with it", _amy.delete("/api/projects/hs1/publish").status_code == 200 and _sdb.query(server.gamestore.HighScore).filter_by(published_id=_pid).count() == 0)
+check("high scores: …and the game's gone", client(f"pat@{M}").get(f"/api/play/{HS}/scores").status_code == 404)
+_sdb.close()
+
 print()
 if failures:
     print(f"FAILED: {len(failures)} — " + "; ".join(failures))

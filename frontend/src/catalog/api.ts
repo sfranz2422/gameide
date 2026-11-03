@@ -260,6 +260,8 @@ export const API: ApiEntry[] = [
     'A value kept with save_set — or `default` if nothing is saved under that name: save_get("best", 0).'),
   fn("Saving", "save_delete", [p("key", "string")], "nothing", "Forgets one saved value."),
   fn("Saving", "save_clear", [], "nothing", "Forgets everything this game saved."),
+  fn("Saving", "high_score", [p("score", "number")], "nothing",
+    "Puts a score on the board beside your game once it's published: high_score(score). Each student's best shows, by first name, to students at the same school. Nothing happens while you're playing it in the editor."),
 
   // Effects: game feel (engine/effects.ts, render/feel.ts)
   fn("Effects", "effect", [p("kind", "string"), p("x", "number"), p("y", "number"), p("color", "color", "None"), p("scale", "number", "1")], "nothing",

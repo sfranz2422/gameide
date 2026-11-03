@@ -121,7 +121,7 @@ __all__ = [
     # sound
     "sound_play", "sound_stop", "sound_playing", "music_play", "music_stop",
     # saving
-    "save_set", "save_get", "save_delete", "save_clear",
+    "save_set", "save_get", "save_delete", "save_clear", "high_score",
     # game feel
     "particles", "effect", "weather", "particles_clear", "hit_pause", "lighting", "light", "screen_effect",
     "screen_flash", "screen_fade", "tween", "tween_stop", "ease", "say", "ask", "answer", "dialogue_open", "dialogue_clear",
@@ -1697,6 +1697,21 @@ _save = {}
 _save_changed = False
 
 
+# The school's board. Only a better score is sent, so calling this every step is
+# no matter. Nothing happens outside a published game: there's no board to put it on.
+_score_best = 0
+_score_new = None
+
+
+def high_score(score):
+    """Puts a score on the board beside a published game. Each student's best is what shows."""
+    global _score_best, _score_new
+    if isinstance(score, bool) or not isinstance(score, (int, float)) or score != score or score in (float("inf"), float("-inf")):
+        raise TypeError(f"high_score takes a number, like high_score(1200), not {score!r}.")
+    if score > _score_best:
+        _score_best = _score_new = score
+
+
 def save_set(key, value):
     """Keeps a value (number, text, True/False, None, or a list/dict of those) under a name, for next time."""
     global _save_changed
@@ -2151,7 +2166,7 @@ def _end_of_frame():
 
 def _commands():
     """What JavaScript must do after this frame, as JSON — or None for nothing."""
-    global _draw, _gui, _debug_changed, _room_changed, _save_changed, _tiles_back, _touch
+    global _draw, _gui, _debug_changed, _room_changed, _save_changed, _tiles_back, _touch, _score_new
     out = {}
     if _touch is not False:
         out["touch"] = _touch
@@ -2171,6 +2186,9 @@ def _commands():
     if _save_changed:
         out["save"] = _save
         _save_changed = False
+    if _score_new is not None:
+        out["score"] = _score_new
+        _score_new = None
     if _draw:
         out["draw"] = _draw
         _draw = []

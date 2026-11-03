@@ -19,7 +19,7 @@ row is backed up with everything else.
 """
 import json
 
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, LargeBinary, String, Text, UniqueConstraint
+from sqlalchemy import BigInteger, Column, DateTime, ForeignKey, Integer, LargeBinary, String, Text, UniqueConstraint
 
 import accounts
 from accounts import Base, now
@@ -289,6 +289,18 @@ class Like(Base):
     id = Column(Integer, primary_key=True)
     published_id = Column(Integer, ForeignKey("gameide_published.id"), index=True, nullable=False)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+
+
+class HighScore(Base):
+    """A student's best score in one published game: what the play page's boards show (publishing.py)."""
+    __tablename__ = "gameide_high_scores"
+    __table_args__ = (UniqueConstraint("published_id", "user_id", name="uq_gameide_high_score"),)
+
+    id = Column(Integer, primary_key=True)
+    published_id = Column(Integer, ForeignKey("gameide_published.id"), index=True, nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True, nullable=False)
+    score = Column(BigInteger, nullable=False, default=0)
+    updated_at = Column(DateTime, nullable=False, default=now)
 
 
 class Report(Base):

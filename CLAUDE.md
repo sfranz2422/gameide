@@ -295,7 +295,7 @@ code (the harness turns bytecode caching off for that reason), or a
 mistyped case name ran nothing and still reported success (the harness now
 refuses unknown names).
 
-**The showcase games' runners** (`GM`, `MM`, `FB`, `GF`, `BB`, `HC`, `KT`, `TD`) rebuild
+**The showcase games' runners** (`GM`, `MM`, `FB`, `GF`, `BB`, `HC`, `KT`, `TD`, `SM`) rebuild
 that game from the sabotaged source before its playtest and again after. A
 build that **refuses** (Greenside's course checks, Ridgeline Rally's stage
 checks) leaves the old `out/project.json`, and the test passes on it: a
@@ -531,6 +531,14 @@ and students' own games are untouched.
 - XP is `check:<qid>`, once per question ever. Partly right isn't right here.
 - The game is held by `GameHost.holdForQuestion`: sound plays on the page, so
   freezing the worker alone left the music playing.
+
+## High scores
+
+`high_score(n)` in a game; `player/Scoreboard.tsx`; the `HighScore` table and the routes in publishing.py. A published game whose code calls it shows the school's top twenty beside the stage (left 1-10, right your best and 11-20); full screen is the stage alone, so they go with the page. A game that never calls it has no boards.
+
+- **Same email domain, first name, students only.** A personal address (`PERSONAL_DOMAINS`, gmail.com and the like) has no school: everyone on Gmail would otherwise be each other's classmates. A new route handing out scores needs a leak check in test_server.py.
+- The score comes from the student's browser, like XP's run claim, so it can be faked with browser tools. It touches no grade. Teachers aren't recorded: they play as practice.
+- It goes Python → `_commands` "score" → worker → `GameHost.events.score` → at most one POST per 2 s, because a game may call it every step.
 
 ## XP
 

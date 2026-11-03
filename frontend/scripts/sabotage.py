@@ -44,6 +44,9 @@ HC = "hillclimb"  # …or Ridgeline Rally's, rebuilt the same way
 KT = "kart"       # …or Zoomtown Cup's, rebuilt the same way
 PC, PCP, PCT = "../backend/pycheck.py", "../backend/publishing.py", "src/pycheck/bank.ts"
 TD = "towers"     # …or Fort Bramble's, rebuilt the same way
+SM = "smash"      # …or Jelly Jailbreak's, rebuilt the same way
+SMR, SML, SMB = "../showcase/smash/game/_2rules.py", "../showcase/smash/game/_1levels.py", "../showcase/smash/build.py"
+def _sm(n): return f"../showcase/smash/game/{n}.py"
 TDL, TDR, TDB = "../showcase/towers/game/_1levels.py", "../showcase/towers/game/_2rules.py", "../showcase/towers/build.py"
 def _td(n): return f"../showcase/towers/game/{n}.py"
 KTT, KTK, KTR = "../showcase/kart/game/_1tracks.py", "../showcase/kart/game/_2kart.py", "../showcase/kart/game/_3race.py"
@@ -1112,11 +1115,100 @@ CASES = [
  ("towers: a road crossing itself allowed", TDL, 'if len(set(road)) != len(road):', 'if False:', "the build refuses a level", TD),
  ("towers: decoration on the road allowed", TDL, 'if (c, r) in road:', 'if False:', "the build refuses a level", TD),
  ("towers: a wave of unknown enemies allowed", TDL, 'if name not in ENEMIES:', 'if False:', "the build refuses a level", TD),
+ ("smash: the dots aren't the flight", SMR, '        v += GRAVITY\n        x += h\n', '        v += GRAVITY * 2\n        x += h\n', "the dots are where the shot goes", SM),
+ ("smash: the dots start a step late", SMR, '        y += v\n        out.append((x, y))', '        out.append((x, y))\n        y += v', "the dots are where the shot goes", SM),
+ ("smash: any pull is a shot", _sm("Sling"), 'if math.hypot(self.pull_x, self.pull_y) < MIN_PULL:', 'if False:', "a little pull isn't a shot", SM),
+ ("smash: the sling stretches for ever", SMR, 'if far > MAX_PULL:', 'if False:', "a little pull isn't a shot", SM),
+ ("smash: a shot costs nothing", SMR, '    name = director.left.pop(0)', '    name = director.left[0]', "a little pull isn't a shot", SM),
+ ("smash: pressing a button pulls the sling too", _sm("GoButton"), 'room_goto(self.to)', 'pass', "pressing a button isn't pulling", SM),
+ ("smash: over the top is gone", _sm("Director"), 'clear_strays()\n', 'clear_strays()\n[s.destroy() for s in instances("Shot") if s.y < -30]\n', "comes back down", SM),
+ ("smash: shots pull into the ground", SMR, 'min(SLING_Y + pull_y, GROUND_Y - 24)', 'SLING_Y + pull_y', "a shot pulled down isn't in the ground", SM),
+ ("smash: strays never go", SMR, 'if t.x < -STRAY or t.x > VIEW_W + STRAY:', 'if False:', "past either side is gone", SM),
+ ("smash: the right side isn't an edge", SMR, 'if t.x < -STRAY or t.x > VIEW_W + STRAY:', 'if t.x < -STRAY:', "past either side is gone", SM),
+ ("smash: glass as hard as stone", _sm("Glass"), 'made_of(self, 0.7, 2.5,', 'made_of(self, 0.7, 26,', "materials: glass breaks", SM),
+ ("smash: wood unhurt", _sm("Wood"), 'made_of(self, 1, 8,', 'made_of(self, 1, 80000,', "materials: glass breaks", SM),
+ ("smash: stone as soft as wood", _sm("Stone"), 'made_of(self, 2.2, 26,', 'made_of(self, 2.2, 4,', "materials: glass breaks", SM),
+ ("smash: metal no harder than stone", _sm("Metal"), 'made_of(self, 3, 80,', 'made_of(self, 3, 10,', "materials: glass breaks", SM),
+ ("smash: speed from after the bump", SMR, 'closing = point_distance(thing.was_h, thing.was_v, other.was_h, other.was_v)', 'closing = point_distance(thing.hspeed, thing.vspeed, other.hspeed, other.vspeed)', "materials: glass breaks", SM),
+ ("smash: speeds never remembered", _sm("Thing"), 'self.was_h = self.hspeed\nself.was_v = self.vspeed', 'pass', "materials: glass breaks", SM),
+ ("smash: nothing cracks", SMR, 'thing.image_index = 0 if thing.hp > 0.66 else 1 if thing.hp > 0.33 else 2', 'pass', "a bump shows", SM),
+ ("smash: broken things stay", SMR, '    if thing.hp <= 0:\n        thing.destroy()', '    if thing.hp <= -99:\n        thing.destroy()', "a bump shows", SM),
+ ("smash: any touch hurts", SMR, 'if closing >= BUMP_MIN:', 'if closing >= 0:', "a gentle touch does nothing", SM, ('(closing - BUMP_MIN) * share', '(closing + 0.001) * share')),
+ ("smash: resting is a bump", SMR, 'BUMP_MIN = 2.2', 'BUMP_MIN = 0.0', "level 2 stands still", SM),
+ ("smash: a level's blocks start hurt", _sm("Thing"), 'self.hp = 1\n', 'self.hp = 0.9\n', "level 0 stands still", SM),
+ ("smash: hard ground breaks nothing", _sm("Ground"), 'self.weight = 1000', 'self.weight = 0.001', "a jar breaks if it falls far", SM),
+ ("smash: a jar frees nobody", _sm("Jar"), 'jelly = instance_create(self.x, self.y, "Jelly")\njelly.sprite = self.sprite.replace("jar", "jelly")', 'pass', "a jar breaks if it falls far", SM),
+ ("smash: every jelly the same", _sm("Jar"), 'self.sprite.replace("jar", "jelly")', '"jelly_green"', "a jar breaks if it falls far", SM),
+ ("smash: jellies never stop", _sm("Jelly"), 'if self.x <= self.home:\n    self.hspeed = 0', 'pass', "a freed jelly hops home", SM),
+ ("smash: jellies fall through the ground", _sm("Jelly"), 'if self.y >= GROUND_Y - 18 and self.vspeed > 0:', 'if False:', "a freed jelly hops home", SM),
+ ("smash: a cannonball stops dead", _sm("Cannonball"), 'self.pierce = 0.8', 'self.pierce = 0', "a cannonball goes on", SM),
+ ("smash: everything pierces", _sm("Thing"), 'self.pierce = 0\n', 'self.pierce = 0.9\n', "a cannonball goes on", SM),
+ ("smash: a crate is only a block", _sm("Crate"), 'blast(self.x, self.y, 130, 13)', 'pass', "a crate goes bang", SM),
+ ("smash: a blast throws nothing", SMR, 't.push((t.x - x) / d * power * near * t.weight, (t.y - y) / d * power * near * t.weight - near * t.weight)', 'pass', "a crate goes bang", SM),
+ ("smash: a blast hurts nothing", SMR, '            hurt(t, power * near / t.tough)', '            pass', "a crate goes bang", SM),
+ ("smash: a bomb ignores a click", _sm("Bomb"), '# === mouse global pressed left\nif self.flying:\n    self.destroy()', '# === mouse global pressed left\nif False:\n    self.destroy()', "a bomb goes off when clicked", SM),
+ ("smash: a bomb goes off on the sling", _sm("Bomb"), '# === mouse global pressed left\nif self.flying:', '# === mouse global pressed left\nif True:', "a bomb goes off when clicked", SM),
+ ("smash: a bomb's a dud", _sm("Bomb"), 'blast(self.x, self.y, 150, 16)', 'pass', "a bomb goes off when clicked", SM),
+ ("smash: a bomb has no fuse", _sm("Shot"), 'if self.life <= 0 or self.still > 30:', 'if False:', "a bomb nobody clicks", SM),
+ ("smash: a Trio ignores a click", _sm("Trio"), 'if self.flying and not self.touched:', 'if False:', "a Trio splits into three", SM),
+ ("smash: a Trio's bits go one way", _sm("Trio"), 'for turn in (-11, 0, 11):', 'for turn in (0, 0, 0):', "a Trio splits into three", SM),
+ ("smash: a Trio makes two", _sm("Trio"), 'for turn in (-11, 0, 11):', 'for turn in (-11, 11):', "a Trio splits into three", SM),
+ ("smash: shots out of order", SMR, 'director.left.pop(0)', 'director.left.pop()', "shots come one at a time", SM),
+ ("smash: the next shot never comes", _sm("Director"), '    if self.left:\n        load_shot(self)', '    if False:\n        load_shot(self)', "shots come one at a time", SM),
+ ("smash: the shot stays forever", _sm("Shot"), '    effect("dust", self.x, self.y)\n    self.destroy()', '    pass', "shots come one at a time", SM),
+ ("smash: a shot flown is still on the sling", SMR, '    global_vars.shot = None\n', '', "shots come one at a time", SM),
+ ("smash: running out ends nothing", _sm("Director"), '        finish_level(self, False)', '        pass', "out of shots with jars left", SM),
+ ("smash: losing counts as winning", _sm("Director"), '        finish_level(self, False)', '        finish_level(self, True)', "out of shots with jars left", SM),
+ ("smash: try again goes nowhere", _sm("GoButton"), '    room_restart()', '    pass', "out of shots with jars left", SM),
+ ("smash: no R key", _sm("Director"), 'if keyboard_check_pressed("r"):\n    room_restart()', 'pass', "the Retry button and R", SM),
+ ("smash: no Esc key", _sm("Director"), 'if keyboard_check_pressed("escape"):\n    room_goto("Title")', 'pass', "the Retry button and R", SM),
+ ("smash: Retry isn't", SMB, 'self.words = "Retry"\\nself.again = True\\n', 'self.words = "Retry"\\n', "the Retry button and R", SM),
+ ("smash: stars ignore shots", SMR, 'return 3 if used <= par else 2 if used == par + 1 else 1', 'return 3', "winning: stars by shots", SM),
+ ("smash: a worse result replaces a better", SMR, 'if director.stars > save_get(key, 0):', 'if True:', "winning: stars by shots", SM),
+ ("smash: a result never kept", SMR, '            save_set(key, director.stars)', '            pass', "winning: stars by shots", SM),
+ ("smash: spare shots score nothing", SMR, '        global_vars.score += len(director.left) * SHOT_POINTS\n', '', "winning: stars by shots", SM),
+ ("smash: freeing a jar scores nothing", _sm("Block"), 'global_vars.score += self.points', 'pass', "winning: stars by shots", SM),
+ ("smash: no way on from winning", SMR, 'buttons.append((LEVELS[director.level + 1]["name"], False, "Next level"))', 'pass', "winning: stars by shots", SM),
+ ("smash: a win never ends", _sm("Director"), '        finish_level(self, True)', '        pass', "winning: stars by shots", SM),
+ ("smash: every level open", _sm("LevelCard"), 'self.off = self.i > 0 and not save_get(f"stars_{self.i - 1}", 0)', 'self.off = False', "the title's levels open", SM),
+ ("smash: a won level opens nothing", _sm("LevelCard"), 'self.off = self.i > 0 and not save_get(f"stars_{self.i - 1}", 0)', 'self.off = self.i > 0', "the title's levels open", SM),
+ ("smash: a locked card still works", _sm("LevelCard"), '# === mouse pressed left\nif not self.off:', '# === mouse pressed left\nif True:', "the title's levels open", SM),
+ ("smash: shapes given no parent", SMB, 'P.obj(name, sprite=P.sprite_id(sprite), parent=P.obj_id(parent))', 'P.obj(name, sprite=P.sprite_id(sprite))', "is objects in rooms", SM),
+ ("smash: blocks not placed", SMB, '            placed.append((name, x, GROUND_Y - y - h / 2, ""))\n        room(level', '            pass\n        room(level', "is objects in rooms", SM),
+ ("smash: a level too hard for three stars", SML, '"name": "Two Huts", "theme": "grass", "shots": ["Rock", "Rock", "Rock"], "par": 2,', '"name": "Two Huts", "theme": "grass", "shots": ["Rock", "Rock", "Rock"], "par": 1,', "a bot frees level 1", SM),
+ ("smash: a late level's jar out of reach", SML, '[("Jar", 905, 0), ("GlassSmall", 960, 0), ("Jar", 960, 35)]', '[("Jar", 905, 0), ("MetalBig", 960, 0), ("Jar", 960, 70)]', "level 10 has a winning run", SM),
+ ("smash: the board never told", SMR, '        high_score(sum(save_get(f"score_{i}", 0) for i in range(len(LEVELS))))\n', '', "the school's board gets", SM),
+ ("smash: the board gets only this level", SMR, 'high_score(sum(save_get(f"score_{i}", 0) for i in range(len(LEVELS))))', 'high_score(global_vars.score)', "the school's board gets", SM),
+ ("smash: a tower that falls by itself", SML, '"blocks": pile(640, 0, "WoodSmall", "WoodSmall", "WoodSmall", "Jar")}', '"blocks": [("WoodSmall", 640, 0), ("WoodSmall", 640, 35), ("WoodWide", 655, 70), ("Jar", 680, 105)]}', "level 0 stands still", SM),
+ ("smash: floating blocks allowed", SML, 'if not (any(o[0] <= middle for o in under) and any(o[1] >= middle for o in under)):', 'if False:', "the build refuses a level", SM),
+ ("smash: blocks inside blocks allowed", SML, 'if left < obox[1] and obox[0] < right and bottom < obox[3] and obox[2] < top:', 'if False:', "the build refuses a level", SM),
+ ("smash: a level with no jars allowed", SML, 'if not any(b[0] == "Jar" for b in blocks):', 'if False:', "the build refuses a level", SM),
+ ("smash: an impossible par allowed", SML, 'if not 1 <= level["par"] <= len(level["shots"]):', 'if False:', "the build refuses a level", SM),
+ ("smash: unknown shots allowed", SML, 'if s not in SHOTS:', 'if False:', "the build refuses a level", SM),
+ ("smash: a level with no shots allowed", SML, 'if not level["shots"]:', 'if False:', "the build refuses a level", SM),
+ ("smash: too near the sling allowed", SML, 'if left < SLING_X + 160 or right > VIEW_W - 10:', 'if False:', "the build refuses a level", SM),
+ ("smash: out of the sky allowed", SML, 'if bottom < 0 or GROUND_Y - top < 40:', 'if False:', "the build refuses a level", SM),
  ('check: the key goes to the student', PC, 'shown = quiz.redact("\\n".join([opener] + keep + [closer])).split("\\n")', 'shown = "\\n".join([opener] + keep + [closer]).split("\\n")', "a choice question's right answer isn't in", PY),
  ('check: an explain line left in the question', PC, '        if m:\n            explain = m.group(1).strip()\n        else:\n            keep.append(ln)', '        keep.append(ln)', 'an explain line is kept apart', PY),
  ('check: a long answer allowed', PC, 'if q["kind"] == "long":\n            problems', 'if False:\n            problems', 'a long answer is refused', PY),
  ('check: an unfinished question allowed', PC, 'elif not q["qid"]:', 'elif False:', 'a question with no answer is refused', PY),
  ('check: an unrun predict block let through', PC, '        if m:\n            problems.append(f"Line {n + 1}: an html', '        if False:\n            problems.append(f"Line {n + 1}: an html', "the server won't take a predict block", PY),
+ ('scores: the page never sends them', "src/python/gameWorker.ts", '    score: (score) => post({ type: "score", score }),\n', '', "the school's high scores", E2E),
+ ('scores: every game gets boards', "src/player/Scoreboard.tsx", 'JSON.stringify(project).includes("high_score(")', 'JSON.stringify(project).length > 0', "has no boards", E2E),
+ ('scores: the boards go under the game', "src/player/player.css", '  min-height: 240px;\n  display: flex;\n  gap: 8px;\n}', '  min-height: 240px;\n  display: flex;\n  flex-direction: column;\n  gap: 8px;\n}', "the school's high scores", E2E),
+ ('scores: another school shows', PCP, 'func.lower(accounts.User.email).endswith("@" + domain, autoescape=True))', 'True)', 'high scores: only your own school', PY),
+ ('scores: a look-alike domain shows', PCP, '.endswith("@" + domain, autoescape=True)', '.endswith(domain, autoescape=True)', 'high scores: a look-alike domain', PY),
+ ('scores: a full name shows', PCP, '"name": _board_name(u), "score"', '"name": u.name, "score"', 'high scores: a first name only', PY),
+ ('scores: the email goes out', PCP, '"name": _board_name(u), "score": h.score, "me": u.id == user.id}', '"name": _board_name(u), "email": u.email, "score": h.score, "me": u.id == user.id}', 'high scores: no email', PY),
+ ('scores: gmail is a school', PCP, 'return None if domain in PERSONAL_DOMAINS else domain', 'return domain', 'high scores: a personal address', PY),
+ ('scores: a worse score replaces a better', PCP, 'elif score > row.score:', 'elif True:', 'high scores: only your best stays', PY),
+ ('scores: a score needs no sign-in', PCP, 'user = _need_user(db)\n        pub = _pub_or_404(db, slug)\n        why = _viewable(db, pub, user)\n        if why:\n            return err(*why)\n        score = ', 'user = _current_user(db)\n        pub = _pub_or_404(db, slug)\n        why = _viewable(db, pub, user)\n        if why:\n            return err(*why)\n        score = ', 'high scores: signing in comes first', PY),
+ ('scores: anything is a score', PCP, 'if isinstance(score, bool) or not isinstance(score, (int, float)) or not 0 < score <= MAX_SCORE:', 'if False:', 'high scores: a score is a number', PY),
+ ('scores: teachers on the board', PCP, 'rows = [(h, u) for h, u in rows if not accounts.is_teacher(u.email)]', 'pass', 'high scores: students only', PY),
+ ('scores: teachers recorded', PCP, 'if accounts.is_teacher(user.email):\n            return jsonify(kept=False)', 'if False:\n            return jsonify(kept=False)', 'high scores: a teacher plays as practice', PY),
+ ('scores: a class game open to all', PCP, 'why = _viewable(db, pub, user)\n        if why:\n            return err(*why)\n        domain = school_domain(user)', 'domain = school_domain(user)', 'high scores: a class game\'s board', PY),
+ ('scores: unpublishing fails', PCP, 'for table in (PublishedAsset, Like, Report, HighScore):', 'for table in (PublishedAsset, Like, Report):', 'high scores: unpublishing takes', PY),
+ ('scores: only 5 shown', PCP, 'SCORES_SHOWN = 20', 'SCORES_SHOWN = 5', 'high scores: the top twenty', PY),
  ('check: students can upload', PC, 'if not practising(user):\n        publishing.fail("That\'s for teachers.", 403)', 'if False:\n        publishing.fail("That\'s for teachers.", 403)', "a student can't upload questions", PY),
  ('check: a bank with a problem saved', PC, 'if problems or not body.get("save"):', 'if not body.get("save"):', "a bank with a problem isn't saved", PY),
  ('check: a student makes a showcase game', PCP, 'pub.showcase = 1 if body.get("showcase") and (is_teacher(user) or is_admin(user)) else 0', 'pub.showcase = 1 if body.get("showcase") else 0', "a student can't make a showcase game", PY),
@@ -1234,7 +1326,7 @@ for name, f, old, new, test, *extra in CASES:
             failed = any(l.startswith("FAIL") and test in l for l in out.splitlines())
             ran = "ok   " in out or "FAIL " in out
         else:
-            if runner in ([GM], [MM], [FB], [GF], [BB], [HC], [KT], [TD]):
+            if runner in ([GM], [MM], [FB], [GF], [BB], [HC], [KT], [TD], [SM]):
                 subprocess.run(["python3", str(ROOT.parent / f"showcase/{runner[0]}/build.py")], capture_output=True)
             cmd = ["npx", "playwright", "test", "-g", test] if runner == [E2E] else ["npx", "vitest", "run", "-t", test]
             r = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True)
@@ -1245,6 +1337,6 @@ for name, f, old, new, test, *extra in CASES:
         if not failed: bad.append(name)
     finally:
         p.write_text(src)
-        if runner in ([GM], [MM], [FB], [GF], [BB], [HC], [KT], [TD]):
+        if runner in ([GM], [MM], [FB], [GF], [BB], [HC], [KT], [TD], [SM]):
             subprocess.run(["python3", str(ROOT.parent / f"showcase/{runner[0]}/build.py")], capture_output=True)
 print("ALL SABOTAGES CAUGHT" if not bad else f"NOT CAUGHT: {bad}")

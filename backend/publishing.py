@@ -30,11 +30,12 @@ import secrets
 
 from flask import Blueprint, Response, abort, jsonify, make_response, request, session
 from sqlalchemy import func, or_
+from sqlalchemy.exc import IntegrityError
 
 import accounts
 import gamestore
 from accounts import now
-from gamestore import ClassSettings, GameAsset, GameProject, Like, Published, PublishedAsset, Report
+from gamestore import ClassSettings, GameAsset, GameProject, HighScore, Like, Published, PublishedAsset, Report
 
 bp = Blueprint("publishing", __name__)
 
@@ -298,7 +299,7 @@ def unpublish(slug):
 
 
 def _delete(db, pub):
-    for table in (PublishedAsset, Like, Report):
+    for table in (PublishedAsset, Like, Report, HighScore):
         db.query(table).filter_by(published_id=pub.id).delete()
     db.delete(pub)
 
@@ -419,6 +420,102 @@ def like(slug):
         pub.likes = db.query(func.count(Like.id)).filter_by(published_id=pub.id).scalar()
         db.commit()
         return jsonify(liked=row is None, likes=pub.likes)
+    finally:
+        db.close()
+
+
+# ---------------------------------------------------------------- high scores
+# A game calls high_score(n); the play page sends it here. Its boards show the
+# best of each student who shares the viewer's school, by email domain: a first
+# name and a score, never an email. A personal address (gmail.com and the like)
+# is no school, or everyone on Gmail would be a classmate of everyone else.
+
+SCORES_SHOWN = 20
+MAX_SCORE = 10 ** 12
+PERSONAL_DOMAINS = {
+    "gmail.com", "googlemail.com", "outlook.com", "hotmail.com", "live.com", "msn.com", "yahoo.com",
+    "icloud.com", "me.com", "mac.com", "aol.com", "proton.me", "protonmail.com", "gmx.com", "mail.com",
+}
+
+
+def school_domain(user):
+    """The part of their email a school shares, or None: not signed in, or a personal address."""
+    if user is None or "@" not in user.email:
+        return None
+    domain = user.email.rsplit("@", 1)[1].strip().lower()
+    return None if domain in PERSONAL_DOMAINS else domain
+
+
+def _board_name(user) -> str:
+    """Only ever a first name. A name that's really an address shows as "A student"."""
+    name = _first_name(user)
+    return "A student" if "@" in name else name
+
+
+@bp.get("/api/play/<slug>/scores")
+def high_scores(slug):
+    db = _db()
+    try:
+        user = _current_user(db)
+        pub = _pub_or_404(db, slug)
+        why = _viewable(db, pub, user)
+        if why:
+            return err(*why)
+        domain = school_domain(user)
+        out = {"signedIn": user is not None, "school": domain is not None, "scores": [], "mine": None}
+        if domain is None:
+            return jsonify(out)
+        rows = (db.query(HighScore, accounts.User).join(accounts.User, HighScore.user_id == accounts.User.id)
+                .filter(HighScore.published_id == pub.id,
+                        func.lower(accounts.User.email).endswith("@" + domain, autoescape=True))
+                .order_by(HighScore.score.desc(), HighScore.updated_at.asc()).all())
+        # Students only: someone made a teacher after they played drops off too.
+        rows = [(h, u) for h, u in rows if not accounts.is_teacher(u.email)]
+        for rank, (h, u) in enumerate(rows, 1):
+            if u.id == user.id:
+                out["mine"] = {"score": h.score, "rank": rank}
+            if rank <= SCORES_SHOWN:
+                out["scores"].append({"name": _board_name(u), "score": h.score, "me": u.id == user.id})
+        return jsonify(out)
+    finally:
+        db.close()
+
+
+@bp.post("/api/play/<slug>/score")
+def post_score(slug):
+    """
+    Keeps a student's best. The game runs in their browser, so as with XP a
+    student with browser tools could send any number: this board is for fun,
+    and nothing here touches a grade.
+    """
+    db = _db()
+    try:
+        user = _need_user(db)
+        pub = _pub_or_404(db, slug)
+        why = _viewable(db, pub, user)
+        if why:
+            return err(*why)
+        score = (request.get_json(silent=True) or {}).get("score")
+        # bool is an int to Python, and NaN and infinity fail the range check.
+        if isinstance(score, bool) or not isinstance(score, (int, float)) or not 0 < score <= MAX_SCORE:
+            return err("A score is a number above zero.", 400)
+        # Teachers play as practice, as they do in the Python check.
+        if accounts.is_teacher(user.email):
+            return jsonify(kept=False)
+        score = round(score)
+        row = db.query(HighScore).filter_by(published_id=pub.id, user_id=user.id).first()
+        if row is None:
+            db.add(HighScore(published_id=pub.id, user_id=user.id, score=score))
+        elif score > row.score:
+            row.score, row.updated_at = score, now()
+        else:
+            return jsonify(kept=False)
+        try:
+            db.commit()
+        except IntegrityError:   # two tabs sending a first score at once: one row is enough
+            db.rollback()
+            return jsonify(kept=False)
+        return jsonify(kept=True)
     finally:
         db.close()
 

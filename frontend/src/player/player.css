@@ -29,6 +29,73 @@ body.player {
 .player-head .btn.on {
   color: #ff6b8a;
 }
+/* The game, and beside it (when it has scores) the school's boards. Full screen
+   is the stage alone, so they go with the rest of the page. */
+.player-middle {
+  flex: 1;
+  min-height: 240px;
+  display: flex;
+  gap: 8px;
+}
+.player-page.published.has-boards {
+  max-width: 1600px;
+}
+.score-board {
+  flex: 0 0 190px;
+  padding: 10px 12px;
+  background: var(--panel, #22313a);
+  border: 1px solid var(--border, #3a4d58);
+  border-radius: 6px;
+  overflow: auto;
+}
+.score-board h2 {
+  margin: 0 0 8px;
+  font-size: 15px;
+}
+.score-board ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.score-board li {
+  display: flex;
+  gap: 6px;
+  padding: 3px 4px;
+  border-radius: 4px;
+  font-size: 14px;
+}
+.score-board li.me {
+  background: var(--panel-2, hsl(200, 30%, 30%));
+  font-weight: 600;
+}
+.score-rank {
+  min-width: 22px;
+  opacity: 0.7;
+}
+.score-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.score-mine {
+  margin: 0 0 10px;
+  font-size: 14px;
+}
+/* Too narrow for three across: the game first, the boards under it. */
+@media (max-width: 1000px) {
+  .player-middle.with-boards {
+    flex-direction: column;
+  }
+  .player-middle.with-boards .player-stage {
+    flex: none;
+    height: 56vw;
+  }
+  .score-board {
+    flex: none;
+    order: 1;
+  }
+}
 .player-stage {
   position: relative;
   flex: 1;
@@ -92,6 +159,7 @@ body.phone-play {
   z-index: 10;
   background: #000;
 }
+.player-page.phone .score-board,
 .player-page.phone .player-head,
 .player-page.phone .player-about {
   display: none;

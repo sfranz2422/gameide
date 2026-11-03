@@ -24,6 +24,7 @@ async function post<T>(path: string, json: unknown): Promise<{ ok: true; data: T
 }
 // Only a showcase game loads it: the questions need the notes' renderer, and most games don't need that.
 const PythonCheck = lazy(() => import("./PythonCheck"));
+import { Scoreboard, useScores, usesScores } from "./Scoreboard";
 import { loadExported, loadPublished, PlayError, type GamePackage, type PublishedInfo } from "./source";
 
 /** /play/<id> on our server; anywhere else, an exported game's own folder. */
@@ -71,6 +72,10 @@ export function PlayerApp() {
   const [phone, setPhone] = useState(false);
   const stage = useRef<HTMLDivElement>(null);
   const host = useRef<GameHost | null>(null);
+  const hasBoards = !!id && !!pkg && usesScores(pkg.project);
+  const scores = useScores(hasBoards ? id : null);
+  const sendScore = useRef(scores.send);
+  sendScore.current = scores.send;
 
   // Python starts loading at once, alongside the game's files.
   useEffect(() => {
@@ -89,6 +94,7 @@ export function PlayerApp() {
       error: (error) => setPhase({ kind: "crashed", error }),
       stats: () => undefined,
       ready: setPythonReady,
+      score: (n) => sendScore.current(n),
     });
     host.current = h;
     (window as unknown as Record<string, unknown>).__gameide = { host: h };
@@ -141,8 +147,10 @@ export function PlayerApp() {
 
   const title = info?.title ?? pkg?.project.name ?? "";
   return (
-    <div className={`player-page${info ? " published" : ""}${phone ? " phone" : ""}`} data-testid="player-page">
+    <div className={`player-page${info ? " published" : ""}${hasBoards ? " has-boards" : ""}${phone ? " phone" : ""}`} data-testid="player-page">
       {info && <PublishedHeader info={info} setInfo={setInfo} host={host.current} />}
+      <div className={`player-middle${hasBoards ? " with-boards" : ""}`}>
+      {hasBoards && <Scoreboard side="left" board={scores.board} />}
       <div className="player-stage" ref={stage} data-testid="player-stage">
         {phone && (
           <>
@@ -189,6 +197,8 @@ export function PlayerApp() {
             )}
           </div>
         )}
+      </div>
+      {hasBoards && <Scoreboard side="right" board={scores.board} />}
       </div>
       {info && (
         <footer className="player-about">

@@ -105,6 +105,8 @@ export interface FrameCommands {
   sounds?: SoundOrder[];
   /** The game's whole save data, when it changed this frame. */
   save?: Record<string, unknown>;
+  /** A better score from high_score(), for the board beside a published game. */
+  score?: number;
   /** Particles, weather, lighting and screen-effect orders (effects.ts). */
   fx?: FxOrder[];
   /** This step's lights (light()); none sent is none shining. */

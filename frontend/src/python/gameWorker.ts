@@ -136,6 +136,7 @@ async function play(msg: Extract<ToWorker, { type: "play" }>) {
     warning: (t) => emit(t, "warn"),
     sounds: (orders) => post({ type: "sounds", orders }),
     save: (data) => post({ type: "save", data }),
+    score: (score) => post({ type: "score", score }),
     touch: (spec) => post({ type: "touch", spec }),
   });
   if (mine !== run) return g.dispose();

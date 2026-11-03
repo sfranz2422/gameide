@@ -60,4 +60,5 @@ export type FromWorker =
   | { type: "sounds"; orders: SoundOrder[] }
   | { type: "snapshot"; id: number; png: Blob | null }
   | { type: "save"; data: Record<string, unknown> }
+  | { type: "score"; score: number }
   | { type: "touch"; spec: TouchSpec | null };
