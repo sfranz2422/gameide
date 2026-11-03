@@ -5,6 +5,11 @@ kart racer seen from just behind the kart, on a track laid flat (draw_floor).
 
     python3 showcase/kart/build.py      # → showcase/kart/out/Kart.zip
 
+THE GAME IS OBJECTS: Kart with its children PlayerKart and ComputerKart, Hedge
+and Tree under Scenery, and Game, the referee and the view. The room is the track,
+in the track's own pixels, so instances stand where they do on the picture and
+the engine's collisions work as in any other game. Only draw_floor's view differs.
+
 THE TRACKS ARE NEVER PICTURES FROM ELSEWHERE. Each is painted here from its
 numbers in game/_1tracks.py, the same numbers the karts drive on, so the road
 you see is the road you're on. Everything else (the kart, the scenery, the
@@ -38,6 +43,7 @@ GEMINI = Path("~/Downloads/kart").expanduser()
 MAP_INNER = 110
 
 GAME = {}
+# Every script only defines things at its top level, so the build can read their numbers.
 for f in ("_1tracks.py", "_2kart.py", "_3race.py", "_4screen.py"):
     exec((HERE / "game" / f).read_text(), GAME)
 TRACKS, RACERS, STEP = GAME["TRACKS"], GAME["RACERS"], GAME["STEP"]
@@ -327,12 +333,17 @@ def build(out):
     P = Kart("Zoomtown Cup")
     P.p["settings"]["pixelScaling"] = False
     for k, racer in enumerate(RACERS):
-        P.sprite(f"kart_{k}", kart_frames(racer["paint"]), (KART_W // 2, KART_H - 8))
+        s = P.sprite(f"kart_{k}", kart_frames(racer["paint"]), (KART_W // 2, KART_H - 8))
+        # A circle round where the kart stands, scaled by the instance to KART_R on the track.
+        s["mask"] = {"kind": "circle", "cx": KART_W // 2, "cy": KART_H - 8, "r": GAME["KART_R"] * KART_W / GAME["KART_WORLD"]}
     for n, track in enumerate(TRACKS):
         P.sprite(f"track_{n}", [paint_track(track)], (0, 0))
         P.sprite(f"map_{n}", [paint_map(track)], (0, 0))
         P.sprite(f"sky_{n}", [picture(f"sky_{n}", paint_sky(track, n + 1))], (0, 0))
-    P.sprite("bush", [picture(f"bush_{k}", bush(k)) for k in range(3)], (BUSH_W // 2, 122))
+    # The hedge's box lies along the road, reaching this far either side of where it stands.
+    reach = 22 * BUSH_W / GAME["HEDGE_LONG"]
+    P.sprite("bush", [picture(f"bush_{k}", bush(k)) for k in range(3)], (BUSH_W // 2, 122),
+             mask=(0, 122 - reach, BUSH_W, 122 + reach))
     P.sprite("tree", [picture(f"tree_{k}", tree(k)) for k in range(3)], (TREE_W // 2, 170))
     make_sounds(P)
 
@@ -345,14 +356,20 @@ def build(out):
         P.obj(name, depth=int(head.get("depth", 0)))
     for name, (head, events) in parsed.items():
         o = next(x for x in P.p["objects"] if x["name"] == name)
+        if head.get("sprite"):
+            o["sprite"] = P.sprite_id(head["sprite"])
+        if head.get("parent"):
+            o["parent"] = P.obj_id(head["parent"])
         for ev, code in events:
             o["events"].append({"id": _tw.new_id(), "key": _tw.event_key(ev, P), "mode": "python", "code": code})
 
     lid = _tw.new_id()
     P.p["rooms"].append({
-        "id": _tw.new_id(), "name": "Race", "width": VIEW_W, "height": VIEW_H, "background": "#3f9be8",
+        "id": _tw.new_id(), "name": "Race", "width": TRACKS[0]["size"], "height": TRACKS[0]["size"], "background": "#3f9be8",
         "gridWidth": 32, "gridHeight": 32, "snap": True,
         "layers": [{"id": lid, "name": "Instances", "kind": "instances", "depth": 0, "visible": True, "locked": False}],
+        # The room is the track, with every instance at its place on it. The view stays
+        # at the room's corner: it shows what's drawn from draw_floor, not the room itself.
         "camera": {"enabled": True, "width": VIEW_W, "height": VIEW_H, "follow": None, "smoothing": 0},
         "instances": [{"id": _tw.new_id(), "object": P.obj_id("Game"), "layer": lid, "x": 0, "y": 0,
                        "scaleX": 1, "scaleY": 1, "angle": 0, "code": ""}],

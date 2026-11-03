@@ -1,8 +1,8 @@
 # script: screen
-# Drawing. The world is one floor (draw_floor: the track's picture, seen from
-# just behind the kart), the sky over it, and everything standing on the
-# track drawn furthest first, each at the size floor_point says. The numbers
-# and menus are Draw GUI.
+# The numbers behind the view, what stands beside the road, and the words
+# and map over it. The floor and sky are drawn by the Game object; each kart,
+# hedge and tree draws itself on it, in its own Draw event, at the size
+# floor_point says.
 import math
 
 VIEW_W, VIEW_H = 640, 360
@@ -17,34 +17,56 @@ INK, SHADOW, GOLD, RED, MINT = "#ffffff", "#17172a", "#ffd23f", "#ff5a4f", "#9ff
 FRAMES = 16            # one view of a kart for every 22.5 degrees
 HEDGE_LOW = 0.62       # how squat a hedge is drawn
 BUSH_W, TREE_W = 192, 128  # the width of those pictures
+HEDGE_LONG = 72        # how long a hedge is on the track, in picture pixels
+HEDGE_GAP = 58         # one every this many pixels: shorter than a hedge, so they overlap
+FAR = 0.33             # things smaller than this scale aren't drawn: too far away to see
+NEAR = 25              # ...nor bigger than this: the camera is inside them
 
 
-def scenery_of(track):
-    """What stands beside the road: a hedge down each side, and trees behind it.
-    Worked out from the road, so it moves with it. Each is [x, y, sprite, frame,
-    width on the track, width of its picture]."""
+def place_scenery(track):
+    """Makes the track's Hedge and Tree instances, from its road. A hedge is laid
+    every HEDGE_GAP pixels along the hedge line itself, not along the road: on
+    the outside of a bend the line is longer, and hedges spaced by the road
+    left gaps there a kart could drive through."""
     line = centre_line(track)
     n = len(line)
     wall = track["half"] + track["verge"]
-    out = []
-    for i in range(0, n, 4):
-        ax, ay = line[i]
-        bx, by = line[(i + 1) % n]
-        nx, ny = -(by - ay) / STEP, (bx - ax) / STEP
-        for side in (-1, 1):
-            for far, sprite, world, width in ((wall + 22, "bush", 72, BUSH_W), (wall + 90 + (i * 13) % 70, "tree", 92, TREE_W)):
-                if sprite == "tree" and (i + side) % 12:
-                    continue
-                x, y = ax + nx * side * far, ay + ny * side * far
-                # A bend's inside or another stretch of road: nothing stands on the road.
-                near = min((x - p[0]) ** 2 + (y - p[1]) ** 2 for p in line[::3])
-                if near < (wall + 12) ** 2 or not (0 < x < track["size"] and 0 < y < track["size"]):
-                    continue
-                out.append([x, y, sprite, (i // 4) % 3, world, width])
-    return out
+    far = wall + 22                # the hedge's middle: its box starts at the wall
+    for side in (-1, 1):
+        last, count = None, 0
+        # A quarter of a road step at a time: on a tight bend's outside one whole
+        # step of road is a long way along the hedge line, and hedges laid at whole
+        # steps came out further apart than they are long, with gaps between.
+        for q in range(n * 4):
+            i, part = q // 4, (q % 4) / 4
+            ax, ay = line[i]
+            bx, by = line[(i + 1) % n]
+            tx, ty = (bx - ax) / STEP, (by - ay) / STEP
+            cx, cy = ax + (bx - ax) * part, ay + (by - ay) * part
+            x, y = cx - ty * side * far, cy + tx * side * far
+            if last is not None and math.hypot(x - last[0], y - last[1]) < HEDGE_GAP:
+                continue
+            # A bend's inside or another stretch of road: nothing stands on the road.
+            if min((x - p[0]) ** 2 + (y - p[1]) ** 2 for p in line[::3]) < (wall + 12) ** 2:
+                continue
+            last = (x, y)
+            count += 1
+            hedge = instance_create(x, y, "Hedge")
+            hedge.image_index = count % 3
+            hedge.image_angle = math.degrees(math.atan2(-ty, tx))
+            hedge.x = x                # (a box that turned is only seen once it has moved)
+            if count % 5 == 0:
+                back = far + 68 + (count * 13) % 70
+                tree_x, tree_y = cx - ty * side * back, cy + tx * side * back
+                clear = min((tree_x - p[0]) ** 2 + (tree_y - p[1]) ** 2 for p in line[::3]) > (wall + 30) ** 2
+                if clear and 0 < tree_x < track["size"] and 0 < tree_y < track["size"]:
+                    instance_create(tree_x, tree_y, "Tree").image_index = count % 3
 
 
-SCENERY = [scenery_of(t) for t in TRACKS]
+def kart_frame(kart, cam_x, cam_y):
+    """Which of the 16 views: how far its nose is turned from the line the camera sees it along."""
+    seen = math.degrees(math.atan2(-(kart.y - cam_y), kart.x - cam_x))
+    return round(((kart.a - seen) % 360) / (360 / FRAMES)) % FRAMES
 
 
 def text(x, y, words, colour=INK, size=16, align="left"):
@@ -66,79 +88,7 @@ def ordinal(n):
     return {1: "1st", 2: "2nd", 3: "3rd"}.get(n, f"{n}th")
 
 
-def move_camera(cam, kart, snap=False):
-    """The camera swings after the kart rather than turning with it: that lag is
-    what shows the kart's side as it turns, and more of it on a drift."""
-    d = angle_diff(kart.a, cam["a"])
-    cam["a"] = (kart.a if snap else cam["a"] + d * 0.11) % 360
-    r = math.radians(cam["a"])
-    cam["x"], cam["y"] = kart.x - math.cos(r) * CAM_BACK, kart.y + math.sin(r) * CAM_BACK
-
-
-def draw_world(cam, t):
-    track_i = RACE["track_i"]
-    # The sky slides as you turn: a whole turn is a whole picture.
-    sx = -(cam["a"] / 360 * SKY_W * 2) % SKY_W
-    draw_sprite(f"sky_{track_i}", 0, sx - SKY_W, 0)
-    draw_sprite(f"sky_{track_i}", 0, sx, 0)
-    draw_floor(f"track_{track_i}", 0, cam["x"], cam["y"], cam["a"], CAM_HEIGHT, HORIZON, FOCAL, RACE["track"]["look"]["hedge"])
-
-    things = []
-    fx, fy = math.cos(math.radians(cam["a"])), -math.sin(math.radians(cam["a"]))
-    for kart in RACE["karts"]:
-        things.append(((kart.x - cam["x"]) * fx + (kart.y - cam["y"]) * fy, 0, kart))
-    for s in SCENERY[track_i]:
-        dx, dy = s[0] - cam["x"], s[1] - cam["y"]
-        d = dx * fx + dy * fy
-        # Only what's in view: a hundred sprites a frame is fine, four hundred isn't.
-        if 12 < d < 900 and abs(dx * -fy + dy * fx) < d * (VIEW_W / 2 / FOCAL) + 60:
-            things.append((d, 1, s))
-    things.sort(key=lambda th: -th[0])
-    for d, kind, thing in things:
-        if kind == 0:
-            draw_kart(thing, cam, t)
-        else:
-            at = floor_point(thing[0], thing[1])
-            if at:
-                sprite, frame, world, width = thing[2], thing[3], thing[4], thing[5]
-                k = at[2] * world / width
-                # A hedge is lower than the camera, or it would hide everything beyond it.
-                draw_sprite_ext(sprite, frame, at[0], at[1], k, k * (HEDGE_LOW if sprite == "bush" else 1))
-
-
-def kart_frame(kart, cam_x, cam_y):
-    """Which of the 16 views: how far its nose is turned from the line the camera sees it along."""
-    seen = math.degrees(math.atan2(-(kart.y - cam_y), kart.x - cam_x))
-    return round(((kart.a - seen) % 360) / (360 / FRAMES)) % FRAMES
-
-
-def draw_kart(kart, cam, t):
-    at = floor_point(kart.x, kart.y)
-    if not at:
-        return
-    sx, sy, scale = at
-    if sx < -80 or sx > VIEW_W + 80 or sy < HORIZON:
-        return
-    k = scale * KART_WORLD / KART_W
-    # Its shadow, then a little bounce on a bumpy surface.
-    draw_set_alpha(0.3)
-    draw_set_color("black")
-    w = 9.5 * scale
-    draw_ellipse(sx - w, sy - w * 0.16, sx + w, sy + w * 0.16)
-    draw_set_alpha(1)
-    hop = -scale * 0.6 if kart.on_grass and t % 6 < 3 and kart.v > 0.6 else 0
-    draw_sprite_ext(f"kart_{kart.who}", kart_frame(kart, cam["x"], cam["y"]), sx, sy + hop, k, k)
-    # Sparks from the back wheels: a drift's colour says the boost it has earned.
-    if kart.drift and kart.charge >= SPARK_1:
-        colour = "#ff9a2e" if kart.charge >= SPARK_2 else "#58c8ff"
-        draw_set_color(colour)
-        for q in range(4):
-            px = sx + (-1 if q % 2 else 1) * (6 + (t * 7 + q * 5) % 7) * scale
-            py = sy - (t * 5 + q * 3) % 8 * scale * 0.4
-            draw_circle(px, py, 1 + scale * 0.25)
-
-
-def draw_map(track_i, t):
+def draw_map(track_i):
     draw_set_alpha(0.85)
     draw_sprite(f"map_{track_i}", 0, VIEW_W - 118, 8)
     draw_set_alpha(1)
@@ -155,7 +105,7 @@ def draw_hud(t):
     text(14, 10, ordinal(you.place), GOLD if you.place <= 3 else INK, 38)
     text(14, 56, f"Lap {min(laps, max(1, you.lap))}/{laps}", INK, 18)
     text(14, 80, clock(r["steps"]), INK, 16)
-    draw_map(r["track_i"], t)
+    draw_map(r["track_i"])
     # Speed, as a bar: it goes orange on a boost.
     draw_set_color(SHADOW)
     draw_rect(14, VIEW_H - 24, 134, VIEW_H - 12)
@@ -164,8 +114,7 @@ def draw_hud(t):
     if r["wrong_way"] > 50 and t % 40 < 26:
         text(VIEW_W / 2, 150, "WRONG WAY", RED, 34, "center")
     if r["count"] > 0:
-        n = math.ceil(r["count"] / 60)
-        text(VIEW_W / 2, 130, str(n), GOLD, 72, "center")
+        text(VIEW_W / 2, 130, str(math.ceil(r["count"] / 60)), GOLD, 72, "center")
     elif r["steps"] < 50:
         text(VIEW_W / 2, 130, "GO!", MINT, 72, "center")
 
@@ -191,9 +140,8 @@ def draw_results(game, t):
     text(VIEW_W / 2, 44, f"You came {ordinal(you.place)}!", GOLD, 30, "center")
     y = 88
     for kart in sorted(r["karts"], key=lambda c: c.place):
-        racer = RACERS[kart.who]
         c = GOLD if kart.who == 0 else INK
-        text(170, y, f"{kart.place}.  {racer['name']}", c, 16)
+        text(170, y, f"{kart.place}.  {RACERS[kart.who]['name']}", c, 16)
         text(VIEW_W - 170, y, clock(kart.done) if kart.done else "...", c, 16, "right")
         y += 22
     if game.new_best:

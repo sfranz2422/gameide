@@ -1,7 +1,8 @@
 # script: tracks
 # The tracks, as numbers. The build paints each track's picture from these,
-# and the game drives on them, so what you see is what you drive on: change
-# a corner here and the road, the kerbs, the hedges and the map all move.
+# and the game places its Hedge and Tree instances from them, so what you see
+# is what you drive on: change a corner here and the road, the kerbs, the
+# hedges and the map all move.
 import math
 
 STEP = 16              # the road's centre line is a point every this many picture pixels

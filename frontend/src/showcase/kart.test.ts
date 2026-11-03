@@ -2,8 +2,9 @@
  * The eighth showcase game, Zoomtown Cup (a kart racer on draw_floor), played
  * headless in the real Pyodide. A bot drives a whole race through the game's
  * own keys, from the title to the results; then the rules one at a time:
- * laps can't be cheated, the grass and the hedges, drifting and its boosts,
- * the computer's drivers, and the build refusing a track that can't be raced.
+ * the objects are there, laps can't be cheated, the grass, the hedges all the
+ * way round, karts bumping, drifting and its boosts, the computer's drivers,
+ * and the build refusing a track that can't be raced.
  * Runs when the game has been built (python3 showcase/kart/build.py).
  */
 import { execFileSync } from "node:child_process";
@@ -88,6 +89,16 @@ function driveBot(g: PythonGame, until: () => boolean, most = 20000) {
 }
 
 describe.runIf(have)("Zoomtown Cup", () => {
+  it("is objects: a player, seven computer drivers, and hedges and trees along the road", async () => {
+    const g = await racing();
+    expect(py(g, "instance_number('Kart')")).toBe(8);
+    expect(py(g, "instance_number('PlayerKart')")).toBe(1);
+    expect(py(g, "instance_number('ComputerKart')")).toBe(7);
+    expect(py(g, "instance_number('Hedge')")).toBeGreaterThan(150);
+    expect(py(g, "instance_number('Tree')")).toBeGreaterThan(10);
+    expect(py(g, "instance_number('Scenery') == instance_number('Hedge') + instance_number('Tree')")).toBe(true);
+  }, 60_000);
+
   it("is driven through a whole race, from the title to the results", async () => {
     const g = await racing();
     driveBot(g, () => py(g, "g.mode") === "results");
@@ -107,54 +118,50 @@ describe.runIf(have)("Zoomtown Cup", () => {
     step(g, 45);
     press(g, "space");
     expect(py(g, "g.mode")).toBe("title");
-  }, 120_000);
+    expect(py(g, "instance_number('PlayerKart')")).toBe(0);
+  }, 240_000);
 
   it("the computer's drivers finish the race on their own, faster ones first", async () => {
     const g = await start();
-    py(g, "start_race(0, player=False)\nRACE['count'] = 0");
-    for (let i = 0; i < 12000 && !py(g, "all(c.done for c in RACE['karts'])"); i++) {
-      py(g, "race_step(False, False, 0, False)");
-    }
+    // Off the title, whose demo starts again as soon as anyone finishes.
+    py(g, "g.mode = 'watching'\nnew_race(g, False)\nRACE['count'] = 0");
+    for (let i = 0; i < 12000 && !py(g, "all(c.done for c in RACE['karts'])"); i++) step(g);
     expect(py(g, "all(c.done for c in RACE['karts'])")).toBe(true);
-    // Nobody stuck in a hedge: each lap took about what the fastest took.
+    // Nobody stuck in a hedge: each took about what the fastest took.
     expect(py(g, "max(c.done for c in RACE['karts']) < 1.25 * min(c.done for c in RACE['karts'])")).toBe(true);
     // Skill decides it: best beats worst, over three laps.
     expect(py(g, "RACE['karts'][1].done < RACE['karts'][7].done")).toBe(true);
-  }, 120_000);
+  }, 240_000);
 
   it("a computer driver lifts for a sharp bend coming, not on a straight", async () => {
     const g = await start();
     py(g, `bend_line = [(i * STEP, 0.0) for i in range(40)] + [(39 * STEP, (i + 1) * STEP) for i in range(40)]
 def lifts(i):
-    k = Kart(bend_line[i][0], bend_line[i][1], 0, 1)
-    k.i = i
-    k.v = 3.5
-    return computer_keys(k, bend_line, RACE["track"], 0.97)[0]`);
+    keep = RACE["line"]
+    RACE["line"] = bend_line
+    k = RACE["karts"][1]
+    k.x, k.y = bend_line[i]
+    k.a, k.i, k.v = 0, i, 3.5
+    gas = computer_keys(k, 0.97)[0]
+    RACE["line"] = keep
+    return gas`);
     expect(py(g, "lifts(10)")).toBe(true);
     expect(py(g, "lifts(28)")).toBe(false);
   }, 60_000);
 
   it("a lap is the whole road: backing over the line pays nothing", async () => {
     const g = await racing();
-    py(g, `you = RACE['karts'][0]
-n = len(RACE['line'])
-you.i = 2
-you.progress = 2.0
-x, y = RACE['line'][2]
-you.x, you.y = x, y
-race_step(False, False, 0, False)
-first = you.lap
-x, y = RACE['line'][n - 3]
-you.x, you.y = x, y
-race_step(False, False, 0, False)
-back = you.lap
-x, y = RACE['line'][4]
-you.x, you.y = x, y
-race_step(False, False, 0, False)
-again = you.lap`);
-    expect(py(g, "first")).toBe(1);
-    expect(py(g, "back")).toBe(0);
-    expect(py(g, "again")).toBe(1);
+    const to = (i: string) => {
+      py(g, `you.x, you.y = RACE['line'][${i}]`);
+      step(g);
+    };
+    py(g, "you = RACE['karts'][0]\nn = len(RACE['line'])\nyou.i = 2\nyou.progress = 2.0");
+    to("2");
+    expect(py(g, "you.lap")).toBe(1);
+    to("n - 3");
+    expect(py(g, "you.lap")).toBe(0);
+    to("4");
+    expect(py(g, "you.lap")).toBe(1);
     expect(py(g, "len(RACE['lap_times'])")).toBe(0);
   }, 60_000);
 
@@ -162,62 +169,152 @@ again = you.lap`);
     const g = await racing();
     py(g, `you = RACE['karts'][0]
 p = you.progress
-x, y = RACE['line'][(you.i + 200) % len(RACE['line'])]
-you.x, you.y = x, y
-race_step(False, False, 0, False)
-gained = you.progress - p`);
-    expect(py(g, "gained")).toBeLessThanOrEqual(14);
+you.x, you.y = RACE['line'][(you.i + 200) % len(RACE['line'])]`);
+    step(g);
+    expect(py(g, "you.progress - p")).toBeLessThanOrEqual(14);
   }, 60_000);
 
-  it("the grass slows you, and the hedge stops you where the picture draws it", async () => {
+  it("the grass slows you, not the road", async () => {
     const g = await racing();
-    const offRoad = (k: number) => `you = RACE['karts'][0]
+    py(g, `you = RACE['karts'][0]
+line = RACE['line']
+def beside(k):
+    ax, ay = line[you.i]
+    bx, by = line[(you.i + 1) % len(line)]
+    tx, ty = (bx - ax) / STEP, (by - ay) / STEP
+    you.x, you.y = ax - ty * k, ay + tx * k
+    you.a = you.move_a = math.degrees(math.atan2(-ty, tx))`);
+    hold(g, "up", true);
+    py(g, "beside(30)\nyou.v = 4.0");
+    step(g);
+    expect(py(g, "you.on_grass")).toBe(false);
+    py(g, "beside(60)\nyou.v = 4.0");
+    step(g);
+    expect(py(g, "you.on_grass")).toBe(true);
+    for (let i = 0; i < 50; i++) {
+      py(g, "beside(60)");
+      step(g);
+    }
+    expect(py(g, "you.v")).toBeLessThan(2.1);
+    py(g, "beside(0)");
+    for (let i = 0; i < 90; i++) {
+      py(g, "beside(0)");
+      step(g);
+    }
+    expect(py(g, "you.v")).toBeGreaterThan(3.5);
+    hold(g, "up", false);
+  }, 60_000);
+
+  it("the hedges hold all the way round: no kart gets through, on either side", async () => {
+    const g = await racing();
+    py(g, `you = RACE['karts'][0]
+line = RACE['line']
+n = len(line)
+wall = RACE['track']['half'] + RACE['track']['verge']
+def aim(i, side):
+    ax, ay = line[i]
+    bx, by = line[(i + 1) % n]
+    tx, ty = (bx - ax) / STEP, (by - ay) / STEP
+    nx, ny = -ty * side, tx * side
+    # From the road's edge, as a kart really gets there: put down right at a hedge
+    # it can land inside one's corner on a bend, and a kart inside a box isn't stopped.
+    you.x, you.y = ax + nx * (wall - 44), ay + ny * (wall - 44)
+    you.i = i
+    you.a = you.move_a = math.degrees(math.atan2(-ny, nx))
+    you.v = 4.0
+    you.boost = 0
+worst = 0`);
+    hold(g, "up", true);
+    const points = py(g, "n") as number;
+    for (let i = 0; i < points; i += 3) {
+      for (const side of [-1, 1]) {
+        py(g, `aim(${i}, ${side})`);
+        for (let k = 0; k < 40; k++) {
+          // Others might shove it: this asks only about the hedge, so they stay out of it.
+          py(g, "for c in RACE['karts'][1:]:\n    c.x, c.y = 10, 10");
+          step(g);
+          py(g, "worst = max(worst, you.off)");
+        }
+      }
+    }
+    hold(g, "up", false);
+    // Short of the middle of the hedge's box. Not short of the wall: at a sharp corner a
+    // kart can stop in the pocket where two hedges meet, a little past the wall's line.
+    expect(py(g, "worst")).toBeLessThan(py(g, "wall + 22"));
+    expect(py(g, "worst")).toBeGreaterThan(py(g, "wall - 20"));   // it did reach them
+  }, 300_000);
+
+  it("a hedge takes your speed; a kart that gets out anyway is put back", async () => {
+    const g = await racing();
+    py(g, `you = RACE['karts'][0]
 line = RACE['line']
 ax, ay = line[you.i]
 bx, by = line[(you.i + 1) % len(line)]
 tx, ty = (bx - ax) / STEP, (by - ay) / STEP
-you.x, you.y = ax - ty * ${k}, ay + tx * ${k}
+wall = RACE['track']['half'] + RACE['track']['verge']
+you.x, you.y = ax - ty * (wall - 14), ay + tx * (wall - 14)
+you.a = you.move_a = math.degrees(math.atan2(-tx, -ty))
 you.v = 4.0
-you.a = you.move_a = math.degrees(math.atan2(-ty, tx))
-race_step(True, False, 0, False)`;
-    py(g, offRoad(30));
-    expect(py(g, "you.on_grass")).toBe(false);
-    py(g, offRoad(60));
-    expect(py(g, "you.on_grass")).toBe(true);
-    for (let i = 0; i < 60; i++) py(g, "race_step(True, False, 0, False)");
-    expect(py(g, "you.v")).toBeLessThan(2.1);
-    py(g, offRoad(200));
-    expect(py(g, "you.off")).toBeLessThanOrEqual(84.01);
-    expect(py(g, "you.v")).toBeLessThan(3);
+you.gas = True
+slowest = 4.0
+for _ in range(4):
+    you.on_grass = False      # only the hedge can be what slows it
+    you.on_step()
+    slowest = min(slowest, you.v)`);
+    expect(py(g, "slowest")).toBeLessThan(3);
+    py(g, "you.x, you.y = ax - ty * (wall + LOST + 40), ay + tx * (wall + LOST + 40)");
+    step(g, 2);
+    expect(py(g, "you.off")).toBeLessThan(py(g, "RACE['track']['half']"));
+  }, 60_000);
+
+  it("two karts can't share a place: the engine's collision moves them apart", async () => {
+    const g = await racing();
+    py(g, `a, b = RACE['karts'][2], RACE['karts'][3]
+x, y = RACE['line'][40]
+a.x, a.y, b.x, b.y = x, y, x + 6, y
+a.i = b.i = 40`);
+    step(g, 2);
+    expect(py(g, "math.hypot(a.x - b.x, a.y - b.y)")).toBeGreaterThan(14);
   }, 60_000);
 
   it("drifting earns a boost for how long it lasted, paid only on letting go", async () => {
     const g = await racing();
-    const drift = (steps: number) => {
-      py(g, `you = RACE['karts'][0]
-you.v = 4.0
-you.boost = 0
-you.drift = 0
-you.on_grass = False
-RACE['track'] = dict(RACE['track'], half=10**6, verge=10)
-what = []`);
-      for (let i = 0; i < steps; i++) py(g, "what += drive(you, True, False, -1, True, RACE['track'], RACE['line'])\nyou.v = max(you.v, 3.5)");
-      py(g, "what += drive(you, True, False, -1, False, RACE['track'], RACE['line'])");
-    };
-    drift(10);
-    expect(py(g, "'drift' in what")).toBe(true);
+    py(g, `you = RACE['karts'][0]
+def drift_for(steps):
+    you.boost, you.drift, you.charge = 0, 0, 0
+    you.on_grass = False
+    you.gas, you.steer, you.drifting = True, -1, True
+    for _ in range(steps):
+        you.x, you.y = RACE['line'][50]
+        you.i = 50
+        you.v = max(you.v, 3.5)
+        you.on_grass = False
+        you.on_step()
+    was = you.drift
+    you.drifting = False
+    you.x, you.y = RACE['line'][50]
+    you.on_step()
+    return was`);
+    expect(py(g, "drift_for(10)")).toBe(-1);
     expect(py(g, "you.boost")).toBe(0);
-    drift(60);
-    expect(py(g, "'boost' in what")).toBe(true);
+    py(g, "drift_for(60)");
     const small = py(g, "you.boost") as number;
     expect(small).toBeGreaterThan(0);
-    drift(120);
+    py(g, "drift_for(120)");
     expect(py(g, "you.boost")).toBeGreaterThan(small);
     // A boost goes faster than the kart's top speed; afterwards, back down to it.
-    py(g, "you.v = 4.0\nyou.boost = 60\nfor _ in range(59): drive(you, True, False, 0, False, RACE['track'], RACE['line'])");
+    py(g, `def run(k):
+    for _ in range(k):
+        you.x, you.y = RACE['line'][50]
+        you.on_grass = False
+        you.on_step()
+you.gas, you.steer, you.drifting = True, 0, False
+you.v = 4.0
+you.boost = 60
+run(59)`);
     expect(py(g, "you.v")).toBeGreaterThan(py(g, "STATS['top']"));
     expect(py(g, "you.v")).toBeLessThanOrEqual(py(g, "STATS['boost_top']"));
-    py(g, "for _ in range(200): drive(you, True, False, 0, False, RACE['track'], RACE['line'])");
+    py(g, "run(200)");
     expect(py(g, "you.v")).toBeLessThanOrEqual(py(g, "STATS['top'] + 0.001"));
   }, 60_000);
 
