@@ -42,6 +42,9 @@ BBD, BBC, BBW = "../showcase/baseball/game/_4derby.py", "../showcase/baseball/ga
 BBK, BBUILD = "../showcase/baseball/game/_7controls.py", "../showcase/baseball/build.py"
 HC = "hillclimb"  # …or Ridgeline Rally's, rebuilt the same way
 KT = "kart"       # …or Zoomtown Cup's, rebuilt the same way
+TD = "towers"     # …or Fort Bramble's, rebuilt the same way
+TDL, TDR, TDB = "../showcase/towers/game/_1levels.py", "../showcase/towers/game/_2rules.py", "../showcase/towers/build.py"
+def _td(n): return f"../showcase/towers/game/{n}.py"
 KTT, KTK, KTR = "../showcase/kart/game/_1tracks.py", "../showcase/kart/game/_2kart.py", "../showcase/kart/game/_3race.py"
 KTS, KTF, KTB = "../showcase/kart/game/_4screen.py", "../showcase/kart/game/_5flow.py", "../showcase/kart/build.py"
 KTA, KTG = "../showcase/kart/game/Kart.py", "../showcase/kart/game/Game.py"
@@ -1044,6 +1047,58 @@ CASES = [
  ("kart: a road off the picture allowed", KTT, 'if min(x, y) < wall + 16 or max(x, y) > size - wall - 16:', 'if False:', "the build refuses a track", KT),
  ("kart: a bend too sharp allowed", KTT, 'if turn > 1.15:', 'if False:', "the build refuses a track", KT),
  ("kart: a road passing itself allowed", KTT, 'if math.hypot(line[i][0] - line[j][0], line[i][1] - line[j][1]) < apart:', 'if False:', "the build refuses a track", KT),
+ ("towers: towers never fire", _td("Tower"), 'shot = instance_create(self.x, self.y, self.shot)\n        aim_shot(shot, self.target, self.damage)', 'pass', "a bot plays level 0", TD),
+ ("towers: enemies don't care about the fort", _td("Fort"), 'global_vars.lives = max(0, global_vars.lives - other.bite)', 'pass', "with no towers the fort falls", TD),
+ ("towers: the fort falling ends nothing", TDR, 'global_vars.mode = "won" if won else "lost"', 'global_vars.mode = "won"', "with no towers the fort falls", TD),
+ ("towers: try again doesn't start again", _td("GoButton"), '    room_restart()', '    pass', "with no towers the fort falls", TD),
+ ("towers: the Fort isn't at the road's end", TDB, '("Fort", *mid(*pts[-1]), "")', '("Fort", *mid(*pts[0]), "")', "is objects in rooms", TD),
+ ("towers: the road's tiles left out", TDB, 'out[f"{c},{r}"] = mask', 'pass', "is objects in rooms", TD),
+ ("towers: a locked level opens", _td("LevelCard"), 'self.off = self.i > 0 and not save_get(f"stars_{self.i - 1}", 0)', 'self.off = False', "the title's levels open", TD),
+ ("towers: a won level opens nothing", _td("LevelCard"), 'self.off = self.i > 0 and not save_get(f"stars_{self.i - 1}", 0)', 'self.off = self.i > 0', "the title's levels open", TD),
+ ("towers: towers on the road", TDR, 'if tile_at(mx, my, "Road") is not None:', 'if False:', "building: a click buys", TD),
+ ("towers: towers on trees", TDR, 'collision_point(mx, my, "Decor") or', 'False or', "building: a click buys", TD),
+ ("towers: towers on towers", TDR, 'return not (collision_point(mx, my, "Tower") or', 'return not (False or', "building: a click buys", TD),
+ ("towers: towers are free", TDR, '    global_vars.gold -= price\n', '', "building: a click buys", TD),
+ ("towers: the poor can buy", _td("BuyButton"), 'self.off = global_vars.gold < PRICES[self.kind]', 'self.off = False', "building: a click buys", TD),
+ ("towers: still buying after placing", _td("Director"), '            sound_play("nope", volume=0.5)\n        global_vars.buying = None', '            sound_play("nope", volume=0.5)', "building: a click buys", TD),
+ ("towers: an upgrade changes nothing", _td("UpgradeButton"), '    t.damage *= 1.6\n', '', "upgrading and selling", TD),
+ ("towers: upgrades without limit", _td("UpgradeButton"), 'self.hidden = t is None or t.level >= MAX_LEVEL', 'self.hidden = t is None', "upgrading and selling", TD),
+ ("towers: upgrades are free", _td("UpgradeButton"), '    global_vars.gold -= upgrade_price(t)\n', '', "upgrading and selling", TD),
+ ("towers: a sale pays for one level only", _td("UpgradeButton"), '    t.spent += upgrade_price(t)\n', '', "upgrading and selling", TD),
+ ("towers: selling keeps the tower", _td("SellButton"), '    t.destroy()\n', '', "upgrading and selling", TD),
+ ("towers: a tower can't be picked", _td("Tower"), '    global_vars.selected = self\n', '', "upgrading and selling", TD),
+ ("towers: clicking away keeps the tower", _td("Director"), 'elif mouse_y < FIELD_H and not collision_point(mouse_x, mouse_y, "Tower"):\n    global_vars.selected = None', 'elif False:\n    pass', "upgrading and selling", TD),
+ ("towers: shoot the first one found", TDR, 'if best is None or e.travelled > best.travelled:', 'if best is None:', "towers shoot the enemy that has got furthest", TD),
+ ("towers: towers reach everything", TDR, 'and point_distance(tower.x, tower.y, e.x, e.y) <= tower.range', '', "towers shoot the enemy that has got furthest", TD),
+ ("towers: the shown range is wrong", TDR, 'BUILD_RANGE = {"Gunner": 140,', 'BUILD_RANGE = {"Gunner": 200,', "towers shoot the enemy that has got furthest", TD),
+ ("towers: Cannons hit planes", _td("Cannon"), 'self.air = False', 'self.air = True', "planes: Cannons and Freezers", TD),
+ ("towers: Rockets can't hit planes", _td("Rocket"), 'self.top = "top_rocket"', 'self.top = "top_rocket"\nself.air = False', "planes: Cannons and Freezers", TD),
+ ("towers: a burst hits planes", TDR, 'if d <= radius and (air or not e.flying):', 'if d <= radius:', "planes: Cannons and Freezers", TD),
+ ("towers: a shot does no damage", TDR, 'hurt(enemy, shot.damage)', 'pass', "what shots do", TD),
+ ("towers: a shot goes on through", TDR, '        enemy.slow = shot.freeze\n    shot.destroy()', '        enemy.slow = shot.freeze', "what shots do", TD),
+ ("towers: a burst's edge as hard as its middle", TDR, 'hurt(e, amount * (1 - 0.4 * d / radius))', 'hurt(e, amount)', "what shots do", TD),
+ ("towers: a burst reaches everywhere", TDR, 'if d <= radius and (air or not e.flying):', 'if (air or not e.flying):', "what shots do", TD),
+ ("towers: a missile doesn't chase", _td("Missile"), 'self.direction = point_direction(self.x, self.y, self.target.x, self.target.y)', 'pass', "what shots do", TD),
+ ("towers: a snowball doesn't slow", TDR, '        enemy.slow = shot.freeze\n', '        pass\n', "what shots do", TD),
+ ("towers: frozen goes as fast", _td("Enemy"), 'pace = self.walk * (0.5 if self.slow > 0 else 1)', 'pace = self.walk', "what shots do", TD),
+ ("towers: frozen for ever", _td("Enemy"), '    self.slow -= 1\n', '    pass\n', "what shots do", TD),
+ ("towers: enemies cut the corners", _td("Enemy"), 'tx, ty = route[min(self.leg, len(route) - 1)]\npace', 'tx, ty = route[-1]\npace', "an enemy walks the road", TD),
+ ("towers: a tank bites like a soldier", _td("Tank"), 'self.bite = 2', 'self.bite = 1', "an enemy walks the road", TD),
+ ("towers: a plane follows the road", _td("Plane"), 'self.flying = True', 'self.flying = False', "an enemy walks the road", TD),
+ ("towers: no bounty", TDR, '        global_vars.gold += enemy.bounty\n', '', "gold: stopping an enemy pays", TD),
+ ("towers: no bonus for a wave", _td("Director"), '    global_vars.gold += WAVE_BONUS\n', '', "gold: stopping an enemy pays", TD),
+ ("towers: no bonus for going early", TDR, '    if wave_busy():\n        global_vars.gold += EARLY_BONUS\n', '', "gold: stopping an enemy pays", TD),
+ ("towers: later waves no tougher", _td("Gate"), 'enemy.hp = enemy.hp_max = enemy.hp_max * tough', 'pass', "gold: stopping an enemy pays", TD),
+ ("towers: a group sends one too many", _td("Gate"), 'if group[1] <= 0:', 'if group[1] < 0:', "a Gate sends", TD),
+ ("towers: groups out of order", _td("Gate"), 'group = self.queue[0]', 'group = self.queue[-1]', "a Gate sends", TD),
+ ("towers: stars ignore lives", TDR, 'return 3 if lives >= start * 0.9 else 2 if lives >= start * 0.5 else 1', 'return 3', "winning: stars", TD),
+ ("towers: a worse result replaces a better", TDR, 'if director.stars > save_get(key, 0):', 'if True:', "winning: stars", TD),
+ ("towers: no next level", TDR, 'buttons.append((LEVELS[director.level + 1]["name"], False, "Next level", ""))', 'buttons.append(("", True, "Try again", ""))', "winning: stars", TD),
+ ("towers: a bent road allowed", TDL, "if a[0] != b[0] and a[1] != b[1]:", "if False:", "the build refuses a level", TD),
+ ("towers: a road off the field allowed", TDL, 'if not (0 <= c < COLS and 0 <= r < ROWS):\n            problems.append(f"the road', 'if False:\n            problems.append(f"the road', "the build refuses a level", TD),
+ ("towers: a road crossing itself allowed", TDL, 'if len(set(road)) != len(road):', 'if False:', "the build refuses a level", TD),
+ ("towers: decoration on the road allowed", TDL, 'if (c, r) in road:', 'if False:', "the build refuses a level", TD),
+ ("towers: a wave of unknown enemies allowed", TDL, 'if name not in ENEMIES:', 'if False:', "the build refuses a level", TD),
  ("hillclimb: the gas burns nothing", HCC, '        car.fuel = max(0.0, car.fuel - car.stats["burn"])', '        car.fuel = max(0.0, car.fuel - 0 * car.stats["burn"])', "burns fuel only on the gas", HC),
  ("hillclimb: fuel burns standing still", HCC, '    if gas:\n        car.fuel = max(0.0,', '    if True:\n        car.fuel = max(0.0,', "burns fuel only on the gas", HC),
  ("hillclimb: an empty tank still drives", HCC, "    if car.fuel <= 0:\n        gas = False", "    if False:\n        gas = False", "burns fuel only on the gas", HC),
@@ -1113,7 +1168,7 @@ for name, f, old, new, test, *extra in CASES:
             failed = any(l.startswith("FAIL") and test in l for l in out.splitlines())
             ran = "ok   " in out or "FAIL " in out
         else:
-            if runner in ([GM], [MM], [FB], [GF], [BB], [HC], [KT]):
+            if runner in ([GM], [MM], [FB], [GF], [BB], [HC], [KT], [TD]):
                 subprocess.run(["python3", str(ROOT.parent / f"showcase/{runner[0]}/build.py")], capture_output=True)
             cmd = ["npx", "playwright", "test", "-g", test] if runner == [E2E] else ["npx", "vitest", "run", "-t", test]
             r = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True)
@@ -1124,6 +1179,6 @@ for name, f, old, new, test, *extra in CASES:
         if not failed: bad.append(name)
     finally:
         p.write_text(src)
-        if runner in ([GM], [MM], [FB], [GF], [BB], [HC], [KT]):
+        if runner in ([GM], [MM], [FB], [GF], [BB], [HC], [KT], [TD]):
             subprocess.run(["python3", str(ROOT.parent / f"showcase/{runner[0]}/build.py")], capture_output=True)
 print("ALL SABOTAGES CAUGHT" if not bad else f"NOT CAUGHT: {bad}")

@@ -291,7 +291,7 @@ code (the harness turns bytecode caching off for that reason), or a
 mistyped case name ran nothing and still reported success (the harness now
 refuses unknown names).
 
-**The showcase games' runners** (`GM`, `MM`, `FB`, `GF`, `BB`, `HC`, `KT`) rebuild
+**The showcase games' runners** (`GM`, `MM`, `FB`, `GF`, `BB`, `HC`, `KT`, `TD`) rebuild
 that game from the sabotaged source before its playtest and again after. A
 build that **refuses** (Greenside's course checks, Ridgeline Rally's stage
 checks) leaves the old `out/project.json`, and the test passes on it: a
