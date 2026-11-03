@@ -66,11 +66,11 @@ function useAct(reload: () => void) {
   return { busy, problem, setProblem, act };
 }
 
-function Page({ title, children, head }: { title: string; children: React.ReactNode; head?: React.ReactNode }) {
+function Page({ title, children, head, wide }: { title: string; children: React.ReactNode; head?: React.ReactNode; wide?: boolean }) {
   return (
     <div className="site-page">
       <SiteNav at="classes" />
-      <main className="explore-page class-page">
+      <main className={`explore-page class-page${wide ? " class-page-wide" : ""}`}>
         <header className="page-head">
           <h1>{title}</h1>
           {head}
@@ -121,11 +121,40 @@ export function ClassesPage() {
     );
   const teaching = data?.classes.filter((c) => c.teaching) ?? [];
   const learning = data?.classes.filter((c) => !c.teaching) ?? [];
+  const yourClasses = data && (
+    <section className="class-section">
+      <h2>{data.teacher ? "Classes you're in" : "Your classes"}</h2>
+      <div className="class-cards">
+        {learning.map((c) => (
+          <a key={c.id} className="class-card" href={`#/class/${c.id}`} data-testid="class-card">
+            <b>{c.name}</b>
+            {c.teacher && <span className="muted small">{c.teacher}</span>}
+          </a>
+        ))}
+      </div>
+      {!learning.length && (
+        <p className="muted">
+          You're not in a class here yet. Your teacher adds you, with the email you signed in with ({me.user.email}).
+        </p>
+      )}
+    </section>
+  );
   return (
-    <Page title="Classes">
+    <Page title="Classes" wide={!data?.teacher}>
       {(loadProblem || problem) && <p className="banner error">{loadProblem || problem}</p>}
       {!data && !loadProblem && <p className="muted">Loading…</p>}
-      {data && !data.teacher && <XpCard />}
+      {/* A student's classes get a column of their own, beside the XP card,
+          not under it: the one button they came for was at the very bottom. */}
+      {data && !data.teacher && (
+        <div className="class-home">
+          <aside className="class-home-side" aria-label="Your classes" data-testid="class-home-side">
+            {yourClasses}
+          </aside>
+          <div className="class-home-main" data-testid="class-home-main">
+            <XpCard />
+          </div>
+        </div>
+      )}
       {data && (
         <>
           {data.teacher && (
@@ -209,24 +238,7 @@ export function ClassesPage() {
               )}
             </section>
           )}
-          {(learning.length > 0 || !data.teacher) && (
-            <section className="class-section">
-              <h2>{data.teacher ? "Classes you're in" : "Your classes"}</h2>
-              <div className="class-cards">
-                {learning.map((c) => (
-                  <a key={c.id} className="class-card" href={`#/class/${c.id}`} data-testid="class-card">
-                    <b>{c.name}</b>
-                    {c.teacher && <span className="muted small">{c.teacher}</span>}
-                  </a>
-                ))}
-              </div>
-              {!learning.length && (
-                <p className="muted">
-                  You're not in a class here yet. Your teacher adds you, with the email you signed in with ({me.user.email}).
-                </p>
-              )}
-            </section>
-          )}
+          {data.teacher && learning.length > 0 && yourClasses}
         </>
       )}
     </Page>

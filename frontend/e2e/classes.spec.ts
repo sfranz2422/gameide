@@ -49,6 +49,12 @@ test("a class: an assignment from a game, a student's own copy, turned in, viewe
   // A student finds the class, opens the assignment and gets their own copy.
   const { ctx: sctx, page: kim } = await signedIn(browser, "kim@example.com");
   await kim.goto("/#/classes");
+  // Their classes are a column beside the XP card, not at the bottom under it.
+  await expect(kim.getByTestId("class-home-side").getByTestId("class-card")).toHaveCount(1);
+  const side = (await kim.getByTestId("class-home-side").boundingBox())!;
+  const rest = (await kim.getByTestId("class-home-main").boundingBox())!;
+  expect(side.x + side.width).toBeLessThanOrEqual(rest.x);
+  if (SHOTS) await kim.screenshot({ path: `${SHOTS}/class-student-home.png` });
   await kim.getByTestId("class-card").filter({ hasText: "Game Design P4" }).click();
   await expect(kim.getByTestId("class-assignment")).toContainText("Not started");
   await kim.getByTestId("open-assignment").click();

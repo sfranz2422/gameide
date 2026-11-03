@@ -503,6 +503,8 @@ header; steps are `---` slides; ` ```check ` blocks gate Next (strict); a
 
 ## XP
 
+A student's Classes page has their classes in a column on the left of the XP card (`.class-home`), first on a phone: under it, the one button they came for was at the bottom.
+
 `backend/rewards.py` (a blueprint), `src/xp/`. **PyIDE's XP joined, not
 copied**: one total per person across all four editors.
 

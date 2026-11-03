@@ -2750,6 +2750,42 @@ a.btn {
 .class-section {
   margin: 22px 0;
 }
+/* A student's Classes page: their classes in a column on the left, sticking
+   while the XP card scrolls, and first on a phone. Under the XP card, the
+   one button they came for was at the bottom of the page. */
+.class-page-wide {
+  max-width: 1600px;
+}
+.class-home {
+  display: grid;
+  grid-template-columns: clamp(180px, 16%, 260px) minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+.class-home-side {
+  position: sticky;
+  top: 0;
+}
+.class-home-side .class-section {
+  margin: 4px 0;
+}
+.class-home-side h2 {
+  margin-top: 0;
+}
+.class-home-side .class-cards {
+  grid-template-columns: minmax(0, 1fr);
+}
+.class-home-side .muted {
+  overflow-wrap: anywhere;
+}
+@media (max-width: 900px) {
+  .class-home {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .class-home-side {
+    position: static;
+  }
+}
 .class-cards {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
