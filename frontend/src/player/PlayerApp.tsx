@@ -8,7 +8,7 @@
  * after the player has clicked something, and the click also gives the
  * game the keyboard.
  */
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import type { PythonGameError } from "../engine/engine";
 import { GameHost } from "../editor/gameHost";
 import { buildGame } from "../python/codegen";
@@ -22,6 +22,8 @@ async function post<T>(path: string, json: unknown): Promise<{ ok: true; data: T
     return { ok: false, error: (e as Error).message };
   }
 }
+// Only a showcase game loads it: the questions need the notes' renderer, and most games don't need that.
+const PythonCheck = lazy(() => import("./PythonCheck"));
 import { loadExported, loadPublished, PlayError, type GamePackage, type PublishedInfo } from "./source";
 
 /** /play/<id> on our server; anywhere else, an exported game's own folder. */
@@ -152,6 +154,11 @@ export function PlayerApp() {
               Turn your phone sideways
             </div>
           </>
+        )}
+        {info?.showcase && phase.kind === "playing" && host.current && (
+          <Suspense fallback={null}>
+            <PythonCheck slug={info.id} host={host.current} />
+          </Suspense>
         )}
         {phase.kind !== "playing" && (
           <div className="player-overlay">

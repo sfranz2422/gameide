@@ -193,6 +193,9 @@ class Published(Base):
     author = Column(String(30), nullable=False)
     tags = Column(String(200), nullable=False, default="")
     allow_remix = Column(Integer, nullable=False, default=1)
+    #: A showcase game: play only (no remix), for signed-in people, and it stops
+    #: for a Python question every few minutes (pycheck.py). Only a teacher can set it.
+    showcase = Column(Integer, nullable=False, default=0)
     visibility = Column(String(12), nullable=False, default="unlisted")
     class_id = Column(Integer, nullable=True, index=True)
     #: For public games: "pending", "approved" or "rejected". "" otherwise.
@@ -208,6 +211,62 @@ class Published(Base):
     remix_of = Column(Text, nullable=False, default="")
     created_at = Column(DateTime, nullable=False, default=now)
     updated_at = Column(DateTime, nullable=False, default=now)
+
+
+class CheckBank(Base):
+    """A teacher's week of Python check questions: the markdown they uploaded,
+    answers and all, so never sent to a student as it is (pycheck.py). The
+    newest row is the bank in use. Older ones stay: answers point at them."""
+    __tablename__ = "gameide_check_banks"
+
+    id = Column(Integer, primary_key=True)
+    teacher_id = Column(Integer, ForeignKey("users.id"), index=True, nullable=False)
+    name = Column(String(120), nullable=False, default="")
+    #: What the teacher wrote, to edit again; `markdown` is that with each
+    #: ```python predict block turned into a question by their page.
+    source = Column(Text, nullable=False, default="")
+    markdown = Column(Text, nullable=False, default="")
+    #: The questions as read at upload, keys included.
+    questions = Column(Text, nullable=False, default="[]")
+    created_at = Column(DateTime, nullable=False)
+
+
+class CheckSettings(Base):
+    """A teacher's timing and penalty for the Python check. Their students follow them."""
+    __tablename__ = "gameide_check_settings"
+
+    teacher_id = Column(Integer, ForeignKey("users.id"), primary_key=True)
+    every_seconds = Column(Integer, nullable=False)
+    strikes_out = Column(Integer, nullable=False)
+    lock_seconds = Column(Integer, nullable=False)
+
+
+class CheckState(Base):
+    """Where one person is with the Python check, across every showcase game:
+    otherwise reloading, or going to another game, would start the clock again."""
+    __tablename__ = "gameide_check_state"
+
+    user_id = Column(Integer, ForeignKey("users.id"), primary_key=True)
+    due_at = Column(DateTime, nullable=True)
+    #: The question they were asked and haven't answered: asked again until they do.
+    pending = Column(String(12), nullable=False, default="")
+    strikes = Column(Integer, nullable=False, default=0)
+    locked_until = Column(DateTime, nullable=True)
+    #: Questions asked lately, so the same one doesn't come straight back.
+    recent = Column(Text, nullable=False, default="[]")
+
+
+class CheckAnswer(Base):
+    """One answer to a Python check question: what the teacher's report counts."""
+    __tablename__ = "gameide_check_answers"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True, nullable=False)
+    bank_id = Column(Integer, ForeignKey("gameide_check_banks.id"), index=True, nullable=False)
+    slug = Column(String(16), nullable=False, default="")
+    qid = Column(String(12), nullable=False, default="")
+    correct = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime, nullable=False)
 
 
 class PublishedAsset(Base):
@@ -392,5 +451,10 @@ class HiddenBuiltin(Base):
     hidden_at = Column(DateTime, nullable=False, default=now)
 
 def create_all(engine):
-    """accounts.create_all, which now also makes the tables above."""
+    """accounts.create_all, which now also makes the tables above; then the
+    columns added since, which it never adds to a table that already exists."""
     accounts.create_all(engine)
+    from sqlalchemy import inspect, text
+    if "showcase" not in {c["name"] for c in inspect(engine).get_columns("gameide_published")}:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE gameide_published ADD COLUMN showcase INTEGER NOT NULL DEFAULT 0"))

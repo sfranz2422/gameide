@@ -22,6 +22,8 @@ export interface PublishedInfo {
   likes: number;
   liked: boolean;
   allowRemix: boolean;
+  /** Play only, signed in, and it stops for Python questions (player/PythonCheck.tsx). */
+  showcase?: boolean;
   tags: string[];
   visibility: "unlisted" | "class" | "public";
   status: string;

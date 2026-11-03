@@ -34,6 +34,7 @@ import library
 import grades
 import gamestore
 import publishing
+import pycheck
 from gamestore import GameAsset, GameProject, GameVersion
 
 APP_NAME = "gameide"
@@ -864,6 +865,8 @@ def blockly_media(name):
 
 # Publishing, playing, Explore and moderation (publishing.py).
 publishing.init(app, _db, current_user)
+# The Python check that stops a showcase game for a question (pycheck.py).
+app.register_blueprint(pycheck.bp)
 # Classes, assignments, turning in, comments and Google Classroom (classes.py).
 classes.init(app, _db, current_user, _scheme, _problem)
 # XP, levels, leaderboards, avatars, the token shop and random events (rewards.py).

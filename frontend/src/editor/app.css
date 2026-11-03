@@ -4151,3 +4151,16 @@ a.btn {
 .library-link-list { max-height: 50vh; overflow: auto; margin: 8px 0; }
 .library-link-list fieldset { border: 1px solid var(--border); border-radius: 8px; margin: 8px 0; }
 .library-link-list label { display: block; padding: 3px 0; }
+
+/* The Python Check page (pycheck/BankPage.tsx). */
+.python-check-page { max-width: 900px; margin: 0 auto; padding: 20px; }
+.python-check-page section { margin-top: 26px; }
+.bank-text { width: 100%; font-family: var(--mono); background: var(--code-bg); color: var(--code-text); border: 1px solid var(--border); border-radius: 6px; padding: 8px; }
+.bank-list pre, .bank-sample { white-space: pre-wrap; font-family: var(--mono); font-size: 13px; margin: 4px 0; }
+.bank-list li { margin-bottom: 12px; }
+.bank-answer { color: var(--go); }
+.bank-report { border-collapse: collapse; width: 100%; }
+.bank-report th, .bank-report td { text-align: left; padding: 4px 10px; border-bottom: 1px solid var(--border); }
+.bank-settings { display: flex; flex-wrap: wrap; gap: 16px; }
+.bank-setting { display: flex; flex-direction: column; gap: 4px; max-width: 240px; }
+.bank-setting input { width: 90px; }

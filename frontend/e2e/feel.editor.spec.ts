@@ -221,8 +221,11 @@ test("the floor is drawn where floor_point says", async ({ page }) => {
   ].join("\n") + "\n");
   await page.getByTestId("play").click();
   await expect(page.getByTestId("fps")).toBeVisible({ timeout: 60_000 });
-  await page.waitForTimeout(500);
-  const pts = (await page.evaluate(() => (window as any).__gameide.host.evalPython("[[round(v) for v in p[:2]] for p in global_vars.pts]"))) as [number, number][];
+  // Until a Draw has run: on a busy machine half a second may not have got that far.
+  const read = () => page.evaluate(() => (window as any).__gameide.host.evalPython("[[round(v) for v in p[:2]] for p in global_vars.pts] if hasattr(global_vars, 'pts') else None"));
+  await expect.poll(async () => Array.isArray(await read()), { timeout: 20_000 }).toBe(true);
+  await page.waitForTimeout(300);
+  const pts = (await read()) as [number, number][];
   const seen = await pixels(page, pts);
   const red = seen.map((c) => near(c, [255, 0, 0], 40));
   expect(red).toEqual([true, true, true, true, false, false, false]);

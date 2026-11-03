@@ -112,6 +112,12 @@ export class SoundPlayer {
     this.music = null;
   }
 
+  /** Held for a question: everything stops where it is, and picks up from there. */
+  hold(on: boolean) {
+    if (!this.ctx) return;
+    void (on ? this.ctx.suspend() : this.ctx.resume());
+  }
+
   /** The game stopped: silence, sounds and music alike. */
   stopAll() {
     this.stopSounds();

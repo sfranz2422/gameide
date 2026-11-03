@@ -275,6 +275,10 @@ engine failure in the player is shown, never a silent black screen.
 cd frontend && npm test && npm run e2e && npm run typecheck
 ```
 
+On a heavily loaded machine (load average over about 8) older browser tests with
+fixed waits fail at random: run `npx playwright test --workers=2`, and a failure
+that moves between tests between runs is load, not a bug.
+
 **Every check must have been watched to fail.** `scripts/sabotage.py`
 holds one deliberate bug per guarded behaviour, applies each, confirms the
 named test fails, and restores. Add a case whenever you add a check; a case
@@ -500,6 +504,33 @@ header; steps are `---` slides; ` ```check ` blocks gate Next (strict); a
   (`origin` builtin:<name>; old ones renamed once by `tutorials.migrate`). An assigned
   game claims step XP under `a:<slug>`, never the teacher's private
   `t:<slug>` its starter was made from.
+
+## The Python check
+
+`backend/pycheck.py`, `src/player/PythonCheck.tsx`, `src/pycheck/` (the teacher's
+page, #/python-check). A **showcase** game (`Published.showcase`, a tick when a
+teacher publishes) is signed-in only and play only, and stops for a question; the
+teacher asked for it so that school staff would allow playing at all. Tutorials
+and students' own games are untouched.
+
+- **The server runs no uploaded code, ever.** A ```python predict block is run by
+  the teacher's own browser (`pycheck/bank.ts`, a worker that can be stopped) and
+  arrives as a ```quiz predict block; `read_bank` refuses one still unconverted.
+  A server-side subprocess was tried and rightly blocked. Don't bring it back.
+- **The server decides everything that matters**: when one's due (`CheckState`,
+  per person across all games, so reloading or changing game doesn't reset it),
+  whether it's right, whether they may play. The key never leaves (`quiz.redact`).
+  A student with browser tools could still unfreeze their own page; the report
+  shows who played without answering. Say so if asked whether it's cheat-proof.
+- A bank is what the teacher wrote (`source`, what the edit box shows, so predict
+  answers are worked out afresh) and what it became (`markdown`, `questions`).
+  Any problem refuses the whole file. `explain:` is taken out here, not in
+  `quiz.py`, which is PyIDE's and copied unchanged.
+- Timing and penalty are per teacher (`CheckSettings`); a student follows their
+  bank's teacher. Teachers play as practice: nothing recorded, no lockout, no XP.
+- XP is `check:<qid>`, once per question ever. Partly right isn't right here.
+- The game is held by `GameHost.holdForQuestion`: sound plays on the page, so
+  freezing the worker alone left the music playing.
 
 ## XP
 

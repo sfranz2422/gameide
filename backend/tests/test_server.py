@@ -1327,6 +1327,348 @@ r = anon.get("/starters/novel/dawn.webp")
 check("the Starter Projects' pictures are served", r.status_code == 200 and r.data == b"WEBPDAWN", r.status_code)
 server.DIST = real_dist
 
+# ---------------------------------------------------------------- the Python check
+import pycheck
+from datetime import timedelta as _td
+from gamestore import CheckAnswer, CheckState
+
+CHECK_TEACHER, CHECK_STUDENT = "teacher@example.com", "pat.check@example.com"
+ct, cs = client(CHECK_TEACHER), client(CHECK_STUDENT)
+check("(the Python check's teacher is a teacher)", pycheck.practising(type("U", (), {"email": CHECK_TEACHER})()))
+
+BANK = """# This week
+```quiz
+What does len("hello") return?
+- [ ] 4
+- [x] 5
+explain: It counts the characters.
+```
+```quiz
+Which keyword repeats code?
+answer: secretwhile
+```
+```quiz
+type: predict
+What will this print?
+~~~python
+print(1 + 1)
+~~~
+answer: 2222
+```
+```quiz
+type: blank
+A [[secretblank]] repeats.
+```
+```quiz
+type: match
+Match them.
+- for -> secretpairone
+- if -> secretpairtwo
+```
+```quiz
+type: order
+Order them.
+- print(1)
+- print(2)
+```
+```quiz
+type: bug
+Which line is wrong?
+~~~python
+print(1)
+print(2
+~~~
+bug: 2
+```
+```quiz
+type: sort
+Sort them.
+group: Number
+- 5
+group: Text
+- "a"
+```
+"""
+KINDS = {"choice", "text", "predict", "blank", "match", "order", "bug", "sort"}
+questions, problems = pycheck.read_bank(BANK)
+check("every self-marked kind reads in a bank", not problems and {q["kind"] for q in questions} == KINDS, str(problems))
+check("an explain line is kept apart from the question", questions[0]["explain"] == "It counts the characters." and "explain" not in questions[0]["prompt"])
+for q in questions:
+    check(f"a {q['kind']} question's right answer isn't in what students are shown", not (
+        [w for w in ("secretwhile", "2222", "secretblank") if w in q["shown"]] or "[x]" in q["shown"] or "explain" in q["shown"] or
+        (q["kind"] == "bug" and "bug:" in q["shown"])), q["shown"])
+check("a long answer is refused: nobody's there to mark it", "marking by hand" in " ".join(pycheck.read_bank("```quiz\nWhy?\ntype: long\n```")[1]))
+check("a question with no answer is refused", "isn't finished" in " ".join(pycheck.read_bank("```quiz\nWhy?\n```")[1]))
+check("a file with no questions is refused", pycheck.read_bank("# Just words")[1] != [])
+check("one bad question refuses the whole file", pycheck.read_bank(BANK + "```quiz\nWhy?\n```")[1] != [])
+check("the server won't take a predict block it would have to run", "hasn't been run" in " ".join(pycheck.read_bank("```python predict\nprint(1)\n```")[1]))
+check("an html predict block is refused in words", "web page" in " ".join(pycheck.read_bank("```html predict\n<p>hi</p>\n```")[1]))
+SERVER_SOURCE = (BACKEND / "pycheck.py").read_text()
+check("the check's server runs nothing it's sent", not any(w in SERVER_SOURCE for w in ("subprocess", "exec(", "eval(", "os.system")))
+
+check("a student can't upload questions", cs.post("/api/check/bank", json={"markdown": BANK, "save": True}).status_code == 403)
+check("a student can't read the bank", cs.get("/api/check/bank").status_code == 403)
+check("a student can't read the report", cs.get("/api/check/report").status_code == 403)
+check("signed out can't read the bank", client().get("/api/check/bank").status_code == 401)
+
+check("(a showcase game saved)", put(ct, "show1", project("show1"), 0).status_code == 200)
+SHOW = {"title": "Show", "visibility": "public", "showcase": True, "allowRemix": True}
+r = ct.post("/api/projects/show1/publish", json=SHOW)
+show = r.get_json()["published"]["id"]
+base = f"/api/play/{show}/check"
+db = server.SessionLocal()
+from gamestore import Published as _P
+pub = db.query(_P).filter_by(slug=show).first()
+check("a teacher can make a showcase game", pub.showcase == 1)
+check("a showcase game can't be remixed, whatever was ticked", pub.allow_remix == 0)
+db.close()
+check("(a student's game saved)", put(cs, "stud1", project("stud1"), 0).status_code == 200)
+cs.post("/api/projects/stud1/publish", json={"title": "Mine", "visibility": "unlisted", "showcase": True})
+db = server.SessionLocal()
+check("a student can't make a showcase game", db.query(_P).filter_by(title="Mine").first().showcase == 0)
+db.close()
+
+check("signed out, a showcase game won't load", client().get(f"/api/play/{show}").status_code == 401)
+db = server.SessionLocal()
+db.query(_P).filter_by(slug=show).first().thumbnail = PNG
+db.commit()
+db.close()
+check("…but Explore can still show its picture", client().get(f"/api/play/{show}/thumbnail").status_code == 200)
+check("…nor its files", client().get(f"/api/play/{show}/assets/x").status_code == 401)
+check("a student can't remix it", cs.post(f"/api/play/{show}/remix").status_code == 403)
+r = cs.get(f"/api/play/{show}")
+check("with no questions uploaded, a student can't play it", r.status_code == 423 and "questions" in r.get_json()["error"], r.data[:100])
+check("the teacher can, to try it", ct.get(f"/api/play/{show}").status_code == 200)
+
+r = ct.post("/api/check/bank", json={"markdown": BANK, "name": "Week 1"})
+check("reading a bank without saving changes nothing", r.get_json()["count"] == 8 and ct.get("/api/check/bank").get_json()["bank"] is None)
+r = ct.post("/api/check/bank", json={"markdown": BANK + "```quiz\nWhy?\n```", "save": True})
+check("a bank with a problem isn't saved", r.get_json()["problems"] and ct.get("/api/check/bank").get_json()["bank"] is None)
+r = ct.post("/api/check/bank", json={"markdown": BANK, "name": "Week 1", "save": True})
+check("a good bank is saved", r.get_json()["bank"]["count"] == 8 and r.get_json()["bank"]["name"] == "Week 1")
+check("the teacher sees the answers", "secretwhile" in json.dumps(ct.get("/api/check/bank").get_json()))
+
+info = cs.get(f"/api/play/{show}")
+check("now a student can play it", info.status_code == 200 and info.get_json()["info"]["showcase"] is True)
+check("…and it offers no remix", info.get_json()["info"]["allowRemix"] is False)
+st = cs.post(f"{base}/start", json={}).get_json()
+check("the first question is due in five minutes", 290 <= st["dueIn"] <= 300 and st["every"] == 300 and st["practice"] is False)
+check("too soon, there's no question to be had", cs.post(f"{base}/next", json={}).status_code == 409)
+check("…and nothing to answer, so no XP to farm", cs.post(f"{base}/answer", json={"response": "5"}).status_code == 409)
+def set_state(**kw):
+    db = server.SessionLocal()
+    u = db.query(server.accounts.User).filter_by(email=CHECK_STUDENT).first()
+    s = db.query(CheckState).get(u.id)
+    for k, v in kw.items():
+        setattr(s, k, v)
+    db.commit()
+    db.close()
+
+set_state(due_at=pycheck.now() + _td(seconds=100))
+check("reloading doesn't start the clock again", cs.post(f"{base}/start", json={}).get_json()["dueIn"] <= 100)
+put(ct, "show2", project("show2"), 0)
+show2 = ct.post("/api/projects/show2/publish", json=SHOW).get_json()["published"]["id"]
+check("going to another showcase game doesn't either: the clock is the student's", cs.post(f"/api/play/{show2}/check/start", json={}).get_json()["dueIn"] <= 100)
+
+def due():
+    set_state(due_at=pycheck.now() - _td(seconds=1))
+
+def right_response(block):
+    """What a person who knows the answer would send, from the bank's own key."""
+    q = next(x for x in questions if x["shown"] == block)
+    k = q["kind"]
+    if k == "choice":
+        return q["correct"][0]
+    if k in ("text", "predict"):
+        return q["answers"][0]
+    if k == "blank":
+        return json.dumps([a[0] for a in q["answers"]])
+    if k in ("match", "sort"):
+        return json.dumps(q["correct"])
+    if k == "order":
+        return json.dumps(q["correct"])
+    return q["correct"][0]
+
+def wrong_response(block):
+    q = next(x for x in questions if x["shown"] == block)
+    k = q["kind"]
+    if k == "choice":
+        return next(c for c in q["choices"] if c not in q["correct"])
+    if k in ("text", "predict"):
+        return "nope"
+    if k == "blank":
+        return json.dumps(["nope"])
+    if k == "match":
+        return json.dumps(list(reversed(q["correct"])))
+    if k == "sort":
+        return json.dumps([q["answers"][-1] if c == q["answers"][0] else q["answers"][0] for c in q["correct"]])
+    if k == "order":
+        return json.dumps(list(reversed(q["correct"])))
+    return "1"
+
+due()
+n1 = cs.post(f"{base}/next", json={})
+check("when it's due, a question comes", n1.status_code == 200 and "block" in n1.get_json())
+leak = json.dumps(n1.get_json())
+check("no answer in it", "secret" not in leak and "2222" not in leak and "[x]" not in leak)
+check("asked again, it's the same one: reloading doesn't change the question", cs.post(f"{base}/next", json={}).get_json()["block"] == n1.get_json()["block"])
+check("reloading finds a question waiting", cs.post(f"{base}/start", json={}).get_json()["dueIn"] == 0)
+check("…and the student isn't told it's practice", cs.post(f"{base}/start", json={}).get_json()["practice"] is False)
+
+block = n1.get_json()["block"]
+r = cs.post(f"{base}/answer", json={"response": wrong_response(block)}).get_json()
+check("a wrong answer says so, with the answer", r["correct"] is False and r.get("rightAnswer") and r["strikes"] == 1 and r["strikesOut"] == 3, str(r))
+n2 = cs.post(f"{base}/next", json={})
+check("then a different question", n2.status_code == 200 and n2.get_json()["block"] != block)
+
+block2 = n2.get_json()["block"]
+r = cs.post(f"{base}/answer", json={"response": right_response(block2)}).get_json()
+check("a right answer is right", r["correct"] is True and "rightAnswer" not in r, str(r))
+check("…pays XP", r.get("xp", 0) > 0, str(r))
+later = cs.post(f"{base}/start", json={}).get_json()
+check("…and the next one is five minutes away", 290 <= later["dueIn"] <= 300)
+check("…and the strikes are wiped", later["strikes"] == 0)
+check("right again so soon: no question to be had", cs.post(f"{base}/next", json={}).status_code == 409)
+
+# The same question, right again: the XP is once only.
+qid2 = next(x for x in questions if x["shown"] == block2)["qid"]
+set_state(pending=qid2)
+r = cs.post(f"{base}/answer", json={"response": right_response(block2)}).get_json()
+check("a question pays XP only once", r["correct"] is True and not r.get("xp"), str(r))
+
+# Three wrong in a row, every kind marked as the notes mark it.
+due()
+for i in range(3):
+    b = cs.post(f"{base}/next", json={}).get_json()["block"]
+    r = cs.post(f"{base}/answer", json={"response": wrong_response(b)}).get_json()
+    check(f"wrong answer {i + 1} counts", r["correct"] is False and r["strikes"] == i + 1 and ("locked" in r) == (i == 2), str(r))
+    if "locked" in r:
+        break
+check("the third puts them out", r.get("locked") == 120, str(r))
+r = cs.get(f"/api/play/{show}")
+check("reloading doesn't let them back in", r.status_code == 423 and "seconds" in r.get_json()["error"])
+check("no question while they're out", cs.post(f"{base}/next", json={}).status_code == 423)
+check("…and the page is told how long", cs.post(f"{base}/start", json={}).get_json()["locked"] > 100)
+set_state(locked_until=pycheck.now() - _td(seconds=5))
+check("when the time's up, they can play", cs.get(f"/api/play/{show}").status_code == 200)
+check("…with a clean slate", cs.post(f"{base}/start", json={}).get_json()["strikes"] == 0)
+
+# Partly right isn't right: the game only goes on for a whole answer.
+match = next(x for x in questions if x["kind"] == "match")
+set_state(pending=match["qid"])
+half = json.dumps([match["correct"][0], "nope"])
+r = cs.post(f"{base}/answer", json={"response": half}).get_json()
+check("partly right isn't right here", r["correct"] is False, str(r))
+set_state(strikes=0)
+
+# A nonsense answer is refused, not counted.
+set_state(pending=match["qid"])
+r = cs.post(f"{base}/answer", json={"response": "not a list"})
+check("an answer that can't be marked is refused", r.status_code == 400)
+set_state(pending="", strikes=0)
+
+report = ct.get("/api/check/report").get_json()["students"]
+check("the report counts the student's answers", len(report) == 1 and report[0]["answered"] >= 5 and report[0]["right"] >= 2, str(report))
+check("…by name, never an email", "@" not in json.dumps(report))
+
+# The teacher tries it: the same questions, and nothing counts.
+tinfo = ct.post(f"{base}/start", json={}).get_json()
+check("the teacher's is practice", tinfo["practice"] is True)
+db = server.SessionLocal()
+tu = db.query(server.accounts.User).filter_by(email=CHECK_TEACHER).first()
+ts = db.query(CheckState).get(tu.id)
+ts.due_at = pycheck.now() - _td(seconds=1)
+db.commit()
+db.close()
+before = ct.get("/api/check/report").get_json()["students"][0]["answered"]
+teacher_out = False
+for _ in range(4):
+    n = ct.post(f"{base}/next", json={})
+    if n.status_code != 200:     # kept waiting, as someone put out would be
+        teacher_out = True
+        break
+    r = ct.post(f"{base}/answer", json={"response": wrong_response(n.get_json()["block"])}).get_json()
+    teacher_out = teacher_out or "locked" in r
+check("a teacher is never put out", not teacher_out and ct.get(f"/api/play/{show}").status_code == 200, str(r))
+check("nor counted in the report", len(ct.get("/api/check/report").get_json()["students"]) == 1 and ct.get("/api/check/report").get_json()["students"][0]["answered"] == before)
+
+# A new week replaces the old at once; a student's waiting question from last week doesn't break it.
+set_state(pending=questions[0]["qid"], due_at=pycheck.now() - _td(seconds=1))
+ct.post("/api/check/bank", json={"markdown": "```quiz\nNew week?\n- [x] yes\n- [ ] no\n```\n```quiz\nStill new?\nanswer: yes\n```", "name": "Week 2", "save": True})
+check("the new week's questions are the bank", ct.get("/api/check/bank").get_json()["bank"]["name"] == "Week 2")
+r = cs.post(f"{base}/next", json={}).get_json()
+check("a student gets the new week's questions at once", "ew" in r["block"] or "new" in r["block"], str(r))
+check("last week's answers stay on record", cs.post(f"{base}/answer", json={"response": "yes"}).status_code == 200)
+
+# Editing: the page gets back what the teacher wrote, not what it became.
+WROTE = "```python predict\nprint(1)\n```"
+ct.post("/api/check/bank", json={"markdown": "```quiz\ntype: predict\nWhat?\n~~~python\nprint(1)\n~~~\nanswer: 1\n```", "source": WROTE, "name": "Edited", "save": True})
+got = ct.get("/api/check/bank").get_json()["bank"]
+check("the bank opens as the teacher wrote it", got["source"] == WROTE and got["count"] == 1, str(got)[:200])
+check("what the teacher wrote isn't sent to students", "print(1)" in json.dumps(got) and "source" not in json.dumps(cs.post(f"{base}/start", json={}).get_json()))
+ct.post("/api/check/bank", json={"markdown": BANK, "name": "Week 3", "save": True})
+
+# Timing and penalty: each teacher's own, and their students follow them.
+check("a student can't change the timing", cs.post("/api/check/settings", json={"everyMinutes": 60}).status_code == 403)
+defaults = ct.get("/api/check/bank").get_json()["settings"]
+check("the defaults are five minutes, three wrong, two minutes out", defaults == {"everyMinutes": 5, "strikesOut": 3, "lockMinutes": 2}, str(defaults))
+for bad, why in (({"everyMinutes": 0}, "Minutes between"), ({"everyMinutes": 61}, "Minutes between"), ({"strikesOut": 0}, "Wrong answers"), ({"strikesOut": 11}, "Wrong answers"),
+                 ({"lockMinutes": 0}, "Minutes out"), ({"lockMinutes": "soon"}, "Minutes out"), ({"strikesOut": True}, "Wrong answers")):
+    r = ct.post("/api/check/settings", json=bad)
+    check(f"refused, in words: {bad}", r.status_code == 400 and why in r.get_json()["error"], r.data[:100])
+check("nothing refused was changed", ct.get("/api/check/bank").get_json()["settings"] == defaults)
+r = ct.post("/api/check/settings", json={"strikesOut": 2})
+check("changing one leaves the others", r.get_json()["settings"] == {"everyMinutes": 5, "strikesOut": 2, "lockMinutes": 2}, str(r.get_json()))
+ct.post("/api/check/settings", json={"everyMinutes": 10, "lockMinutes": 7})
+set_state(pending="", strikes=0, locked_until=None, due_at=None)
+check("students' next question is that far off", 595 <= cs.post(f"{base}/start", json={}).get_json()["dueIn"] <= 600)
+check("…and the page is told", cs.post(f"{base}/start", json={}).get_json()["every"] == 600)
+due()
+b = cs.post(f"{base}/next", json={}).get_json()["block"]
+r = cs.post(f"{base}/answer", json={"response": right_response(b)}).get_json()
+check("a right answer waits as long as the teacher set", 595 <= cs.post(f"{base}/start", json={}).get_json()["dueIn"] <= 600, str(r))
+due()
+b = cs.post(f"{base}/next", json={}).get_json()["block"]
+r = cs.post(f"{base}/answer", json={"response": wrong_response(b)}).get_json()
+check("the student is told how many", r["strikesOut"] == 2 and "locked" not in r, str(r))
+b = cs.post(f"{base}/next", json={}).get_json()["block"]
+r = cs.post(f"{base}/answer", json={"response": wrong_response(b)}).get_json()
+check("they're out after as many as the teacher set, for as long", r.get("locked") == 420, str(r))
+check("…and it says so on the way back in", "seconds" in cs.get(f"/api/play/{show}").get_json()["error"] and cs.post(f"{base}/start", json={}).get_json()["locked"] > 400)
+check("another teacher's settings are theirs", client("admin@example.com").get("/api/check/bank").get_json()["settings"] == defaults)
+ct.post("/api/check/settings", json={"everyMinutes": 5, "strikesOut": 3, "lockMinutes": 2})
+set_state(pending="", strikes=0, locked_until=None)
+
+# Another teacher's class gets that teacher's questions.
+ct2 = client("admin@example.com")
+check("(a second teacher is a teacher)", ct2.get("/api/check/bank").status_code == 200)
+ct2.post("/api/check/bank", json={"markdown": "```quiz\nFrom the other teacher?\nanswer: yes\n```", "name": "Other", "save": True})
+db = server.SessionLocal()
+stud = db.query(server.accounts.User).filter_by(email=CHECK_STUDENT).first()
+tch = db.query(server.accounts.User).filter_by(email=CHECK_TEACHER).first()
+course = server.accounts.Course(name="Check class", teacher_id=tch.id, app="gameide")
+db.add(course)
+db.flush()
+db.add(server.accounts.Enrollment(class_id=course.id, email=CHECK_STUDENT))
+db.commit()
+check("a student gets their own teacher's bank, not the newest", pycheck.bank_for(db, stud).name == "Week 3")
+db.close()
+
+check("a game that isn't there has no check", cs.post("/api/play/nosuch/check/start", json={}).status_code == 404)
+ordinary = alice.post("/api/projects/pub1/publish", json={"title": "Coin Run", "visibility": "unlisted"}).get_json()["published"]["id"]
+check("…and refuses to ask", alice.post(f"/api/play/{ordinary}/check/start", json={}).status_code == 400)
+check("an ordinary game stays open to everyone", client().get(f"/api/play/{ordinary}").status_code == 200)
+
+# A database from before showcase existed gets the column.
+from sqlalchemy import create_engine, text as _text
+old_db = Path(tempfile.mkdtemp()) / "old.db"
+old = create_engine(f"sqlite:///{old_db}")
+with old.begin() as conn:
+    conn.execute(_text("CREATE TABLE gameide_published (id INTEGER PRIMARY KEY, slug VARCHAR(16))"))
+server.gamestore.create_all(old)
+from sqlalchemy import inspect as _inspect
+check("an old database gains the showcase column", "showcase" in {c["name"] for c in _inspect(old).get_columns("gameide_published")})
+
 print()
 if failures:
     print(f"FAILED: {len(failures)} — " + "; ".join(failures))

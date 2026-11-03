@@ -451,7 +451,7 @@ function Section({ how, speed, onFinish, onPlayed, children }: { how: "" | "word
  * its own), `block` is the question whole and is marked as practice
  * (/api/quiz/practice): any number of tries, counted nowhere.
  */
-export function QuestionCard({ q: asWritten, assignment, block, reply, onAnswer, practice }: { q: Question; assignment: string | null; block?: string; reply?: Reply; onAnswer: (qid: string, r: Reply) => void; practice: boolean }) {
+export function QuestionCard({ q: asWritten, assignment, block, reply, onAnswer, practice, submit }: { submit?: (response: string) => Promise<Reply>; q: Question; assignment: string | null; block?: string; reply?: Reply; onAnswer: (qid: string, r: Reply) => void; practice: boolean }) {
   // Unassigned, nothing has given it an id (the server adds one as it hides the key).
   const q = !asWritten.id && !assignment && block ? { ...asWritten, id: `p${fnv(block)}` } : asWritten;
   const [choice, setChoice] = useState("");
@@ -488,7 +488,10 @@ export function QuestionCard({ q: asWritten, assignment, block, reply, onAnswer,
     setBusy(true);
     setProblem(null);
     try {
-      const r = assignment
+      // Marked somewhere of its caller's own (the Python check), or as below.
+      const r = submit
+        ? await submit(response())
+        : assignment
         ? await api<Reply>("/api/quiz/answer", { json: { assignment, question: q.id, response: response() } })
         : await api<Reply>("/api/quiz/practice", { json: { block, response: response() } });
       onAnswer(q.id, r);

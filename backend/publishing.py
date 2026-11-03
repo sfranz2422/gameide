@@ -10,6 +10,8 @@ Who may see a game, in one place (`_viewable`):
              approves it, or straight away from a teacher or an auto-approve
              class. Until then it plays like unlisted.
   taken down only its owner and its moderators
+  showcase   signed in only, whatever the above says, play only (no remix),
+             and it stops for Python questions (pycheck.py)
 
 A game's moderators are the teachers of any class its owner is enrolled in,
 and the admins (ADMIN_EMAILS, an environment variable like TEACHER_EMAILS,
@@ -119,6 +121,9 @@ def _viewable(db, pub, user):
     owner = user is not None and user.id == pub.owner_id
     if pub.taken_down and not (owner or moderates(db, user, pub)):
         return ("This game was taken down by a teacher.", 404)
+    # A showcase game stops for Python questions, so it needs to know who's playing.
+    if pub.showcase and user is None:
+        return ("This game is for signed-in students. Sign in to play it.", 401)
     if pub.visibility == "class" and not owner:
         if user is None:
             return ("This game is for a class. Sign in to play it.", 401)
@@ -157,6 +162,7 @@ def _settings(pub):
         "author": pub.author,
         "tags": [t for t in pub.tags.split(",") if t],
         "allowRemix": bool(pub.allow_remix),
+        "showcase": bool(pub.showcase),
         "visibility": pub.visibility,
         "classId": pub.class_id,
         "status": pub.status,
@@ -249,6 +255,10 @@ def publish(slug):
         pub.author = _clean_author(body.get("author"), user)
         pub.tags = ",".join(tags)
         pub.allow_remix = 1 if body.get("allowRemix", True) else 0
+        # Only a teacher can make a showcase game: it's what puts a question bank in front of students.
+        pub.showcase = 1 if body.get("showcase") and (is_teacher(user) or is_admin(user)) else 0
+        if pub.showcase:
+            pub.allow_remix = 0
         pub.visibility = visibility
         pub.class_id = class_id
         pub.status = status
@@ -306,6 +316,7 @@ def _info(db, pub, user):
         "likes": pub.likes,
         "liked": liked,
         "allowRemix": bool(pub.allow_remix),
+        "showcase": bool(pub.showcase),
         "tags": [t for t in pub.tags.split(",") if t],
         "visibility": pub.visibility,
         "status": pub.status,
@@ -322,6 +333,11 @@ def play_info(slug):
         user = _current_user(db)
         pub = _pub_or_404(db, slug)
         why = _viewable(db, pub, user)
+        if why:
+            return err(*why)
+        # Out for wrong answers, or no questions to ask: reloading the page doesn't get round it.
+        import pycheck
+        why = pycheck.play_refusal(db, pub, user)
         if why:
             return err(*why)
         return jsonify(info=_info(db, pub, user), project=json.loads(pub.data))
@@ -356,7 +372,10 @@ def play_thumbnail(slug):
     db = _db()
     try:
         pub = _pub_or_404(db, slug)
-        if _viewable(db, pub, _current_user(db)) or not pub.thumbnail:
+        user = _current_user(db)
+        # Explore shows a showcase game's picture to anyone; only playing it needs signing in.
+        hidden = _viewable(db, pub, user) and not (pub.showcase and user is None)
+        if hidden or not pub.thumbnail:
             return err("No picture.", 404)
         r = Response(pub.thumbnail, mimetype="image/png")
         r.headers["Cache-Control"] = "private, max-age=300"
@@ -414,6 +433,8 @@ def remix(slug):
         why = _viewable(db, pub, user)
         if why:
             return err(*why)
+        if pub.showcase and pub.owner_id != user.id:
+            return err("This game is play only.", 403)
         if not pub.allow_remix and pub.owner_id != user.id:
             return err("Its author didn't allow remixing this game.", 403)
         count = db.query(func.count(GameProject.id)).filter_by(owner_id=user.id).filter(GameProject.deleted_at.is_(None)).scalar()

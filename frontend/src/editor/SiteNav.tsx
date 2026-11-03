@@ -11,7 +11,7 @@ import { useSession } from "./session";
 import { Icon } from "./ui/icons";
 import { ThemeToggle } from "./ui/ThemeToggle";
 
-export type NavPlace = "home" | "explore" | "games" | "learn" | "docs" | "classes" | "moderation" | "";
+export type NavPlace = "home" | "explore" | "games" | "learn" | "docs" | "classes" | "moderation" | "pycheck" | "";
 
 /** GameIDE's mark: the pixel cartridge (scripts/make_logo.py, also the favicon). */
 export function LogoMark({ size = 30 }: { size?: number }) {
@@ -53,6 +53,7 @@ export function SiteNav({ at }: { at: NavPlace }) {
         {item("docs", "#/docs", Icon.docs(20), "Docs", "nav-docs")}
         {me.user && item("classes", "#/classes", Icon.classes(20), "Classes", "nav-classes")}
         {(me.user?.teacher || me.user?.admin) && item("moderation", "#/moderation", Icon.approve(20), "Approvals", "link-moderation")}
+        {(me.user?.teacher || me.user?.admin) && item("pycheck", "#/python-check", Icon.docs(20), "Python Check", "nav-python-check")}
       </nav>
       <span className="spacer" />
       <AccountMenu />

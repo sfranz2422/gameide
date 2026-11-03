@@ -20,6 +20,7 @@ interface Published {
   author: string;
   tags: string[];
   allowRemix: boolean;
+  showcase?: boolean;
   visibility: "unlisted" | "class" | "public";
   classId: number | null;
   status: string;
@@ -71,7 +72,7 @@ function PublishDialog({ host, close }: { host: GameHost | null; close: () => vo
   const { project, store } = useProjectApi();
   const { me } = useSession();
   const [settings, setSettings] = useState<Settings | null>(null);
-  const [form, setForm] = useState({ title: project.name, description: "", author: "", tags: [] as string[], allowRemix: true, visibility: "unlisted" as Published["visibility"], classId: 0 });
+  const [form, setForm] = useState({ title: project.name, description: "", author: "", tags: [] as string[], allowRemix: true, showcase: false, visibility: "unlisted" as Published["visibility"], classId: 0 });
   const [usePicture, setUsePicture] = useState(true);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
@@ -89,6 +90,7 @@ function PublishDialog({ host, close }: { host: GameHost | null; close: () => vo
           author: p?.author ?? s.author,
           tags: p?.tags ?? [],
           allowRemix: p?.allowRemix ?? true,
+          showcase: p?.showcase ?? false,
           visibility: p?.visibility ?? "unlisted",
           classId: p?.classId ?? s.classes[0]?.id ?? 0,
         });
@@ -233,6 +235,13 @@ function PublishDialog({ host, close }: { host: GameHost | null; close: () => vo
               <input type="checkbox" checked={form.allowRemix} onChange={(e) => set("allowRemix", e.target.checked)} />
               Let others remix it (copy it to change, with credit to you)
             </label>
+            {(me.user?.teacher || me.user?.admin) && (
+              <label className="check field" data-testid="publish-showcase-label">
+                <input type="checkbox" checked={form.showcase} onChange={(e) => set("showcase", e.target.checked)} data-testid="publish-showcase" />
+                Showcase game: play only, signed-in students, and it stops for a Python question every few minutes
+                <span className="muted small"> (your questions and how often they come are on the <a href="/#/python-check">Python Check</a> page)</span>
+              </label>
+            )}
             <label className="check field">
               <input type="checkbox" checked={usePicture} onChange={(e) => setUsePicture(e.target.checked)} />
               Use what the game shows now as its picture

@@ -136,3 +136,11 @@ body.phone-play {
   font-size: 56px;
   line-height: 1;
 }
+
+/* The Python check, over a held game (PythonCheck.tsx). */
+.player-check { position: absolute; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; padding: 12px; background: rgba(8, 16, 24, 0.82); overflow: auto; }
+.player-check-card { background: var(--panel, #22313a); color: var(--text, #e8eef2); border: 1px solid var(--border, #3a4d58); border-radius: 10px; padding: 16px 20px; width: min(620px, 100%); max-height: 100%; overflow: auto; text-align: left; }
+.player-check-card h2 { margin: 0 0 4px; font-size: 20px; }
+.player-check-result { margin-top: 10px; }
+.player-check-result pre { white-space: pre-wrap; background: var(--code-bg, #17212a); padding: 8px; border-radius: 6px; margin: 6px 0; }
+.player-check-note { position: absolute; left: 8px; top: 8px; z-index: 50; background: #7a2b2b; color: #fff; padding: 4px 8px; border-radius: 6px; font-size: 13px; }

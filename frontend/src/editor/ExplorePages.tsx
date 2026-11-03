@@ -37,7 +37,7 @@ function GameCard({ g, extra }: { g: Card; extra?: React.ReactNode }) {
   );
 }
 
-function PageHead({ title, children, at = "" }: { title: string; children?: React.ReactNode; at?: NavPlace }) {
+export function PageHead({ title, children, at = "" }: { title: string; children?: React.ReactNode; at?: NavPlace }) {
   return (
     <>
       <SiteNav at={at} />

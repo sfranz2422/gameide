@@ -15,6 +15,7 @@ import { LocalStore } from "../store/store";
 import { EditorPage } from "./EditorPage";
 import { HomePage } from "./HomePage";
 import { ExplorePage, GalleryPage, ModerationPage } from "./ExplorePages";
+import { BankPage } from "../pycheck/BankPage";
 import { AssignmentPage, ClassesPage, ClassPage, StartAssignment } from "./ClassPages";
 import { ViewStore } from "../store/viewStore";
 import { ClassXpPage, ShopPage, XpLogPage, XpToasts } from "../xp/XpPages";
@@ -95,6 +96,8 @@ export function App() {
         <ExplorePage />
       ) : gallery ? (
         <GalleryPage classId={Number(gallery[1])} />
+      ) : hash.startsWith("#/python-check") ? (
+        <BankPage />
       ) : hash.startsWith("#/moderation") ? (
         <ModerationPage />
       ) : hash.startsWith("#/games") ? (

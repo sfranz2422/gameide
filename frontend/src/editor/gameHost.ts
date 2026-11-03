@@ -480,6 +480,17 @@ export class GameHost {
     this.send({ type: "freeze", on });
   }
 
+  /**
+   * Holds the game for a Python check (player/PythonCheck.tsx): no steps, and
+   * no sound, which plays on the page and wouldn't stop with the worker. Let go,
+   * the keyboard goes back to the game, which only listens while it has focus.
+   */
+  holdForQuestion(on: boolean) {
+    this.freeze(on);
+    this.sound.hold(on);
+    if (!on) this.canvas?.focus();
+  }
+
   /** One step of a frozen game. */
   stepOnce() {
     this.send({ type: "step" });
