@@ -240,6 +240,80 @@ const MAKES: Record<string, Steps> = {
       },
     }),
   },
+  "make-gem-guard": {
+    1: ([road, create, draw]) => ({
+      scripts: { road: road! },
+      objects: [{ name: "Road", sprite: null }],
+      place: [{ object: "Road", x: 0, y: 0 }],
+      code: { "Road.create": create!, "Road.draw": draw! },
+    }),
+    2: ([create, walk]) => ({
+      sprites: ["enemy"],
+      objects: [{ name: "Enemy", sprite: "enemy" }],
+      code: { "Enemy.create": create!, "Enemy.step": walk! },
+    }),
+    3: ([create, alarm]) => ({
+      objects: [{ name: "Gate", sprite: null }],
+      place: [{ object: "Gate", x: 0, y: 0 }],
+      code: { "Gate.create": create!, "Gate.alarm 0": alarm! },
+    }),
+    4: ([create, fire, shotCreate, shotAlarm]) => ({
+      sprites: ["ship", "bullet"],
+      objects: [{ name: "Tower", sprite: "ship" }, { name: "Shot", sprite: "bullet" }],
+      place: [{ object: "Tower", x: 300, y: 150 }],
+      code: { "Tower.create": create!, "Tower.step": fire!, "Shot.create": shotCreate!, "Shot.alarm 0": shotAlarm! },
+    }),
+    5: ([hit, top], code) => ({ code: { "Shot.collision Enemy": hit!, "Enemy.step": top! + code("Enemy.step") } }),
+    6: ([steal, start, shown, paid, pay], code) => {
+      const blow = 'effect("explosion", self.x, self.y)\n';
+      expect(code("Enemy.step")).toContain(blow);
+      return {
+        sprites: ["gem"],
+        objects: [{ name: "Gem", sprite: "gem" }, { name: "Hud", sprite: null }],
+        place: [{ object: "Gem", x: 596, y: 400 }, { object: "Hud", x: 0, y: 0 }],
+        code: {
+          "Gem.collision Enemy": steal!,
+          "Hud.create": start!,
+          "Hud.draw_gui": shown!,
+          "Enemy.step": code("Enemy.step").replace(blow, blow + paid!),
+          "Enemy.create": code("Enemy.create") + pay!,
+        },
+      };
+    },
+    7: ([build]) => ({
+      sprites: ["wall"],
+      objects: [{ name: "Spot", sprite: "wall" }],
+      place: [[220, 130], [400, 130], [530, 170], [230, 290], [400, 290], [90, 300]].map(([x, y]) => ({ object: "Spot", x: x!, y: y! })),
+      code: { "Spot.mouse left pressed": build! },
+    }),
+    8: ([runner, brute, left, pick], code) => {
+      const line = 'instance_create(ROAD[0][0], ROAD[0][1], "Enemy")\n';
+      expect(code("Gate.alarm 0")).toContain(line);
+      return {
+        objects: [{ name: "Runner", sprite: "enemy", parent: "Enemy" }, { name: "Brute", sprite: "enemy", parent: "Enemy" }],
+        code: {
+          "Runner.create": runner!,
+          "Brute.create": brute!,
+          "Gate.create": code("Gate.create") + left!,
+          "Gate.alarm 0": code("Gate.alarm 0").replace(line, pick!),
+        },
+      };
+    },
+    9: ([up]) => ({ code: { "Tower.mouse left pressed": up! } }),
+    10: ([again, done, won, restart, ended], code) => {
+      const last = "self.alarm[0] = 60\n";
+      expect(code("Gate.alarm 0")).toContain(last);
+      return {
+        code: {
+          "Gate.alarm 0": code("Gate.alarm 0").replace(last, again!),
+          "Gate.step": done!,
+          "Hud.create": code("Hud.create") + won!,
+          "Hud.step": restart!,
+          "Hud.draw_gui": code("Hud.draw_gui") + ended!,
+        },
+      };
+    },
+  },
   "make-alley-brawl": {
     1: ([draw]) => ({
       roomSettings: { Room1: { width: 1920 } },
@@ -408,6 +482,74 @@ const PLAYS: Record<string, (g: PythonGame) => void> = {
     for (let i = 0; i < 30 && run(g, "b.hspeed") > 0; i++) step(g);
     expect(run(g, "b.hspeed"), "the ball bounces off the right paddle").toBeLessThan(0);
     expect(run(g, "b.x")).toBeLessThan(run(g, "p2.x"));
+  },
+  // A whole game with the mouse: towers built on spots and upgraded hold the gem; a lone tower doesn't.
+  "make-gem-guard": (g) => {
+    const click = (x: number, y: number) => {
+      g.engine.input.mouseMove(x + 5, y + 5);
+      step(g);
+      g.engine.input.mouseDown(0);
+      step(g);
+      g.engine.input.mouseUp(0);
+      step(g);
+    };
+    const start = run(g, "instance_number('Tower')");
+    run(g, "s = instances('Spot')[0]\nsx, sy = s.x, s.y\ngold = global_vars.gold");
+    click(run(g, "sx"), run(g, "sy"));
+    expect(run(g, "instance_number('Tower')"), "a click on a spot builds").toBe(start + 1);
+    expect(run(g, "global_vars.gold"), "and costs").toBe(run(g, "gold - 50"));
+    expect(run(g, "instance_number('Spot')")).toBe(5);
+    // The tower stands in the middle of where the spot was.
+    expect(run(g, "any(t.x == sx + 16 and t.y == sy + 16 for t in instances('Tower'))")).toBe(true);
+    // Too poor: nothing.
+    run(g, "global_vars.gold = 10");
+    run(g, "s = instances('Spot')[0]\nsx, sy = s.x, s.y");
+    click(run(g, "sx"), run(g, "sy"));
+    expect(run(g, "instance_number('Tower')")).toBe(start + 1);
+    // An upgrade doubles what its shots do.
+    run(g, "global_vars.gold = 100\nt = instances('Tower')[0]");
+    click(run(g, "t.x"), run(g, "t.y"));
+    expect(run(g, "t.damage")).toBe(14);
+    expect(run(g, "global_vars.gold")).toBe(40);
+    // Children are enemies, with their own numbers and their parent's walk.
+    run(g, "r = instance_create(0, 80, 'Runner')\nb = instance_create(0, 80, 'Brute')");
+    expect(run(g, "r.walk > 1.5 and r.hp < 20 and b.walk < 1.5 and b.hp > 20")).toBe(true);
+    step(g);
+    expect(run(g, "r.speed")).toBeCloseTo(3);
+    // Enemies walk the middle of the road they're drawn on: its corners are their own x and y.
+    run(g, "e = instance_create(ROAD[0][0], ROAD[0][1], 'Enemy')");
+    step(g, 60);
+    expect(run(g, "e.y")).toBe(run(g, "ROAD[0][1]"));
+    run(g, "e.destroy()");
+    run(g, "r.hp = 0\ngold = global_vars.gold");
+    step(g, 2);
+    expect(run(g, "r._alive"), "a child dies as its parent does").toBe(false);
+    expect(run(g, "global_vars.gold")).toBe(run(g, "gold + 5"));
+    run(g, "b.destroy()");
+    // Now the whole game, built up as gold comes in.
+    for (let i = 0; i < 16000 && !run(g, "global_vars.won or global_vars.lives <= 0"); i += 30) {
+      if (run(g, "global_vars.gold >= 50 and instance_number('Spot') > 0")) {
+        run(g, "s = instances('Spot')[0]\nsx, sy = s.x, s.y");
+        click(run(g, "sx"), run(g, "sy"));
+      } else if (run(g, "global_vars.gold >= 60 and instance_number('Spot') == 0")) {
+        run(g, "t = min(instances('Tower'), key=lambda t: t.damage)");
+        click(run(g, "t.x"), run(g, "t.y"));
+      }
+      step(g, 30);
+    }
+    expect(run(g, "global_vars.won"), "towers and upgrades hold the gem").toBe(true);
+    expect(run(g, "global_vars.lives")).toBeGreaterThan(0);
+    expect(run(g, "instance_number('Enemy')")).toBe(0);
+    // R starts again, as it began.
+    press(g, "r");
+    step(g, 2);
+    expect(run(g, "global_vars.won")).toBe(false);
+    expect(run(g, "global_vars.lives")).toBe(10);
+    expect(run(g, "instance_number('Spot')")).toBe(6);
+    // And with only the one tower it started with, the gem goes.
+    for (let i = 0; i < 16000 && run(g, "global_vars.lives > 0"); i += 60) step(g, 60);
+    expect(run(g, "global_vars.lives"), "one tower isn't enough").toBeLessThanOrEqual(0);
+    expect(run(g, "global_vars.won")).toBe(false);
   },
   // A key opens the door it's next to; without one, the door stays.
   "make-crypt-of-keys": (g) => {

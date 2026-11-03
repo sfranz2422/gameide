@@ -463,6 +463,15 @@
   "description": "A whole beat 'em up from an empty one: walk a long street, punch the thugs that close in from both sides, and clear it before your health runs out."
  },
  {
+  "key": "make-gem-guard",
+  "title": "Gem Guard",
+  "level": "Now You Can Make",
+  "after": "el3-button",
+  "time": "50 min",
+  "starter": "empty",
+  "description": "A whole tower defense from an empty game: enemies march down a road to steal your gem, and you click to build the towers that stop them."
+ },
+ {
   "key": "make-moonwell",
   "title": "Moonwell",
   "level": "Now You Can Make",
