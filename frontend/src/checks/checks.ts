@@ -108,7 +108,7 @@ export type Check =
   | { kind: "exists"; what: "object" | "sprite" | "room" | "sound" | "font" | "script" | "tileset"; name: string }
   | { kind: "has-sprite"; object: string }
   | { kind: "has-event"; object: string; event: string }
-  | { kind: "mode"; object: string; event: string; mode: "python" | "blocks" | "sheet" }
+  | { kind: "mode"; object: string; event: string; mode: "python" | "blocks" | "sheet" | "scene" }
   | { kind: "uses"; avoid: boolean; word: string; object: string | null; event: string | null }
   | { kind: "count"; room: string; atLeast: boolean; n: number; object: string }
   | { kind: "frames"; sprite: string; atLeast: boolean; n: number }
@@ -138,9 +138,9 @@ export function readCheck(line: string): Check {
     return { kind: "exists", what: m[1]!.toLowerCase() as "object", name: m[2]! };
   if ((m = new RegExp(String.raw`^${NAME}\s+has\s+(?:a\s+)?sprite$`, "i").exec(s))) return { kind: "has-sprite", object: m[1]! };
   if ((m = new RegExp(String.raw`^${NAME}\s+has\s+(?:an?\s+)?event\s+(.+)$`, "i").exec(s))) return { kind: "has-event", object: m[1]!, event: m[2]! };
-  if ((m = new RegExp(String.raw`^${NAME}\.(.+?)\s+is\s+(?:written\s+)?in\s+(python|blocks|code blocks|an event sheet|event sheets?|a sheet)$`, "i").exec(s))) {
+  if ((m = new RegExp(String.raw`^${NAME}\.(.+?)\s+is\s+(?:written\s+)?in\s+(python|blocks|code blocks|an event sheet|event sheets?|a sheet|a scene|scene mode)$`, "i").exec(s))) {
     const how = m[3]!.toLowerCase();
-    return { kind: "mode", object: m[1]!, event: m[2]!, mode: how === "python" ? "python" : how.includes("block") ? "blocks" : "sheet" };
+    return { kind: "mode", object: m[1]!, event: m[2]!, mode: how === "python" ? "python" : how.includes("block") ? "blocks" : how.includes("scene") ? "scene" : "sheet" };
   }
   if ((m = new RegExp(String.raw`^${NAME}\.(.+?)\s+(uses|avoids)\s+(\S+)$`, "i").exec(s)))
     return { kind: "uses", avoid: m[3]!.toLowerCase() === "avoids", word: m[4]!, object: m[1]!, event: m[2]! };
@@ -245,7 +245,7 @@ export function checkProject(p: Project, c: Check): { ok: boolean; detail: strin
       if (!o) return { ok: false, detail: `There's no object called ${c.object}.` };
       const ev = o.events.find((e) => eventName(eventLabel(p, e.key)) === eventName(c.event));
       if (!ev) return { ok: false, detail: `${o.name} doesn't have a ${c.event} event yet.` };
-      const say = { python: "Python", blocks: "blocks", sheet: "an event sheet" };
+      const say = { python: "Python", blocks: "blocks", sheet: "an event sheet", scene: "a scene" };
       const is = ev.mode ?? "python";
       return is === c.mode ? { ok: true, detail: "" } : { ok: false, detail: `${o.name}'s ${c.event} event is written in ${say[is]}, not ${say[c.mode]}.` };
     }

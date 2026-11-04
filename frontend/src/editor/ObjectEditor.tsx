@@ -10,6 +10,7 @@
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { emptyBlocks, hasBlocks } from "../blocks/blockState";
 import { emptySheet, hasRows } from "../eventsheets/sheet";
+import { emptyScene, hasSteps, REPEATING_EVENTS } from "../scenes/scene";
 import { KEY_NAMES } from "../engine/layout";
 import { generateObject, methodSignature } from "../python/codegen";
 import {
@@ -25,7 +26,7 @@ import {
   type Project,
 } from "../store/project";
 import { CodeEditor } from "./code/CodeEditor";
-import { blockNamesFor, BlocksEditor, canUse, canUseBlocks, confirmToPython, projectNames, SheetEditor, switchTo, toBlocks as makeBlocks, toPython as makePython } from "./codeMode";
+import { blockNamesFor, BlocksEditor, canUse, canUseBlocks, confirmToPython, projectNames, SceneEditor, SheetEditor, switchTo, toBlocks as makeBlocks, toPython as makePython } from "./codeMode";
 import { Icon } from "./ui/icons";
 import { useProjectApi } from "./useProject";
 
@@ -73,7 +74,7 @@ export function ObjectEditor({
 
   const removeEvent = (id: string) => {
     const ev = obj.events.find((e) => e.id === id)!;
-    if ((ev.code.trim() || hasBlocks(ev.blocks) || hasRows(ev.sheet)) && !confirm(`Delete the ${eventLabel(project, ev.key)} event and its code?`)) return;
+    if ((ev.code.trim() || hasBlocks(ev.blocks) || hasRows(ev.sheet) || hasSteps(ev.scene)) && !confirm(`Delete the ${eventLabel(project, ev.key)} event and its code?`)) return;
     set((o) => void (o.events = o.events.filter((e) => e.id !== id)), `delete ${eventLabel(project, ev.key)} event`);
     if (selected === id) select(null);
   };
@@ -102,7 +103,9 @@ export function ObjectEditor({
   };
   const isBlocks = current?.mode === "blocks";
   const isSheet = current?.mode === "sheet";
-  const isPython = !isBlocks && !isSheet;
+  const isScene = current?.mode === "scene";
+  const isPython = !isBlocks && !isSheet && !isScene;
+  const repeats = !!current && REPEATING_EVENTS.has(current.key.type);
 
   return (
     <div className="object-editor" data-tutorial="object-editor">
@@ -187,7 +190,7 @@ export function ObjectEditor({
               className={!showClass && isPython ? "on" : ""}
               onClick={() => (current ? toPython(current) : setShowClass(false))}
               data-testid="tab-python"
-              title={isPython ? "Write this event in Python" : `Turn this ${isBlocks ? "blocks" : "sheet"} event into Python, to edit as Python from now on`}
+              title={isPython ? "Write this event in Python" : `Turn this ${isBlocks ? "blocks" : isScene ? "scene" : "sheet"} event into Python, to edit as Python from now on`}
             >
               Python
             </button>
@@ -223,6 +226,28 @@ export function ObjectEditor({
             >
               Event Sheet
             </button>
+            <button
+              role="tab"
+              aria-selected={!showClass && isScene}
+              className={!showClass && isScene ? "on" : ""}
+              disabled={!current || repeats || !canUse(current, "scene")}
+              onClick={() => {
+                if (!current) return;
+                setShowClass(false);
+                setEvent(current.id, (e) => switchTo(e, "scene", "event"));
+              }}
+              data-testid="tab-scene"
+              data-tutorial="tab-scene"
+              title={
+                repeats
+                  ? "This event runs every step, so a scene here would start over and over. Use Create, a collision, an alarm or a key press."
+                  : current && !canUse(current, "scene")
+                    ? "This event is already written another way. Only an empty event can become a scene."
+                    : "Build a cutscene from a list of steps"
+              }
+            >
+              Scene
+            </button>
             <span className="spacer" />
             <button
               role="tab"
@@ -240,6 +265,26 @@ export function ObjectEditor({
               <div className="signature">The Python your events make. Read-only — edit the events instead.</div>
               <CodeEditor docKey={`class:${obj.id}`} value={generated} readOnly testId="generated-class" />
             </>
+          ) : current && isScene ? (
+            <Suspense fallback={<div className="empty-pane">Loading the scene…</div>}>
+              <SceneEditor
+                key={current.id}
+                id={current.id}
+                scene={current.scene ?? emptyScene()}
+                code={current.code}
+                onChange={(scene, code) =>
+                  setEvent(current.id, (e) => {
+                    e.scene = scene;
+                    e.code = code;
+                  })
+                }
+                names={() => blockNamesFor(projectRef.current)}
+                onConvert={() => toPython(current)}
+                errorLine={focus && focus.eventId === current.id ? { line: focus.line, nonce: focus.nonce } : null}
+                canRepeat={current.key.type !== "create"}
+                collision={current.key.type === "collision"}
+              />
+            </Suspense>
           ) : current && isSheet ? (
             <Suspense fallback={<div className="empty-pane">Loading the sheet…</div>}>
               <SheetEditor

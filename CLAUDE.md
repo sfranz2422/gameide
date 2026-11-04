@@ -175,7 +175,7 @@ engine failure in the player is shown, never a silent black screen.
   fight text selection in its boxes); `moveRow`/`canDrop` in sheet.ts do the
   move, and the drag carries its own type so a dragged picture or text is
   never taken for a row.
-- `codeMode.tsx` holds the rules for all three modes (`canUse`, `switchTo`,
+- `codeMode.tsx` holds the rules for all the modes (`canUse`, `switchTo`,
   `confirmToPython`).
 
 ## Sounds, gamepads, save files, fonts
@@ -452,6 +452,7 @@ and fades are plain Python drawn with ordinary draw commands).
 - **A skip must leave the game where a watched scene would**: every step's end state is applied, in order. A new step needs its case in `scene_skip` too.
 - Steps with an end state and no time go in `_SCENE_INSTANT`; a fade, tint or animation is a change (`_scene_change_start`: `tick` each step, `end` when done or skipped). `scene_create` makes its instance at once, hidden until its turn, because later lines need to name it; an `on_draw` of its own still draws while hidden, since `visible` doesn't stop `on_draw`.
 - Overlays are sized by `_screen_size()`, never `view_width`: the GUI layer doesn't zoom, and a fade once covered only the window's corner.
+- **Scene mode** (`mode: "scene"`, `src/scenes/`) is a fourth way to write an object event, by cards; like a sheet it writes its Python into `code`, one line a step, and `scene.ts` is pure. Every value is kept as the Python that goes in the call, whatever box shows it. A new `scene_` function needs a place in `SCENE_GROUPS` (scene.test.ts fails until it has one) and its box comes from `boxOf`. Not for per-step events (`REPEATING_EVENTS`): each run would line the scene up again. A step with a problem writes `pass` and goes red, so one unfinished card doesn't stop the game starting.
 - A room change ends a scene (`_goto`). `scene_camera` parks what the camera follows on the engine, and it's restored as the scene ends.
 
 ## Tutorials

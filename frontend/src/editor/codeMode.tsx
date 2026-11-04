@@ -9,11 +9,13 @@
  * Python never becomes blocks or a sheet: that would mean reading any code
  * at all as blocks or rows, and a student's typing would come back changed.
  * Blocks and sheets don't turn into each other either; both go to Python.
+ * A scene (a cutscene's steps) follows the same rules, in object events only.
  */
 import { lazy } from "react";
 import { emptyBlocks, hasBlocks, hasPython, scriptFunctions, type BlocksKind, type BlocksState } from "../blocks/blockState";
 import type { BlockNames } from "../blocks/catalogBlocks";
 import { emptySheet, hasRows, type Sheet } from "../eventsheets/sheet";
+import { emptyScene, hasSteps, type Scene } from "../scenes/scene";
 import type { Project } from "../store/project";
 import type { ProjectNames } from "./code/pythonHelp";
 
@@ -21,8 +23,9 @@ import type { ProjectNames } from "./code/pythonHelp";
 export const BlocksEditor = lazy(() => import("../blocks/BlocksEditor"));
 // The sheet editor is small, but only sheet users need it.
 export const SheetEditor = lazy(() => import("../eventsheets/SheetEditor"));
+export const SceneEditor = lazy(() => import("../scenes/SceneEditor"));
 
-export type CodeMode = "python" | "blocks" | "sheet";
+export type CodeMode = "python" | "blocks" | "sheet" | "scene";
 
 /** Anything that holds code that may be blocks or a sheet. */
 export interface CodeHolder {
@@ -30,16 +33,19 @@ export interface CodeHolder {
   mode?: CodeMode;
   blocks?: BlocksState;
   sheet?: Sheet;
+  scene?: Scene;
 }
 
 export const modeOf = (h: CodeHolder): CodeMode => h.mode ?? "python";
 export const isBlocks = (h: CodeHolder) => h.mode === "blocks";
 export const isSheet = (h: CodeHolder) => h.mode === "sheet";
+export const isScene = (h: CodeHolder) => h.mode === "scene";
 
 /** Nothing written yet, however it is written. */
 export function isEmpty(h: CodeHolder): boolean {
   if (isBlocks(h)) return !hasBlocks(h.blocks);
   if (isSheet(h)) return !hasRows(h.sheet);
+  if (isScene(h)) return !hasSteps(h.scene);
   return !hasPython(h.code);
 }
 
@@ -48,12 +54,14 @@ export const canUse = (h: CodeHolder, mode: CodeMode) => modeOf(h) === mode || i
 export const canUseBlocks = (h: CodeHolder) => canUse(h, "blocks");
 
 /** Switches something empty to blocks or a sheet (Python is toPython, which may ask). */
-export function switchTo(h: CodeHolder, mode: "blocks" | "sheet", kind: BlocksKind) {
+export function switchTo(h: CodeHolder, mode: "blocks" | "sheet" | "scene", kind: BlocksKind) {
   if (modeOf(h) === mode || !isEmpty(h)) return;
   h.mode = mode;
   delete h.blocks;
   delete h.sheet;
+  delete h.scene;
   if (mode === "blocks") h.blocks = emptyBlocks(kind);
+  else if (mode === "scene") h.scene = emptyScene();
   else h.sheet = emptySheet();
   // A new script's "# Functions here…" comment is not code the blocks made.
   h.code = "";
@@ -66,13 +74,14 @@ export const toBlocks = (h: CodeHolder, kind: BlocksKind) => switchTo(h, "blocks
  */
 export function confirmToPython(h: CodeHolder, what: string): boolean {
   if (modeOf(h) === "python") return false;
-  return isEmpty(h) || confirm(`Turn ${what} into Python?\n\nYou'll edit the Python from now on. It can't be turned back into ${isSheet(h) ? "a sheet" : "blocks"}.`);
+  return isEmpty(h) || confirm(`Turn ${what} into Python?\n\nYou'll edit the Python from now on. It can't be turned back into ${isScene(h) ? "a scene" : isSheet(h) ? "a sheet" : "blocks"}.`);
 }
 
 export function toPython(h: CodeHolder) {
   h.mode = "python";
   delete h.blocks;
   delete h.sheet;
+  delete h.scene;
 }
 
 /** Names for autocomplete and the blocks' pickers. */

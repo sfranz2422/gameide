@@ -18,10 +18,11 @@
  */
 import type { BlocksState } from "../blocks/blockState";
 import type { Sheet } from "../eventsheets/sheet";
+import type { Scene } from "../scenes/scene";
 import type { Project } from "../store/project";
 
 /** Anything with code in it: an event, a script, a room instance's creation code. Ids are unique across all. */
-type CodeHolder = { id: string; code: string; mode?: "python" | "blocks" | "sheet"; blocks?: BlocksState; sheet?: Sheet };
+type CodeHolder = { id: string; code: string; mode?: "python" | "blocks" | "sheet" | "scene"; blocks?: BlocksState; sheet?: Sheet; scene?: Scene };
 
 export const GROUP_MS = 1000;
 export const MAX_STEPS = 200;
@@ -60,6 +61,8 @@ export function keepCode(snapshot: Project, current: Project): Project {
     else delete h.blocks;
     if (n.sheet) h.sheet = structuredClone(n.sheet);
     else delete h.sheet;
+    if (n.scene) h.scene = structuredClone(n.scene);
+    else delete h.scene;
   }
   return out;
 }

@@ -67,6 +67,7 @@ CB, PB, TB = "src/blocks/catalogBlocks.ts", "src/blocks/python.ts", "src/blocks/
 BE, OE = "src/blocks/BlocksEditor.tsx", "src/editor/ObjectEditor.tsx"
 SH, SE, EB = "src/eventsheets/sheet.ts", "src/eventsheets/SheetEditor.tsx", "src/eventsheets/ExprBox.tsx"
 GH, SND, AT = "src/editor/gameHost.ts", "src/editor/sound.ts", "src/store/assetTypes.ts"
+SCN = "src/scenes/scene.ts"
 GS = "../backend/gamestore.py"
 PUB, PA, PD = "../backend/publishing.py", "src/player/PlayerApp.tsx", "src/editor/PublishDialog.tsx"
 CM, BS = "src/editor/codeMode.tsx", "src/blocks/blockState.ts"
@@ -1273,6 +1274,18 @@ CASES = [
  ("dialogue: bubble covers who's at the top", RT, '    under = head - 12 - bh < 6\n', '    under = False\n', "with no room over the head"),
  ("dialogue: bubble on a dead speaker", RT, 'if speaker is not None and speaker._alive and not choices:', 'if speaker is not None and not choices:', "a speaker destroyed"),
  ("dialogue: speed ignored", RT, '_dlg_chars = min(len(text), _dlg_chars + _dlg_speed)', '_dlg_chars = min(len(text), _dlg_chars + 1)', "dialogue_style sets"),
+ ("scene mode: a new step isn't on the menu", SCN, '  { label: "Camera", steps: { scene_camera: "Camera to", scene_zoom: "Zoom", scene_shake: "Shake" } },', '  { label: "Camera", steps: { scene_camera: "Camera to", scene_zoom: "Zoom" } },', "every scene_ function"),
+ ("scene mode: defaults written out", SCN, 'if (!v || v === p.default) {', 'if (!v) {', "one step is one line"),
+ ("scene mode: left-out arguments shift the rest", SCN, 'parts.push(byName ? `${p.name}=${v}` : v);', 'parts.push(v);', "one step is one line"),
+ ("scene mode: Create's name is lost", SCN, '`${step.as ? `${step.as} = ` : ""}${step.fn}', '`${step.fn}', "one step is one line"),
+ ("scene mode: a broken step reaches the game", SCN, '(bad ? `pass  # ${stepLabel(s.fn)}: ${bad.replace(/\\s+/g, " ")}` : stepPython(s))', 'stepPython(s)', "a step missing something"),
+ ("scene mode: Play once forgets", SCN, 'lines.push(null, null);', 'lines.push(null, null); out[1] = "    pass";', "Play once plays once"),
+ ("scene mode: actor order unchecked", SCN, 'if (at >= index) return', 'if (at > index + 1000) return', "an actor must be brought on"),
+ ("scene mode: the easings drift", SCN, '"linear", "in_quad"', '"in_quad"', "the card's easings"),
+ ("scene mode: rename misses it", "src/store/project.ts", '      if (e.scene) renameInScene(e.scene, sub);\n', '', "renaming a sprite"),
+ ("scene mode: the project's undo takes it back", "src/editor/history.ts", '    if (n.scene) h.scene = structuredClone(n.scene);\n    else delete h.scene;\n', '', "the project's undo leaves a scene"),
+ ("scene mode: a check can't ask", "src/checks/checks.ts", 'how.includes("scene") ? "scene" : "sheet"', '"sheet"', "a tutorial check can ask"),
+ ("scene mode: a long scene hides its Python", "src/editor/app.css", '  min-height: 0; /* Stacked on a laptop', '  /* Stacked on a laptop', "a cutscene built from cards", E2E),
  ("scene: the Skip button does nothing", RT, 'if keyboard_check_pressed("escape") or _scene_skip_pressed():', 'if keyboard_check_pressed("escape"):', "tapping it plays the rest"),
  ("scene: any tap skips", RT, '    return left <= mx < right and top <= my < bottom', '    return True', "tapping anywhere else"),
  ("scene: the button is too wide", RT, '    return left <= mx < right and top <= my < bottom', '    return top <= my < bottom', "tapping anywhere else"),

@@ -17,11 +17,12 @@
  */
 import { renameInBlocks, type BlocksState } from "../blocks/blockState";
 import { renameInSheet, type Sheet } from "../eventsheets/sheet";
+import { renameInScene, type Scene } from "../scenes/scene";
 import { KEY_NAMES, MOUSE_BUTTONS, type KeyName } from "../engine/layout";
 import { TILE_MASK } from "../engine/game";
 
 /** Bump when the format changes, and teach `migrate` the old shape. */
-export const SCHEMA_VERSION = 8; // 2: room layers, grid, camera, instance overrides. 3: tilesets and tile layers. 4: autotile sets. 5: blocks in events. 6: blocks in scripts and creation code. 7: event sheets. 8: sounds and fonts
+export const SCHEMA_VERSION = 9; // 2: room layers, grid, camera, instance overrides. 3: tilesets and tile layers. 4: autotile sets. 5: blocks in events. 6: blocks in scripts and creation code. 7: event sheets. 8: sounds and fonts. 9: scenes in events
 
 export interface Project {
   format: "gameide-project";
@@ -192,13 +193,15 @@ export interface ObjectEvent {
    * make into `code` on every change, so the game, error mapping and export
    * only ever read `code`. Python never turns into blocks or a sheet.
    */
-  mode: "python" | "blocks" | "sheet";
+  mode: "python" | "blocks" | "sheet" | "scene";
   /** The body of the method, without the def line: typed, or made by the blocks. */
   code: string;
   /** Blockly's saved workspace, when mode is "blocks" (blocks/blockState.ts). */
   blocks?: BlocksState;
   /** The event sheet's rows, when mode is "sheet" (eventsheets/sheet.ts). */
   sheet?: Sheet;
+  /** A cutscene's steps, when mode is "scene" (scenes/scene.ts). Events only: not scripts or creation code. */
+  scene?: Scene;
 }
 
 export interface RoomResource {
@@ -626,6 +629,7 @@ export function replaceQuoted(project: Project, from: string, to: string) {
       e.code = sub(e.code);
       if (e.blocks) renameInBlocks(e.blocks, from, to);
       if (e.sheet) renameInSheet(e.sheet, from, sub, to);
+      if (e.scene) renameInScene(e.scene, sub);
     }
   for (const s of project.scripts) {
     s.code = sub(s.code);
@@ -719,6 +723,8 @@ export function migrate(data: unknown): Project {
     p.fonts ??= [];
     p.schemaVersion = 8;
   }
+  // 8 → 9: events may be scenes. Nothing older is one.
+  if (p.schemaVersion < 9) p.schemaVersion = 9;
   return p as Project;
 }
 
