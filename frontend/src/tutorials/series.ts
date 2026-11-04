@@ -466,6 +466,12 @@ export const DODGE2: Series = {
         },
       },
     },
+    {
+      key: "el2-leaderboard",
+      edits: {
+        1: { code: { "EndScreen.create": 'save_set("best", global_vars.best)\nhigh_score(global_vars.score)\n' } },
+      },
+    },
   ],
 };
 

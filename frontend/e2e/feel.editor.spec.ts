@@ -233,3 +233,19 @@ test("the floor is drawn where floor_point says", async ({ page }) => {
   const [sky] = await pixels(page, [[320, 40]]);
   expect(near(sky!, [255, 0, 0], 40)).toBe(false);
 });
+
+test("a cutscene plays in the browser: it holds the game, shows its text, and Esc skips it", async ({ page }) => {
+  await fromTemplate(page, "coins");
+  await page.getByTestId("play").click();
+  await expect(page.getByTestId("fps")).toBeVisible({ timeout: 60_000 });
+  const py = (code: string) => page.evaluate((c) => (window as any).__gameide.host.evalPython(c), code);
+  await py('p = instances("Player")[0]; start = p.x; scene_say("A long speech", "Robin"); scene_move(p, start + 100, p.y, 600)');
+  await expect.poll(() => py("scene_playing() and game_paused()")).toBe(true);
+  await page.waitForTimeout(500);
+  expect(await py("p.x == start")).toBe(true);
+  await page.locator("canvas[data-testid=game-canvas]").click();
+  await page.keyboard.press("Escape");
+  await expect.poll(() => py("scene_playing()")).toBe(false);
+  expect(await py("p.x == start + 100")).toBe(true);
+  expect(await py("game_paused()")).toBe(false);
+});

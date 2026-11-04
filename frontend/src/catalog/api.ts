@@ -26,6 +26,7 @@ export type Category =
   | "Sound"
   | "Saving"
   | "Effects"
+  | "Cutscenes"
   | "Debug";
 
 /**
@@ -33,7 +34,7 @@ export type Category =
  * blocks palette and the sheet pickers each list categories; catalog.test.ts
  * holds all three to this, so a new category can't go missing from one.
  */
-export const CATEGORIES: Category[] = ["Instances", "Collision", "Input", "Motion", "Physics", "Drawing", "Sound", "Saving", "Rooms", "Camera", "Effects", "Debug"];
+export const CATEGORIES: Category[] = ["Instances", "Collision", "Input", "Motion", "Physics", "Drawing", "Sound", "Saving", "Rooms", "Camera", "Effects", "Cutscenes", "Debug"];
 
 export type ParamType =
   | "number" | "string" | "object" | "sprite" | "key" | "button" | "color" | "boolean" | "room" | "instance" | "layer" | "any"
@@ -291,6 +292,22 @@ export const API: ApiEntry[] = [
     "Stops a target's tweens (or just the one moving prop), leaving it where it got to."),
   fn("Effects", "ease", [p("name", "string"), p("t", "number")], "a number",
     'An easing at t, from 0 to 1: the curve tween() moves along. ease("out_bounce", 0.5).'),
+  fn("Cutscenes", "scene_move", [p("instance", "instance"), p("x", "number"), p("y", "number"), p("steps", "number", "60"), p("ease", "string", '"in_out_sine"'), p("wait", "boolean", "True")], "nothing",
+    "A cutscene step: moves an instance to (x, y) over that many steps, animating as it goes. Each scene_ call lines up a step, and they play one after another while the game holds still. wait=False lets the next step start with it, so two can walk together. Esc skips the scene."),
+  fn("Cutscenes", "scene_wait", [p("steps", "number", "30")], "nothing", "A cutscene step: nothing happens for a while. 60 steps is about a second."),
+  fn("Cutscenes", "scene_say", [p("text", "any"), p("name", "string", "None")], "nothing", "A cutscene step: shows text in the dialogue box, and waits for Space, Enter or a click."),
+  fn("Cutscenes", "scene_ask", [p("question", "any"), p("choices", "any"), p("name", "string", "None"), p("then", "any", "None")], "nothing",
+    'A cutscene step: asks a question and waits for a choice: scene_ask("Open it?", ["Yes", "No"]). answer() has it afterwards, or give a then function, called with the choice. Skipping the scene takes the first choice.'),
+  fn("Cutscenes", "scene_camera", [p("x", "number"), p("y", "number"), p("steps", "number", "45"), p("ease", "string", '"in_out_sine"')], "nothing",
+    "A cutscene step: glides the view until (x, y) is in its middle. When the scene ends, the camera goes back to following what it followed."),
+  fn("Cutscenes", "scene_zoom", [p("zoom", "number", "1"), p("steps", "number", "30")], "nothing", "A cutscene step: zooms the view (2 is closer, 1 as drawn) and waits until it's there. It stays zoomed until you zoom back."),
+  fn("Cutscenes", "scene_fade", [p("to", "number", "1.0"), p("steps", "number", "30"), p("color", "color", '"black"')], "nothing", "A cutscene step: fades the screen to a colour (to=1) or back from it (to=0), and waits until it's done."),
+  fn("Cutscenes", "scene_shake", [p("strength", "number", "4"), p("steps", "number", "15")], "nothing", "A cutscene step: shakes the view, and goes straight on to the next step."),
+  fn("Cutscenes", "scene_sound", [p("sound", "sound")], "nothing", "A cutscene step: plays a sound, and goes straight on to the next step."),
+  fn("Cutscenes", "scene_do", [p("function", "any")], "nothing", "A cutscene step: calls a function of yours, for anything else: scene_do(open_door), with no () after its name."),
+  fn("Cutscenes", "scene_room", [p("room", "room")], "nothing", "A cutscene step: goes to another room, which ends the scene. Steps after it never run."),
+  fn("Cutscenes", "scene_playing", [], "True or False", "Is a cutscene playing?"),
+  fn("Cutscenes", "scene_skip", [], "nothing", "Plays the rest of the scene instantly, as Esc does. Anything it would have moved or changed still happens."),
   fn("Effects", "say", [p("text", "any"), p("name", "string", "None")], "nothing",
     "Shows text in a box at the bottom of the screen, typed out. Space, Enter or a click goes on to the next say()."),
   fn("Effects", "ask", [p("question", "any"), p("choices", "any"), p("name", "string", "None"), p("then", "any", "None")], "nothing",
@@ -345,7 +362,7 @@ export const PROPERTIES: { name: string; description: string }[] = [
   { name: "outline", description: 'A coloured outline round the sprite: self.outline = "white"; None takes it off.' },
   { name: "glow", description: 'A soft glow round the sprite: self.glow = "yellow"; None takes it off.' },
   { name: "flash", description: 'self.flash("white", 6): drawn as one solid colour for a few steps — "I was hit".' },
-  { name: "alarm", description: "Twelve countdowns: self.alarm[0] = 60 runs on_alarm_0 in 60 steps." },
+  { name: "alarm", description: "Twelve countdown timers on each instance, alarm[0] to alarm[11]. self.alarm[0] = 60 runs this instance's Alarm 0 event once, 60 steps from now (one second, at 60 steps a second). Set it again inside that event to repeat it. Set it in Create or a collision, not in Step, or it starts over every step and never runs. Reading it gives the steps left, or -1 when it isn't running. Set it to -1 to cancel; 0 runs nothing. Alarms wait while the game is paused." },
   { name: "object_name", description: "The name of this instance's object." },
   { name: "once", description: 'self.once("key", condition): True the first step the condition is true, then not until it has been false. Event sheets\' "Trigger once".' },
 ];

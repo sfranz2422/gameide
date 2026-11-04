@@ -443,6 +443,14 @@ and fades are plain Python drawn with ordinary draw commands).
   floor mesh sits at the camera without its shake (`worldDraw.view`), so it
   shakes with the room rather than staying put under what stands on it.
 
+## Cutscenes
+
+`scene_*` in runtime.py (the "cutscenes" section), `python/scene.test.ts`; each call lines up a step, run in `_step_scene` first thing in `_frame`, statements rather than a list so blocks and sheets get them free.
+
+- The game holds still with the ordinary pause. A paused engine moves and animates nothing, so the runner moves and animates what it moves itself.
+- **A skip must leave the game where a watched scene would**: every step's end state is applied, in order. A new step needs its case in `scene_skip` too.
+- A room change ends a scene (`_goto`). `scene_camera` parks what the camera follows on the engine, and it's restored as the scene ends.
+
 ## Tutorials
 
 `src/tutorials/` and `backend/tutorials.py`; built-in ones are

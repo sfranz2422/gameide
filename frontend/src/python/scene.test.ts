@@ -1,0 +1,310 @@
+/**
+ * Cutscenes, step by step in the real Pyodide: scene_ calls play one after
+ * another while the game holds still, Esc plays the rest instantly, and a scene
+ * leaves the game as it found it.
+ */
+import { describe, expect, it } from "vitest";
+import { key, load, py, run } from "./testkit";
+
+const game = (body = "    pass\n", extra = {}) =>
+  load({
+    code: {
+      A: `class A(GameObject):\n${body}`,
+      B: "class B(GameObject):\n    def on_step(self):\n        global_vars.b_steps = getattr(global_vars, 'b_steps', 0) + 1\n",
+    },
+    instances: [{ object: "A", x: 100, y: 100 }, { object: "B", x: 300, y: 100 }],
+    ...extra,
+  });
+const a = "instances('A')[0]";
+const fade = (g: Parameters<typeof run>[0]) => (g.engine.guiList.find((c) => c[0] === "rect" && c[1] === -3e6) as number[] | undefined)?.[8] ?? 0;
+/** What the dialogue box says just now: the name, if any, then the line. */
+const boxSays = (g: Parameters<typeof run>[0]) => g.engine.guiList.filter((c) => c[0] === "text").map((c) => c[4]).join("|");
+const press = (g: Parameters<typeof run>[0], k: string) => {
+  g.engine.input.keyDown(key(k));
+  run(g, 1);
+  g.engine.input.keyUp(key(k));
+};
+
+describe("cutscenes", () => {
+  it("a move gets there on time, smoothly, and the next step waits for it", async () => {
+    const { game: g } = await game();
+    py(g, `scene_move(${a}, 200, 150, 10); scene_move(${a}, 200, 50, 10)`);
+    expect(py(g, "scene_playing()")).toBe(true);
+    run(g, 6);
+    const x = py(g, `${a}.x`) as number;
+    expect(x).toBeGreaterThan(100);
+    expect(x).toBeLessThan(200);
+    expect(py(g, `${a}.y`) as number).toBeGreaterThan(100);
+    run(g, 6);
+    expect(py(g, `${a}.x`)).toBeCloseTo(200);
+    run(g, 12);
+    expect(py(g, `${a}.y`)).toBeCloseTo(50);
+    run(g, 2);
+    expect(py(g, "scene_playing()")).toBe(false);
+  });
+
+  it("the game holds still while it plays, and carries on after", async () => {
+    const { game: g } = await game();
+    run(g, 3);
+    const before = py(g, "global_vars.b_steps") as number;
+    py(g, "scene_wait(20)");
+    run(g, 10);
+    expect(py(g, "global_vars.b_steps")).toBe(before);
+    expect(py(g, "game_paused()")).toBe(true);
+    run(g, 15);
+    expect(py(g, "game_paused()")).toBe(false);
+    expect(py(g, "global_vars.b_steps") as number).toBeGreaterThan(before);
+  });
+
+  it("a game paused before the scene stays paused after it, and a pause menu can't start it under the scene", async () => {
+    const { game: g } = await game();
+    py(g, "game_pause(); scene_wait(5)");
+    run(g, 10);
+    expect(py(g, "scene_playing()")).toBe(false);
+    expect(py(g, "game_paused()")).toBe(true);
+    py(g, "game_pause(False); scene_wait(20)");
+    run(g, 2);
+    py(g, "game_pause(False)");
+    run(g, 2);
+    expect(py(g, "game_paused()")).toBe(true);
+  });
+
+  it("wait=False lets two walk together", async () => {
+    const { game: g } = await game();
+    py(g, `scene_move(${a}, 200, 100, 10, wait=False); scene_move(instances('B')[0], 400, 100, 10)`);
+    run(g, 6);
+    expect(py(g, `${a}.x`) as number).toBeGreaterThan(100);
+    expect(py(g, "instances('B')[0].x") as number).toBeGreaterThan(300);
+    run(g, 8);
+    expect(py(g, `${a}.x`)).toBeCloseTo(200);
+    expect(py(g, "instances('B')[0].x")).toBeCloseTo(400);
+    expect(py(g, "scene_playing()")).toBe(false);
+  });
+
+  it("a scene doesn't end before a move nothing waited for", async () => {
+    const { game: g } = await game();
+    py(g, `scene_move(${a}, 200, 100, 20, wait=False)`);
+    run(g, 10);
+    expect(py(g, "scene_playing()")).toBe(true);
+    run(g, 14);
+    expect(py(g, "scene_playing()")).toBe(false);
+    expect(py(g, `${a}.x`)).toBeCloseTo(200);
+  });
+
+  it("what it moves animates, though the game is paused", async () => {
+    const { game: g } = await load({
+      code: { A: "class A(GameObject):\n    pass\n" },
+      objects: [{ name: "A", sprite: "anim" }],
+      instances: [{ object: "A", x: 100, y: 100 }],
+    });
+    py(g, `scene_move(${a}, 200, 100, 30)`);
+    const frames = new Set<number>();
+    for (let i = 0; i < 8; i++) {
+      run(g, 1);
+      frames.add(Math.floor(py(g, `${a}.image_index`) as number));
+    }
+    expect(frames.size).toBeGreaterThan(2);
+    expect(Math.max(...frames)).toBeLessThan(4);
+  });
+
+  it("says wait for the player, in order", async () => {
+    const { game: g } = await game();
+    py(g, `scene_say("One", "Robin"); scene_say("Two"); scene_move(${a}, 200, 100, 5)`);
+    run(g, 40);
+    expect(boxSays(g)).toContain("Robin");
+    expect(boxSays(g)).toContain("One");
+    run(g, 40);
+    expect(boxSays(g)).toContain("One");
+    press(g, "space");
+    run(g, 40);
+    expect(boxSays(g)).toContain("Two");
+    expect(py(g, `${a}.x`)).toBe(100);
+    press(g, "space");
+    run(g, 8);
+    expect(py(g, "dialogue_open()")).toBe(false);
+    expect(py(g, `${a}.x`)).toBeCloseTo(200);
+    expect(py(g, "scene_playing()")).toBe(false);
+  });
+
+  it("a question waits for its answer, and answer() has it", async () => {
+    const { game: g } = await game();
+    py(g, `scene_ask("Open it?", ["Yes", "No"]); scene_move(${a}, 200, 100, 3)`);
+    run(g, 40);
+    expect(py(g, `${a}.x`)).toBe(100);
+    press(g, "2");
+    run(g, 8);
+    expect(py(g, "answer()")).toBe("No");
+    expect(py(g, `${a}.x`)).toBeCloseTo(200);
+  });
+
+  it("Esc plays the rest instantly: everything it would have done is done", async () => {
+    const { game: g } = await game();
+    py(g, `
+global_vars.done = []
+scene_move(${a}, 200, 100, 100)
+scene_say("Long speech")
+scene_ask("Which?", ["First", "Second"], then=lambda c: global_vars.done.append(c))
+scene_do(lambda: global_vars.done.append("did"))
+scene_move(${a}, 500, 300, 100)
+scene_fade(1, 500)
+`);
+    run(g, 4);
+    press(g, "escape");
+    expect(py(g, "scene_playing()")).toBe(false);
+    expect(py(g, `${a}.x`)).toBe(500);
+    expect(py(g, `${a}.y`)).toBe(300);
+    expect(py(g, "global_vars.done")).toEqual(["First", "did"]);
+    expect(py(g, "dialogue_open()")).toBe(false);
+    expect(py(g, "answer()")).toBe("First");
+    expect(py(g, "game_paused()")).toBe(false);
+    run(g, 3);
+    expect(fade(g)).toBe(1);
+  });
+
+  it("skipping in the middle of a say, or a move under way", async () => {
+    const { game: g } = await game();
+    py(g, `scene_say("Hello"); scene_move(${a}, 200, 100, 5)`);
+    run(g, 3);
+    press(g, "escape");
+    expect(py(g, "dialogue_open()")).toBe(false);
+    expect(py(g, `${a}.x`)).toBe(200);
+  });
+
+  it("a skip finishes a move that's under way", async () => {
+    const { game: g } = await game();
+    py(g, `scene_move(${a}, 200, 150, 50)`);
+    run(g, 5);
+    expect(py(g, `${a}.x`) as number).toBeLessThan(200);
+    press(g, "escape");
+    expect(py(g, `${a}.x`)).toBe(200);
+    expect(py(g, `${a}.y`)).toBe(150);
+  });
+
+  it("an ordinary room change ends the scene too", async () => {
+    const { game: g } = await load({
+      code: { A: "class A(GameObject):\n    pass\n" },
+      rooms: [
+        { name: "One", width: 640, height: 360, instances: [{ object: "A", x: 1, y: 1 }] },
+        { name: "Two", width: 640, height: 360, instances: [] },
+      ],
+    } as never);
+    py(g, 'scene_wait(500); room_goto("Two")');
+    run(g, 3);
+    expect(py(g, "room_name()")).toBe("Two");
+    expect(py(g, "scene_playing()")).toBe(false);
+    expect(py(g, "game_paused()")).toBe(false);
+  });
+
+  it("the screen says Esc skips, only while a scene plays", async () => {
+    const { game: g } = await game();
+    const shown = () => JSON.stringify(g.engine.guiList).includes("Esc: skip");
+    run(g, 1);
+    expect(shown()).toBe(false);
+    py(g, "scene_wait(5)");
+    run(g, 1);
+    expect(shown()).toBe(true);
+    run(g, 10);
+    expect(shown()).toBe(false);
+  });
+
+  it("the camera glides there, and goes back to following afterwards", async () => {
+    const { game: g } = await load({
+      code: { A: "class A(GameObject):\n    pass\n" },
+      rooms: [{ name: "Big", width: 3000, height: 2000, camera: { enabled: true, width: 640, height: 360, follow: null, smoothing: 1 }, instances: [{ object: "A", x: 400, y: 300 }] }],
+    } as never);
+    py(g, `camera_follow(${a})`);
+    run(g, 2);
+    const start = g.engine.camera.x;
+    expect(start).toBeGreaterThan(0);
+    py(g, "scene_camera(1500, 800, 10); scene_wait(5)");
+    run(g, 5);
+    expect(g.engine.camera.x).toBeGreaterThan(start);
+    expect(g.engine.camera.x).toBeLessThan(1500 - 320);
+    run(g, 7);
+    expect(g.engine.camera.x).toBeCloseTo(1500 - 320);
+    expect(g.engine.camera.y).toBeCloseTo(800 - 180);
+    run(g, 10);
+    expect(py(g, "scene_playing()")).toBe(false);
+    run(g, 2);
+    expect(g.engine.camera.x).toBeCloseTo(start);
+  });
+
+  it("zoom and fade wait until they're done", async () => {
+    const { game: g } = await game();
+    py(g, `scene_fade(1, 10); scene_move(${a}, 200, 100, 2)`);
+    run(g, 6);
+    expect(py(g, `${a}.x`)).toBe(100);
+    run(g, 10);
+    expect(fade(g)).toBe(1);
+    expect(py(g, `${a}.x`)).toBeCloseTo(200);
+    py(g, `scene_zoom(2, 10); scene_move(${a}, 300, 100, 2)`);
+    run(g, 5);
+    expect(py(g, `${a}.x`)).toBeCloseTo(200);
+    run(g, 12);
+    expect(py(g, `${a}.x`)).toBeCloseTo(300);
+  });
+
+  it("a room change ends the scene, steps after it never run, and the game isn't left paused", async () => {
+    const { game: g } = await load({
+      code: { A: "class A(GameObject):\n    pass\n" },
+      rooms: [
+        { name: "One", width: 640, height: 360, instances: [{ object: "A", x: 1, y: 1 }] },
+        { name: "Two", width: 640, height: 360, instances: [] },
+      ],
+    } as never);
+    py(g, 'global_vars.after = 0; scene_room("Two"); scene_do(lambda: setattr(global_vars, "after", 1))');
+    run(g, 3);
+    expect(py(g, "room_name()")).toBe("Two");
+    expect(py(g, "scene_playing()")).toBe(false);
+    expect(py(g, "game_paused()")).toBe(false);
+    expect(py(g, "global_vars.after")).toBe(0);
+  });
+
+  it("something destroyed mid-move doesn't stop the scene", async () => {
+    const { game: g } = await game();
+    py(g, `scene_move(${a}, 200, 100, 50); scene_wait(1)`);
+    run(g, 3);
+    py(g, `${a}.destroy()`);
+    run(g, 6);
+    expect(py(g, "scene_playing()")).toBe(false);
+  });
+
+  it("a scene started in a room's Create plays when the room starts, the first room or a later one", async () => {
+    const code = { A: "class A(GameObject):\n    def on_create(self):\n        scene_move(self, 200, self.y, 10)\n    def on_step(self):\n        global_vars.a_steps = getattr(global_vars, 'a_steps', 0) + 1\n" };
+    const first = (await load({ code, instances: [{ object: "A", x: 100, y: 100 }] })).game;
+    run(first, 4);
+    expect(py(first, "scene_playing()")).toBe(true);
+    expect(py(first, "game_paused()")).toBe(true);
+    expect(py(first, "hasattr(global_vars, 'a_steps')")).toBe(false);
+    run(first, 10);
+    expect(py(first, "scene_playing()")).toBe(false);
+    expect(py(first, `${a}.x`)).toBeCloseTo(200);
+    const later = (await load({
+      code,
+      rooms: [{ name: "One", width: 320, height: 240, instances: [] }, { name: "Two", width: 320, height: 240, instances: [{ object: "A", x: 100, y: 100 }] }],
+    } as never)).game;
+    py(later, 'room_goto("Two")');
+    run(later, 4);
+    expect(py(later, "scene_playing()")).toBe(true);
+    run(later, 10);
+    expect(py(later, `${a}.x`)).toBeCloseTo(200);
+    expect(py(later, "game_paused()")).toBe(false);
+  });
+
+  it("mistakes are said in words, at the line that made them", async () => {
+    const { game: g } = await game();
+    const wrong = (code: string) => {
+      try {
+        py(g, code);
+        return "";
+      } catch (e) {
+        return String(e);
+      }
+    };
+    expect(wrong('scene_move("hero", 1, 2)')).toContain("wants an instance");
+    expect(wrong(`scene_move(${a}, 1, 2, 5, "bouncy")`)).toContain("bouncy");
+    expect(wrong('scene_ask("Hm", "Yes")')).toContain("list of choices");
+    expect(wrong("scene_do(print('x'))")).toContain("no () after its name");
+    expect(wrong("scene_zoom(0)")).toContain("above 0");
+  });
+});

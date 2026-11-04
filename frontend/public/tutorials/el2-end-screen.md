@@ -128,4 +128,4 @@ game runs 2 seconds without errors
 
 Your game has a title, coins, bullets, enemies that get faster, two players, and a game-over screen with a best score that lasts. That's a whole game, beginning to end.
 
-Next: **Game Elements 3: Advanced Techniques**.
+Next: **7. School Leaderboard**, where your best score meets everyone else's.

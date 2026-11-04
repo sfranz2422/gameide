@@ -15,6 +15,14 @@
   "starter": "coins-start",
   "description": "Touch a coin to collect it, keep score, and show it on screen."
  },
+{
+  "key": "alarms",
+  "title": "Alarms",
+  "level": "Getting Started",
+  "time": "15 min",
+  "starter": "coins-start",
+  "description": "How alarms work: run something later, repeat it, give every instance its own timer, and stop one."
+},
  {
   "key": "blocks-to-python",
   "title": "Blocks to Python",
@@ -263,6 +271,14 @@
   "starter": "dodge2-5",
   "description": "A game-over room with the final score, back to the title from there, and a best score that's saved."
  },
+{
+  "key": "el2-leaderboard",
+  "title": "7. School Leaderboard",
+  "level": "Game Elements 2: Adding to the Fun",
+  "time": "15 min",
+  "starter": "dodge2-6",
+  "description": "Put your score on a board beside your published game, where students at your school can try to beat it."
+},
  {
   "key": "el3-angled",
   "title": "1. Angled Movement",

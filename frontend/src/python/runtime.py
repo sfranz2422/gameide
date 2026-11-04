@@ -117,6 +117,8 @@ __all__ = [
     "room_goto", "room_restart", "room_name", "game_restart", "global_vars", "room_width", "room_height",
     "game_pause", "game_paused",
     # the camera
+    "scene_move", "scene_wait", "scene_say", "scene_ask", "scene_camera", "scene_zoom", "scene_fade", "scene_shake",
+    "scene_sound", "scene_do", "scene_room", "scene_playing", "scene_skip",
     "camera_follow", "camera_set", "camera_shake", "camera_zoom", "view_x", "view_y", "view_width", "view_height",
     # sound
     "sound_play", "sound_stop", "sound_playing", "music_play", "music_stop",
@@ -175,6 +177,7 @@ _descendants = []    # type index -> [it and every type inheriting from it]
 _templates = []      # type index -> array of STRIDE doubles: a new instance
 _sprite_index = {}   # sprite name -> index
 _sprite_names = []   # index -> sprite name
+_sprite_rate = {}    # name -> (frames a step at image_speed 1, how many frames): a cutscene animates what it moves
 _rooms = []          # room definitions from the game
 
 # Event lists: the instances that have a given per-frame event. Built as
@@ -1462,6 +1465,8 @@ def _overlays():
                 y += 24
         elif typed and (_step_count // 20) % 2 == 0:
             _gui.append(["text", d - 0.1, w - 34, h - 36, "▼", 0xFFD166, -1, 14, 1.0])
+    if _scene_on:
+        _gui.append(["text", -1e6, w - 78, 8, "Esc: skip", 0xFFFFFF, -1, 13, 0.75])
     if _sflash[0] > 0:
         _gui.append(["rect", -2e6, 0, 0, w, h, _sflash[2], 0, 0.85 * _sflash[0] / _sflash[1]])
         _sflash[0] -= 1
@@ -1470,6 +1475,296 @@ def _overlays():
         _fade[0] = _fade[1] + (_fade[2] - _fade[1]) * (_fade[3] / _fade[4])
     if _fade[0] > 0:
         _gui.append(["rect", -3e6, 0, 0, w, h, _fade[5], 0, _fade[0]])
+
+
+# ---------------------------------------------------------------- cutscenes
+# scene_ calls line up steps, played one after another, while the game holds
+# still (the same pause as game_pause), so nothing can hurt the player halfway
+# through. Plain Python, one step a frame, run first thing in _frame. Moved
+# instances are moved here, because a paused engine moves and animates nothing.
+# Esc plays the rest instantly, so a skipped scene leaves the game exactly where
+# a watched one would. A room change ends a scene: its instances are gone.
+_scene = []          # steps not started yet: each [kind, ...]
+_scene_now = None    # the step being waited for
+_scene_moves = []    # moves under way, some with nothing waiting for them
+_scene_was_paused = False
+_scene_on = False
+_scene_camera_moved = False
+
+
+def _scene_add(step):
+    global _scene_on, _scene_was_paused, _scene_camera_moved
+    if not _scene_on:
+        _scene_on = True
+        _scene_was_paused = _g[_L.G.PAUSED] == 1
+        _scene_camera_moved = False
+        _g[_L.G.PAUSED] = 1.0
+    _scene.append(step)
+
+
+def scene_move(instance, x, y, steps=60, ease="in_out_sine", wait=True):
+    """A step: moves an instance to (x, y) over `steps` steps. wait=False lets the next step start with it."""
+    if not isinstance(instance, GameObject):
+        raise TypeError(f"scene_move wants an instance, like scene_move(self, 300, 200), not {instance!r}.")
+    if ease not in _EASES:
+        _named(ease, list(_EASES), "scene_move", "an easing")
+    _scene_add(["move", instance, _num(x, "scene_move", "x"), _num(y, "scene_move", "y"),
+                max(1, int(_num(steps, "scene_move", "steps"))), ease, bool(wait)])
+
+
+def scene_wait(steps=30):
+    """A step: nothing happens for a while. 60 steps is about a second."""
+    _scene_add(["wait", max(1, int(_num(steps, "scene_wait", "steps")))])
+
+
+def scene_say(text, name=None):
+    """A step: shows text in the dialogue box, and waits for Space, Enter or a click."""
+    _scene_add(["say", text, name])
+
+
+def scene_ask(question, choices, name=None, then=None):
+    """A step: asks a question with choices and waits for one. answer() has it afterwards, or give a then function."""
+    if not isinstance(choices, (list, tuple)) or not choices:
+        raise TypeError(f'scene_ask wants a list of choices, like ["Yes", "No"], not {choices!r}.')
+    _scene_add(["ask", question, list(choices), name, then])
+
+
+def scene_camera(x, y, steps=45, ease="in_out_sine"):
+    """A step: glides the view until (x, y) is in its middle. When the scene ends it goes back to following what it followed."""
+    if ease not in _EASES:
+        _named(ease, list(_EASES), "scene_camera", "an easing")
+    _scene_add(["camera", _num(x, "scene_camera", "x"), _num(y, "scene_camera", "y"),
+                max(1, int(_num(steps, "scene_camera", "steps"))), ease])
+
+
+def scene_zoom(zoom=1, steps=30):
+    """A step: zooms the view (2 is closer, 1 as drawn), and waits until it's there."""
+    zoom = _num(zoom, "scene_zoom", "zoom")
+    if zoom <= 0:
+        raise ValueError("scene_zoom: zoom is above 0: 2 is closer, 0.5 further out, 1 as drawn.")
+    _scene_add(["zoom", zoom, max(0, int(_num(steps, "scene_zoom", "steps")))])
+
+
+def scene_fade(to=1.0, steps=30, color="black"):
+    """A step: fades the screen to a colour (to=1) or back from it (to=0), and waits until it's done."""
+    _scene_add(["fade", _num(to, "scene_fade", "to"), max(1, int(_num(steps, "scene_fade", "steps"))), color])
+
+
+def scene_shake(strength=4, steps=15):
+    """A step: shakes the view, and goes straight on to the next step."""
+    _scene_add(["shake", strength, steps])
+
+
+def scene_sound(sound):
+    """A step: plays a sound, and goes straight on to the next step."""
+    _scene_add(["sound", sound])
+
+
+def scene_do(function):
+    """A step: calls a function of yours with no arguments, for anything else: a new sprite, a door opening."""
+    if not callable(function):
+        raise TypeError(f"scene_do wants a function, like scene_do(open_door), with no () after its name, not {function!r}.")
+    _scene_add(["do", function])
+
+
+def scene_room(room):
+    """A step: goes to another room, which ends the scene. Steps after it never run."""
+    _scene_add(["room", room])
+
+
+def scene_playing():
+    """Is a cutscene playing?"""
+    return _scene_on
+
+
+def scene_skip():
+    """Plays the rest of the scene instantly, as Esc does. Anything it would have moved or changed still happens."""
+    global _scene_now
+    if not _scene_on:
+        return
+    for m in _scene_moves:
+        if m["who"]._alive:
+            m["who"].x, m["who"].y = m["x1"], m["y1"]
+    _scene_moves.clear()
+    if _scene_now is not None and _scene_now[0] in ("say", "ask"):
+        # The box is up already: its line ends here.
+        was = _scene_now
+        dialogue_clear()
+        _scene_now = None
+        if was[0] == "ask":
+            _scene_answer(was[2], was[4])
+    elif _scene_now is not None and _scene_now[0] == "camera":
+        _js.camera_set(_scene_now[3], _scene_now[4])
+        _scene_now = None
+    elif _scene_now is not None and _scene_now[0] == "fade":
+        screen_fade(_scene_now[1], 1, _scene_now[3])
+        _scene_now = None
+    elif _scene_now is not None and _scene_now[0] == "zoom":
+        camera_zoom(_scene_now[1], 0)
+        _scene_now = None
+    else:
+        _scene_now = None
+    while _scene and _scene_on:
+        s = _scene.pop(0)
+        k = s[0]
+        if k == "move":
+            if s[1]._alive:
+                s[1].x, s[1].y = s[2], s[3]
+        elif k == "ask":
+            _scene_answer(s[2], s[4])
+        elif k == "camera":
+            _scene_look(s[1], s[2], 1, s[4])
+            _js.camera_set(_scene_now[3], _scene_now[4])
+            _scene_now = None
+        elif k == "zoom":
+            camera_zoom(s[1], 0)
+        elif k == "fade":
+            screen_fade(s[1], 1, s[3])
+        elif k == "do":
+            s[1]()
+        elif k == "room":
+            room_goto(s[1])
+            _scene_stop()
+    _scene_end()
+
+
+def _scene_answer(choices, then):
+    """A question skipped takes its first choice, so code reading answer() still has one."""
+    global _answer
+    _answer = choices[0]
+    if then is not None:
+        then(_answer)
+
+
+def _scene_look(x, y, steps, how):
+    """Starts the view on its way to having (x, y) in the middle."""
+    global _scene_now, _scene_camera_moved
+    if not _scene_camera_moved:
+        _scene_camera_moved = True
+        _js.camera_park()
+    w, h = view_width or room_width, view_height or room_height
+    _scene_now = ["camera", view_x, view_y, x - w / 2, y - h / 2, 0, steps, how]
+
+
+def _scene_end():
+    """Everything back as it was before the scene."""
+    global _scene_on
+    if _scene_on:
+        _scene_on = False
+        _g[_L.G.PAUSED] = 1.0 if _scene_was_paused else 0.0
+        if _scene_camera_moved:
+            _js.camera_unpark()
+
+
+def _scene_stop():
+    """A room change or a restart: the scene's over and what it was following has gone."""
+    global _scene_on, _scene_now
+    if _scene_on:
+        _scene_on = False
+        _g[_L.G.PAUSED] = 1.0 if _scene_was_paused else 0.0
+    _scene.clear()
+    _scene_moves.clear()
+    _scene_now = None
+
+
+def _step_scene():
+    """One frame of the scene, first thing in _frame."""
+    global _scene_now
+    if not _scene_on:
+        return
+    _g[_L.G.PAUSED] = 1.0   # a pause menu's "unpause" mustn't set the game going under the scene
+    if keyboard_check_pressed("escape"):
+        scene_skip()
+        return
+    for m in list(_scene_moves):
+        who = m["who"]
+        if not who._alive:   # destroyed mid-move: nothing left to move, and nothing to wait for
+            _scene_moves.remove(m)
+            if _scene_now is m["step"]:
+                _scene_now = None
+            continue
+        m["t"] += 1
+        k = ease(m["ease"], m["t"] / m["steps"])
+        who.x = m["x0"] + (m["x1"] - m["x0"]) * k
+        who.y = m["y0"] + (m["y1"] - m["y0"]) * k
+        # The engine animates nothing while paused, so a walk would slide.
+        sprite = who.sprite
+        if sprite in _sprite_rate:
+            rate, frames = _sprite_rate[sprite]
+            who.image_index = (who.image_index + who.image_speed * rate) % frames
+        if m["t"] >= m["steps"]:
+            _scene_moves.remove(m)
+            if _scene_now is m["step"]:
+                _scene_now = None
+    while _scene_on:
+        if _scene_now is not None and not _scene_wait_on():
+            return
+        if _scene_now is not None:
+            _scene_now = None
+        if not _scene:
+            if not _scene_moves:
+                _scene_end()
+            return
+        _scene_start(_scene.pop(0))
+
+
+def _scene_wait_on():
+    """Is the step under way finished? (Moves finish themselves, above.)"""
+    global _scene_now
+    s = _scene_now
+    k = s[0]
+    if k == "wait":
+        s[1] -= 1
+        return s[1] < 0
+    if k in ("say", "ask"):
+        return not _dialogue
+    if k == "camera":
+        s[5] += 1
+        t = s[5] / s[6]
+        e = ease(s[7], min(1.0, t))
+        _js.camera_set(s[1] + (s[3] - s[1]) * e, s[2] + (s[4] - s[2]) * e)
+        return t >= 1
+    if k in ("zoom", "fade"):
+        s[2] -= 1
+        return s[2] < 0
+    return False
+
+
+def _scene_start(s):
+    global _scene_now
+    k = s[0]
+    if k == "move":
+        if not s[1]._alive:
+            return
+        m = {"who": s[1], "x0": s[1].x, "y0": s[1].y, "x1": s[2], "y1": s[3], "t": 0, "steps": s[4], "ease": s[5], "step": s}
+        _scene_moves.append(m)
+        if s[6]:
+            _scene_now = s
+    elif k == "wait":
+        _scene_now = ["wait", s[1]]
+    elif k == "say":
+        say(s[1], s[2])
+        _scene_now = s
+    elif k == "ask":
+        ask(s[1], s[2], s[3], s[4])
+        _scene_now = s
+    elif k == "camera":
+        _scene_look(s[1], s[2], s[3], s[4])
+    elif k == "zoom":
+        camera_zoom(s[1], s[2])
+        _scene_now = ["zoom", s[1], s[2]]
+    elif k == "fade":
+        screen_fade(s[1], s[2], s[3])
+        _scene_now = ["fade", s[1], s[2], s[3]]
+    elif k == "shake":
+        camera_shake(s[1], s[2])
+    elif k == "sound":
+        sound_play(s[1])
+    elif k == "do":
+        s[1]()
+    elif k == "room":
+        room_goto(s[1])
+        _scene_stop()
 
 
 def room_goto(room):
@@ -1957,6 +2252,7 @@ def _unpark(o, state):
 def _goto(index, first=False):
     """Leaves the current room (if any) and builds room `index` — or, for a persistent room left before, puts it back."""
     global _room_now, _room_changed, room_width, room_height, _cur, _restarting_room, _tiles_back
+    _scene_stop()
     if _room_now >= 0:
         for o in list(_all):
             if o._alive:
@@ -2028,6 +2324,7 @@ def _restart_game():
     # The game's feel starts over too: no tweens, lines, fades or effects left from the last go.
     _tweens.clear()
     dialogue_clear()
+    _scene_stop()
     _fade[:] = [0.0, 0.0, 0.0, 0, 1, 0]
     _sflash[0] = 0
     _fx.append(["screen", None])
@@ -2220,6 +2517,7 @@ def _frame():
         _publish_globals()
         # Paused (game_pause): only instances that ignore the pause run their
         # events; the engine holds everyone else still. Tweens wait too.
+        _step_scene()
         paused = _g[_L.G.PAUSED] == 1
         run = _call_unpaused if paused else _call_all
         if not paused:
@@ -2378,6 +2676,7 @@ def _setup(layout_json, game_json):
     for i, s in enumerate(game["sprites"]):
         _sprite_index[s["name"]] = i
         _sprite_names.append(s["name"])
+        _sprite_rate[s["name"]] = ((s.get("fps") or (game.get("stepsPerSecond") or 60)) / (game.get("stepsPerSecond") or 60), max(1, s.get("frameCount") or 1))
     _rooms = game["rooms"]
     global _steps_per_second, _save, _font, _step_count, _music
     _steps_per_second = game.get("stepsPerSecond") or 60

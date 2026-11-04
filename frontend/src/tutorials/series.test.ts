@@ -17,6 +17,8 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { checkGame, checkProject, readCheck } from "../checks/checks";
+import { PythonGame } from "../python/bridge";
+import { buildGame } from "../python/codegen";
 import { TUTORIAL_STARTERS } from "../store/templates";
 import { nodeRunner } from "./nodeRunner";
 import { applyEdit, SERIES } from "./series";
@@ -40,6 +42,24 @@ function contains(code: string, block: string) {
 }
 
 describe("tutorial series", () => {
+  it("the leaderboard lesson's game sends the final score when the game ends", { timeout: 60_000 }, async () => {
+    const series = SERIES.find((s) => s.lessons.some((l) => l.key === "el2-leaderboard"))!;
+    const n = series.lessons.findIndex((l) => l.key === "el2-leaderboard");
+    const { project } = await TUTORIAL_STARTERS[`${series.name}-${n}`]!();
+    applyEdit(project, series.lessons[n]!.edits[1]!);
+    const scores: number[] = [];
+    const { game, error } = await PythonGame.load(buildGame(project, new Map()).def, {
+      stdout: () => undefined, stderr: () => undefined, warning: () => undefined, score: (s) => scores.push(s),
+    });
+    expect(error).toBeFalsy();
+    game.step();
+    expect(scores).toEqual([]);
+    game.evalPython('global_vars.score = 7; global_vars.best = 7; room_goto("GameOver")');
+    game.step();
+    game.step();
+    expect(scores).toEqual([7]);
+  });
+
   for (const series of SERIES) {
     it(`${series.name}: every lesson is listed, in order, starting from the lesson before`, () => {
       series.lessons.forEach((l, n) => {

@@ -214,7 +214,7 @@ test("Now you can make: a whole-game tutorial sits just after the lesson it buil
   const after = page.locator('[data-after="collect-coins"] + [data-testid="shelf"]');
   await expect(after).toHaveAttribute("data-shelf", "Getting Started");
   await expect(after.getByRole("heading")).toHaveCount(0);
-  await expect(after.getByTestId("tutorial-card").first()).toContainText("Blocks to Python");
+  await expect(after.getByTestId("tutorial-card").first()).toContainText("Alarms");
   // Not a shelf of its own.
   await expect(page.getByRole("heading", { name: "Now You Can Make", exact: true })).toHaveCount(0);
 

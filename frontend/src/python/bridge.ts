@@ -175,6 +175,8 @@ export class PythonGame {
       instance_nearest: (x: number, y: number, t: number, ex: number) => e().instance_nearest(x, y, t, ex),
       move_and_collide: (s: number, dx: number, dy: number, t: number) => e().move_and_collide(s, dx, dy, t),
       camera_follow: (s: number, smooth: number) => e().camera_follow(s, smooth),
+      camera_park: () => e().camera_park(),
+      camera_unpark: () => e().camera_unpark(),
       camera_set: (x: number, y: number) => e().camera_set(x, y),
       camera_shake: (strength: number, steps: number) => e().camera_shake(strength, steps),
       camera_zoom: (zoom: number, steps: number) => e().camera_zoom(zoom, steps),

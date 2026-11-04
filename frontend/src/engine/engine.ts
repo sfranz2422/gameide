@@ -247,6 +247,7 @@ export class Engine {
     return g[G.PAUSED] === 1 && !st[b + F.UNPAUSED];
   }
   roomIndex = 0;
+  private parked: { followSlot: number; followGen: number; followType: number } | null = null;
   /** Set when there were more events than the events array holds. */
   overflowed = false;
 
@@ -738,6 +739,7 @@ export class Engine {
     c.h = cam?.height ?? room.height;
     c.followType = cam?.follow ? (this.typeIndex.get(cam.follow) ?? -1) : -1;
     c.followSlot = -1;
+    this.parked = null;
     c.smoothing = cam?.smoothing ?? 1;
     c.x = c.y = 0;
     c.shakeLeft = 0;
@@ -754,6 +756,17 @@ export class Engine {
     this.camera.followGen = slot >= 0 ? st[slot * STRIDE + F.GEN]! : 0;
     if (slot < 0) this.camera.followType = -1;
     if (smoothing >= 0) this.camera.smoothing = smoothing;
+  }
+
+  /** A cutscene taking the camera: what it was following, to go back to. A new room forgets this. */
+  camera_park() {
+    const c = this.camera;
+    this.parked = { followSlot: c.followSlot, followGen: c.followGen, followType: c.followType };
+  }
+
+  camera_unpark() {
+    if (this.parked) Object.assign(this.camera, this.parked);
+    this.parked = null;
   }
 
   camera_set(x: number, y: number) {
