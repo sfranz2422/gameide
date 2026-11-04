@@ -1,0 +1,28 @@
+room: Forest
+ground: g
+camera: yes
+# g forest floor  : path  # edge  t tree  p pine  u bush  o boulder
+# @ start  1 gate to town  e thornling  v bat  m shroom  h herb  c chest  K Mittens  X Thornback
+####################################################################
+#tptptptptptgggggggtptptptptptptptptptptptptpggggggggtptptptptptptp#
+#ptptptpggggggggggegggtptptptpggghggggggtptpgggggXgggggtptptptptptp#
+#tptpggggtptptpggggggggtptpggggggtptpgggggggggggggggggggggggggtptp#
+#ptggvggptptptptgghggggtpgggegggtptptpggggugggggggggguggggggggggptp#
+#tggggtptptptptptpgggggggggggtptptptptpggggggggggggggggggggggggggggg#
+#pgggtptptpgcgtptptptptptpggtptpghgtptptgggggugggggggggggggggggptpt#
+#tgggtptpgggggggtptptptptpggtpggggggtptptpggggggggggggggggggggtptpt#
+#pgggtpggggggggggtptptptptpgtpggmggggtptptptpgggggggggggggggtptptpt#
+#tgggtpggggmggggg::::::::::::::::::::::::::::::::::::::::::tptptptp#
+#pgggtpgggggggggg:tptptptptptpggggggggtptptptptptptpgggggggtptptptp#
+#tgggtptpgggggggtt:ptptptptpgggvggggtptptptptptptptpggugggtptptptpt#
+#pgggtptptpggptptt:ptptptptpgggggggtptptptptptptptptpgggggtptptptpt#
+#tggggtptptptptptt:tptptptpgggggggtptptptptptptpgKggtpgggtptptptptp#
+#pggggggggggggggggggggggggggggggggggtptptptptptpgggggtpggtptptptptp#
+#tgggegggggvgggggg:ggggggggghggggggggtptptptptptpgggtpggtptptptptp#
+#tptptptptptptpggg:gggtptptptptpggggggggggggtptpgggggggtptptptptptp#
+#ptptptptptptptpgg:ggtptptptptptptpgggmgggggggghgggggtptptptptptptp#
+#tptptptptptptptgg:gtptptptptptptptptptptptptptptptptptptptptptptp#
+#ptptptptptptptpgg:ggtptptptptptptptptptptptptptptptptptptptptptptp#
+#tptptptptptptpggg@gggtptptptptptptptptptptptptptptptptptptptptptp#
+#ptptptptptptptpgg1ggtptptptptptptptptptptptptptptptptptptptptptptp#
+####################################################################

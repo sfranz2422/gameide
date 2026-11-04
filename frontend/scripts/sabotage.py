@@ -46,8 +46,10 @@ _mm_g, _mm_e = "../showcase/mystery/game/Game.py", "../showcase/mystery/game/_2e
 PC, PCP, PCT = "../backend/pycheck.py", "../backend/publishing.py", "src/pycheck/bank.ts"
 TD = "towers"     # …or Fort Bramble's, rebuilt the same way
 SM = "smash"      # …or Jelly Jailbreak's, rebuilt the same way
+RP = "rpg"        # …or The Lanterns of Hollowmere's, rebuilt the same way
 SMR, SML, SMB = "../showcase/smash/game/_2rules.py", "../showcase/smash/game/_1levels.py", "../showcase/smash/build.py"
 def _sm(n): return f"../showcase/smash/game/{n}.py"
+def _rp(n): return f"../showcase/rpg/game/{n}.py"
 TDL, TDR, TDB = "../showcase/towers/game/_1levels.py", "../showcase/towers/game/_2rules.py", "../showcase/towers/build.py"
 def _td(n): return f"../showcase/towers/game/{n}.py"
 KTT, KTK, KTR = "../showcase/kart/game/_1tracks.py", "../showcase/kart/game/_2kart.py", "../showcase/kart/game/_3race.py"
@@ -1296,6 +1298,17 @@ CASES = [
  ("lesson: Scene Mode's cards aren't applied", "src/tutorials/series.ts", '    ev.code = sceneToPython(scene).code;\n', '    void sceneToPython;\n', "the Scene Mode lesson's game"),
  ("lesson: Play once dropped from the cards", "src/tutorials/series.ts", ', once: "seen_friend" }', ' }', "the Scene Mode lesson's game"),
  ("room paint: nothing drawn in the picker", "src/scenes/PositionPicker.tsx", 'paintRoom(ctx, project, room, images, tileImages, { view: fit, width: el.clientWidth, height: el.clientHeight });', 'void paintRoom; void tileImages;', "a Move step's place", E2E),
+ ("rpg: the picture hides the fight", _rp("BattleBack"), "# depth: 5000", "# depth: -99000", "Pip joins, and a fight", RP),
+ ("rpg: Esc that skips a scene opens the menu too", _rp("Player"), "if self.settling > 0:\n    self.settling -= 1\n    return\n", "", "starts with its opening scene", RP),
+ ("rpg: the gate lets anyone through", _rp("Door"), "if self.needs and self.needs not in", "if False and self.needs not in", "the gate waits", RP),
+ ("rpg: no xp for a win", _rp("_2state"), '    hero["xp"] += amount\n', '    pass\n', "Pip joins, and a fight", RP),
+ ("rpg: beaten foes come back", _rp("BattleDirector"), '        S["cleared"].append(self.info["tag"])\n', '        pass\n', "Pip joins, and a fight", RP),
+ ("rpg: a lost party never ends", _rp("BattleDirector"), 'if not self.alive(self.heroes):\n    self.state = "lost"', 'if False:\n    self.state = "lost"', "losing leads to Game Over", RP),
+ ("rpg: saves don't save", _rp("_2state"), '    save_set(SAVE_KEY, dict(S))\n', '    pass\n', "a save comes back", RP),
+ ("rpg: the shop gives it away", _rp("_5menus"), '        S["gold"] -= data["price"]\n', '', "the shop sells", RP),
+ ("rpg: gear does nothing", _rp("_2state"), '        n += GEAR[hero[slot]].get(name, 0)\n', '        pass\n', "the shop sells", RP),
+ ("rpg: the boss can't be beaten", _rp("_1data"), '"thornback": {"name": "Thornback", "hp": 130,', '"thornback": {"name": "Thornback", "hp": 13000,', "the whole first chapter", RP),
+ ("rpg: the shard doesn't light the lantern", _rp("_4story"), '    scene_do(lantern.light_up)\n', '', "the whole first chapter", RP),
  ("scene: the Skip button does nothing", RT, 'if keyboard_check_pressed("escape") or _scene_skip_pressed():', 'if keyboard_check_pressed("escape"):', "tapping it plays the rest"),
  ("scene: any tap skips", RT, '    return left <= mx < right and top <= my < bottom', '    return True', "tapping anywhere else"),
  ("scene: the button is too wide", RT, '    return left <= mx < right and top <= my < bottom', '    return top <= my < bottom', "tapping anywhere else"),
@@ -1470,7 +1483,7 @@ for name, f, old, new, test, *extra in CASES:
             failed = any(l.startswith("FAIL") and test in l for l in out.splitlines())
             ran = "ok   " in out or "FAIL " in out
         else:
-            if runner in ([GM], [MM], [FB], [GF], [BB], [HC], [KT], [TD], [SM]):
+            if runner in ([GM], [MM], [FB], [GF], [BB], [HC], [KT], [TD], [SM], [RP]):
                 subprocess.run(["python3", str(ROOT.parent / f"showcase/{runner[0]}/build.py")], capture_output=True)
             cmd = ["npx", "playwright", "test", "-g", test] if runner == [E2E] else ["npx", "vitest", "run", "-t", test]
             r = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True)
@@ -1481,6 +1494,6 @@ for name, f, old, new, test, *extra in CASES:
         if not failed: bad.append(name)
     finally:
         p.write_text(src)
-        if runner in ([GM], [MM], [FB], [GF], [BB], [HC], [KT], [TD], [SM]):
+        if runner in ([GM], [MM], [FB], [GF], [BB], [HC], [KT], [TD], [SM], [RP]):
             subprocess.run(["python3", str(ROOT.parent / f"showcase/{runner[0]}/build.py")], capture_output=True)
 print("ALL SABOTAGES CAUGHT" if not bad else f"NOT CAUGHT: {bad}")
