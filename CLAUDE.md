@@ -450,6 +450,8 @@ and fades are plain Python drawn with ordinary draw commands).
 
 - The game holds still with the ordinary pause. A paused engine moves and animates nothing, so the runner moves and animates what it moves itself.
 - **A skip must leave the game where a watched scene would**: every step's end state is applied, in order. A new step needs its case in `scene_skip` too.
+- Steps with an end state and no time go in `_SCENE_INSTANT`; a fade, tint or animation is a change (`_scene_change_start`: `tick` each step, `end` when done or skipped). `scene_create` makes its instance at once, hidden until its turn, because later lines need to name it; an `on_draw` of its own still draws while hidden, since `visible` doesn't stop `on_draw`.
+- Overlays are sized by `_screen_size()`, never `view_width`: the GUI layer doesn't zoom, and a fade once covered only the window's corner.
 - A room change ends a scene (`_goto`). `scene_camera` parks what the camera follows on the engine, and it's restored as the scene ends.
 
 ## Tutorials

@@ -119,6 +119,8 @@ __all__ = [
     # the camera
     "scene_move", "scene_wait", "scene_say", "scene_ask", "scene_camera", "scene_zoom", "scene_fade", "scene_shake",
     "scene_sound", "scene_do", "scene_room", "scene_playing", "scene_skip",
+    "scene_bars", "scene_flash", "scene_caption", "scene_sprite", "scene_animate", "scene_face",
+    "scene_show", "scene_hide", "scene_tint", "scene_create", "scene_destroy", "dialogue_style",
     "camera_follow", "camera_set", "camera_shake", "camera_zoom", "view_x", "view_y", "view_width", "view_height",
     # sound
     "sound_play", "sound_stop", "sound_playing", "music_play", "music_stop",
@@ -177,6 +179,7 @@ _descendants = []    # type index -> [it and every type inheriting from it]
 _templates = []      # type index -> array of STRIDE doubles: a new instance
 _sprite_index = {}   # sprite name -> index
 _sprite_names = []   # index -> sprite name
+_sprite_box = {}     # name -> (width, height, origin x, origin y): a portrait is fitted to its box, a bubble sits on a head
 _sprite_rate = {}    # name -> (frames a step at image_speed 1, how many frames): a cutscene animates what it moves
 _rooms = []          # room definitions from the game
 
@@ -1300,20 +1303,42 @@ def _step_tweens():
 # one out, and Space, Enter or a click shows it all, then goes on. ask()
 # queues a question in the same line, so it comes after what was said
 # before it: its choices appear under it once it's typed out.
-_dialogue = []    # [(name or None, text, choices or None, then or None)]
+_dialogue = []    # [(name or None, text, choices or None, then or None, picture or None, speaker or None)]
 _dlg_chars = 0.0
 _dlg_age = 0      # steps the current line has been up: the key that said it doesn't also skip it
 _dlg_pick = 0     # the choice lit up
 _dlg_mouse = None # where the mouse was: only moving it lights a choice, or a still mouse would fight the keys
 _answer = None
+_dlg_speed = 1.0  # letters typed a step (dialogue_style)
+_dlg_sound = None # played as letters are typed
 
 
-def say(text, name=None):
-    """Shows text in a box at the bottom of the screen, typed out. Space, Enter or a click goes on."""
-    _dialogue.append((None if name is None else str(name), str(text), None, None))
+def _dialogue_picture(picture):
+    """A portrait's sprite, checked here so a misspelt one is an error on the student's own line."""
+    if picture is not None:
+        _sprite_of(picture)
+    return picture
 
 
-def ask(question, choices, name=None, then=None):
+def say(text, name=None, picture=None, above=None):
+    """Shows text in a box at the bottom of the screen, typed out. Space, Enter or a click goes on.
+    picture is a sprite to show beside the words; above is an instance to speak from, in a speech bubble over its head."""
+    if above is not None and not isinstance(above, GameObject):
+        raise TypeError(f"say's above is an instance to speak from, like above=self, not {above!r}.")
+    _dialogue.append((None if name is None else str(name), str(text), None, None, _dialogue_picture(picture), above))
+
+
+def dialogue_style(speed=1, sound=None):
+    """How words get typed out, from now on: speed is letters a step (0.5 is slower, 2 faster), sound plays as they appear."""
+    global _dlg_speed, _dlg_sound
+    speed = _num(speed, "dialogue_style", "speed")
+    if speed <= 0:
+        raise ValueError("dialogue_style: speed is above 0: 1 is a letter a step, 0.5 slower, 2 faster.")
+    _dlg_speed = speed
+    _dlg_sound = None if sound is None else _sound(sound)
+
+
+def ask(question, choices, name=None, then=None, picture=None):
     """Asks a question in the dialogue box, with choices under it: click or tap one, or pick with the arrow keys
     and Enter, or press its number. answer() is the choice made; then, if given, is a function called with it."""
     if isinstance(choices, str) or not hasattr(choices, "__iter__"):
@@ -1325,7 +1350,7 @@ def ask(question, choices, name=None, then=None):
         raise TypeError(f"ask's then is a function to call with the choice (its name, no brackets), not {then!r}.")
     global _answer
     _answer = None
-    _dialogue.append((None if name is None else str(name), str(question), choices, then))
+    _dialogue.append((None if name is None else str(name), str(question), choices, then, _dialogue_picture(picture), None))
 
 
 def answer():
@@ -1390,15 +1415,56 @@ def _screen_size():
     return round(_g[_L.G.VIEW_W] * zoom) or room_width, round(_g[_L.G.VIEW_H] * zoom) or room_height
 
 
+_DLG_PICTURE = 64   # the portrait's box, on the screen
+_CAPTION_FADE = 15  # steps a caption takes to appear, and to go
+
+
+def _dlg_layout(name, text, choices, picture, w, h):
+    """How wide the words run, and where the box's top is: both its reader and its drawing need them to agree."""
+    cols = max(12, int((w - 56 - (_DLG_PICTURE + 12 if picture else 0)) / 8.6))
+    top = h - 20 - 24 * len(_wrap(text, cols)) - (26 if name else 12) - (24 * len(choices) + 8 if choices else 0)
+    return cols, min(top, h - 12 - _DLG_PICTURE - 20) if picture else top
+
+
+def _dlg_bubble(who, name, text, w, h, d):
+    """The line in a bubble over who's head. In screen pixels, worked out each frame, so it stays there as the camera moves."""
+    zoom = _g[_L.G.ZOOM] or 1.0
+    cols = max(8, min(28, int((w - 40) / 8.6)))
+    all_lines = _wrap(text, cols)
+    lines = _wrap(text[: int(_dlg_chars)], cols)
+    # Sized for the whole line, so it doesn't grow as the letters arrive.
+    bw = 8.6 * max(len(l) for l in all_lines + [name or ""]) + 20
+    bh = 24 * len(all_lines) + (24 if name else 0) + 12
+    box = _sprite_box.get(who.sprite, (0, 0, 0, 0))
+    size = abs(who.image_yscale)
+    cx = (who.x - view_x) * zoom
+    head = (who.y - box[3] * size - view_y) * zoom
+    feet = (who.y + (box[1] - box[3]) * size - view_y) * zoom
+    left = max(6, min(w - bw - 6, cx - bw / 2))
+    # No room over the head (someone at the top of the screen): under the feet, or it covers who's talking.
+    under = head - 12 - bh < 6
+    top = max(6, min(h - bh - 6, feet + 12 if under else head - 12 - bh))
+    _gui.append(["rect", d, left, top, left + bw, top + bh, 0x10141F, 0, 0.9])
+    _gui.append(["rect", d + 0.1, left, top, left + bw, top + bh, 0xFFFFFF, 1, 0.85])
+    tip = max(left + 8, min(left + bw - 8, cx))
+    edge, point = (top, top - 9) if under else (top + bh, top + bh + 9)
+    _gui.append(["tri", d, tip - 7, edge, tip + 7, edge, tip, point, 0x10141F, 0, 0.9])
+    y = top + 6
+    if name:
+        _gui.append(["text", d - 0.1, left + 10, y, name, 0xFFD166, -1, 16, 1.0])
+        y += 24
+    if lines:
+        _gui.append(["text", d - 0.1, left + 10, y, "\n".join(lines), 0xFFFFFF, -1, 16, 1.0])
+
+
 def _overlays():
     """After Draw GUI: the dialogue box, then flashes and fades over everything."""
     global _dlg_chars, _dlg_age, _dlg_pick, _dlg_mouse, _answer
     w, h = _screen_size()
     rows = []   # a question's choices: (top, bottom) of each on screen, from the last frame's layout
     if _dialogue:
-        name, text, choices, then = _dialogue[0]
-        cols = max(12, int((w - 56) / 8.6))
-        top = h - 20 - 24 * len(_wrap(text, cols)) - (26 if name else 12) - (24 * len(choices) + 8 if choices else 0)
+        name, text, choices, then, picture, speaker = _dialogue[0]
+        cols, top = _dlg_layout(name, text, choices, picture, w, h)
         y = top + 10 + (24 if name else 0) + 24 * len(_wrap(text, cols)) + 8
         rows = [(y + 24 * i - 2, y + 24 * i + 22) for i in range(len(choices or ()))]
         typed = _dlg_chars >= len(text)
@@ -1444,34 +1510,54 @@ def _overlays():
             _dlg_chars = 0.0
             _dlg_age = 0
         else:
-            _dlg_chars = min(len(text), _dlg_chars + 1)
+            before = int(_dlg_chars)
+            _dlg_chars = min(len(text), _dlg_chars + _dlg_speed)
             _dlg_age += 1
+            # Every fourth letter: one a letter, sixty a second, is a buzz.
+            if _dlg_sound is not None and int(_dlg_chars) // 4 != before // 4 and text[int(_dlg_chars) - 1:int(_dlg_chars)].strip():
+                sound_play(_dlg_sound)
     if _dialogue:
-        name, text, choices, then = _dialogue[0]
-        cols = max(12, int((w - 56) / 8.6))
-        lines = _wrap(text[: int(_dlg_chars)], cols)
-        all_lines = _wrap(text, cols)
-        top = h - 20 - 24 * len(all_lines) - (26 if name else 12) - (24 * len(choices) + 8 if choices else 0)
+        name, text, choices, then, picture, speaker = _dialogue[0]
         d = -1e6
-        _gui.append(["rect", d, 12, top, w - 12, h - 12, 0x10141F, 0, 0.9])
-        _gui.append(["rect", d + 0.1, 12, top, w - 12, h - 12, 0xFFFFFF, 1, 0.85])
-        y = top + 10
-        if name:
-            _gui.append(["text", d - 0.1, 26, y, name, 0xFFD166, -1, 16, 1.0])
-            y += 24
-        if lines:
-            _gui.append(["text", d - 0.1, 26, y, "\n".join(lines), 0xFFFFFF, -1, 16, 1.0])
         typed = _dlg_chars >= len(text)
-        if choices and typed:
-            y += 24 * len(all_lines) + 8
-            for i, c in enumerate(choices):
-                lit = i == _dlg_pick
-                if lit:
-                    _gui.append(["rect", d + 0.05, 18, y - 2, w - 18, y + 22, 0xFFD166, 0, 0.18])
-                _gui.append(["text", d - 0.1, 26, y, f"{i + 1}. {c}", 0xFFD166 if lit else 0xFFFFFF, -1, 16, 1.0])
+        # A speaker destroyed mid-line leaves no head to speak from: the words go in the box.
+        if speaker is not None and speaker._alive and not choices:
+            _dlg_bubble(speaker, name, text, w, h, d)
+        else:
+            cols, top = _dlg_layout(name, text, choices, picture, w, h)
+            lines = _wrap(text[: int(_dlg_chars)], cols)
+            all_lines = _wrap(text, cols)
+            left = 26 + (_DLG_PICTURE + 12 if picture else 0)
+            _gui.append(["rect", d, 12, top, w - 12, h - 12, 0x10141F, 0, 0.9])
+            _gui.append(["rect", d + 0.1, 12, top, w - 12, h - 12, 0xFFFFFF, 1, 0.85])
+            if picture:
+                pw, ph, ox, oy = _sprite_box[picture]
+                fit = _DLG_PICTURE / max(pw, ph)
+                _gui.append(["sprite", d - 0.1, _sprite_of(picture), 0,
+                             20 + (_DLG_PICTURE - pw * fit) / 2 + ox * fit, top + 10 + (_DLG_PICTURE - ph * fit) / 2 + oy * fit, 1.0, fit, fit])
+            y = top + 10
+            if name:
+                _gui.append(["text", d - 0.1, left, y, name, 0xFFD166, -1, 16, 1.0])
                 y += 24
-        elif typed and (_step_count // 20) % 2 == 0:
-            _gui.append(["text", d - 0.1, w - 34, h - 36, "▼", 0xFFD166, -1, 14, 1.0])
+            if lines:
+                _gui.append(["text", d - 0.1, left, y, "\n".join(lines), 0xFFFFFF, -1, 16, 1.0])
+            if choices and typed:
+                y += 24 * len(all_lines) + 8
+                for i, c in enumerate(choices):
+                    lit = i == _dlg_pick
+                    if lit:
+                        _gui.append(["rect", d + 0.05, 18, y - 2, w - 18, y + 22, 0xFFD166, 0, 0.18])
+                    _gui.append(["text", d - 0.1, left, y, f"{i + 1}. {c}", 0xFFD166 if lit else 0xFFFFFF, -1, 16, 1.0])
+                    y += 24
+            elif typed and (_step_count // 20) % 2 == 0:
+                _gui.append(["text", d - 0.1, w - 34, h - 36, "▼", 0xFFD166, -1, 14, 1.0])
+    # Letterbox bars go under the words and the Skip button, over the game.
+    if _bars[0] != _bars[1]:
+        _bars[0] = min(_bars[1], _bars[0] + _bars[2]) if _bars[1] > _bars[0] else max(_bars[1], _bars[0] - _bars[2])
+    if _bars[0] > 0:
+        bar = round(h * 0.11 * _bars[0])
+        _gui.append(["rect", -0.5e6, 0, 0, w, bar, 0x000000, 0, 1.0])
+        _gui.append(["rect", -0.5e6, 0, h - bar, w, h, 0x000000, 0, 1.0])
     if _scene_on:
         # A real button: a phone has no Esc key, and tapping the screen only moves the words on.
         left, top, right, bottom = _scene_skip_box()
@@ -1485,6 +1571,12 @@ def _overlays():
         _fade[0] = _fade[1] + (_fade[2] - _fade[1]) * (_fade[3] / _fade[4])
     if _fade[0] > 0:
         _gui.append(["rect", -3e6, 0, 0, w, h, _fade[5], 0, _fade[0]])
+    # Over the fade: "Three days later..." is usually on black.
+    if _scene_now is not None and _scene_now[0] == "caption":
+        _, text, steps, color, size, done = _scene_now
+        cols = max(8, int((w - 40) / (size * 0.54)))
+        alpha = max(0.0, min(1.0, done / _CAPTION_FADE, (steps - done) / _CAPTION_FADE))
+        _gui.append(["text", -4e6, w / 2, h / 2, "\n".join(_wrap(text, cols)), color, -1, size, alpha, "center", "middle"])
 
 
 # ---------------------------------------------------------------- cutscenes
@@ -1497,6 +1589,8 @@ def _overlays():
 _scene = []          # steps not started yet: each [kind, ...]
 _scene_now = None    # the step being waited for
 _scene_moves = []    # moves under way, some with nothing waiting for them
+_scene_changes = []  # an actor's fades, tints and animations under way: tick(0..1) each step, end() when done or skipped
+_bars = [0.0, 0.0, 0.05]   # letterbox bars: how far in (0 to 1), where they're going, how far a step
 _scene_was_paused = False
 _scene_on = False
 _scene_camera_moved = False
@@ -1527,16 +1621,18 @@ def scene_wait(steps=30):
     _scene_add(["wait", max(1, int(_num(steps, "scene_wait", "steps")))])
 
 
-def scene_say(text, name=None):
-    """A step: shows text in the dialogue box, and waits for Space, Enter or a click."""
-    _scene_add(["say", text, name])
+def scene_say(text, name=None, picture=None, above=None):
+    """A step: shows text and waits for Space, Enter or a click. picture is a sprite beside the words; above is an instance to speak from, in a bubble."""
+    if above is not None and not isinstance(above, GameObject):
+        raise TypeError(f"scene_say's above is an instance to speak from, like above=self, not {above!r}.")
+    _scene_add(["say", text, name, _dialogue_picture(picture), above])
 
 
-def scene_ask(question, choices, name=None, then=None):
+def scene_ask(question, choices, name=None, then=None, picture=None):
     """A step: asks a question with choices and waits for one. answer() has it afterwards, or give a then function."""
     if not isinstance(choices, (list, tuple)) or not choices:
         raise TypeError(f'scene_ask wants a list of choices, like ["Yes", "No"], not {choices!r}.')
-    _scene_add(["ask", question, list(choices), name, then])
+    _scene_add(["ask", question, list(choices), name, then, _dialogue_picture(picture)])
 
 
 def scene_camera(x, y, steps=45, ease="in_out_sine"):
@@ -1582,6 +1678,82 @@ def scene_room(room):
     _scene_add(["room", room])
 
 
+def scene_bars(on=True, steps=20):
+    """A step: slides black movie bars in (or out with on=False), and goes straight on. They always go when the scene ends."""
+    steps = max(1, int(_num(steps, "scene_bars", "steps")))
+    _scene_add(["bars", 1.0 if on else 0.0, steps])
+
+
+def scene_flash(color="white", steps=8):
+    """A step: flashes the whole screen a colour, and goes straight on."""
+    _parse_color(color, "scene_flash")
+    _scene_add(["flash", color, max(1, int(_num(steps, "scene_flash", "steps")))])
+
+
+def scene_caption(text, steps=120, color="white", size=28):
+    """A step: words in the middle of the screen, over everything, like "Three days later...". Waits while they show."""
+    size = _num(size, "scene_caption", "size")
+    if size <= 0:
+        raise ValueError("scene_caption: size is above 0: 28 is about right.")
+    _scene_add(["caption", str(text), max(1, int(_num(steps, "scene_caption", "steps"))), _parse_color(color, "scene_caption"), size])
+
+
+def _scene_actor(instance, fn):
+    if not isinstance(instance, GameObject):
+        raise TypeError(f"{fn} wants an instance, like {fn}(self), not {instance!r}.")
+    return instance
+
+
+def scene_sprite(instance, sprite):
+    """A step: changes an instance's sprite, and goes straight on."""
+    _sprite_of(sprite)
+    _scene_add(["sprite", _scene_actor(instance, "scene_sprite"), sprite])
+
+
+def scene_animate(instance, steps=60, wait=True):
+    """A step: plays an instance's animation on the spot for that many steps. wait=False lets the next step start with it."""
+    _scene_add(["animate", _scene_actor(instance, "scene_animate"), max(1, int(_num(steps, "scene_animate", "steps"))), bool(wait)])
+
+
+def scene_face(instance, target):
+    """A step: flips an instance to look "left", "right", or at another instance. Sprites are taken to be drawn facing right."""
+    _scene_actor(instance, "scene_face")
+    if not isinstance(target, GameObject) and target not in ("left", "right"):
+        raise ValueError(f'scene_face looks "left", "right" or at an instance, not {target!r}.')
+    _scene_add(["face", instance, target])
+
+
+def scene_show(instance, steps=0, wait=True):
+    """A step: makes a hidden instance appear, fading in over that many steps (0 is at once)."""
+    _scene_add(["show", _scene_actor(instance, "scene_show"), max(0, int(_num(steps, "scene_show", "steps"))), bool(wait)])
+
+
+def scene_hide(instance, steps=0, wait=True):
+    """A step: makes an instance disappear, fading out over that many steps (0 is at once). It's still there, unseen."""
+    _scene_add(["hide", _scene_actor(instance, "scene_hide"), max(0, int(_num(steps, "scene_hide", "steps"))), bool(wait)])
+
+
+def scene_tint(instance, color="white", steps=0, wait=True):
+    """A step: tints an instance a colour, over that many steps (0 is at once). "white" is the sprite as drawn."""
+    _scene_add(["tint", _scene_actor(instance, "scene_tint"), _parse_color(color, "scene_tint"),
+                max(0, int(_num(steps, "scene_tint", "steps"))), bool(wait)])
+
+
+def scene_create(x, y, obj):
+    """A step: a new instance appears at (x, y). Unlike the other steps it hands the instance back at once, so
+    later steps can use it. It exists from this line, with its Create event run, but stays hidden until its turn."""
+    who = instance_create(x, y, obj)
+    was = who.visible
+    who.visible = False
+    _scene_add(["create", who, was])
+    return who
+
+
+def scene_destroy(instance):
+    """A step: destroys an instance, and goes straight on."""
+    _scene_add(["destroy", _scene_actor(instance, "scene_destroy")])
+
+
 def scene_playing():
     """Is a cutscene playing?"""
     return _scene_on
@@ -1596,6 +1768,7 @@ def scene_skip():
         if m["who"]._alive:
             m["who"].x, m["who"].y = m["x1"], m["y1"]
     _scene_moves.clear()
+    _scene_finish_changes()
     if _scene_now is not None and _scene_now[0] in ("say", "ask"):
         # The box is up already: its line ends here.
         was = _scene_now
@@ -1630,6 +1803,10 @@ def scene_skip():
             camera_zoom(s[1], 0)
         elif k == "fade":
             screen_fade(s[1], 1, s[3])
+        elif k in _SCENE_INSTANT:
+            _SCENE_INSTANT[k](s)
+        elif k in ("show", "hide", "tint"):
+            _scene_change_start(s, instantly=True)
         elif k == "do":
             s[1]()
         elif k == "room":
@@ -1656,11 +1833,103 @@ def _scene_look(x, y, steps, how):
     _scene_now = ["camera", view_x, view_y, x - w / 2, y - h / 2, 0, steps, how]
 
 
+def _scene_finish_changes():
+    """Whatever's mid-fade or mid-tint jumps to where it was going."""
+    for c in _scene_changes:
+        if c["who"]._alive:
+            c["end"]()
+    _scene_changes.clear()
+
+
+def _scene_set_sprite(s):
+    if s[1]._alive:
+        s[1].sprite = s[2]
+
+
+def _scene_set_face(s):
+    who, target = s[1], s[2]
+    if not who._alive:
+        return
+    if isinstance(target, GameObject):
+        if not target._alive or target.x == who.x:
+            return
+        left = target.x < who.x
+    else:
+        left = target == "left"
+    who.image_xscale = -abs(who.image_xscale) if left else abs(who.image_xscale)
+
+
+def _scene_appear(s):
+    if s[1]._alive:
+        s[1].visible = s[2]
+
+
+def _scene_remove(s):
+    if s[1]._alive:
+        s[1].destroy()
+
+
+# The steps with an end state and no time: the same when watched and when skipped.
+_SCENE_INSTANT = {"sprite": _scene_set_sprite, "face": _scene_set_face, "create": _scene_appear, "destroy": _scene_remove}
+
+
+def _scene_change_start(s, instantly=False):
+    """Starts a show, hide, tint or animation. Instantly, or with no steps, it just ends: a skip goes through here too."""
+    global _scene_now
+    who = s[1]
+    if not who._alive:
+        return
+    k = s[0]
+    tick = lambda t: None
+    end = lambda: None
+    if k == "show":
+        steps, wait = s[2], s[3]
+        # Already showing: there's nothing to fade in, and starting from nothing would blink.
+        if who.visible:
+            return
+        alpha = who.image_alpha
+        def end():
+            who.visible, who.image_alpha = True, alpha
+        def tick(t):
+            who.visible, who.image_alpha = True, alpha * t
+        if steps and not instantly:
+            tick(0)
+    elif k == "hide":
+        steps, wait = s[2], s[3]
+        alpha = who.image_alpha
+        def end():
+            # Faded out and put back, so a later scene_show has the alpha it started with.
+            who.visible, who.image_alpha = False, alpha
+        def tick(t):
+            who.image_alpha = alpha * (1 - t)
+    elif k == "tint":
+        color, steps, wait = s[2], s[3], s[4]
+        was = int(who.image_blend[1:], 16)
+        def end():
+            who.image_blend = color
+        def tick(t):
+            who.image_blend = tuple(round(((was >> b) & 255) + (((color >> b) & 255) - ((was >> b) & 255)) * t) for b in (16, 8, 0))
+    else:  # animate: nothing to end, it just stops
+        steps, wait = s[2], s[3]
+        def tick(t):
+            sprite = who.sprite
+            if sprite in _sprite_rate:
+                rate, frames = _sprite_rate[sprite]
+                who.image_index = (who.image_index + who.image_speed * rate) % frames
+    if instantly or not steps:
+        end()
+        return
+    _scene_changes.append({"who": who, "t": 0, "steps": steps, "tick": tick, "end": end, "step": s})
+    if wait:
+        _scene_now = s
+
+
 def _scene_end():
     """Everything back as it was before the scene."""
     global _scene_on
     if _scene_on:
         _scene_on = False
+        _bars[1] = 0.0   # They slide out by themselves, and a skip gets there the same way.
         _g[_L.G.PAUSED] = 1.0 if _scene_was_paused else 0.0
         if _scene_camera_moved:
             _js.camera_unpark()
@@ -1674,6 +1943,8 @@ def _scene_stop():
         _g[_L.G.PAUSED] = 1.0 if _scene_was_paused else 0.0
     _scene.clear()
     _scene_moves.clear()
+    _scene_finish_changes()
+    _bars[0] = _bars[1] = 0.0   # A new room starts with a clear picture.
     _scene_now = None
 
 
@@ -1722,13 +1993,24 @@ def _step_scene():
             _scene_moves.remove(m)
             if _scene_now is m["step"]:
                 _scene_now = None
+    for c in list(_scene_changes):
+        if c["who"]._alive:
+            c["t"] += 1
+            c["tick"](min(1.0, c["t"] / c["steps"]))
+            if c["t"] < c["steps"]:
+                continue
+            c["end"]()
+        # Finished, or its instance destroyed: either way nothing's left to wait for.
+        _scene_changes.remove(c)
+        if _scene_now is c["step"]:
+            _scene_now = None
     while _scene_on:
         if _scene_now is not None and not _scene_wait_on():
             return
         if _scene_now is not None:
             _scene_now = None
         if not _scene:
-            if not _scene_moves:
+            if not _scene_moves and not _scene_changes:
                 _scene_end()
             return
         _scene_start(_scene.pop(0))
@@ -1753,6 +2035,9 @@ def _scene_wait_on():
     if k in ("zoom", "fade"):
         s[2] -= 1
         return s[2] < 0
+    if k == "caption":
+        s[5] += 1
+        return s[5] >= s[2]
     return False
 
 
@@ -1769,10 +2054,10 @@ def _scene_start(s):
     elif k == "wait":
         _scene_now = ["wait", s[1]]
     elif k == "say":
-        say(s[1], s[2])
+        say(s[1], s[2], s[3], s[4])
         _scene_now = s
     elif k == "ask":
-        ask(s[1], s[2], s[3], s[4])
+        ask(s[1], s[2], s[3], s[4], s[5])
         _scene_now = s
     elif k == "camera":
         _scene_look(s[1], s[2], s[3], s[4])
@@ -1786,6 +2071,17 @@ def _scene_start(s):
         camera_shake(s[1], s[2])
     elif k == "sound":
         sound_play(s[1])
+    elif k == "bars":
+        _bars[1] = s[1]
+        _bars[2] = 1.0 / s[2]
+    elif k == "flash":
+        screen_flash(s[1], s[2])
+    elif k == "caption":
+        _scene_now = ["caption", s[1], s[2], s[3], s[4], 0]
+    elif k in _SCENE_INSTANT:
+        _SCENE_INSTANT[k](s)
+    elif k in ("show", "hide", "tint", "animate"):
+        _scene_change_start(s)
     elif k == "do":
         s[1]()
     elif k == "room":
@@ -2368,6 +2664,7 @@ def _restart_game():
     _camera_later.clear()
     _fade[:] = [0.0, 0.0, 0.0, 0, 1, 0]
     _sflash[0] = 0
+    dialogue_style()
     _fx.append(["screen", None])
     _room_now = -1
     _goto(0, first=True)
@@ -2720,6 +3017,7 @@ def _setup(layout_json, game_json):
     for i, s in enumerate(game["sprites"]):
         _sprite_index[s["name"]] = i
         _sprite_names.append(s["name"])
+        _sprite_box[s["name"]] = (s.get("width") or 1, s.get("height") or 1, s.get("originX") or 0, s.get("originY") or 0)
         _sprite_rate[s["name"]] = ((s.get("fps") or (game.get("stepsPerSecond") or 60)) / (game.get("stepsPerSecond") or 60), max(1, s.get("frameCount") or 1))
     _rooms = game["rooms"]
     global _steps_per_second, _save, _font, _step_count, _music

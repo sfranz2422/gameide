@@ -270,6 +270,248 @@ scene_fade(1, 500)
     expect(box[5]).toBe(360 - 12); // bottom edge
   });
 
+  describe("movie polish", () => {
+    const rects = (g: Parameters<typeof run>[0], depth: number) => g.engine.guiList.filter((c) => c[0] === "rect" && c[1] === depth) as number[][];
+
+    it("bars slide in over their steps, stop there, and slide out when the scene ends", async () => {
+      const { game: g } = await game();
+      py(g, "scene_bars(True, 10); scene_wait(30)");
+      run(g, 5);
+      const part = rects(g, -0.5e6)[0]![5]!;
+      expect(part).toBeGreaterThan(0);
+      run(g, 15);
+      const full = rects(g, -0.5e6)[0]![5]!;
+      expect(full).toBeGreaterThan(part);
+      run(g, 5);
+      expect(rects(g, -0.5e6)[0]![5]!).toBe(full); // stopped there
+      run(g, 40);
+      expect(py(g, "scene_playing()")).toBe(false);
+      expect(rects(g, -0.5e6)).toEqual([]);
+    });
+
+    it("a room change takes the bars away at once", async () => {
+      const { game: g } = await load({
+        code: { A: "class A(GameObject):\n    pass\n" },
+        rooms: [{ name: "One", width: 320, height: 240, instances: [{ object: "A", x: 1, y: 1 }] }, { name: "Two", width: 320, height: 240, instances: [] }],
+      } as never);
+      py(g, 'scene_bars(True, 1); scene_wait(5); scene_room("Two")');
+      run(g, 3);
+      expect(rects(g, -0.5e6).length).toBe(2);
+      run(g, 10);
+      expect(rects(g, -0.5e6)).toEqual([]);
+    });
+
+    it("a caption waits, fades in and out, and shows over a fade", async () => {
+      const { game: g } = await game();
+      py(g, 'screen_fade(1, 0); scene_caption("Later", 60); scene_wait(1)');
+      const caption = () => g.engine.guiList.find((c) => c[0] === "text" && c[4] === "Later") as unknown[] | undefined;
+      run(g, 5);
+      expect(caption()![1]).toBeLessThan(-3e6);
+      expect(caption()![8] as number).toBeLessThan(1);
+      run(g, 25);
+      expect(caption()![8]).toBe(1);
+      run(g, 50);
+      expect(caption()).toBeUndefined();
+      expect(py(g, "scene_playing()")).toBe(false);
+    });
+
+    it("a flash is a step, in its turn", async () => {
+      const { game: g } = await game();
+      py(g, 'scene_wait(5); scene_flash("red", 10); scene_wait(30)');
+      run(g, 2);
+      expect(rects(g, -2e6)).toEqual([]);
+      run(g, 6);
+      expect(rects(g, -2e6).length).toBe(1);
+    });
+  });
+
+  describe("acting", () => {
+    const extra = { sprites: [{ name: "Walk", width: 16, height: 32, originX: 8, originY: 32, frameCount: 4, fps: 60, mask: { kind: "rect" } }] };
+
+    it("scene_sprite and scene_face happen in their turn, and scene_face looks at an instance", async () => {
+      const { game: g } = await game("    pass\n", extra);
+      py(g, `scene_wait(5); scene_sprite(${a}, "Walk"); scene_face(${a}, "left"); scene_wait(5); scene_face(${a}, instances('B')[0]); scene_wait(5)`);
+      run(g, 2);
+      expect(py(g, `${a}.sprite`)).not.toBe("Walk");
+      expect(py(g, `${a}.image_xscale`)).toBe(1);
+      run(g, 6);
+      expect(py(g, `${a}.sprite`)).toBe("Walk");
+      expect(py(g, `${a}.image_xscale`)).toBe(-1);
+      run(g, 6);
+      expect(py(g, `${a}.image_xscale`)).toBe(1); // B is to the right
+    });
+
+    it("scene_animate runs the animation though the game is paused, then the next step starts", async () => {
+      const { game: g } = await game("    pass\n", extra);
+      py(g, `${a}.sprite = "Walk"; scene_animate(${a}, 3); scene_wait(40)`);
+      const start = py(g, `${a}.image_index`) as number;
+      run(g, 2);
+      expect(py(g, `${a}.image_index`)).not.toBe(start);
+      run(g, 6);
+      const after = py(g, `${a}.image_index`);
+      run(g, 5);
+      expect(py(g, `${a}.image_index`)).toBe(after);
+      expect(py(g, "scene_playing()")).toBe(true);
+    });
+
+    it("scene_hide fades out then hides with its alpha back; scene_show fades in", async () => {
+      const { game: g } = await game();
+      py(g, `scene_hide(${a}, 10); scene_wait(5); scene_show(${a}, 10)`);
+      run(g, 5);
+      const mid = py(g, `${a}.image_alpha`) as number;
+      expect(mid).toBeGreaterThan(0);
+      expect(mid).toBeLessThan(1);
+      expect(py(g, `${a}.visible`)).toBe(true);
+      run(g, 8);
+      expect(py(g, `${a}.visible`)).toBe(false);
+      expect(py(g, `${a}.image_alpha`)).toBe(1);
+      run(g, 9);
+      expect(py(g, `${a}.visible`)).toBe(true);
+      expect(py(g, `${a}.image_alpha`)).toBeLessThan(1);
+      run(g, 10);
+      expect(py(g, `${a}.image_alpha`)).toBe(1);
+    });
+
+    it("scene_tint goes there gradually", async () => {
+      const { game: g } = await game();
+      py(g, `scene_tint(${a}, "#ff0000", 10); scene_wait(5)`);
+      run(g, 5);
+      const mid = py(g, `${a}.image_blend`) as string;
+      expect(mid).not.toBe("#ffffff");
+      expect(mid).not.toBe("#ff0000");
+      run(g, 8);
+      expect(py(g, `${a}.image_blend`)).toBe("#ff0000");
+    });
+
+    it("scene_create hands the instance back now, hidden until its turn, and later steps can use it", async () => {
+      const { game: g } = await game();
+      py(g, `global_vars.new = scene_create(10, 20, "B"); scene_wait(1)`);
+      py(g, `scene_wait(5)`);
+      expect(py(g, "global_vars.new.visible")).toBe(false);
+      py(g, `global_vars.new2 = scene_create(30, 40, "B"); scene_move(global_vars.new2, 200, 40, 2)`);
+      run(g, 3);
+      expect(py(g, "global_vars.new.visible")).toBe(true);
+      expect(py(g, "global_vars.new2.visible")).toBe(false);
+      run(g, 10);
+      expect(py(g, "global_vars.new2.visible")).toBe(true);
+      expect(py(g, "global_vars.new2.x")).toBe(200);
+    });
+
+    it("scene_destroy removes it in its turn", async () => {
+      const { game: g } = await game();
+      py(g, `scene_wait(5); scene_destroy(${a}); scene_wait(5)`);
+      run(g, 2);
+      expect(py(g, "instance_number('A')")).toBe(1);
+      run(g, 6);
+      expect(py(g, "instance_number('A')")).toBe(0);
+    });
+
+    it("a skip leaves every acting step's end state", async () => {
+      const { game: g } = await game("    pass\n", extra);
+      py(g, `
+global_vars.new = scene_create(10, 20, "B")
+scene_hide(instances('B')[0], 50)
+scene_sprite(${a}, "Walk")
+scene_face(${a}, "left")
+scene_tint(${a}, "#00ff00", 50)
+scene_show(global_vars.new)
+scene_destroy(global_vars.new)
+scene_create(1, 1, "A")
+scene_wait(500)
+`);
+      run(g, 3); // the hide is under way: it ends too
+      press(g, "escape");
+      expect(py(g, "scene_playing()")).toBe(false);
+      expect(py(g, "instances('B')[0].visible")).toBe(false);
+      expect(py(g, "instances('B')[0].image_alpha")).toBe(1);
+      expect(py(g, `${a}.sprite`)).toBe("Walk");
+      expect(py(g, `${a}.image_xscale`)).toBe(-1);
+      expect(py(g, `${a}.image_blend`)).toBe("#00ff00");
+      expect(py(g, "global_vars.new._alive")).toBe(false);
+      expect(py(g, "instances('A')[-1].visible")).toBe(true);
+    });
+
+    it("a misspelt sprite or a non-instance is an error on the student's own line", async () => {
+      const { game: g } = await game();
+      expect(() => py(g, `scene_sprite(${a}, "Nope")`)).toThrow(/no sprite called/);
+      expect(() => py(g, 'scene_hide("A")')).toThrow(/wants an instance/);
+      expect(() => py(g, `scene_face(${a}, "up")`)).toThrow(/looks "left"/);
+      expect(() => py(g, 'scene_say("Hi", picture="Nope")')).toThrow(/no sprite called/);
+      expect(() => py(g, 'scene_say("Hi", above="A")')).toThrow(/above is an instance/);
+    });
+  });
+
+  describe("better dialogue", () => {
+    const extra = { sprites: [{ name: "Face", width: 32, height: 16, originX: 0, originY: 0, frameCount: 1, mask: { kind: "rect" } }, { name: "Tall", width: 16, height: 32, originX: 8, originY: 32, frameCount: 1, mask: { kind: "rect" } }] };
+    const texts = (g: Parameters<typeof run>[0]) => g.engine.guiList.filter((c) => c[0] === "text") as unknown[][];
+    const boxes = (g: Parameters<typeof run>[0]) => g.engine.guiList.filter((c) => c[0] === "rect" && c[1] === -1e6) as number[][];
+
+    it("a portrait is drawn fitted, and the words move over for it", async () => {
+      const { game: g } = await game("    pass\n", extra);
+      py(g, 'scene_say("Hello", "Ann", picture="Face")');
+      run(g, 3);
+      const pic = g.engine.guiList.find((c) => c[0] === "sprite") as number[];
+      expect(pic[7]).toBe(2); // 32 wide, in a 64 box
+      expect(texts(g).find((t) => t[4] === "Ann")![2] as number).toBeGreaterThan(26 + 64);
+      const box = boxes(g)[0]!;
+      expect(box[3]! + 10 + 64).toBeLessThanOrEqual(box[5]!);
+    });
+
+    it("a line above an instance is a bubble over its head, following the camera", async () => {
+      const { game: g } = await load({
+        code: { A: "class A(GameObject):\n    pass\n" },
+        sprites: extra.sprites,
+        rooms: [{ name: "Big", width: 3000, height: 2000, camera: { width: 640, height: 360, smoothing: 1 }, instances: [{ object: "A", x: 400, y: 300 }] }],
+      } as never);
+      py(g, `${a}.sprite = "Tall"; camera_set(100, 100)`);
+      run(g, 2);
+      py(g, `scene_say("Hi", above=${a})`);
+      run(g, 1);
+      const box = () => boxes(g)[0]!;
+      const left = box()[2]!;
+      // Head at y 300 - 32 = 268, less the view's 100 = 168 on screen.
+      expect(box()[5]!).toBeLessThanOrEqual(168);
+      expect(box()[5]!).toBeGreaterThan(120);
+      expect(left).toBeLessThan(300);
+      expect(box()[4]!).toBeGreaterThan(300);
+      py(g, "camera_set(150, 100)");
+      run(g, 2);
+      expect(box()[2]!).toBeCloseTo(left - 50);
+    });
+
+    it("with no room over the head, the bubble goes under the feet", async () => {
+      const { game: g } = await game("    pass\n", extra);
+      py(g, `${a}.sprite = "Tall"; ${a}.y = 40`);
+      run(g, 1);
+      py(g, `scene_say("Hi", above=${a})`);
+      run(g, 1);
+      expect(boxes(g)[0]![3]!).toBeGreaterThanOrEqual(40); // feet at 40: origin at the sprite's bottom
+    });
+
+    it("a speaker destroyed mid-line leaves the words in the box", async () => {
+      const { game: g } = await game();
+      py(g, `scene_say("Hi", above=${a})`);
+      run(g, 2);
+      py(g, `${a}.destroy()`);
+      run(g, 2);
+      expect(boxes(g)[0]![2]).toBe(12);
+      expect(texts(g).some((t) => t[4] === "Hi")).toBe(true);
+    });
+
+    it("dialogue_style sets how fast the letters come", async () => {
+      const { game: g } = await game();
+      py(g, 'dialogue_style(0.5); say("Twelve chars")');
+      run(g, 9);
+      const slow = (texts(g)[0]![4] as string).length;
+      expect(slow).toBeLessThan(6);
+      expect(slow).toBeGreaterThan(2);
+      py(g, 'dialogue_clear(); dialogue_style(4); say("Twelve chars")');
+      run(g, 4);
+      expect(texts(g)[0]![4]).toBe("Twelve chars");
+      expect(() => py(g, "dialogue_style(0)")).toThrow(/above 0/);
+    });
+  });
+
   it("the Skip button shows only while a scene plays", async () => {
     const { game: g } = await game();
     const shown = () => JSON.stringify(g.engine.guiList).includes("Skip (Esc)");

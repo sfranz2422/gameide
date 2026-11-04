@@ -8,6 +8,7 @@
  * The coins maze: the Player starts at (36, 36), 24 pixels square, in a room
  * 640 × 480 with a dark blue floor.
  */
+import { writeFileSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
 import { fromTemplate, setCode, SHOTS, treeItem } from "./helpers";
 
@@ -248,6 +249,50 @@ test("a cutscene plays in the browser: it holds the game, shows its text, and Es
   await expect.poll(() => py("scene_playing()")).toBe(false);
   expect(await py("p.x == start + 100")).toBe(true);
   expect(await py("game_paused()")).toBe(false);
+});
+
+test("a cutscene's bars, bubble, portrait and caption are drawn", async ({ page }) => {
+  await fromTemplate(page, "coins");
+  await page.getByTestId("play").click();
+  await expect(page.getByTestId("fps")).toBeVisible({ timeout: 60_000 });
+  const py = (code: string) => page.evaluate((c) => (window as any).__gameide.host.evalPython(c), code);
+  const dark = ([r, g, b]: number[]) => r! < 12 && g! < 12 && b! < 12;
+  // SCENE_SHOTS=<folder> keeps the pictures, to look at by eye.
+  const pic = async (name: string) => {
+    if (!process.env.SCENE_SHOTS) return;
+    await page.waitForTimeout(150);
+    const bytes: number[] = await page.evaluate(async () => [...new Uint8Array(await (await (window as any).__gameide.host.snapshot()).arrayBuffer())]);
+    writeFileSync(`${process.env.SCENE_SHOTS}/${name}.png`, Buffer.from(bytes));
+  };
+
+  // Bars: black along the top and bottom edges, the game between them.
+  await py('p = instances("Player")[0]; scene_bars(True, 1); scene_wait(100000)');
+  await expect.poll(async () => dark((await pixels(page, [[320, 10]]))[0]!) && dark((await pixels(page, [[320, 470]]))[0]!)).toBe(true);
+  expect(dark((await pixels(page, [[320, 200]]))[0]!)).toBe(false);
+  await pic("bars");
+  await py("scene_skip()");
+
+  // A bubble: its box is over the Player's head, not along the bottom.
+  await py('scene_say("Up here!", "Ann", above=p)');
+  await page.waitForTimeout(300);
+  await pic("bubble");
+  await py("scene_skip()");
+
+  // A portrait: the Player's own sprite in the dialogue box's corner.
+  const before = (await pixels(page, [[52, 426]]))[0]!;
+  await py('scene_say("Look at my face", "Ann", picture=p.sprite)');
+  await page.waitForTimeout(300);
+  expect((await pixels(page, [[52, 426]]))[0]).not.toEqual(before);
+  await pic("portrait");
+  await py("scene_skip()");
+
+  // A caption over black: pixels that aren't black in the middle of a black screen.
+  await py('screen_fade(1, 0); scene_caption("Three days later...", 600)');
+  await page.waitForTimeout(600);
+  const middle = await area(page, 180, 225, 280, 30);
+  expect(middle.some((c) => c[0]! > 200)).toBe(true);
+  expect(dark((await pixels(page, [[20, 20]]))[0]!)).toBe(true);
+  await pic("caption");
 });
 
 test("a phone can skip a cutscene: a real tap on the button in the corner", async ({ browser }) => {

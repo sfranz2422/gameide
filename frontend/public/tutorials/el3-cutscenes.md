@@ -190,7 +190,11 @@ game runs 2 seconds without errors
 
 ## That's a wrap
 
-You can tell a story now. There are a few more steps to try: `scene_ask` asks a question, `scene_zoom` moves the camera in, `scene_sound` plays a sound, and `scene_room` moves on to another room. They're all in the docs under **Cutscenes**, and in the blocks too.
+You can tell a story now. There are a few more steps to try: `scene_ask` asks a question, `scene_zoom` moves the camera in, `scene_sound` plays a sound, and `scene_room` moves on to another room.
+
+For more of a movie, `scene_bars` slides in black bars, and `scene_caption` writes "Three days later..." across the screen. Your actors can act too: `scene_face` turns them, `scene_sprite` and `scene_animate` change how they look, `scene_show` and `scene_hide` fade them in and out, and `scene_create` brings on someone new. `scene_say` can show a face with `picture=`, or a speech bubble with `above=`.
+
+They're all in the docs under **Cutscenes**, and in the blocks too.
 
 Every game you'll ever play is made of pieces like these. Now make your own.
 
