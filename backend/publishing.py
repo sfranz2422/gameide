@@ -469,8 +469,6 @@ def high_scores(slug):
                 .filter(HighScore.published_id == pub.id,
                         func.lower(accounts.User.email).endswith("@" + domain, autoescape=True))
                 .order_by(HighScore.score.desc(), HighScore.updated_at.asc()).all())
-        # Students only: someone made a teacher after they played drops off too.
-        rows = [(h, u) for h, u in rows if not accounts.is_teacher(u.email)]
         for rank, (h, u) in enumerate(rows, 1):
             if u.id == user.id:
                 out["mine"] = {"score": h.score, "rank": rank}
@@ -499,9 +497,6 @@ def post_score(slug):
         # bool is an int to Python, and NaN and infinity fail the range check.
         if isinstance(score, bool) or not isinstance(score, (int, float)) or not 0 < score <= MAX_SCORE:
             return err("A score is a number above zero.", 400)
-        # Teachers play as practice, as they do in the Python check.
-        if accounts.is_teacher(user.email):
-            return jsonify(kept=False)
         score = round(score)
         row = db.query(HighScore).filter_by(published_id=pub.id, user_id=user.id).first()
         if row is None:

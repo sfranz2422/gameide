@@ -536,8 +536,8 @@ and students' own games are untouched.
 
 `high_score(n)` in a game; `player/Scoreboard.tsx`; the `HighScore` table and the routes in publishing.py. A published game whose code calls it shows the school's top twenty beside the stage (left 1-10, right your best and 11-20); full screen is the stage alone, so they go with the page. A game that never calls it has no boards.
 
-- **Same email domain, first name, students only.** A personal address (`PERSONAL_DOMAINS`, gmail.com and the like) has no school: everyone on Gmail would otherwise be each other's classmates. A new route handing out scores needs a leak check in test_server.py.
-- The score comes from the student's browser, like XP's run claim, so it can be faked with browser tools. It touches no grade. Teachers aren't recorded: they play as practice.
+- **Same email domain, first name.** Teachers and admins are on their school's board too (the teacher's wish). A personal address (`PERSONAL_DOMAINS`, gmail.com and the like) has no school: everyone on Gmail would otherwise be each other's classmates. A new route handing out scores needs a leak check in test_server.py.
+- The score comes from the student's browser, like XP's run claim, so it can be faked with browser tools. It touches no grade.
 - It goes Python → `_commands` "score" → worker → `GameHost.events.score` → at most one POST per 2 s, because a game may call it every step.
 
 ## XP

@@ -1706,15 +1706,12 @@ check("high scores: only your best stays", _score(_amy, 50).get_json() == {"kept
 _score(_amy, 500)
 check("high scores: a better one takes its place", _names(_pat)[0] == ("Amy", 500), _names(_pat))
 check("high scores: you can find yourself", _board(_ben)["mine"] == {"score": 300, "rank": 2} and [r["me"] for r in _board(_ben)["scores"]] == [False, True])
-_tm = client("teacher@example.com")
-check("high scores: a teacher plays as practice", _score(_tm, 99999).get_json() == {"kept": False} and _board(_tm)["mine"] is None)
-# At the same school, or the domain rule alone would hide them and prove nothing.
+# The teacher's own wish: teachers and admins are on their school's board too.
 _miss = client(f"miss@{M}")
-_score(_miss, 9999)
-check("high scores: …a student's score shows", ("Miss", 9999) in _names(_pat), _names(_pat))
 _te = os.environ["TEACHER_EMAILS"]
 os.environ["TEACHER_EMAILS"] = _te + f",miss@{M}"
-check("high scores: students only, even a teacher who once played", all(r["score"] != 9999 for r in _board(_pat)["scores"]), _names(_pat))
+check("high scores: a teacher's score is kept", _score(_miss, 9999).get_json() == {"kept": True})
+check("high scores: a teacher shows on their school's board", ("Miss", 9999) in _names(_pat) and _board(_miss)["mine"]["score"] == 9999, _names(_pat))
 os.environ["TEACHER_EMAILS"] = _te
 _sdb.query(server.gamestore.HighScore).filter_by(score=9999).delete()
 _sdb.commit()
