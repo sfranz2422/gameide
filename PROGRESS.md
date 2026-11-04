@@ -2,7 +2,7 @@
 
 ## School high scores on the play page (2026-11-03, waiting for review)
 - **A published game can have a board of its school's best** either side of it: the top ten on the left, your best and the next ten on the right, gone in full screen. A new catalog function, `high_score(n)`, puts a score on it from any game, typed, blocks or sheet; a game that never calls it has no boards, and it does nothing in the editor or an export.
-- **Who sees what:** students at the same email domain see each other, first names only, never an email. Signed out sees no names. A personal address (Gmail and the like) has no school and sees no scores. Teachers and admins are on their school's board too, at the teacher's request (2026-11-04).
+- **Who sees what:** students at the same email domain see each other, first names only, never an email. Signed out sees no names. A personal address (Gmail and the like) has no school and sees no scores. Teachers and admins are on their school's board too, by last name, at the teacher's request (2026-11-04).
 - Only Jelly Jailbreak calls it so far: your best on each level, added up. The other showcase games need a decision each, and Greenside and Zoomtown Cup score lowest-is-best, which this doesn't do.
 - Tests: 21 server checks in `test_server.py`, 2 browser tests with students from two schools, 16 sabotage cases. One first missed: the teacher in the students-only check was at another school, so the domain rule hid them anyway. Fixed.
 - **Limits:** a score comes from the student's browser, so someone with browser tools could fake one; nothing touches a grade. A score earned in the last 2 seconds before closing the tab may not arrive. Published games need publishing again to get a new version of their code.

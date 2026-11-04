@@ -1711,7 +1711,23 @@ _miss = client(f"miss@{M}")
 _te = os.environ["TEACHER_EMAILS"]
 os.environ["TEACHER_EMAILS"] = _te + f",miss@{M}"
 check("high scores: a teacher's score is kept", _score(_miss, 9999).get_json() == {"kept": True})
-check("high scores: a teacher shows on their school's board", ("Miss", 9999) in _names(_pat) and _board(_miss)["mine"]["score"] == 9999, _names(_pat))
+check("high scores: a teacher shows on their school's board", (_board(_miss)["mine"] or {}).get("score") == 9999 and 9999 in [s for _, s in _names(_pat)], _names(_pat))
+check("high scores: a teacher with only one name shows it", ("Miss", 9999) in _names(_pat), _names(_pat))
+_mu = _sdb.query(accounts.User).filter_by(email=f"miss@{M}").first()
+_mu.name, _mu.first_name, _mu.last_name = "Mia Stone", "Mia", ""
+_sdb.commit()
+check("high scores: a teacher's last name from their full name", ("Stone", 9999) in _names(_pat), _names(_pat))
+_mu.last_name = "Rivers"
+_sdb.commit()
+_tb = _pat.get(f"/api/play/{HS}/scores").get_data(as_text=True)
+check("high scores: a teacher's last name only, no first name", ("Rivers", 9999) in _names(_pat) and "Mia" not in _tb and "Stone" not in _tb, _tb)
+check("high scores: students keep first names beside a teacher", ("Amy", 500) in _names(_pat), _names(_pat))
+os.environ["TEACHER_EMAILS"] = _te
+_ae = os.environ.get("ADMIN_EMAILS", "")
+os.environ["ADMIN_EMAILS"] = _ae + f",miss@{M}"
+check("high scores: an admin's last name too", ("Rivers", 9999) in _names(_pat), _names(_pat))
+os.environ["ADMIN_EMAILS"] = _ae
+check("high scores: …and a student's first name, the same person once not staff", ("Mia", 9999) in _names(_pat), _names(_pat))
 os.environ["TEACHER_EMAILS"] = _te
 _sdb.query(server.gamestore.HighScore).filter_by(score=9999).delete()
 _sdb.commit()

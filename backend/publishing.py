@@ -447,8 +447,15 @@ def school_domain(user):
 
 
 def _board_name(user) -> str:
-    """Only ever a first name. A name that's really an address shows as "A student"."""
+    """
+    A student's first name; a teacher's or admin's last name (the teacher's
+    wish), or their only name if that's all we have. Never both, and a name
+    that's really an address shows as "A student".
+    """
     name = _first_name(user)
+    if is_teacher(user) or is_admin(user):
+        parts = (user.name or "").split()
+        name = ((user.last_name or "").strip() or (parts[-1] if len(parts) > 1 else "") or name)[:30]
     return "A student" if "@" in name else name
 
 
