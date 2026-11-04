@@ -9,6 +9,7 @@ import { py, load, run } from "../python/testkit";
 import { checkProject, readCheck } from "../checks/checks";
 import { EASES, emptyScene, moveStep, NOT_STEPS, newStep, renameInScene, SCENE_FUNCTIONS, SCENE_GROUPS, sceneProblems, sceneToPython, stepPython, quote, type Scene, type SceneStep } from "./scene";
 import { keepCode } from "../editor/history";
+import { fitRoom, pointAt, startingRoom } from "./pick";
 import { replaceQuoted, type Project } from "../store/project";
 
 const names = { objects: ["Hero", "Ghost"], sprites: ["Walk"], rooms: ["Town"], sounds: [], functions: [{ name: "open_door", params: [] }] };
@@ -128,6 +129,24 @@ describe("scene steps", () => {
     const now = project({ steps: [step("scene_wait", {})] });
     const undone = keepCode(before, now);
     expect(undone.objects[0]!.events[0]!.scene!.steps.length).toBe(1);
+  });
+
+  it("a click in the room is the room's own point, on its grid unless Alt is held", () => {
+    const room = { width: 800, height: 400, gridWidth: 32, gridHeight: 32 };
+    const fit = fitRoom(room, 424, 300);
+    expect(fit.zoom).toBe(0.5); // (424 - 24) / 800
+    expect(fit.panY).toBe(50); // what's left over, shared
+    expect(pointAt(room, fit, fit.panX + 100, fit.panY + 50)).toEqual({ x: 192, y: 96 }); // 200, 100, on the grid
+    expect(pointAt(room, fit, fit.panX + 100, fit.panY + 50, true)).toEqual({ x: 200, y: 100 });
+    expect(pointAt(room, fit, fit.panX - 5, fit.panY + 50)).toBeNull();
+    expect(pointAt(room, fit, fit.panX + 100, fit.panY + 250)).toBeNull();
+  });
+
+  it("the picker starts in a room the object is in", () => {
+    const p = { rooms: [{ id: "a", instances: [] }, { id: "b", instances: [{ object: "hero" }] }] } as unknown as Project;
+    expect(startingRoom(p, "hero")?.id).toBe("b");
+    expect(startingRoom(p, "nobody")?.id).toBe("a");
+    expect(startingRoom({ rooms: [] } as unknown as Project, "hero")).toBeUndefined();
   });
 
   it("a tutorial check can ask whether an event is a scene", () => {

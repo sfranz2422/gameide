@@ -104,3 +104,48 @@ test("drag a card by its grip; a repeatable event asks about Play once; Convert 
   await expect(page.getByTestId("event-code")).toContainText("scene_flash");
   await expect(page.getByTestId("tab-scene")).toBeDisabled();
 });
+
+test("a Move step's place is clicked in a picture of the room", async ({ page }) => {
+  await newObject(page, "pick-create");
+  await placeInRoom(page, "Room1 start", "Star", 96, 96);
+  await treeItem(page, "Star").click();
+  await page.getByTestId("tab-scene").click();
+  await add(page, "scene_move");
+  // Steps with no place in the room don't offer it.
+  await add(page, "scene_wait");
+  await expect(page.getByTestId("scene-pick")).toHaveCount(1);
+  await page.getByTestId("scene-pick").click();
+  const canvas = page.getByTestId("position-canvas");
+  await expect(canvas).toBeVisible();
+
+  // The room is drawn: Star is a stand-in box where it was placed, so it isn't all background.
+  const size = (await canvas.boundingBox())!;
+  const room = await page.evaluate(() => {
+    const c = document.querySelector<HTMLCanvasElement>("[data-testid=position-canvas]")!;
+    const d = c.getContext("2d")!.getImageData(0, 0, c.width, c.height).data;
+    const seen = new Set<number>();
+    for (let i = 0; i < d.length; i += 4 * 97) seen.add((d[i]! << 16) | (d[i + 1]! << 8) | d[i + 2]!);
+    return seen.size;
+  });
+  expect(room).toBeGreaterThan(1);
+
+  await canvas.click({ position: { x: size.width / 2, y: size.height / 2 } });
+  await expect(page.getByTestId("position-picker")).toHaveCount(0);
+  const x = await page.getByTestId("scene-scene_move-x").textContent();
+  const y = await page.getByTestId("scene-scene_move-y").textContent();
+  expect(x).toMatch(/^\d+$/);
+  expect(y).toMatch(/^\d+$/);
+  await expect(page.getByTestId("scene-code")).toContainText(`scene_move(self, ${x}, ${y})`);
+  // One click, one undo: x and y together.
+  await page.getByTestId("scene-undo").click();
+  await expect(page.getByTestId("scene-code")).toContainText("scene_move(self, self.x, self.y)");
+  // ...and redo brings it back: a box told of the undo mustn't count as a new edit.
+  await page.getByTestId("scene-redo").click();
+  await expect(page.getByTestId("scene-code")).toContainText(`scene_move(self, ${x}, ${y})`);
+  await page.getByTestId("scene-undo").click();
+
+  // Cancel leaves it as it was.
+  await page.getByTestId("scene-pick").click();
+  await page.getByTestId("position-cancel").click();
+  await expect(page.getByTestId("scene-code")).toContainText("scene_move(self, self.x, self.y)");
+});

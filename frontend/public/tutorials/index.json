@@ -383,6 +383,14 @@
   "starter": "cave-4",
   "description": "A little movie at the start of your level: people talk and walk, the camera looks around, and the player can skip it."
 },
+{
+  "key": "el3-scene-mode",
+  "title": "14. Scene Mode",
+  "level": "Game Elements 3: Advanced Techniques",
+  "time": "20 min",
+  "starter": "cave-5",
+  "description": "Build a cutscene from cards with no typing: a speech bubble, movie bars, someone walking to a spot you click, and a caption."
+},
  {
   "key": "simple-platformer",
   "title": "Simple Platformer",

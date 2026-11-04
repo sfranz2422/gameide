@@ -267,3 +267,13 @@ test("rows move by drag and drop: before, after, into a row as a sub-event, and 
   await page.keyboard.press("ControlOrMeta+z");
   await expect(python(page)).toHaveText(lines("if self.x < 0:", "    self.a = 1", "    self.b = 2"));
 });
+
+test("however long the sheet, its Python stays on screen, at a laptop's size too", async ({ page }) => {
+  await page.setViewportSize({ width: 1366, height: 600 });
+  await emptyGame(page);
+  await newObjectWithEvent(page, "Long");
+  await page.getByTestId("tab-sheet").click();
+  for (let i = 0; i < 12; i++) await page.getByTestId("sheet-add-row").click();
+  const box = await page.getByTestId("sheet-code").boundingBox();
+  expect(box!.y + box!.height / 2).toBeLessThan(600);
+});

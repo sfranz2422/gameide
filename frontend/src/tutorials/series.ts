@@ -13,6 +13,7 @@
  * Without that, a lesson's code and the next lesson's starter could drift
  * apart and a student would open lesson 4 to find code lesson 3 never had.
  */
+import { sceneToPython, type Scene } from "../scenes/scene";
 import { newEvent, newInstance, newObject, newRoom, newScript, type EventKey, type ObjectResource, type Project } from "../store/project";
 
 /** What one step of a lesson changes, as a careful student would do it. */
@@ -27,6 +28,8 @@ export interface Edit {
   scripts?: Record<string, string>;
   /** Events deleted, as "Object.event". */
   remove?: string[];
+  /** "Object.event" → that event as a scene (Scene mode), with its Python made from it, as the Scene tab does. */
+  scene?: Record<string, Scene>;
   /** "Object.event" → that event's whole code after the step. Events: create, step, draw, draw_gui, "alarm 0", "collision Enemy". */
   code?: Record<string, string>;
   /** Instances dragged into a room (Room1 unless it says). */
@@ -118,6 +121,17 @@ export function applyEdit(p: Project, e: Edit) {
     const ev = obj.events.find((x) => sameKey(x.key, key));
     if (ev) ev.code = code;
     else obj.events.push({ ...newEvent(key), code });
+  }
+  for (const [where, scene] of Object.entries(e.scene ?? {})) {
+    const dot = where.indexOf(".");
+    const obj = p.objects.find((o) => o.name === where.slice(0, dot));
+    if (!obj) throw new Error(`There's no object called ${where.slice(0, dot)}.`);
+    const key = eventKey(p, where.slice(dot + 1));
+    let ev = obj.events.find((x) => sameKey(x.key, key));
+    if (!ev) obj.events.push((ev = newEvent(key)));
+    ev.mode = "scene";
+    ev.scene = structuredClone(scene);
+    ev.code = sceneToPython(scene).code;
   }
   for (const i of e.place ?? []) {
     const obj = p.objects.find((o) => o.name === i.object);
@@ -837,6 +851,16 @@ const SCENE = {
   scared: 'def friend_scared():\n    friend.image_blend = "yellow"\n',
   once: 'if not hasattr(global_vars, "seen_intro"):\n    global_vars.seen_intro = True\n',
 };
+// The Scene Mode lesson's cards, as its steps have the student make them.
+const FIRST_FRIEND = 'instances("Friend")[0]';
+const CARD = {
+  say: { id: "say", fn: "scene_say", args: { text: '"Follow me!"' } },
+  bubble: { id: "say", fn: "scene_say", args: { text: '"Follow me!"', above: FIRST_FRIEND } },
+  bars: { id: "bars", fn: "scene_bars", args: { steps: "20" } },
+  move: { id: "move", fn: "scene_move", args: { instance: FIRST_FRIEND, x: "400", y: "224", steps: "60" } },
+  face: { id: "face", fn: "scene_face", args: { instance: "self", target: FIRST_FRIEND } },
+  caption: { id: "caption", fn: "scene_caption", args: { text: '"Later that day..."', steps: "120" } },
+};
 const indent = (code: string) => code.replace(/^(?=.)/gm, "    ");
 const sceneLevel = (parts: string[]) => mapCode(MAP_FULL, MAKE_PLAYER + MAKE_COIN + MAKE_SLIME) + parts.join("");
 
@@ -918,6 +942,16 @@ export const CAVE: Series = {
             "Level.create": sceneLevel([SCENE.once, indent(SCENE.people + SCENE.fade + SCENE.scared + SCENE.talk + SCENE.walk + SCENE.together + SCENE.look + SCENE.shakeOnly + SCENE.doIt + SCENE.what)]),
           },
         },
+      },
+    },
+    {
+      key: "el3-scene-mode",
+      edits: {
+        1: { scene: { "Player.collision Friend": { steps: [CARD.say] } } },
+        2: { scene: { "Player.collision Friend": { steps: [CARD.bars, CARD.bubble] } } },
+        3: { scene: { "Player.collision Friend": { steps: [CARD.bars, CARD.bubble, CARD.move] } } },
+        4: { scene: { "Player.collision Friend": { steps: [CARD.bars, CARD.face, CARD.bubble, CARD.move, CARD.caption] } } },
+        5: { scene: { "Player.collision Friend": { steps: [CARD.bars, CARD.face, CARD.bubble, CARD.move, CARD.caption], once: "seen_friend" } } },
       },
     },
   ],

@@ -11,7 +11,7 @@ import { autocompletion, closeBrackets, completionKeymap, type CompletionContext
 import { history, historyKeymap } from "@codemirror/commands";
 import { python } from "@codemirror/lang-python";
 import { syntaxHighlighting, HighlightStyle } from "@codemirror/language";
-import { EditorState } from "@codemirror/state";
+import { EditorState, Transaction } from "@codemirror/state";
 import { EditorView, keymap } from "@codemirror/view";
 import { tags as t } from "@lezer/highlight";
 import { useEffect, useRef } from "react";
@@ -74,7 +74,10 @@ export function ExprBox({ value, onChange, problem, label, names, type, testId }
           keymap.of([...completionKeymap, ...historyKeymap, { key: "Enter", run: (v) => (v.contentDOM.blur(), true) }]),
           EditorState.transactionFilter.of((tr) => (tr.newDoc.lines > 1 ? [] : tr)),
           EditorView.contentAttributes.of({ "aria-label": label, ...(testId ? { "data-testid": testId } : {}) }),
-          EditorView.updateListener.of((u) => u.docChanged && latest.current.onChange(u.state.doc.toString())),
+          // Only typing: told of a change from outside (below), answering it would make an undo step of the undo itself.
+          EditorView.updateListener.of((u) => {
+            if (u.docChanged && !u.transactions.some((t) => t.annotation(Transaction.remote))) latest.current.onChange(u.state.doc.toString());
+          }),
         ],
       }),
     });
@@ -85,7 +88,7 @@ export function ExprBox({ value, onChange, problem, label, names, type, testId }
   // A change from outside (undo, a rename) while the box isn't being typed in.
   useEffect(() => {
     const v = view.current;
-    if (v && v.state.doc.toString() !== value && !v.hasFocus) v.dispatch({ changes: { from: 0, to: v.state.doc.length, insert: value } });
+    if (v && v.state.doc.toString() !== value && !v.hasFocus) v.dispatch({ changes: { from: 0, to: v.state.doc.length, insert: value }, annotations: [Transaction.remote.of(true), Transaction.addToHistory.of(false)] });
   }, [value]);
 
   return <span ref={host} className={`expr-box${problem ? " bad" : ""}`} title={problem ?? undefined} />;

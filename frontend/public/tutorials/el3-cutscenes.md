@@ -196,8 +196,6 @@ For more of a movie, `scene_bars` slides in black bars, and `scene_caption` writ
 
 They're all in the docs under **Cutscenes**, and in the blocks too.
 
-There's also a way to build a scene without typing. Add a new event that's still empty, open its **Scene** tab, and press **+ Add a step**. You pick the steps from a menu, fill in their boxes and put them in order, and the Python appears beside them. It's the same `scene_` code you've been writing.
-
 Every game you'll ever play is made of pieces like these. Now make your own.
 
-Next: **Starter Projects**, whole games to take apart.
+Next: **Scene Mode**, where you build a scene from cards.

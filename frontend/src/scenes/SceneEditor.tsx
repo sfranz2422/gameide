@@ -12,7 +12,10 @@ import { API, type ApiFunction, type Param } from "../catalog/api";
 import { CodeEditor } from "../editor/code/CodeEditor";
 import { ExprBox } from "../eventsheets/ExprBox";
 import type { SheetNames } from "../eventsheets/SheetEditor";
+import { useProjectApi } from "../editor/useProject";
 import { newId } from "../store/project";
+import { startingRoom } from "./pick";
+import { PositionPicker } from "./PositionPicker";
 import { boxOf, EASES, isMainOption, linesOf, listOf, moveStep, newStep, quote, SCENE_GROUPS, sceneProblems, sceneToPython, stepLabel, unquote, type Scene, type SceneStep } from "./scene";
 
 export interface SceneEditorProps {
@@ -27,6 +30,8 @@ export interface SceneEditorProps {
   canRepeat: boolean;
   /** In a collision event, `other` is the one bumped into. */
   collision?: boolean;
+  /** Whose event this is: the picker starts in a room it's in. */
+  objectId?: string;
 }
 
 const UNDO_GROUP_MS = 1000;
@@ -194,6 +199,7 @@ export default function SceneEditor(props: SceneEditorProps) {
               dropAfter={dropAt === i + 1 && i === props.scene.steps.length - 1}
               names={props.names}
               collision={!!props.collision}
+              objectId={props.objectId}
               edit={edit}
               onSelect={() => setSelected(step.id)}
               onDragStart={() => (dragging.current = step.id)}
@@ -256,6 +262,7 @@ interface CardProps {
   dropAfter: boolean;
   names: () => SheetNames;
   collision: boolean;
+  objectId: string | undefined;
   edit: (recipe: (s: Scene) => void, group?: string | null) => void;
   onSelect: () => void;
   onDragStart: () => void;
@@ -272,6 +279,7 @@ function StepCard(c: CardProps) {
       const s = sc.steps.find((x) => x.id === step.id);
       if (s) recipe(s);
     }, group);
+  const required = f?.params.filter((p) => p.default === undefined) ?? [];
   const main = f?.params.filter((p) => p.default === undefined || isMainOption(p)) ?? [];
   const optional = f?.params.filter((p) => p.default !== undefined && !isMainOption(p)) ?? [];
   // Optional boxes that hold something stay open, or a value could hide behind a closed door.
@@ -334,6 +342,7 @@ function StepCard(c: CardProps) {
         <div className="scene-fields">
           {main.map(box)}
           {showMore && optional.map(box)}
+          {required.some((p) => p.name === "x") && <PickButton step={step} objectId={c.objectId} change={change} />}
         </div>
         {c.problem && (
           <p className="sheet-problem" data-testid="scene-problem">
@@ -342,6 +351,42 @@ function StepCard(c: CardProps) {
         )}
       </div>
     </div>
+  );
+}
+
+/** The room last picked in, per scene card editor: the next pick is most likely in the same one. */
+let lastRoom: string | null = null;
+
+function PickButton({ step, objectId, change }: { step: SceneStep; objectId: string | undefined; change: (r: (s: SceneStep) => void) => void }) {
+  const { project, assets } = useProjectApi();
+  const [open, setOpen] = useState(false);
+  const known = project.rooms.find((r) => r.id === lastRoom)?.id ?? startingRoom(project, objectId)?.id;
+  const num = (v: string | undefined) => (v !== undefined && /^-?\d+(\.\d+)?$/.test(v.trim()) ? Number(v) : null);
+  const x = num(step.args.x), y = num(step.args.y);
+  return (
+    <>
+      <button className="btn small scene-pick-btn" onClick={() => setOpen(true)} disabled={!known} title={known ? "Click the place in the room instead of typing x and y" : "This game has no room yet"} data-testid="scene-pick">
+        Pick in room
+      </button>
+      {open && known && (
+        <PositionPicker
+          project={project}
+          assets={assets}
+          roomId={known}
+          showView={step.fn === "scene_camera"}
+          current={x !== null && y !== null ? { x, y } : null}
+          onClose={() => setOpen(false)}
+          onPick={(px, py, roomId) => {
+            lastRoom = roomId;
+            setOpen(false);
+            change((s) => {
+              s.args.x = String(px);
+              s.args.y = String(py);
+            });
+          }}
+        />
+      )}
+    </>
   );
 }
 

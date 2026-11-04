@@ -43,6 +43,34 @@ function contains(code: string, block: string) {
 }
 
 describe("tutorial series", () => {
+  it("the Scene Mode lesson's game plays its cards once, when the two touch", { timeout: 60_000 }, async () => {
+    const series = SERIES.find((s) => s.lessons.some((l) => l.key === "el3-scene-mode"))!;
+    const n = series.lessons.findIndex((l) => l.key === "el3-scene-mode");
+    const { project } = await TUTORIAL_STARTERS[`${series.name}-${n}`]!();
+    for (const e of Object.values(series.lessons[n]!.edits)) applyEdit(project, e);
+    const event = project.objects.find((o) => o.name === "Player")!.events.find((e) => e.mode === "scene")!;
+    expect(event.code).toContain('scene_say("Follow me!", above=instances("Friend")[0])');
+    const { game, error } = await PythonGame.load(buildGame(project, new Map()).def, { stdout: () => undefined, stderr: () => undefined, warning: () => undefined });
+    expect(error).toBeFalsy();
+    const py = (c: string) => game.evalPython(c) as never;
+    const steps = (k: number) => {
+      for (let i = 0; i < k; i++) expect(game.step()).toBeFalsy();
+    };
+    steps(1);
+    py("scene_skip()"); // Lesson 13's scene, at the start of the level.
+    steps(2);
+    expect(py("scene_playing()")).toBe(false);
+    py('p = instances("Player")[0]; f = instances("Friend")[0]; p.x, p.y = f.x, f.y');
+    steps(2);
+    expect(py("scene_playing()")).toBe(true);
+    py("scene_skip()");
+    expect(py("f.x")).toBe(400);
+    // Put back on the friend: without Play once it would start again.
+    py("p.x, p.y = f.x, f.y");
+    steps(3);
+    expect(py("scene_playing()")).toBe(false);
+  });
+
   describe("the cutscene lesson's game", () => {
     const build = async () => {
       const series = SERIES.find((s) => s.lessons.some((l) => l.key === "el3-cutscenes"))!;

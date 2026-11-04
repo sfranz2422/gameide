@@ -282,6 +282,7 @@ export function ObjectEditor({
                 onConvert={() => toPython(current)}
                 errorLine={focus && focus.eventId === current.id ? { line: focus.line, nonce: focus.nonce } : null}
                 canRepeat={current.key.type !== "create"}
+                objectId={obj.id}
                 collision={current.key.type === "collision"}
               />
             </Suspense>
