@@ -179,7 +179,7 @@ if not hasattr(global_vars, "seen_intro"):
 
 `global_vars` lasts through a room restart, so the second time round `seen_intro` is already there and the scene is left out.
 
-The player can always press **Esc** to skip a scene, and the screen says so while one plays. Everything still ends up where it would have: the hero and friend are in their places, and your function has been called.
+The player can always skip a scene with **Esc** or the **Skip** button in the corner, which works on a phone too. Everything still ends up where it would have: the hero and friend are in their places, and your function has been called.
 
 ```check
 Level.create uses seen_intro

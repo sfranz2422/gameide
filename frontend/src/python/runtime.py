@@ -1466,7 +1466,10 @@ def _overlays():
         elif typed and (_step_count // 20) % 2 == 0:
             _gui.append(["text", d - 0.1, w - 34, h - 36, "▼", 0xFFD166, -1, 14, 1.0])
     if _scene_on:
-        _gui.append(["text", -1e6, w - 78, 8, "Esc: skip", 0xFFFFFF, -1, 13, 0.75])
+        # A real button: a phone has no Esc key, and tapping the screen only moves the words on.
+        left, top, right, bottom = _scene_skip_box()
+        _gui.append(["rect", -1e6, left, top, right, bottom, 0x10141F, 0, 0.7])
+        _gui.append(["text", -1e6 - 0.1, left + 12, top + 9, "Skip (Esc)", 0xFFFFFF, -1, 14, 0.95])
     if _sflash[0] > 0:
         _gui.append(["rect", -2e6, 0, 0, w, h, _sflash[2], 0, 0.85 * _sflash[0] / _sflash[1]])
         _sflash[0] -= 1
@@ -1667,13 +1670,29 @@ def _scene_stop():
     _scene_now = None
 
 
+def _scene_skip_box():
+    """Where the Skip button is on the screen: big enough for a thumb, at any size of game."""
+    w = view_width or room_width
+    return (w - 104, 6, w - 6, 40)
+
+
+def _scene_skip_pressed():
+    """Was the Skip button just clicked or tapped? The mouse is in the room; the button is on the screen."""
+    if not mouse_check_pressed("left"):
+        return False
+    zoom = _g[_L.G.ZOOM] or 1.0
+    mx, my = (mouse_x - view_x) * zoom, (mouse_y - view_y) * zoom
+    left, top, right, bottom = _scene_skip_box()
+    return left <= mx < right and top <= my < bottom
+
+
 def _step_scene():
     """One frame of the scene, first thing in _frame."""
     global _scene_now
     if not _scene_on:
         return
     _g[_L.G.PAUSED] = 1.0   # a pause menu's "unpause" mustn't set the game going under the scene
-    if keyboard_check_pressed("escape"):
+    if keyboard_check_pressed("escape") or _scene_skip_pressed():
         scene_skip()
         return
     for m in list(_scene_moves):

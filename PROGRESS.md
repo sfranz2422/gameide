@@ -8,7 +8,7 @@
 - The teacher couldn't find how alarms work in the docs: they had one line. **Alarms**, on Getting Started right after Collect the Coins: something that happens once, something that repeats, the mistake of setting one in Step, each instance's own timers, and reading and cancelling one. Three questions. `alarm` in the docs now says all of that too. Walked step by step in `alarms.test.ts`, which also pins what the lesson claims against the engine.
 
 ## Cutscenes (2026-11-04, waiting for review)
-- **`scene_` calls line up steps that play in order while the game holds still**: `scene_move` (animates as it goes; `wait=False` for two at once), `scene_wait`, `scene_say`, `scene_ask`, `scene_camera`, `scene_zoom`, `scene_fade`, `scene_shake`, `scene_sound`, `scene_do` (your own function), `scene_room`, plus `scene_playing()` and `scene_skip()`. A new Cutscenes category in the docs, blocks and sheets. Esc skips, and a skipped scene ends exactly where a watched one would. No skip on a phone yet: Esc is a key.
+- **`scene_` calls line up steps that play in order while the game holds still**: `scene_move` (animates as it goes; `wait=False` for two at once), `scene_wait`, `scene_say`, `scene_ask`, `scene_camera`, `scene_zoom`, `scene_fade`, `scene_shake`, `scene_sound`, `scene_do` (your own function), `scene_room`, plus `scene_playing()` and `scene_skip()`. A new Cutscenes category in the docs, blocks and sheets. Esc or a Skip button in the corner skips, by mouse or by a tap on a phone, and a skipped scene ends exactly where a watched one would.
 - Tests: `python/scene.test.ts` and a browser test.
 
 ## 7. School Leaderboard: a lesson on high_score (2026-11-04, waiting for review)

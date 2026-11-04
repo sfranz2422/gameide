@@ -249,3 +249,25 @@ test("a cutscene plays in the browser: it holds the game, shows its text, and Es
   expect(await py("p.x == start + 100")).toBe(true);
   expect(await py("game_paused()")).toBe(false);
 });
+
+test("a phone can skip a cutscene: a real tap on the button in the corner", async ({ browser }) => {
+  const ctx = await browser.newContext({ hasTouch: true, viewport: { width: 1000, height: 800 } });
+  const page = await ctx.newPage();
+  await fromTemplate(page, "coins");
+  await page.getByTestId("play").click();
+  await expect(page.getByTestId("fps")).toBeVisible({ timeout: 60_000 });
+  const py = (code: string) => page.evaluate((c) => (window as any).__gameide.host.evalPython(c), code);
+  await py('p = instances("Player")[0]; start = p.x; scene_say("A long speech", "Robin"); scene_move(p, start + 100, p.y, 600)');
+  await expect.poll(() => py("scene_playing()")).toBe(true);
+  const box = (await page.locator("canvas[data-testid=game-canvas]").boundingBox())!;
+  const w = (await py("view_width or room_width")) as number;
+  const k = box.width / w;
+  // A tap elsewhere only moves the words on.
+  await page.touchscreen.tap(box.x + 40 * k, box.y + box.height / 2);
+  await page.waitForTimeout(300);
+  expect(await py("scene_playing()")).toBe(true);
+  await page.touchscreen.tap(box.x + (w - 50) * k, box.y + 22 * k);
+  await expect.poll(() => py("scene_playing()")).toBe(false);
+  expect(await py("p.x == start + 100")).toBe(true);
+  await ctx.close();
+});

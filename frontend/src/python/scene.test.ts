@@ -195,9 +195,64 @@ scene_fade(1, 500)
     expect(py(g, "game_paused()")).toBe(false);
   });
 
-  it("the screen says Esc skips, only while a scene plays", async () => {
+  describe("the Skip button", () => {
+    const tapAt = (g: Parameters<typeof run>[0], x: number, y: number) => {
+      g.engine.input.mouseMove(x, y);
+      run(g, 1);
+      g.engine.input.mouseDown(0);
+      run(g, 1);
+      g.engine.input.mouseUp(0);
+      run(g, 1);
+    };
+    const W = 320; // the test room's width, with no camera
+
+    it("tapping it plays the rest instantly, as Esc does", async () => {
+      const { game: g } = await game();
+      py(g, `scene_say("A long speech"); scene_move(${a}, 200, 150, 100)`);
+      run(g, 4);
+      tapAt(g, W - 50, 20);
+      expect(py(g, "scene_playing()")).toBe(false);
+      expect(py(g, `${a}.x`)).toBe(200);
+      expect(py(g, "dialogue_open()")).toBe(false);
+    });
+
+    it("tapping anywhere else doesn't skip: it only moves the words on", async () => {
+      const { game: g } = await game();
+      py(g, `scene_say("One"); scene_say("Two"); scene_wait(20)`);
+      run(g, 40);
+      tapAt(g, 50, 200);
+      expect(py(g, "scene_playing()")).toBe(true);
+      expect(py(g, "dialogue_open()")).toBe(true);
+      tapAt(g, W - 120, 20); // just left of it
+      expect(py(g, "scene_playing()")).toBe(true);
+      tapAt(g, W - 50, 60); // just under it
+      expect(py(g, "scene_playing()")).toBe(true);
+    });
+
+    it("is under the finger when the camera has moved and zoomed", async () => {
+      const { game: g } = await load({
+        code: { A: "class A(GameObject):\n    pass\n" },
+        rooms: [{ name: "Big", width: 3000, height: 2000, camera: { width: 640, height: 360, smoothing: 1 }, instances: [{ object: "A", x: 1, y: 1 }] }],
+      } as never);
+      py(g, "camera_set(800, 500); camera_zoom(2)");
+      run(g, 2);
+      py(g, "scene_wait(500)");
+      run(g, 2);
+      // Input is in screen pixels: the engine works out the room point from the camera.
+      tapAt(g, (py(g, "view_width") as number) - 50, 20);
+      expect(py(g, "scene_playing()")).toBe(false);
+    });
+
+    it("doesn't skip anything when no scene is playing", async () => {
+      const { game: g } = await game();
+      tapAt(g, W - 50, 20);
+      expect(py(g, "scene_playing()")).toBe(false);
+    });
+  });
+
+  it("the Skip button shows only while a scene plays", async () => {
     const { game: g } = await game();
-    const shown = () => JSON.stringify(g.engine.guiList).includes("Esc: skip");
+    const shown = () => JSON.stringify(g.engine.guiList).includes("Skip (Esc)");
     run(g, 1);
     expect(shown()).toBe(false);
     py(g, "scene_wait(5)");
