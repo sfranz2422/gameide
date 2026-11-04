@@ -97,6 +97,12 @@ def sim_game(a, b, no_ties=False):
     return pts[a], pts[b]
 
 
+def season_points():
+    """Everything the player's team scored this season, the championship too."""
+    us = SEASON["team"]
+    return sum(sa if a == us else sb for _, a, b, sa, sb in SEASON["games"] if us in (a, b))
+
+
 def finish_week(mine, theirs):
     """The player's game is over (their score, the other team's): it goes in
     the table, the rest of the week is played out, and the season moves on.
@@ -106,6 +112,7 @@ def finish_week(mine, theirs):
         SEASON["champion"] = us if mine > theirs else them
         SEASON["games"].append(["final", us, them, mine, theirs])
         save_season()
+        high_score(season_points())
         return
     for a, b in SEASON["weeks"][SEASON["week"]]:
         if us in (a, b):
@@ -120,6 +127,7 @@ def finish_week(mine, theirs):
             sa, sb = sim_game(a, b, no_ties=True)
             SEASON["champion"] = a if sa > sb else b
             SEASON["games"].append(["final", a, b, sa, sb])
+            high_score(season_points())
     save_season()
 
 

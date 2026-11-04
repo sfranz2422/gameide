@@ -98,6 +98,7 @@ if self.mode == "scores":
                 best = save_get("best", None)
                 if best is None or total(0) < best:
                     save_set("best", total(0))
+                high_score(total(0))
             self.mode, self.since = "final", self.t
     return
 

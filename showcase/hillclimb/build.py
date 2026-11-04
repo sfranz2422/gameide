@@ -560,6 +560,7 @@ def make_sounds(P):
 def build(out):
     check_stages()
     P = HillClimb("Ridgeline Rally")
+    P.p["settings"]["scoreboard"] = {"unit": "metres"}
     P.p["settings"]["pixelScaling"] = False
 
     for kind in VEHICLES:

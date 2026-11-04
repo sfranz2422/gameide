@@ -277,3 +277,39 @@ test("a game that never calls high_score has no boards", async ({ browser }) => 
   await expect(page.getByTestId("scores-left")).toHaveCount(0);
   await ctx.close();
 });
+
+// A race: lowest wins and times show as a clock, set in the game's Settings, as a student would.
+test("a board can rank lowest first and show times as a clock, from the game's settings", async ({ browser }) => {
+  const project = {
+    format: "gameide-project", schemaVersion: 8, id: "timezip", name: "Racing", created: "2026-01-01T00:00:00Z", modified: "2026-01-01T00:00:00Z",
+    settings: { stepsPerSecond: 60 }, sprites: [], tilesets: [], scripts: [], sounds: [], fonts: [],
+    objects: [{ id: "o1", name: "Timer", sprite: null, visible: true, solid: false, persistent: false, depth: 0, parent: null,
+      events: [{ id: "e1", key: { type: "alarm", n: 0 }, mode: "python", code: "high_score(5)\n" }] }],
+    rooms: [{ id: "r1", name: "Room1", width: 320, height: 180, background: "#223344", gridWidth: 16, gridHeight: 16, snap: true,
+      layers: [{ id: "L", name: "Instances", kind: "instances", depth: 0, visible: true, locked: false }],
+      camera: { enabled: false, width: 320, height: 180, follow: null, smoothing: 1 },
+      instances: [{ id: "i1", object: "o1", layer: "L", x: 0, y: 0, scaleX: 1, scaleY: 1, angle: 0, code: "" }] }],
+  };
+  const zip = Buffer.from(zipSync({ "project.json": strToU8(JSON.stringify(project)), "assets/index.json": strToU8("{}") }));
+  const owner = await signedIn(browser, "rae@mohawk.k12.pa.us");
+  await owner.page.goto("/#/games");
+  await owner.page.getByTestId("import-file").setInputFiles({ name: "t.zip", mimeType: "application/zip", buffer: zip });
+  await owner.page.waitForURL(/#\/p\//, { timeout: 30_000 });
+  await owner.page.getByRole("button", { name: "Game settings" }).click();
+  await owner.page.getByTestId("score-lowest").check();
+  await owner.page.getByTestId("score-unit").fill("time");
+  await expect(owner.page.getByTestId("save-status")).toHaveText("Saving…");
+  await expect(owner.page.getByTestId("save-status")).toHaveText("Saved", { timeout: 30_000 });
+  const url = await publish(owner.page, "Racing", "unlisted");
+  await owner.page.goto(url);
+  await expect(owner.page.getByTestId("scores-unit")).toHaveText("Time, lowest wins", { timeout: 30_000 });
+  await owner.page.getByTestId("player-start").click({ timeout: 60_000 });
+  await owner.page.waitForFunction(() => (window as any).__gameide.host.state === "running", null, { timeout: 30_000 });
+  await owner.page.evaluate(() => (window as any).__gameide.host.evalPython("high_score(65.5)"));
+  await expect(owner.page.getByTestId("scores-left")).toContainText("1:05.50", { timeout: 15_000 });
+  await owner.page.evaluate(() => (window as any).__gameide.host.evalPython("high_score(70)"));
+  await owner.page.waitForTimeout(3000);
+  await owner.page.reload();
+  await expect(owner.page.getByTestId("scores-left")).toContainText("1:05.50", { timeout: 30_000 });
+  await owner.ctx.close();
+});

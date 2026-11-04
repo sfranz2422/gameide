@@ -420,6 +420,7 @@ def build(out):
     if problems:
         raise SystemExit("The tracks:\n  " + "\n  ".join(problems))
     P = Kart("Zoomtown Cup")
+    P.p["settings"]["scoreboard"] = {"lowest": True, "unit": "time"}
     P.p["settings"]["pixelScaling"] = False
     for k, racer in enumerate(RACERS):
         s = P.sprite(f"kart_{k}", kart_frames(racer["paint"]), (KART_W // 2, KART_H - 8))

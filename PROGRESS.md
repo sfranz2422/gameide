@@ -1,5 +1,13 @@
 # Progress
 
+## High score boards on every showcase game (2026-11-04, waiting for review)
+- **Every game now reports:** Fort Bramble (lives and gold, each level's best added up), Ridgeline Rally (best distance on each stage added up), Moonshot (most Derby home runs), Under the Lights (points in a season, the final too), Greenside (strokes in a one-player round, lowest wins), Zoomtown Cup (all four tracks' best times added up, once there are four, lowest wins), Thornwood (coins when you finish), Greymire (endings found), the mystery (time to finish, lowest wins, a new clock that only runs while playing and saves with the game).
+- **Boards can rank lowest first and show a clock**: `settings.scoreboard`, set in Game settings. The server reads it from the published game, never the page.
+- **Mistake on 2026-11-04:** rebuilding to see what still builds overwrote `out/` for the mystery, football and baseball with stand-in pictures, because the teacher's art is no longer in `~/Downloads`. Those zips aren't in git and couldn't be restored. The site and the games in accounts weren't touched. Until the art turns up or those games are exported from GameIDE, those three can't be made with real pictures here.
+- `showcase/patch_zip.py` puts new code into a zip that holds the pictures, without touching them. Greymire and Thornwood have `-patched` zips this way.
+- Tests: `src/showcase/scores.test.ts` (15), server checks and a browser test for lowest-first and the clock. Sabotage cases for each; Greymire's and Thornwood's were watched by hand, patching a broken source, as their runners need the art.
+- **Each game must be imported and published again** to get a board, Showcase box ticked.
+
 ## School high scores on the play page (2026-11-03, waiting for review)
 - **A published game can have a board of its school's best** either side of it: the top ten on the left, your best and the next ten on the right, gone in full screen. A new catalog function, `high_score(n)`, puts a score on it from any game, typed, blocks or sheet; a game that never calls it has no boards, and it does nothing in the editor or an export.
 - **Who sees what:** students at the same email domain see each other, first names only, never an email. Signed out sees no names. A personal address (Gmail and the like) has no school and sees no scores. Teachers and admins are on their school's board too, by last name, at the teacher's request (2026-11-04).

@@ -465,6 +465,7 @@ def build(assets_dir, out, check=True, strict=True):
         if not need.is_dir():
             raise SystemExit(f"Missing {need}: download Anokolisa's packs there, or pass --assets.")
     P = Project("Thornwood")
+    P.p["settings"]["scoreboard"] = {"unit": "coins"}
     char = HF / "Character"
     mob = HF / "Mob"
 

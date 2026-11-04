@@ -401,6 +401,7 @@ def build(assets_dir, out):
     A = Path(assets_dir).expanduser()
     world = load_world()
     P = Adventure("Mystery Meat from Outer Space")
+    P.p["settings"]["scoreboard"] = {"lowest": True, "unit": "time"}
     P.p["settings"]["pixelScaling"] = True
     made = []
 

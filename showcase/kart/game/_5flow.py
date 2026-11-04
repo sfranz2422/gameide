@@ -88,5 +88,9 @@ def keep_best(track, steps):
     best = save_get("best_" + track)
     if best is None or steps < best:
         save_set("best_" + track, steps)
+        # The school's board: all four tracks' best times added up, once there are four.
+        times = [save_get("best_" + t["name"]) for t in TRACKS]
+        if None not in times:
+            high_score(sum(times) / 60)
         return True
     return False

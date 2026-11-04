@@ -92,6 +92,7 @@ def go_to(to):
         found = save_get("endings", [])
         if STATE["page"] not in found:
             save_set("endings", found + [STATE["page"]])
+            high_score(len(found) + 1)
     else:
         STATE["mode"] = "page"
         STATE["page"] = to

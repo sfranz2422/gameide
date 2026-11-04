@@ -229,6 +229,7 @@ def build(assets_dir, out):
     if problems:
         raise SystemExit("The story has problems (above); nothing was built.")
     P = Book("The Lantern of Greymire")
+    P.p["settings"]["scoreboard"] = {"unit": "endings found"}
     # Painted pictures are scaled smoothly, not in whole steps.
     P.p["settings"]["pixelScaling"] = False
 

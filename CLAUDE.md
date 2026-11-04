@@ -538,6 +538,8 @@ and students' own games are untouched.
 
 - **Same email domain. Students by first name; teachers and admins by last name** (the teacher's wish), on their school's board too. A personal address (`PERSONAL_DOMAINS`, gmail.com and the like) has no school: everyone on Gmail would otherwise be each other's classmates. A new route handing out scores needs a leak check in test_server.py.
 - The score comes from the student's browser, like XP's run claim, so it can be faked with browser tools. It touches no grade.
+- **How a game's scores rank is `settings.scoreboard`** (`lowest`, `unit`; set in Game settings or by a showcase build), and the server reads it from the published game, never from the page, or one student could turn a board upside down. Unit `time` is seconds, kept as hundredths.
+- Every showcase game reports (`src/showcase/scores.test.ts`). Thornwood and Greymire can't be built without their art, so `showcase/patch_zip.py` puts new code into a zip that already has the pictures, writing `-patched` files beside it. **Their runners can't test a sabotage here; a build that lacks art also overwrites `out/` with stand-ins for the games that allow that (mystery, football, baseball). Check `~/Downloads` before rebuilding those.**
 - It goes Python → `_commands` "score" → worker → `GameHost.events.score` → at most one POST per 2 s, because a game may call it every step.
 
 ## XP

@@ -81,6 +81,8 @@ export interface ProjectSettings {
   stepsPerSecond: number;
   /** Whole-number scaling of the game window (crisp pixel art). Absent = on. */
   pixelScaling?: boolean;
+  /** How high_score ranks on the play page. Absent = highest wins, plain numbers. unit "time" reads scores as seconds. */
+  scoreboard?: { lowest?: boolean; unit?: string };
 }
 
 export interface SpriteResource {

@@ -4,6 +4,7 @@
 self.t = 0
 music_play("music_forest")
 screen_fade(0, 40)
+high_score(global_vars.coins)
 
 # === step
 self.t += 1

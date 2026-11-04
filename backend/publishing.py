@@ -446,6 +446,16 @@ def school_domain(user):
     return None if domain in PERSONAL_DOMAINS else domain
 
 
+def _score_rules(pub):
+    """
+    How a game's scores rank, from the published game itself and never from what
+    a page sends: if it came from the page, one student could turn a whole
+    board upside down. unit "time" keeps hundredths of a second.
+    """
+    rules = (json.loads(pub.data).get("settings") or {}).get("scoreboard") or {}
+    return bool(rules.get("lowest")), str(rules.get("unit") or "")[:20]
+
+
 def _board_name(user) -> str:
     """
     A student's first name; a teacher's or admin's last name (the teacher's
@@ -469,13 +479,14 @@ def high_scores(slug):
         if why:
             return err(*why)
         domain = school_domain(user)
-        out = {"signedIn": user is not None, "school": domain is not None, "scores": [], "mine": None}
+        lowest, unit = _score_rules(pub)
+        out = {"signedIn": user is not None, "school": domain is not None, "scores": [], "mine": None, "lowest": lowest, "unit": unit}
         if domain is None:
             return jsonify(out)
         rows = (db.query(HighScore, accounts.User).join(accounts.User, HighScore.user_id == accounts.User.id)
                 .filter(HighScore.published_id == pub.id,
                         func.lower(accounts.User.email).endswith("@" + domain, autoescape=True))
-                .order_by(HighScore.score.desc(), HighScore.updated_at.asc()).all())
+                .order_by(HighScore.score.asc() if lowest else HighScore.score.desc(), HighScore.updated_at.asc()).all())
         for rank, (h, u) in enumerate(rows, 1):
             if u.id == user.id:
                 out["mine"] = {"score": h.score, "rank": rank}
@@ -504,11 +515,12 @@ def post_score(slug):
         # bool is an int to Python, and NaN and infinity fail the range check.
         if isinstance(score, bool) or not isinstance(score, (int, float)) or not 0 < score <= MAX_SCORE:
             return err("A score is a number above zero.", 400)
-        score = round(score)
+        lowest, unit = _score_rules(pub)
+        score = round(score * 100) if unit == "time" else round(score)
         row = db.query(HighScore).filter_by(published_id=pub.id, user_id=user.id).first()
         if row is None:
             db.add(HighScore(published_id=pub.id, user_id=user.id, score=score))
-        elif score > row.score:
+        elif score < row.score if lowest else score > row.score:
             row.score, row.updated_at = score, now()
         else:
             return jsonify(kept=False)

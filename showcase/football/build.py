@@ -501,6 +501,7 @@ def swell(seconds, vol, seed):
 def build(assets_dir, out):
     A = Path(assets_dir).expanduser()
     P = _mm.Adventure("Under the Lights")
+    P.p["settings"]["scoreboard"] = {"unit": "points in a season"}
     P.p["settings"]["pixelScaling"] = True
     made = []
     feet = (CANVAS[0] // 2, CANVAS[1] - 1)

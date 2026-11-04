@@ -204,6 +204,7 @@ def play_queue(clicked):
             return bool(options)
         elif kind == "ending":
             STATE["ended"] = True
+            high_score(STATE.get("time", 0) / 60)
             QUEUE.pop(0)
             return True
         QUEUE.pop(0)

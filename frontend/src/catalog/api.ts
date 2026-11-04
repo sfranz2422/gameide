@@ -261,7 +261,7 @@ export const API: ApiEntry[] = [
   fn("Saving", "save_delete", [p("key", "string")], "nothing", "Forgets one saved value."),
   fn("Saving", "save_clear", [], "nothing", "Forgets everything this game saved."),
   fn("Saving", "high_score", [p("score", "number")], "nothing",
-    "Puts a score on the board beside your game once it's published: high_score(score). Each player's best shows, by first name, to others at the same school. Nothing happens while you're playing it in the editor."),
+    "Puts a score on the board beside your game once it's published: high_score(score). Each player's best shows, by first name, to others at the same school. Nothing happens while you're playing it in the editor. If lowest wins, or the score is a time in seconds, say so in the game's Settings."),
 
   // Effects: game feel (engine/effects.ts, render/feel.ts)
   fn("Effects", "effect", [p("kind", "string"), p("x", "number"), p("y", "number"), p("color", "color", "None"), p("scale", "number", "1")], "nothing",

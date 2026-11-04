@@ -196,6 +196,7 @@ def cell(sheet, col, row, cw, ch):
 def build(out):
     check_course()
     P = Golf("Greenside")
+    P.p["settings"]["scoreboard"] = {"lowest": True, "unit": "strokes"}
     P.p["settings"]["pixelScaling"] = False
 
     for n, h in enumerate(HOLES):

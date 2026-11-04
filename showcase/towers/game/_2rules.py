@@ -104,6 +104,11 @@ def finish_level(director, won):
         key = f"stars_{director.level}"
         if director.stars > save_get(key, 0):
             save_set(key, director.stars)
+        # The school's board: lives left and gold on each level's best, added up.
+        points = global_vars.lives * 100 + int(global_vars.gold)
+        if points > save_get(f"points_{director.level}", 0):
+            save_set(f"points_{director.level}", points)
+        high_score(sum(save_get(f"points_{i}", 0) for i in range(len(LEVELS))))
         sound_play("win", volume=0.8)
         effect("confetti", 512, 200)
     else:

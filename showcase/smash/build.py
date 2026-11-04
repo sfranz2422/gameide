@@ -141,6 +141,7 @@ def build(out):
     if problems:
         raise SystemExit("The levels:\n  " + "\n  ".join(problems))
     P = Smash("Jelly Jailbreak")
+    P.p["settings"]["scoreboard"] = {"unit": "points"}
     P.p["settings"]["pixelScaling"] = False
 
     # The pack's blocks are 70 pixels to the unit; here 35, so a tower fits one screen.

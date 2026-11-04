@@ -476,6 +476,7 @@ def picture(A, name):
 def build(assets_dir, out):
     A = Path(assets_dir).expanduser()
     P = Ballpark("Moonshot")
+    P.p["settings"]["scoreboard"] = {"unit": "home runs"}
     P.p["settings"]["pixelScaling"] = False
     made = []
 

@@ -1697,19 +1697,20 @@ _save = {}
 _save_changed = False
 
 
-# The school's board. Only a better score is sent, so calling this every step is
-# no matter. Nothing happens outside a published game: there's no board to put it on.
-_score_best = 0
+# The school's board. Only a changed score is sent, so calling this every step is
+# no matter; whether it's better is for the page and the server, which know if
+# lowest wins. Nothing happens outside a published game: there's no board to put it on.
+_score_last = None
 _score_new = None
 
 
 def high_score(score):
-    """Puts a score on the board beside a published game. Each student's best is what shows."""
-    global _score_best, _score_new
+    """Puts a score on the board beside a published game. Each player's best is what shows."""
+    global _score_last, _score_new
     if isinstance(score, bool) or not isinstance(score, (int, float)) or score != score or score in (float("inf"), float("-inf")):
         raise TypeError(f"high_score takes a number, like high_score(1200), not {score!r}.")
-    if score > _score_best:
-        _score_best = _score_new = score
+    if score != _score_last:
+        _score_last = _score_new = score
 
 
 def save_set(key, value):

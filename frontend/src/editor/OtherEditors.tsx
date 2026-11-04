@@ -151,6 +151,27 @@ export function SettingsEditor() {
           Grow the game window only by whole steps (2×, 3×…), so every pixel stays square. Turn off to fill the space exactly, and smoothly: for painted pictures and photos.
         </span>
       </label>
+      <label className="check field">
+        <input
+          type="checkbox"
+          checked={!!project.settings.scoreboard?.lowest}
+          onChange={(e) => mutate((p) => void (p.settings.scoreboard = { ...p.settings.scoreboard, lowest: e.target.checked }), { label: "scoreboard lowest" })}
+          data-testid="score-lowest"
+        />
+        Lowest score wins
+        <span className="muted small">For games that call high_score(): golf strokes, fastest times. Takes effect when the game is published again.</span>
+      </label>
+      <label className="field">
+        What the score counts
+        <input
+          value={project.settings.scoreboard?.unit ?? ""}
+          maxLength={20}
+          placeholder="points"
+          onChange={(e) => mutate((p) => void (p.settings.scoreboard = { ...p.settings.scoreboard, unit: e.target.value }), { label: "scoreboard unit" })}
+          data-testid="score-unit"
+        />
+        <span className="muted small">Shown over the board beside your game. Type "time" and high_score(seconds) shows as a clock.</span>
+      </label>
       <SavedData gameId={project.id} />
     </div>
   );

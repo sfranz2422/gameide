@@ -1688,7 +1688,7 @@ def _board(c, slug=None):
     return c.get(f"/api/play/{slug or HS}/scores").get_json()
 _names = lambda c: [(r["name"], r["score"]) for r in _board(c)["scores"]]
 check("high scores: signing in comes first", _score(client(), 10).status_code == 401)
-check("high scores: signed out shows no names", _board(client()) == {"signedIn": False, "school": False, "scores": [], "mine": None})
+check("high scores: signed out shows no names", _board(client()) == {"signedIn": False, "school": False, "scores": [], "mine": None, "lowest": False, "unit": ""})
 check("high scores: a score is a number above zero", all(_score(_amy, v).status_code == 400 for v in ("100", True, None, 0, -5, 10 ** 13, [1])))
 check("high scores: a first score counts", _score(_amy, 100).get_json() == {"kept": True})
 _score(_ben, 300)
@@ -1748,6 +1748,26 @@ _pid = _sdb.query(server.gamestore.Published).filter_by(slug=HS).first().id
 _sdb.close()
 _sdb = server.SessionLocal()
 check("high scores: unpublishing takes the scores with it", _amy.delete("/api/projects/hs1/publish").status_code == 200 and _sdb.query(server.gamestore.HighScore).filter_by(published_id=_pid).count() == 0)
+# Lowest wins, and clock times: ranked by the published game's own settings.
+put(_amy, "hs3", project("hs3", "Golfish", settings={"stepsPerSecond": 60, "scoreboard": {"lowest": True, "unit": "strokes"}}), 0)
+LO = _amy.post("/api/projects/hs3/publish", json={"title": "Golfish", "visibility": "unlisted"}).get_json()["published"]["id"]
+_score(_amy, 50, LO)
+_score(_ben, 40, LO)
+_b = _board(_pat, LO)
+check("high scores: lowest wins when the game says so", [r["score"] for r in _b["scores"]] == [40, 50] and _b["lowest"] is True and _b["unit"] == "strokes", _b)
+check("high scores: a higher score isn't your best then", _score(_ben, 60, LO).get_json() == {"kept": False} and _board(_ben, LO)["mine"] == {"score": 40, "rank": 1})
+check("high scores: a lower one is", _score(_amy, 30, LO).get_json() == {"kept": True} and _board(_amy, LO)["mine"] == {"score": 30, "rank": 1})
+_forged = _ben.post(f"/api/play/{LO}/score", json={"score": 90, "lowest": False, "unit": "points"}).get_json()
+_bf = _board(_pat, LO)
+check("high scores: a page can't change the rules", _forged == {"kept": False} and _bf["lowest"] is True and _bf["unit"] == "strokes", (_forged, _bf))
+put(_amy, "hs4", project("hs4", "Racer", settings={"stepsPerSecond": 60, "scoreboard": {"lowest": True, "unit": "time"}}), 0)
+TI = _amy.post("/api/projects/hs4/publish", json={"title": "Racer", "visibility": "unlisted"}).get_json()["published"]["id"]
+_score(_amy, 65.5, TI)
+check("high scores: a time keeps its hundredths", _board(_amy, TI)["mine"]["score"] == 6550 and _board(_amy, TI)["unit"] == "time", _board(_amy, TI))
+put(_amy, "hs5", project("hs5", "Plain"), 0)
+PL = _amy.post("/api/projects/hs5/publish", json={"title": "Plain", "visibility": "unlisted"}).get_json()["published"]["id"]
+_bp = _board(_amy, PL)
+check("high scores: a game that says nothing is highest wins", _bp["lowest"] is False and _bp["unit"] == "", _bp)
 check("high scores: …and the game's gone", client(f"pat@{M}").get(f"/api/play/{HS}/scores").status_code == 404)
 _sdb.close()
 

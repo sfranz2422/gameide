@@ -46,5 +46,6 @@ def derby_save():
     DERBY["record"] = DERBY["homers"] > best or DERBY["longest"] > far
     if DERBY["homers"] > best:
         save_set("derby_homers", DERBY["homers"])
+        high_score(DERBY["homers"])
     if DERBY["longest"] > far:
         save_set("derby_longest", DERBY["longest"])

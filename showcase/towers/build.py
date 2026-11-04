@@ -199,6 +199,7 @@ def build(out):
     if problems:
         raise SystemExit("The levels:\n  " + "\n  ".join(problems))
     P = Towers("Fort Bramble")
+    P.p["settings"]["scoreboard"] = {"unit": "points"}
     P.p["settings"]["pixelScaling"] = False
 
     # Towers: a base the object draws, and a turret it turns.

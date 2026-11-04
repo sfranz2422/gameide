@@ -14,6 +14,8 @@ music_play("theme", volume=0.5)
 self.t += 1
 clicked = mouse_check_pressed("left")
 mx, my = mouse_x, mouse_y
+if self.mode == "play" and not STATE.get("ended"):
+    STATE["time"] = STATE.get("time", 0) + 1
 
 if self.mode == "title":
     pick = next((i for i, (a, b) in enumerate(self.rows) if a <= my < b and 120 <= mx < 200), None) if clicked else None

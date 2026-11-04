@@ -52,6 +52,9 @@ body.player {
   margin: 0 0 8px;
   font-size: 15px;
 }
+.score-board .score-unit {
+  margin: -6px 0 8px;
+}
 .score-board ol {
   margin: 0;
   padding: 0;

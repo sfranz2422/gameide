@@ -82,6 +82,8 @@ def keep_best(stage_name, metres_now):
     b = save_get("best", {})
     b[stage_name] = metres_now
     save_set("best", b)
+    # The school's board: the best distance on each stage, added up.
+    high_score(sum(b.values()))
     ghosts = save_get("ghosts", {})
     ghosts[stage_name] = {"car": RUN["car"].kind, "path": RUN["path"]}
     save_set("ghosts", ghosts)
