@@ -159,4 +159,4 @@ game runs 2 seconds without errors
 
 You've built three games and used every element on the way: players, enemies, collisions, scores, timers, title and end screens, projectiles, two players, angled movement, physics, spawning, health bars, explosions, pause menus, buttons, level maps, platforming, cameras, striking and talking.
 
-Every game you'll ever play is made of pieces like these. Now make your own.
+Next: **13. Cutscenes**, and your game gets a story.

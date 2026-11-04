@@ -1,12 +1,15 @@
 # Progress
 
+## Camera orders in Create work; 13. Cutscenes (2026-11-04, waiting for review)
+- **Fixed: `camera_follow`, `camera_set`, `camera_zoom` and `camera_shake` in a Create event did nothing.** The engine sets up a new room's camera after Python's frame, and that wiped them with no error. While a room starts they now wait and go with the frame's commands, like effects. This also makes the Scrolling Camera lesson's glide and zoom actually happen, which no check had noticed. No showcase game gave a camera order in Create.
+- **13. Cutscenes**, on the cave game from where Strike and Interact leaves it: talking, walking, walking together, showing what's ahead, a fade and a shake, `scene_do`, and playing only the first time, because a room restart runs Create again. Walked step by step in `series.test.ts`, which also plays the finished scene through, skips it, and restarts the room.
+
 ## Alarms: a lesson, and a proper docs entry (2026-11-04, waiting for review)
 - The teacher couldn't find how alarms work in the docs: they had one line. **Alarms**, on Getting Started right after Collect the Coins: something that happens once, something that repeats, the mistake of setting one in Step, each instance's own timers, and reading and cancelling one. Three questions. `alarm` in the docs now says all of that too. Walked step by step in `alarms.test.ts`, which also pins what the lesson claims against the engine.
 
 ## Cutscenes (2026-11-04, waiting for review)
 - **`scene_` calls line up steps that play in order while the game holds still**: `scene_move` (animates as it goes; `wait=False` for two at once), `scene_wait`, `scene_say`, `scene_ask`, `scene_camera`, `scene_zoom`, `scene_fade`, `scene_shake`, `scene_sound`, `scene_do` (your own function), `scene_room`, plus `scene_playing()` and `scene_skip()`. A new Cutscenes category in the docs, blocks and sheets. Esc skips, and a skipped scene ends exactly where a watched one would. No skip on a phone yet: Esc is a key.
-- Tests: `python/scene.test.ts` and a browser test. No tutorial yet.
-- **Found, not fixed: `camera_follow(self)` in a Create event does nothing.** Python's call reaches the engine before the room change is applied at the end of the step, and that clears it. The camera tutorial's `camera_follow(self, 0.1)` in Create is affected.
+- Tests: `python/scene.test.ts` and a browser test.
 
 ## 7. School Leaderboard: a lesson on high_score (2026-11-04, waiting for review)
 - Right after 6. End Screen, on the Game Elements 2 shelf, from where that lesson leaves the game: send the final score, say what it counts, publish and find yourself on the board, then lowest-wins and times. Two questions. Walked step by step in `series.test.ts`, which also plays the finished game to the end and reads what reached the board. The publishing step has no check: a check can't publish.

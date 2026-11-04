@@ -822,6 +822,24 @@ const SLIME_STEP = `if not place_free(self.x + self.hspeed * 13, self.y):
 `;
 const CAVE_CREATE = "self.vy = 0\ncamera_follow(self, 0.1)\n";
 
+// The cutscene lesson's scene, in the pieces its steps add. The lesson's blocks must match these.
+const SCENE = {
+  people: 'hero = instances("Player")[0]\nfriend = instances("Friend")[0]\n',
+  talk: 'scene_say("Where is everybody?", "Hero")\nscene_say("Over here! Come and see.", "Friend")\n',
+  walk: "scene_move(hero, friend.x - 40, hero.y, 60)\n",
+  together: 'scene_say("Come on, follow me.", "Friend")\nscene_move(hero, 200, hero.y, 90, wait=False)\nscene_move(friend, 240, friend.y, 90)\n',
+  look: 'scene_say("There\'s treasure at the far end.", "Friend")\nscene_camera(1600, 200, 90)\nscene_wait(60)\n',
+  fade: "screen_fade(1, 0)\nscene_fade(0, 45)\n",
+  shake: 'scene_shake(6, 30)\nscene_say("What was that?!", "Hero")\n',
+  shakeOnly: "scene_shake(6, 30)\n",
+  doIt: "scene_do(friend_scared)\n",
+  what: 'scene_say("What was that?!", "Hero")\n',
+  scared: 'def friend_scared():\n    friend.image_blend = "yellow"\n',
+  once: 'if not hasattr(global_vars, "seen_intro"):\n    global_vars.seen_intro = True\n',
+};
+const indent = (code: string) => code.replace(/^(?=.)/gm, "    ");
+const sceneLevel = (parts: string[]) => mapCode(MAP_FULL, MAKE_PLAYER + MAKE_COIN + MAKE_SLIME) + parts.join("");
+
 export const CAVE: Series = {
   name: "cave",
   sprites: ["player", "wall", "coin", "enemy", "block"],
@@ -884,6 +902,22 @@ export const CAVE: Series = {
         },
         3: { code: { "Friend.create": 'self.image_blend = "lime"\n', "Player.step": PLATFORMER + FACING + TALK(false) } },
         4: { code: { "Player.step": PLATFORMER + FACING + TALK(true) } },
+      },
+    },
+    {
+      key: "el3-cutscenes",
+      edits: {
+        1: { code: { "Level.create": sceneLevel([SCENE.people, SCENE.talk]) } },
+        2: { code: { "Level.create": sceneLevel([SCENE.people, SCENE.talk, SCENE.walk]) } },
+        3: { code: { "Level.create": sceneLevel([SCENE.people, SCENE.talk, SCENE.walk, SCENE.together]) } },
+        4: { code: { "Level.create": sceneLevel([SCENE.people, SCENE.talk, SCENE.walk, SCENE.together, SCENE.look]) } },
+        5: { code: { "Level.create": sceneLevel([SCENE.people, SCENE.fade, SCENE.talk, SCENE.walk, SCENE.together, SCENE.look, SCENE.shake]) } },
+        6: { code: { "Level.create": sceneLevel([SCENE.people, SCENE.fade, SCENE.scared, SCENE.talk, SCENE.walk, SCENE.together, SCENE.look, SCENE.shakeOnly, SCENE.doIt, SCENE.what]) } },
+        7: {
+          code: {
+            "Level.create": sceneLevel([SCENE.once, indent(SCENE.people + SCENE.fade + SCENE.scared + SCENE.talk + SCENE.walk + SCENE.together + SCENE.look + SCENE.shakeOnly + SCENE.doIt + SCENE.what)]),
+          },
+        },
       },
     },
   ],

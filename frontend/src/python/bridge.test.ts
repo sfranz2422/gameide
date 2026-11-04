@@ -446,6 +446,55 @@ describe("rooms and the camera", () => {
     expect([game.engine.camera.offX, game.engine.camera.offY]).toEqual([0, 0]); // faded out
   });
 
+  describe("camera orders in a Create event", () => {
+    const room = (name: string, instances: { object: string; x: number; y: number }[]) => ({
+      name, width: 3000, height: 2000, camera: { width: 640, height: 360, smoothing: 1 }, instances,
+    });
+    const inCreate = async (line: string, later = false) => {
+      const code = { A: `class A(GameObject):\n    def on_create(self):\n        ${line}\n` };
+      const here = room("Big", [{ object: "A", x: 900, y: 700 }]);
+      const rooms = later ? [{ name: "First", width: 320, height: 240, instances: [] }, here] : [here];
+      const { game } = await load({ code, rooms } as never);
+      if (later) py(game, 'room_goto("Big")');
+      run(game, 2);
+      return game;
+    };
+
+    it.each([false, true])("camera_follow(self) sticks, in the first room or a later one (later: %s)", async (later) => {
+      const g = await inCreate("camera_follow(self)", later);
+      expect(g.engine.camera.x).toBe(900 - g.engine.viewW / 2);
+      py(g, "instances('A')[0].x = 1500");
+      run(g, 1);
+      expect(g.engine.camera.x).toBe(1500 - g.engine.viewW / 2);
+    });
+
+    it("smoothing sticks too: it starts on the instance, and glides after it", async () => {
+      const g = await inCreate("camera_follow(self, 0.1)");
+      const start = 900 - g.engine.viewW / 2;
+      expect(g.engine.camera.x).toBeCloseTo(start, 0);
+      py(g, "instances('A')[0].x = 1500");
+      run(g, 1);
+      expect(g.engine.camera.x).toBeCloseTo(start + 60, 0);
+    });
+
+    it("camera_set, camera_zoom and camera_shake stick", async () => {
+      const set = await inCreate("camera_set(500, 400)");
+      expect([set.engine.camera.x, set.engine.camera.y]).toEqual([500, 400]);
+      const zoom = await inCreate("camera_zoom(2)");
+      expect(zoom.engine.camera.zoom).toBe(2);
+      const shake = await inCreate("camera_shake(50, 40)");
+      expect(Math.abs(shake.engine.camera.offX) + Math.abs(shake.engine.camera.offY)).toBeGreaterThan(0);
+    });
+
+    it("the order given later in a Create wins, and later steps go straight through", async () => {
+      const g = await inCreate('camera_set(500, 400); camera_set(600, 400)');
+      expect(g.engine.camera.x).toBe(600);
+      py(g, "camera_set(700, 400)");
+      run(g, 1);
+      expect(g.engine.camera.x).toBe(700);
+    });
+  });
+
   it("the mouse is where it points in the room, not on the screen", async () => {
     const { game } = await load(camRoom({ width: 200, height: 100, follow: "P", smoothing: 1 }));
     game.engine.input.mouseMove(10, 20);

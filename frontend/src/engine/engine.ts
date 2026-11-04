@@ -105,6 +105,8 @@ export interface FrameCommands {
   sounds?: SoundOrder[];
   /** The game's whole save data, when it changed this frame. */
   save?: Record<string, unknown>;
+  /** Camera orders from a new room's Create events, done once the room is set up. */
+  camera?: [string, number, number][];
   /** A better score from high_score(), for the board beside a published game. */
   score?: number;
   /** Particles, weather, lighting and screen-effect orders (effects.ts). */
@@ -1065,6 +1067,17 @@ export class Engine {
     // or a burst made in a room's first step was wiped out at once.
     if (commands?.room !== undefined) this.setRoom(commands.room);
     else this.updateCamera();
+    if (commands?.camera) {
+      for (const [name, a, b] of commands.camera) {
+        if (name === "camera_follow") this.camera_follow(a, b);
+        else if (name === "camera_set") this.camera_set(a, b);
+        else if (name === "camera_zoom") this.camera_zoom(a, b);
+        else if (name === "camera_shake") this.camera_shake(a, b);
+      }
+      // The first look starts on what it follows, not gliding in from the corner.
+      this.camera.fresh = true;
+      this.updateCamera();
+    }
     // A remembered room (persistent) coming back: its tiles as they were left, after setRoom laid the room's own.
     if (commands?.tiles) this.restoreTiles(commands.tiles);
     this.effects.apply(commands?.fx);

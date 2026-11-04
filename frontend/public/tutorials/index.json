@@ -375,6 +375,14 @@
   "starter": "cave-3",
   "description": "Slimes to fight with a sword strike that lasts a moment, and a friend to talk to when you're close."
  },
+{
+  "key": "el3-cutscenes",
+  "title": "13. Cutscenes",
+  "level": "Game Elements 3: Advanced Techniques",
+  "time": "25 min",
+  "starter": "cave-4",
+  "description": "A little movie at the start of your level: people talk and walk, the camera looks around, and the player can skip it."
+},
  {
   "key": "simple-platformer",
   "title": "Simple Platformer",

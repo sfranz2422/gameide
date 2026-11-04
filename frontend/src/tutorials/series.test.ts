@@ -17,6 +17,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { checkGame, checkProject, readCheck } from "../checks/checks";
+import { KEY_CODE } from "../engine/input";
 import { PythonGame } from "../python/bridge";
 import { buildGame } from "../python/codegen";
 import { TUTORIAL_STARTERS } from "../store/templates";
@@ -42,6 +43,69 @@ function contains(code: string, block: string) {
 }
 
 describe("tutorial series", () => {
+  describe("the cutscene lesson's game", () => {
+    const build = async () => {
+      const series = SERIES.find((s) => s.lessons.some((l) => l.key === "el3-cutscenes"))!;
+      const n = series.lessons.findIndex((l) => l.key === "el3-cutscenes");
+      const { project } = await TUTORIAL_STARTERS[`${series.name}-${n}`]!();
+      for (const e of Object.values(series.lessons[n]!.edits)) applyEdit(project, e);
+      const { game, error } = await PythonGame.load(buildGame(project, new Map()).def, {
+        stdout: () => undefined, stderr: () => undefined, warning: () => undefined,
+      });
+      expect(error).toBeFalsy();
+      return {
+        game,
+        py: (c: string) => game.evalPython(c) as never,
+        tap: (k: string, steps = 1) => {
+          game.engine.input.keyDown(KEY_CODE.get(k)!);
+          for (let i = 0; i < steps; i++) expect(game.step()).toBeFalsy();
+          game.engine.input.keyUp(KEY_CODE.get(k)!);
+          expect(game.step()).toBeFalsy();
+        },
+      };
+    };
+
+    it("plays from start to end, and leaves everyone where it says", { timeout: 60_000 }, async () => {
+      const { game, py, tap } = await build();
+      expect(game.step()).toBeFalsy();
+      expect(py("scene_playing()")).toBe(true);
+      for (let i = 0; i < 400 && py("scene_playing()"); i++) {
+        for (let k = 0; k < 50; k++) expect(game.step()).toBeFalsy();
+        tap("space");
+      }
+      expect(py("scene_playing()")).toBe(false);
+      expect(py('instances("Player")[0].x')).toBeCloseTo(200);
+      expect(py('instances("Friend")[0].x')).toBeCloseTo(240);
+      expect(py('instances("Friend")[0].image_blend')).not.toBe(py('instances("Slime")[0].image_blend'));
+      // The game's going again, and the camera is back on the player.
+      const x = py('instances("Player")[0].x') as number;
+      game.engine.input.keyDown(KEY_CODE.get("left")!);
+      for (let k = 0; k < 30; k++) expect(game.step()).toBeFalsy();
+      game.engine.input.keyUp(KEY_CODE.get("left")!);
+      expect(py('instances("Player")[0].x') as number).toBeLessThan(x);
+      expect(game.engine.camera.x).toBeLessThan(400);
+    });
+
+    it("plays only the first time: a room restart leaves it out", { timeout: 60_000 }, async () => {
+      const { game, py, tap } = await build();
+      expect(game.step()).toBeFalsy();
+      tap("escape");
+      expect(py("scene_playing()")).toBe(false);
+      py("room_restart()");
+      for (let k = 0; k < 3; k++) expect(game.step()).toBeFalsy();
+      expect(py("scene_playing()")).toBe(false);
+      expect(py('instances("Player")[0].x') as number).toBeLessThan(100);
+    });
+
+    it("Esc leaves everyone where the whole scene would", { timeout: 60_000 }, async () => {
+      const { game, py, tap } = await build();
+      expect(game.step()).toBeFalsy();
+      tap("escape");
+      expect(py('instances("Player")[0].x')).toBe(200);
+      expect(py('instances("Friend")[0].x')).toBe(240);
+    });
+  });
+
   it("the leaderboard lesson's game sends the final score when the game ends", { timeout: 60_000 }, async () => {
     const series = SERIES.find((s) => s.lessons.some((l) => l.key === "el2-leaderboard"))!;
     const n = series.lessons.findIndex((l) => l.key === "el2-leaderboard");

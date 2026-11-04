@@ -1807,24 +1807,38 @@ def game_paused():
     return _g[_L.G.PAUSED] == 1
 
 
+# The engine sets up a new room's camera after Python's frame (endStep), so an
+# order given in a Create event, straight to the engine, was wiped a moment
+# later with no error: camera_follow(self) in Create silently did nothing. While
+# a room is starting, orders wait and go with the frame's commands, after it.
+_camera_later = []
+
+
+def _camera_order(name, *args):
+    if _room_changed:
+        _camera_later.append([name, *args])
+    else:
+        getattr(_js, name)(*args)
+
+
 def camera_follow(instance, smoothing=None):
     """Keeps the view centred on an instance (None stops). smoothing: 1 sticks, 0.1 glides."""
     if instance is None:
-        _js.camera_follow(-1, -1.0)
+        _camera_order("camera_follow", -1, -1.0)
         return
     if not isinstance(instance, GameObject):
         raise TypeError(f"camera_follow wants an instance, like camera_follow(self), not {instance!r}.")
-    _js.camera_follow(instance._slot, -1.0 if smoothing is None else max(0.0, min(1.0, float(smoothing))))
+    _camera_order("camera_follow", instance._slot, -1.0 if smoothing is None else max(0.0, min(1.0, float(smoothing))))
 
 
 def camera_set(x, y):
     """Puts the view's top-left corner at (x, y), and stops following."""
-    _js.camera_set(x, y)
+    _camera_order("camera_set", x, y)
 
 
 def camera_shake(strength=4, steps=15):
     """Shakes the view by up to `strength` pixels, fading out over `steps` steps."""
-    _js.camera_shake(strength, steps)
+    _camera_order("camera_shake", strength, steps)
 
 
 def camera_zoom(zoom=1, steps=0):
@@ -1832,7 +1846,7 @@ def camera_zoom(zoom=1, steps=0):
     zoom = _num(zoom, "camera_zoom", "zoom")
     if zoom <= 0:
         raise ValueError("camera_zoom: zoom is above 0 — 2 is closer, 0.5 further out, 1 as drawn.")
-    _js.camera_zoom(zoom, max(0, int(_num(steps, "camera_zoom", "steps"))))
+    _camera_order("camera_zoom", zoom, max(0, int(_num(steps, "camera_zoom", "steps"))))
 
 
 def _layer_number(layer):
@@ -2325,6 +2339,7 @@ def _restart_game():
     _tweens.clear()
     dialogue_clear()
     _scene_stop()
+    _camera_later.clear()
     _fade[:] = [0.0, 0.0, 0.0, 0, 1, 0]
     _sflash[0] = 0
     _fx.append(["screen", None])
@@ -2484,6 +2499,9 @@ def _commands():
     if _save_changed:
         out["save"] = _save
         _save_changed = False
+    if _camera_later:
+        out["camera"] = list(_camera_later)
+        _camera_later.clear()
     if _score_new is not None:
         out["score"] = _score_new
         _score_new = None

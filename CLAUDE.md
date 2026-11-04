@@ -65,6 +65,7 @@ engine failure in the player is shown, never a silent black screen.
   of every step). Shake is `offX/offY`: it moves the picture only, never
   `view_x`, the mouse or collisions. Python's `view_*` are published at the
   start of a step, so they are where the camera was at the end of the last.
+- **Camera orders in a new room's Create wait** (`_camera_order`) and go with the frame's commands, applied after `setRoom`: sent straight to the engine, they were wiped a moment later with no error. A new camera function must go through it.
 - `on_draw_gui` draws in screen pixels on a layer the camera doesn't move.
 - Room instance overrides (scale, angle) apply before Create; creation code
   runs after it, compiled as `def _creation(self)` under `<instance r:i>`,
