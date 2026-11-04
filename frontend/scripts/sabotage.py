@@ -1251,6 +1251,8 @@ CASES = [
  ("scene: a skip leaves the box up", RT, '        was = _scene_now\n        dialogue_clear()\n', '        was = _scene_now\n', "skipping in the middle"),
  ("scene: no Skip button", RT, '        _gui.append(["rect", -1e6, left, top, right, bottom, 0x10141F, 0, 0.7])\n        _gui.append(["text", -1e6 - 0.1, left + 12, top + 9, "Skip (Esc)", 0xFFFFFF, -1, 14, 0.95])\n', '        pass\n', "the Skip button shows only"),
  ("scene: Skip button stays up", RT, '    if _scene_on:\n        # A real button', '    if True:\n        # A real button', "the Skip button shows only"),
+ ("zoom: a fade covers only view_width", RT, '    w, h = _screen_size()\n', '    w, h = view_width or room_width, view_height or room_height\n', "a zoomed camera doesn't shrink"),
+ ("zoom: the Skip button sits at view_width", RT, '    w = _screen_size()[0]\n', '    w = view_width or room_width\n', "is under the finger"),
  ("scene: the Skip button does nothing", RT, 'if keyboard_check_pressed("escape") or _scene_skip_pressed():', 'if keyboard_check_pressed("escape"):', "tapping it plays the rest"),
  ("scene: any tap skips", RT, '    return left <= mx < right and top <= my < bottom', '    return True', "tapping anywhere else"),
  ("scene: the button is too wide", RT, '    return left <= mx < right and top <= my < bottom', '    return top <= my < bottom', "tapping anywhere else"),

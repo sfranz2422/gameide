@@ -1382,11 +1382,18 @@ def screen_flash(color="white", steps=8):
     _sflash[2] = _parse_color(color, "screen_flash")
 
 
+def _screen_size():
+    """The game window, in Draw GUI's pixels. view_width won't do: it's how much of the
+    room shows, which camera_zoom shrinks, and the GUI layer doesn't zoom. Using it put
+    a fade in a box in the window's corner, with no error."""
+    zoom = _g[_L.G.ZOOM] or 1.0
+    return round(_g[_L.G.VIEW_W] * zoom) or room_width, round(_g[_L.G.VIEW_H] * zoom) or room_height
+
+
 def _overlays():
     """After Draw GUI: the dialogue box, then flashes and fades over everything."""
     global _dlg_chars, _dlg_age, _dlg_pick, _dlg_mouse, _answer
-    w = view_width or room_width
-    h = view_height or room_height
+    w, h = _screen_size()
     rows = []   # a question's choices: (top, bottom) of each on screen, from the last frame's layout
     if _dialogue:
         name, text, choices, then = _dialogue[0]
@@ -1672,7 +1679,7 @@ def _scene_stop():
 
 def _scene_skip_box():
     """Where the Skip button is on the screen: big enough for a thumb, at any size of game."""
-    w = view_width or room_width
+    w = _screen_size()[0]
     return (w - 104, 6, w - 6, 40)
 
 

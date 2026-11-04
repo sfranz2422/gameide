@@ -239,7 +239,8 @@ scene_fade(1, 500)
       py(g, "scene_wait(500)");
       run(g, 2);
       // Input is in screen pixels: the engine works out the room point from the camera.
-      tapAt(g, (py(g, "view_width") as number) - 50, 20);
+      // The button is at the window's edge (640), not view_width's (320, zoomed).
+      tapAt(g, 640 - 50, 20);
       expect(py(g, "scene_playing()")).toBe(false);
     });
 
@@ -248,6 +249,25 @@ scene_fade(1, 500)
       tapAt(g, W - 50, 20);
       expect(py(g, "scene_playing()")).toBe(false);
     });
+  });
+
+  it("a zoomed camera doesn't shrink what's drawn over the window", async () => {
+    const { game: g } = await load({
+      code: { A: "class A(GameObject):\n    pass\n" },
+      rooms: [{ name: "Big", width: 3000, height: 2000, camera: { width: 640, height: 360, smoothing: 1 }, instances: [{ object: "A", x: 1, y: 1 }] }],
+    } as never);
+    py(g, "camera_zoom(1.5)");
+    run(g, 2);
+    const rect = (depth: number) => g.engine.guiList.find((c) => c[0] === "rect" && c[1] === depth) as number[] | undefined;
+    py(g, "screen_fade(1, 0); screen_flash()");
+    run(g, 1);
+    expect(rect(-3e6)!.slice(2, 6)).toEqual([0, 0, 640, 360]);
+    expect(rect(-2e6)!.slice(2, 6)).toEqual([0, 0, 640, 360]);
+    py(g, 'say("Hello")');
+    run(g, 1);
+    const box = rect(-1e6)!;
+    expect(box[4]).toBe(640 - 12); // right edge
+    expect(box[5]).toBe(360 - 12); // bottom edge
   });
 
   it("the Skip button shows only while a scene plays", async () => {
