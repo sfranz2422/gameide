@@ -430,6 +430,13 @@ describe.skipIf(!have)("Moonshot", () => {
     expect(py(g, "(GAME['half'], batter_is(), pitcher_is())")).toEqual(["bottom", 1, 0]);
   });
 
+  it("a ground ball in a Derby is just an out, with no game going and nobody on", async () => {
+    const g = await start();
+    py(g, "GAME.clear()\nstart(g, 'derby', {})");
+    expect(py(g, "derby()")).toBe(true);
+    expect(py(g, "runners_for({'result': 'out', 'words': 'Grounded out to short', 'bases': 0, 'feet': 90})")).toEqual([[0, 1]]);
+  });
+
   it("counts a Derby: a home run is a home run, any other swing an out, and a pitch taken costs nothing", async () => {
     const g = await start();
     py(g, "new_derby()");

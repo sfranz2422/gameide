@@ -143,7 +143,9 @@ def runners_for(play):
     if play["result"] in ("homer", "hit"):
         n = play["bases"]
         return [(0, n)] + [(b, min(4, b + n)) for b in on]
-    if play["words"].startswith("Ground") and GAME["outs"] < 2:
+    # A Derby has no game going, and no GAME: reading its outs was a KeyError on any
+    # Derby grounder, since a Derby has nobody on base to move up anyway.
+    if play["words"].startswith("Ground") and not derby() and GAME["outs"] < 2:
         return [(0, 1)] + [(b, min(4, b + 1)) for b in on]
     return [(0, 1)] + [(b, b) for b in on]
 

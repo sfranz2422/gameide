@@ -954,6 +954,7 @@ CASES = [
  ("baseball: a walk pushes every runner", BBI, '    b, runs = GAME["bases"], 0\n    if b[0]:', '    b, runs = GAME["bases"], 0\n    if True:', "walks on ball four", BB),
  ("baseball: runners never score on a hit", BBI, "            if b + n >= 3:\n                runs += 1", "            if b + n >= 3:\n                runs += 0", "moves runners on hits", BB),
  ("baseball: runners frozen on a ground out", BBI, '        if not GAME["half_over"] and play["words"].startswith("Ground"):', "        if False:", "counts outs", BB),
+ ("baseball: a Derby grounder reads a game's outs", BBW, 'and not derby() and GAME["outs"] < 2', 'and GAME["outs"] < 2', "a ground ball in a Derby", BB),
  ("baseball: a run scores on the third out", BBI, '        if not GAME["half_over"] and play["words"].startswith("Ground"):', '        if play["words"].startswith("Ground"):', "counts outs", BB),
  ("baseball: four outs an inning", BBI, '    if GAME["outs"] >= 3:', '    if GAME["outs"] >= 4:', "counts outs", BB),
  ("baseball: the home team bats when it's already won", BBI, '        if GAME["inning"] >= INNINGS and s["home"] > s["away"]:', "        if False:", "ends the game after three innings", BB),
