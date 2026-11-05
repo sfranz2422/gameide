@@ -72,6 +72,14 @@
   "description": "A room wider than the screen, more ground to run on, a gap to fall through, and a camera that follows the hero."
  },
  {
+  "key": "lv-physics",
+  "title": "Crates and Balls",
+  "level": "Getting Started",
+  "time": "20 min",
+  "starter": "levels-5",
+  "description": "Physics: crates that fall and stack on your tiles with one line of code, a hero who shoves them, and a ball that knocks the tower down."
+ },
+ {
   "key": "art-sprite-sheet",
   "title": "1. Your Own Sprite Sheet",
   "level": "Art and Tiles",

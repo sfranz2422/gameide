@@ -31,6 +31,8 @@ if move_and_collide(0, self.vy):
 
 Every frame it falls a bit faster, up to 10. `move_and_collide` moves it, but stops it against anything solid, like your grass, and says whether it hit something. Landing stops the fall.
 
+**Why not physics?** GameIDE has physics too: one line, `self.physics = True`, and things fall on their own. It's perfect for crates and balls, and you'll use it in **Crates and Balls**. But a physics object tips over, rolls and slides, and that's no good for a hero you steer. Platform games give their hero gravity like this instead, so you decide exactly how it falls and jumps.
+
 ```quiz
 Why does `self.vy` go back to 0 when `move_and_collide` hits something?
 - [x] The hero has landed, so it should stop falling

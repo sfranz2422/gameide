@@ -9,7 +9,7 @@ description: A walking hero from the free art library: two frames of a Kenney ch
 
 You don't have to draw your game's art. GameIDE has a **free art library**: packs of characters, tiles and ships by Kenney, a game artist who gives them away. They're **public domain**, so your games can use them, share them, even sell them.
 
-In the next five lessons you'll build a level with that art: a hero, a tileset, a room painted with tiles, a player who walks and jumps on them, and a world bigger than the screen.
+In the next six lessons you'll build a level with that art: a hero, a tileset, a room painted with tiles, a player who walks and jumps on them, a world bigger than the screen, and crates and a ball that fall and roll by physics.
 
 Each step tells you what to do, then **✔ Check my work** checks it. When it passes, **Next** opens the next step.
 

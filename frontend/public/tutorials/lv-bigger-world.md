@@ -105,5 +105,6 @@ game runs 2 seconds without errors
 You built a level from free art: a sprite, a tileset, two layers of tiles, a hero who runs and jumps on them, and a world bigger than the screen.
 
 Where next:
+- **Crates and Balls**, the next lesson, fills this level with things that fall, stack and roll on their own.
 - **Game Elements** builds whole games, one idea at a time.
 - **Starter Projects** has more for a game like this one: coins, enemies, scores.

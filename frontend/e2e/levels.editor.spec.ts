@@ -2,7 +2,8 @@
  * The Building Levels lessons (public/tutorials/lv-*.md), each done the way
  * a student does it, in the editor on its own: art from the library, a
  * tileset and its solid tiles, painting two tile layers, a player who
- * stands on them, and a wider room with a camera. Every step's checks are
+ * stands on them, a wider room with a camera, and physics crates and a
+ * ball. Every step's checks are
  * pressed and must pass — so a lesson can't tell a student to do something
  * its own checks don't accept, and each starter (store/templates.ts,
  * levelsStart) really opens with the lessons before it done.
@@ -281,6 +282,99 @@ test("A Bigger World: a wider room, more ground, a gap that restarts, a camera t
     await page.waitForTimeout(2500);
     await page.keyboard.up("ArrowRight");
     await page.screenshot({ path: `${SHOTS}/levels-camera.png` });
+    await page.getByTestId("stop").click();
+  }
+  await next.click();
+  await expect(page.getByTestId("tutorial-step")).toContainText("finished ✓");
+});
+
+test("Crates and Balls: physics crates that stack on the tiles, a shove, and a ball that knocks the tower down", async ({ page }) => {
+  test.setTimeout(300_000);
+  const { next, pass, spot } = await startLesson(page, "Crates and Balls");
+  await expect(treeItem(page, "Player")).toBeVisible(); // lessons 1 to 5, done
+  // Lesson 5 done: three screens wide, the camera on, and falling in the gap restarts.
+  await openRoom(page);
+  await page.getByTestId("room-panel-room").click();
+  await expect(page.getByTestId("room-width")).toHaveValue("1920");
+  await expect(page.getByTestId("camera-enabled")).toBeChecked();
+  await treeItem(page, "Player").click();
+  await page.getByRole("button", { name: /^Step/ }).first().click();
+  await expect(page.getByTestId("event-code")).toContainText("room_restart()");
+  await page.getByTestId("notes-tab").click();
+  await next.click();
+  /** One picture from the library's Tiles sheet, as a sprite named `name`. */
+  const libraryTile = async (n: number, name: string) => {
+    await page.getByTestId("add-sprites").click();
+    await page.getByTestId("open-library").click();
+    await page.getByTestId("library-pixel-platformer").click();
+    const sheet = page.getByTestId("sheet-canvas-Tiles");
+    await expect(sheet).toHaveAttribute("data-ready", "1");
+    await sheet.click({ position: await cell(page, "sheet-canvas-Tiles", n, 20, TILE) });
+    await expect(page.getByTestId("sheet-sprite-Tiles")).toHaveText("Add as a sprite (1 frame)");
+    await page.getByTestId("sheet-sprite-Tiles").click();
+    await rename(page, `pixel-platformer-tiles-${n}`, name);
+  };
+  /** An object wearing `sprite`, with a Create event of `code`. */
+  const object = async (name: string, sprite: string, code: string) => {
+    await page.getByTestId("add-objects").click();
+    await page.getByRole("textbox", { name: "Name", exact: true }).fill(name);
+    await page.keyboard.press("Enter");
+    await page.getByTestId("object-sprite").selectOption({ label: sprite });
+    await page.getByTestId("add-event").click();
+    await page.getByTestId("pick-create").click();
+    await setCode(page, code);
+    await page.getByTestId("notes-tab").click();
+  };
+  /** Places `name` at each room point, on the Instances layer, as the lesson says. */
+  const place = async (name: string, at: [number, number][]) => {
+    await openRoom(page);
+    await page.getByTestId("current-layer").selectOption({ label: "Instances" });
+    await page.getByTestId("tool-place").click();
+    await page.getByTestId("place-object").selectOption({ label: name });
+    for (const [x, y] of at) {
+      const p = await screenAt(page, x, y);
+      await page.mouse.click(p.x, p.y);
+    }
+    await page.getByTestId("tool-select").click();
+  };
+  // A crate: the second row's seventh picture.
+  await spot("add-sprites");
+  await libraryTile(26, "crate");
+  await pass(1);
+  await next.click();
+  // A Crate object.
+  await object("Crate", "crate", "self.physics = True\n");
+  await pass(3);
+  await next.click();
+  // A tower of five, right of the platform, with gaps.
+  await place("Crate", [424, 392, 360, 328, 296].map((y) => [408, y]));
+  await pass(2, 90_000);
+  await next.click();
+  // Shove them: one crate on its own, and the push under the walking line.
+  await place("Crate", [[200, 424]]);
+  await treeItem(page, "Player").click();
+  await page.getByRole("button", { name: /^Step/ }).first().click();
+  const push = 'crate = instance_place(self.x + move, self.y, "Crate")\nif crate:\n    crate.push(move * 0.5, 0)\n';
+  await setCode(page, STEP_CODE.replace("move_and_collide(move * 3, 0)\n", "move_and_collide(move * 3, 0)\n" + push) + "if self.y > room_height:\n    room_restart()\n");
+  await page.getByTestId("notes-tab").click();
+  await pass(4, 90_000);
+  await next.click();
+  // A ball: the gold coin, with a circle mask.
+  await libraryTile(151, "ball");
+  await page.getByTestId("mask-kind").selectOption("circle");
+  await pass(1);
+  await next.click();
+  // Knock it down.
+  await object("Ball", "ball", "self.physics = True\nself.hspeed = 6\nself.bounce = 0.5\nself.weight = 3\n");
+  await place("Ball", [[232, 328]]); // the platform's left end
+  await pass(5, 90_000);
+  await next.click();
+  // Play it.
+  await pass(1, 90_000);
+  if (SHOTS) {
+    await page.getByTestId("play").click();
+    await page.waitForTimeout(3000);
+    await page.screenshot({ path: `${SHOTS}/levels-physics.png` });
     await page.getByTestId("stop").click();
   }
   await next.click();

@@ -429,6 +429,10 @@ export const LEVELS_STEP = [
   "    self.vy = 0",
   "",
 ].join("\n");
+/** Lesson 5's Step event as it ends: lesson 4's, and falling into the gap restarts the room. */
+export const LEVELS_STEP_5 = LEVELS_STEP + "if self.y > room_height:\n    room_restart()\n";
+/** Lesson 5's gap: these columns of grass and dirt are erased. */
+export const LEVELS_GAP = [50, 51, 52, 53];
 
 function levelsStart(n: number) {
   return async (): Promise<Built> => {
@@ -488,7 +492,27 @@ function levelsStart(n: number) {
     if (n >= 4) {
       const player = p.objects.find((o) => o.name === "Player")!;
       ev(player, { type: "create" }, LEVELS_CREATE);
-      ev(player, { type: "step" }, LEVELS_STEP);
+      ev(player, { type: "step" }, n >= 5 ? LEVELS_STEP_5 : LEVELS_STEP);
+    }
+    // 5. A bigger world: three screens wide, the ground carried on with a
+    //    platform on the way, a gap to fall through, and a camera on the Player.
+    if (n >= 5) {
+      const ts = p.tilesets[0]!;
+      const ground = room.layers.find((l) => l.kind === "tiles" && l.name === "Ground");
+      const rows = Math.floor(room.height / ts.tileHeight);
+      room.width = 1920;
+      if (ground?.kind === "tiles") {
+        for (let c = 0; c < Math.ceil(room.width / ts.tileWidth); c++) {
+          const gap = LEVELS_GAP.includes(c);
+          for (const [r, tile] of [[rows - 2, LEVELS_ART.grass], [rows - 1, LEVELS_ART.dirt]] as const) {
+            if (gap) delete ground.tiles[`${c},${r}`];
+            else ground.tiles[`${c},${r}`] = tile;
+          }
+        }
+        for (let c = 70; c < 75; c++) ground.tiles[`${c},${rows - 7}`] = LEVELS_ART.grass;
+      }
+      const player = p.objects.find((o) => o.name === "Player")!;
+      room.camera = { ...room.camera, enabled: true, width: 640, height: 480, follow: player.id };
     }
     return { project: p, assets };
   };
@@ -559,7 +583,7 @@ export const TUTORIAL_STARTERS: Record<string, () => Promise<Built>> = {
   topdown,
   pointclick,
   novel,
-  ...Object.fromEntries([0, 1, 2, 3, 4].map((n) => [`levels-${n}`, levelsStart(n)])),
+  ...Object.fromEntries([0, 1, 2, 3, 4, 5].map((n) => [`levels-${n}`, levelsStart(n)])),
   "art-garden": artGarden,
   "art-town": artTown,
 };

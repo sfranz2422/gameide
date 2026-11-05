@@ -9,7 +9,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { LEVELS_ART, LEVELS_CREATE, LEVELS_STEP, TUTORIAL_STARTERS } from "../store/templates";
+import { LEVELS_ART, LEVELS_CREATE, LEVELS_GAP, LEVELS_STEP, LEVELS_STEP_5, TUTORIAL_STARTERS } from "../store/templates";
 import { LIBRARY } from "../library/library";
 import { LEVELS, parseTutorial } from "./tutorial";
 
@@ -19,7 +19,7 @@ const python = (md: string) => [...md.matchAll(/```python\n([\s\S]*?)```/g)].map
 
 describe("Building Levels", () => {
   it("has a starter for each lesson, each lesson's the one before it done", () => {
-    const keys = ["lv-library", "lv-tileset", "lv-painting", "lv-walking", "lv-bigger-world"];
+    const keys = ["lv-library", "lv-tileset", "lv-painting", "lv-walking", "lv-bigger-world", "lv-physics"];
     keys.forEach((k, n) => expect(parseTutorial(lesson(k)).meta.starter, k).toBe(`levels-${n}`));
     for (let n = 0; n < keys.length; n++) expect(Object.keys(TUTORIAL_STARTERS)).toContain(`levels-${n}`);
   });
@@ -28,6 +28,28 @@ describe("Building Levels", () => {
     const blocks = python(lesson("lv-walking"));
     expect(blocks[0]).toBe(LEVELS_CREATE);
     expect(blocks[blocks.length - 1]).toBe(LEVELS_STEP);
+  });
+
+  it("lesson 6 opens with lesson 5 done: its restart line, its gap and its camera", () => {
+    // Lesson 5 has the student add these lines to the end of lesson 4's Step event.
+    const added = python(lesson("lv-bigger-world"));
+    expect(added).toHaveLength(1);
+    expect(LEVELS_STEP_5).toBe(LEVELS_STEP + added[0]);
+    // The gap it has them erase: "three or four tiles wide".
+    expect(LEVELS_GAP.length).toBeGreaterThanOrEqual(3);
+    expect(LEVELS_GAP.length).toBeLessThanOrEqual(4);
+    expect(lesson("lv-bigger-world")).toContain("**1920**");
+  });
+
+  it("lesson 4 says why its hero isn't physics, and names the lesson that is", () => {
+    expect(lesson("lv-walking")).toContain("**Why not physics?**");
+    expect(lesson("lv-walking")).toContain(`**${parseTutorial(lesson("lv-physics")).meta.title}**`);
+  });
+
+  it("lesson 6 tells the hero's push to go where lesson 4's walking line is", () => {
+    // "just under `move_and_collide(move * 3, 0)`": that line must be in the Step event it opens with.
+    expect(lesson("lv-physics")).toContain("just under `move_and_collide(move * 3, 0)`");
+    expect(LEVELS_STEP_5.split("\n")).toContain("move_and_collide(move * 3, 0)");
   });
 
   it("the art the lessons name is the art the starters use", () => {
