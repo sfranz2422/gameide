@@ -52,7 +52,8 @@ export class CloudStore implements ProjectStore {
   private uploads = new Set<(id: string, done: number, total: number) => void>();
   /** One sync at a time per project; a save during one asks for another after it. */
   private running = new Map<string, Promise<SaveOutcome>>();
-  private again = new Set<string>();
+  /** The one sync lined up behind the running one, shared by everyone who asked meanwhile. */
+  private queued = new Map<string, Promise<SaveOutcome>>();
   private readonly timer: ReturnType<typeof setInterval>;
   private readonly onOnline = () => void this.syncAll();
 
@@ -206,17 +207,33 @@ export class CloudStore implements ProjectStore {
   sync(id: string): Promise<SaveOutcome> {
     const current = this.running.get(id);
     if (current) {
-      this.again.add(id);
-      return current.then(() => this.sync(id));
+      // Everyone who asks during a sync shares ONE sync after it. This used to
+      // be a flag that started a sync plus a retry per caller: the retry always
+      // found the flag's sync running, so it set the flag and waited again,
+      // forever. One save landing during another (a dragged slider, pictures
+      // going up) spun IndexedDB until reload, on a chain of promises that could
+      // never be freed: the tab reached Chrome's 4 GB limit and crashed.
+      let next = this.queued.get(id);
+      if (!next) {
+        const go = () => {
+          this.queued.delete(id);
+          return this.sync(id);
+        };
+        next = current.then(go, go);
+        this.queued.set(id, next);
+      }
+      return next;
     }
     const run = this.push(id).finally(() => {
       this.running.delete(id);
     });
     this.running.set(id, run);
-    void run.then((o) => {
-      for (const l of this.listeners) l(id, o);
-      if (this.again.delete(id)) void this.sync(id);
-    });
+    void run.then(
+      (o) => {
+        for (const l of this.listeners) l(id, o);
+      },
+      () => undefined,
+    );
     return run;
   }
 

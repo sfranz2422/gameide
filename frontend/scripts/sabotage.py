@@ -231,6 +231,8 @@ CASES = [
  # Phase 3: the editor's side
  ("tab speaks for the browser", "src/store/cloudStore.ts", "          json: { data: project, base: this.bases.get(id) ?? meta.base },", "          json: { data: project, base: meta.base },", "two tabs editing one game", E2E),
  ("offline is an error", "src/store/cloudStore.ts", '      if (e instanceof OfflineError) return { state: "offline" };', '      if (e instanceof OfflineError) return { state: "error", message: "offline" };', "edits made offline", E2E),
+ ("overlapping saves loop forever", "src/store/cloudStore.ts", "        for (const l of this.listeners) l(id, o);\n", "        for (const l of this.listeners) l(id, o);\n        if (this.queued.has(id)) void this.sync(id);\n", "a save during a save finishes"),
+ ("overlapping saves lose the last one", "src/store/cloudStore.ts", "        next = current.then(go, go);\n", "        void go;\n        next = current;\n", "the last save is what reaches the server"),
  ("bulk never queued", "src/store/cloudStore.ts", "      for (const assetId of assets.keys()) if (!m.pending.includes(assetId)) m.pending.push(assetId);", "      for (const assetId of assets.keys()) if (assetId === \"never\") m.pending.push(assetId);", "imported game's pictures", E2E),
  ("every other picture", "src/store/cloudStore.ts", "        for (let assetId = queue.shift(); assetId !== undefined; assetId = queue.shift()) {", "        for (let assetId = queue.shift(); assetId !== undefined; queue.shift(), assetId = queue.shift()) {", "imported game's pictures", E2E),
  ("workspace row grows", "src/editor/app.css", "  grid-template-rows: minmax(0, 1fr);\n  min-height: 0;\n}", "  min-height: 0;\n}", "long event scrolls", E2E),
