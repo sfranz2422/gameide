@@ -8,12 +8,13 @@ music_play("battle")
 self.info = S["battle"]
 self.heroes, self.foes = [], []
 for i, h in enumerate(S["party"]):
-    f = instance_create(470 + i * 34, 190 + i * 40, "HeroFighter")
+    # The last stands just clear of the party's box, which grows upward with each hero.
+    f = instance_create(470 + i * 34, 264 - (len(S["party"]) - 1 - i) * 44, "HeroFighter")
     f.setup(h)
     self.heroes.append(f)
 count = len(self.info["foes"])
 for i, key in enumerate(self.info["foes"]):
-    f = instance_create(220 + (i % 2) * 70, 200 + (i * 46 if count > 1 else 20) - (count - 1) * 20, "FoeFighter")
+    f = instance_create((240 if count == 1 else 220) + (i % 2) * 70, 244 + (i * 46 if count > 1 else 44) - (count - 1) * 20, "FoeFighter")
     f.setup(key)
     self.foes.append(f)
 self.queue = []

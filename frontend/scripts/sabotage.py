@@ -1300,6 +1300,7 @@ CASES = [
  ("room paint: nothing drawn in the picker", "src/scenes/PositionPicker.tsx", 'paintRoom(ctx, project, room, images, tileImages, { view: fit, width: el.clientWidth, height: el.clientHeight });', 'void paintRoom; void tileImages;', "a Move step's place", E2E),
  ("rpg: the picture hides the fight", _rp("BattleBack"), "# depth: 5000", "# depth: -99000", "Pip joins, and a fight", RP),
  ("rpg: Esc that skips a scene opens the menu too", _rp("Player"), "if self.settling > 0:\n    self.settling -= 1\n    return\n", "", "starts with its opening scene", RP),
+ ("rpg: walls in the wrong ground", "../showcase/rpg/build.py", 'P.tileset("Ground", im, [ground_tile("edge", c, r) for', 'P.tileset("Ground", im, [ground_tile("grass", c, r) for', "the map's edge stops you", RP),
  ("rpg: the gate lets anyone through", _rp("Door"), "if self.needs and self.needs not in", "if False and self.needs not in", "the gate waits", RP),
  ("rpg: no xp for a win", _rp("_2state"), '    hero["xp"] += amount\n', '    pass\n', "Pip joins, and a fight", RP),
  ("rpg: beaten foes come back", _rp("BattleDirector"), '        S["cleared"].append(self.info["tag"])\n', '        pass\n', "Pip joins, and a fight", RP),

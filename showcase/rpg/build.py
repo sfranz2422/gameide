@@ -20,6 +20,7 @@ HeroFighter. Scenery objects have no code at all, only a picture and a parent.
 import importlib.util
 import json
 import sys
+import zipfile
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
@@ -66,12 +67,24 @@ DOORS = {
     ("Town", "1"): ("Forest", "self.to, self.at_x, self.at_y = \"Forest\", 18 * 32 + 16, 20 * 32 + 16\nself.needs = \"thorn_road\"\nself.sorry = \"Whisper Wood is no place to wander alone. Talk to Oona in the square first.\"\n"),
     ("Forest", "1"): ("Town", "self.to, self.at_x, self.at_y = \"Town\", 20 * 32 + 16, 2 * 32\n"),
 }
-BIG = {"npc": (32, 44), "foe": (72, 72), "boss": (160, 160), "hero": (64, 72), "walk": (32, 44), "face": (64, 64)}
+BIG = {"npc": (32, 44), "foe": (72, 72), "boss": (240, 160), "hero": (64, 72), "walk": (32, 44), "face": (64, 64)}
 HERO_COLOURS = {"wren": (190, 60, 50), "pip": (70, 110, 200), "bram": (70, 140, 80)}
 NPC_COLOURS = {"oona": (220, 220, 230), "pip": (70, 110, 200), "baker": (230, 200, 150), "child": (240, 170, 80), "cat": (130, 90, 60), "shop": (150, 120, 180), "inn": (200, 140, 110)}
 FOE_COLOURS = {"thornling": (70, 120, 50), "bat": (90, 70, 120), "shroom": (170, 90, 90), "thornback": (120, 70, 50)}
 BACKS = {"back_fields": (70, 90, 110), "back_forest": (34, 60, 50)}
 FACES = {"wren": (190, 60, 50), "pip": (70, 110, 200), "oona": (220, 220, 230), "baker": (230, 200, 150), "cat": (130, 90, 60), "thornback": (120, 70, 50)}
+
+
+class Hollowmere(_tw.Project):
+    def write(self, path):
+        index = {i: f"assets/{i}.{ext}" for i, (_, ext) in self.assets.items()}
+        with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as z:
+            z.writestr("project.json", json.dumps(self.p, indent=1))
+            z.writestr("assets/index.json", json.dumps(index, indent=1))
+            for i, (data, ext) in self.assets.items():
+                z.writestr(index[i], data)
+            z.writestr("README.txt", f"{self.p['name']}\n\nA GameIDE project. To open it, go to GameIDE's front page and use Import.\n"
+                       "Pictures made for this game with Google Gemini.\n")
 
 
 def art(name, size):
@@ -129,20 +142,30 @@ def walk_frames(key, view):
     return [a, a.transpose(Image.FLIP_LEFT_RIGHT)]
 
 
+# Each ground is a block of tiles, so that a big texture shows across the map: one
+# picture squeezed into a single 32-pixel tile was mush, repeating every step.
+BLOCK = 4
+
+
+def ground_tile(name, c, r):
+    """The tile for a ground at map cell c, r: numbered across then down, as tilesets are."""
+    return (r % BLOCK) * BLOCK * len(GROUND) + GROUND.index(name) * BLOCK + c % BLOCK
+
+
 def ground_tileset(P):
-    """One texture per tile. A real one is faded into itself at its edges, or the map shows its seams."""
-    im = Image.new("RGBA", (TILE * len(GROUND), TILE))
+    size = TILE * BLOCK
+    im = Image.new("RGBA", (size * len(GROUND), size))
     for i, name in enumerate(GROUND):
-        t = art(f"ground_{name}", (TILE, TILE))
+        t = art(f"ground_{name}", (size, size))
         if t is None:
-            t = Image.new("RGBA", (TILE, TILE), GROUND_COLOURS[name] + (255,))
+            t = Image.new("RGBA", (size, size), GROUND_COLOURS[name] + (255,))
             d = ImageDraw.Draw(t)
             shade = tuple(max(0, c - 10) for c in GROUND_COLOURS[name])
-            for k in range(0, TILE, 8):
-                d.point((k, (k * 7) % TILE), fill=shade + (255,))
-                d.point(((k * 5) % TILE, k), fill=shade + (255,))
-        im.paste(t, (i * TILE, 0))
-    t = P.tileset("Ground", im, [GROUND.index("edge")])
+            for k in range(0, size, 8):
+                d.point((k, (k * 7) % size), fill=shade + (255,))
+                d.point(((k * 5) % size, k), fill=shade + (255,))
+        im.paste(t, (i * size, 0))
+    t = P.tileset("Ground", im, [ground_tile("edge", c, r) for c in range(BLOCK) for r in range(BLOCK)])
     t["tileWidth"], t["tileHeight"] = TILE, TILE
     return t
 
@@ -197,7 +220,7 @@ def make_sounds(P):
 
 
 def build(out):
-    P = _tw.Project("The Lanterns of Hollowmere")
+    P = Hollowmere("The Lanterns of Hollowmere")
     P.p["settings"]["scoreboard"] = {"lowest": True, "unit": "time"}
     P.p["settings"]["pixelScaling"] = False
 
@@ -220,8 +243,8 @@ def build(out):
     P.sprite("title", [art("title", (VIEW_W, VIEW_H)) or block((VIEW_W, VIEW_H), (16, 20, 44))], (0, 0))
 
     # Things on the map.
-    for name, (size, colour, words) in {"map_thornling": ((36, 36), FOE_COLOURS["thornling"], "tho"), "map_bat": ((36, 30), FOE_COLOURS["bat"], "bat"),
-                                        "map_shroom": ((36, 36), FOE_COLOURS["shroom"], "shr"), "map_thornback": ((96, 84), FOE_COLOURS["thornback"], "BOSS")}.items():
+    for name, (size, colour, words) in {"map_thornling": ((36, 36), FOE_COLOURS["thornling"], "tho"), "map_bat": ((36, 36), FOE_COLOURS["bat"], "bat"),
+                                        "map_shroom": ((36, 36), FOE_COLOURS["shroom"], "shr"), "map_thornback": ((120, 80), FOE_COLOURS["thornback"], "BOSS")}.items():
         pic = art(name, size) or art(name.replace("map_", "foe_"), size) or blob(size, colour, words)
         w, h = size
         P.sprite(name, [pic], (w // 2, h - 4), mask=(4, h // 2, w - 4, h))
@@ -281,7 +304,7 @@ def build(out):
         head, rows = read_map(path)
         name = head["room"]
         lid, gid = _tw.new_id(), _tw.new_id()
-        base = GROUND.index(GROUND_CHAR[head.get("ground", ".")])
+        base = GROUND_CHAR[head.get("ground", ".")]
         tiles, instances, blocked, start, targets = {}, [], set(), None, []
 
         def place(obj, x, y, code=""):
@@ -293,7 +316,7 @@ def build(out):
                 # Under a person or a tree, the ground of whatever's next to it: a patch of the
                 # map's main ground would show round them on a cobbled square.
                 nearby = [rows[y2][x2] for x2, y2 in ((c - 1, r), (c + 1, r), (c, r - 1), (c, r + 1)) if 0 <= y2 < len(rows) and 0 <= x2 < len(row) and rows[y2][x2] in GROUND_CHAR and rows[y2][x2] != "#"]
-                tiles[f"{c},{r}"] = GROUND.index(GROUND_CHAR[ch]) if ch in GROUND_CHAR else GROUND.index(GROUND_CHAR[nearby[0]]) if nearby else base
+                tiles[f"{c},{r}"] = ground_tile(GROUND_CHAR[ch] if ch in GROUND_CHAR else GROUND_CHAR[nearby[0]] if nearby else base, c, r)
                 if ch in PROPS:
                     place(PROPS[ch][0], x, y)
                     if PROPS[ch][2][0]:

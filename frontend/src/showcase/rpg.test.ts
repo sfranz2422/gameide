@@ -126,6 +126,22 @@ function fightWell(g: PythonGame, steps = 20000) {
 }
 
 describe.skipIf(!have)("The Lanterns of Hollowmere", () => {
+  it("the map's edge stops you and no other ground does", () => {
+    // Each ground is a block of tiles, so a mistake in the numbering makes the wrong ground solid, silently.
+    const project = JSON.parse(readFileSync(BUILT, "utf8")) as Project;
+    const solid = new Set(project.tilesets[0].solid);
+    const town = readFileSync(resolve(__dirname, "../../../showcase/rpg/maps/Town.txt"), "utf8").split("\n").filter((l) => !/^# |: /.test(l) && l.trim());
+    const layer = project.rooms.find((r) => r.name === "Town")!.layers.find((l) => l.kind === "tiles") as unknown as { tiles: Record<string, number> };
+    let edges = 0;
+    town.forEach((row, r) => {
+      [...row].forEach((ch, c) => {
+        if (ch === "#") edges++;
+        expect(solid.has(layer.tiles[`${c},${r}`]), `${ch} at ${c},${r}`).toBe(ch === "#");
+      });
+    });
+    expect(edges).toBeGreaterThan(0);
+  });
+
   it("starts with its opening scene and a town to walk in", { timeout: 60_000 }, async () => {
     const g = await start();
     tap(g, "enter");
