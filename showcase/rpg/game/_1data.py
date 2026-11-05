@@ -81,7 +81,7 @@ QUESTS = {
         "Find what's wrong in Whisper Wood, north of town.",
         "Bring the Ember Shard back to Oona.",
     ]},
-    "herbs": {"title": "Five Moonherbs", "stages": ["Pick 5 Moonherbs in Whisper Wood for Dot the baker."]},
+    "herbs": {"title": "Five Moonherbs", "stages": ["Pick 5 Moonherbs in Whisper Wood for Dot."]},
     "cat": {"title": "Where's Mittens?", "stages": ["Find Mittens in Whisper Wood, and tell Tam."]},
     "next": {"title": "To be continued", "main": True, "stages": ["More of the valley comes in the next chapter."]},
 }

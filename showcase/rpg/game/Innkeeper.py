@@ -21,6 +21,6 @@ def talk():
             sound_play("nope")
             say("Not enough gold, love. Come back with some.")
 
-    open_menu(f"A bed is {INN_PRICE} gold", ["Stay the night", "Not now"], pick, close_menus, left=200, top=120, w=240)
+    open_menu(f"A bed is {INN_PRICE} gold", ["Stay the night"], pick, close_menus, left=200, top=120, w=240, back_words="Not now")
 
 self.use = talk

@@ -126,6 +126,24 @@ function fightWell(g: PythonGame, steps = 20000) {
 }
 
 describe.skipIf(!have)("The Lanterns of Hollowmere", () => {
+  it("every menu's words fit inside it", { timeout: 60_000 }, async () => {
+    const g = await start();
+    tap(g, "enter");
+    step(g, 4);
+    clear(g);
+    py(g, 'S["party"].extend([new_hero("pip"), new_hero("bram")]); S["gear"] = list(GEAR); S["items"] = {k: 9 for k in ITEMS}; [start_quest(k) for k in QUESTS]');
+    for (const menu of ["items_menu", "gear_menu", "party_menu", "quests_menu", "shop_menu"]) {
+      py(g, `${menu}()`);
+      step(g);
+      // The built-in font at the menus' size 15: 0.6 of that a letter.
+      const over = py(g, '" | ".join(w for w, _ in newest_menu().options + [(newest_menu().note, True)] if len(w) * 9 + 16 > newest_menu().w)');
+      expect(over, menu).toBe("");
+      expect(py(g, "newest_menu().left + newest_menu().w <= VIEW_W and newest_menu().top + newest_menu().height() <= VIEW_H"), menu).toBe(true);
+      py(g, "close_menus()");
+      step(g);
+    }
+  });
+
   it("the map's edge stops you and no other ground does", () => {
     // Each ground is a block of tiles, so a mistake in the numbering makes the wrong ground solid, silently.
     const project = JSON.parse(readFileSync(BUILT, "utf8")) as Project;
@@ -222,6 +240,45 @@ describe.skipIf(!have)("The Lanterns of Hollowmere", () => {
     step(again, 4);
     expect(room(again)).toBe("Forest");
     expect(py(again, '"thorn_road" in S["quests"]')).toBe(true);
+  });
+
+  it("walking into Thornback starts its scene, with no teleporting", { timeout: 60_000 }, async () => {
+    const g = await newGame();
+    useIt(g, "Oona");
+    clear(g);
+    goThrough(g, "Forest");
+    py(g, 'p = instances("Player")[0]; p.safe = 0; o = instances("Thornback")[0]; p.x, p.y = o.x, o.y + 40');
+    g.engine.input.keyDown(KEY_CODE.get("up")!);
+    for (let i = 0; i < 60 && !py(g, 'flag("met_thornback")'); i++) step(g);
+    g.engine.input.keyUp(KEY_CODE.get("up")!);
+    expect(py(g, 'flag("met_thornback")')).toBe(true);
+  });
+
+  it("walking steps through all four frames, so the legs move", { timeout: 60_000 }, async () => {
+    const g = await newGame();
+    const project = JSON.parse(readFileSync(BUILT, "utf8")) as Project;
+    expect(project.sprites.find((s) => s.name === "wren_down")!.frames.length).toBe(4);
+    const seen = new Set<number>();
+    g.engine.input.keyDown(KEY_CODE.get("down")!);
+    for (let i = 0; i < 60; i++) {
+      step(g);
+      seen.add(Math.floor(py(g, 'instances("Player")[0].image_index') as number) % 4);
+    }
+    g.engine.input.keyUp(KEY_CODE.get("down")!);
+    expect(seen.size).toBe(4);
+  });
+
+  it("the shop can be left without buying, by a row on the list", { timeout: 60_000 }, async () => {
+    const g = await newGame();
+    const gold = py(g, 'S["gold"]') as number;
+    useIt(g, "Shopkeeper");
+    expect(py(g, 'newest_menu().options[-1][0]')).toBe("Leave");
+    step(g, 2);
+    tap(g, "up"); // from the top, round to the bottom
+    tap(g, "enter");
+    step(g, 2);
+    expect(py(g, 'instance_exists("MenuBox")')).toBe(false);
+    expect(py(g, 'S["gold"]')).toBe(gold);
   });
 
   it("the shop sells, and gear can be put on", { timeout: 60_000 }, async () => {

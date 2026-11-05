@@ -146,14 +146,14 @@ def hero_menu(user):
                 else:
                     use_skill(user, key)
 
-            open_menu("Skills", [(f"{SKILLS[k]['name']}  {SKILLS[k]['mp']} MP", user.mp >= SKILLS[k]["mp"]) for k in skills], on_skill, back_to_root, left=150, top=170, w=230)
+            open_menu("Skills", [(f"{SKILLS[k]['name']}  {SKILLS[k]['mp']} MP", user.mp >= SKILLS[k]["mp"]) for k in skills], on_skill, back_to_root, left=150, top=100, w=230)
         elif kind == "Item":
             keys = [k for k in S["items"] if ITEMS[k].get("heal") or ITEMS[k].get("mana")]
 
             def on_item(j):
                 choose_target(self.heroes, lambda t: use_item(user, keys[j], t), back_to_root)
 
-            open_menu("Items", [f"{ITEMS[k]['name']} x{S['items'][k]}" for k in keys], on_item, back_to_root, left=150, top=170, w=230)
+            open_menu("Items", [f"{ITEMS[k]['name']} x{S['items'][k]}" for k in keys], on_item, back_to_root, left=150, top=100, w=230)
         elif kind == "Defend":
             user.guarding = True
             say_line(f"{user.name} takes guard.")

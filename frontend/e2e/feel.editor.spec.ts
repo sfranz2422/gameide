@@ -251,6 +251,16 @@ test("a cutscene plays in the browser: it holds the game, shows its text, and Es
   expect(await py("game_paused()")).toBe(false);
 });
 
+test("dialogue wraps to the real font's width", async ({ page }) => {
+  await fromTemplate(page, "coins");
+  await page.getByTestId("play").click();
+  await expect(page.getByTestId("fps")).toBeVisible({ timeout: 60_000 });
+  const py = (code: string) => page.evaluate((c) => (window as any).__gameide.host.evalPython(c), code);
+  // Only a browser has the font: a full line, from where the words start to the box's edge.
+  const cols = await py('say.__globals__["_dlg_layout"]("A", "x", [], None, 640, 360)[0]');
+  expect(await py(`say.__globals__["_js"].text_size("0" * ${cols}, -1, 16, 0)`)).toBeLessThanOrEqual(640 - 26 - 12);
+});
+
 test("a cutscene's bars, bubble, portrait and caption are drawn", async ({ page }) => {
   await fromTemplate(page, "coins");
   await page.getByTestId("play").click();
@@ -293,6 +303,13 @@ test("a cutscene's bars, bubble, portrait and caption are drawn", async ({ page 
   expect(middle.some((c) => c[0]! > 200)).toBe(true);
   expect(dark((await pixels(page, [[20, 20]]))[0]!)).toBe(true);
   await pic("caption");
+  await py("scene_skip()");
+
+  // A caption's lines are each centred: the short line isn't under the long one's start.
+  await py('screen_fade(1, 0); scene_caption("Three days later...\\nHi", 600)');
+  await page.waitForTimeout(600);
+  expect((await area(page, 150, 245, 60, 25)).some((c) => c[0]! > 200)).toBe(false);
+  expect((await area(page, 295, 245, 50, 25)).some((c) => c[0]! > 200)).toBe(true);
 });
 
 test("a phone can skip a cutscene: a real tap on the button in the corner", async ({ browser }) => {

@@ -1,13 +1,13 @@
 # object: Thornback
 # sprite: map_thornback
 # parent: MapFoe
-# The boss of Whisper Wood. It waits in its clearing until you come.
+# The boss of Whisper Wood. It waits in its clearing until you come. Never solid: a
+# solid thing stops you a pixel short of it, so you never touch it and no fight starts.
 
 # === create
 super().on_create()
 if flag("thornback_beaten"):
     self.destroy()
-self.solid = True
 
 def touched(hero):
     if not flag("met_thornback"):

@@ -34,7 +34,7 @@ for i in range(n):
 if hit is not None and (mouse_x, mouse_y) != getattr(self, "seen", None):
     self.pick = hit
 self.seen = (mouse_x, mouse_y)
-if self.on_move:
+if self.on_move and self.pick != self.back_row:
     self.on_move(self.pick)
 chosen = confirm_pressed() and not mouse_check_pressed("left")
 if mouse_check_pressed("left"):
@@ -42,7 +42,10 @@ if mouse_check_pressed("left"):
         self.pick = hit
         chosen = True
 if chosen:
-    if self.options[self.pick][1]:
+    if self.pick == self.back_row:
+        sound_play("tick")
+        self.on_back()
+    elif self.options[self.pick][1]:
         sound_play("click")
         self.on_pick(self.pick)
     else:

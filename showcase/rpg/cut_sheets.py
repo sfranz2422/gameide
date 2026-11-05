@@ -147,11 +147,63 @@ def sheet(tail, shape, loose=True):
 WALK = (32, 44)
 
 
+# Where a hero's legs start on the walking picture, down from its top: under the tunic, robe or apron.
+LEGS = {"wren": 0.76, "pip": 0.87, "bram": 0.8}
+
+
+def walk_cycle(pic, key, view):
+    """
+    Four frames from one drawing. Gemini's "other foot forward" row came back almost the
+    same as the first, so walking looked like sliding: the legs are moved here instead.
+    Frame 0 is standing still. From the front and back each leg in turn gets shorter, as
+    a foot lifts; from the side the legs part, come together, and part the other way.
+    """
+    w, h = pic.size
+    top = round(h * LEGS[key])
+    legs = pic.crop((0, top, w, h))
+    box = legs.getbbox()
+    left, right = box[0], box[2]
+    mid = (left + right) // 2
+    rest = pic.copy()
+    rest.paste((0, 0, 0, 0), (0, top, w, h))
+
+    def with_legs(part):
+        out = rest.copy()
+        out.alpha_composite(part, (0, top))
+        return out
+
+    if view == "side":
+        strip = legs.crop((left, 0, right, h - top))
+        apart = Image.new("RGBA", legs.size)
+        apart.alpha_composite(strip, (left, 0))
+        other = Image.new("RGBA", legs.size)
+        other.alpha_composite(strip.transpose(Image.FLIP_LEFT_RIGHT), (left, 0))
+        narrow = strip.resize((max(1, strip.width // 2), strip.height), Image.LANCZOS)
+        together = Image.new("RGBA", legs.size)
+        together.alpha_composite(narrow, (mid - narrow.width // 2, 0))
+        return [with_legs(together), with_legs(apart), with_legs(together), with_legs(other)]
+
+    def lifted(x0, x1):
+        """The legs with the part between x0 and x1 shorter: its foot comes up, its top stays."""
+        out = legs.copy()
+        height = h - top
+        short = max(1, height - round(h * 0.09))
+        out.paste((0, 0, 0, 0), (x0, 0, x1, height))
+        out.alpha_composite(legs.crop((x0, 0, x1, height)).resize((x1 - x0, short), Image.LANCZOS), (x0, 0))
+        return out
+
+    return [pic, with_legs(lifted(left, mid)), pic, with_legs(lifted(mid, right))]
+
+
 def heroes():
     for key, tail in (("wren", "jzrud8jzrud8jzru"), ("pip", "e7119de7119de711"), ("bram", "h4ddrjh4ddrjh4dd")):
         im, boxes = sheet(tail, [3, 3])
-        names = [f"{key}_{view}_{n}" for n in (0, 1) for view in ("down", "up", "side")]
-        group(im, boxes, names, WALK)
+        # The first row's drawings only: the second row was almost the same.
+        size = (WALK[0] * S, WALK[1] * S)
+        scale = fit(boxes, size)
+        for b, view in zip(boxes, ("down", "up", "side")):
+            for n, frame in enumerate(walk_cycle(place(im, b, size, scale), key, view)):
+                save(frame, f"{key}_{view}_{n}")
     im, boxes = sheet("7a1u2v7a1u2v7a1u", [4, 4, 4])
     for r, key in enumerate(("wren", "pip", "bram")):
         # The prompt asked for them facing left and Gemini drew them facing right.

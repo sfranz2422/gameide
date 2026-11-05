@@ -17,6 +17,10 @@ const game = (body = "    pass\n", extra = {}) =>
   });
 const a = "instances('A')[0]";
 const fade = (g: Parameters<typeof run>[0]) => (g.engine.guiList.find((c) => c[0] === "rect" && c[1] === -3e6) as number[] | undefined)?.[8] ?? 0;
+const LONG = "Sixty years I have lit these lanterns in this valley, and they have never gone out, not even once, not in the worst of winters.";
+/** The widest line of some words on the screen, in the built-in font (0.6 of its size a letter, headless). */
+const widest = (c: unknown[]) => Math.max(...String(c[4]).split("\n").map((l) => l.length)) * (c[7] as number) * 0.6;
+const longWords = (g: Parameters<typeof run>[0]) => g.engine.guiList.find((c) => c[0] === "text" && String(c[4]).startsWith("Sixty")) as unknown[];
 /** What the dialogue box says just now: the name, if any, then the line. */
 const boxSays = (g: Parameters<typeof run>[0]) => g.engine.guiList.filter((c) => c[0] === "text").map((c) => c[4]).join("|");
 const press = (g: Parameters<typeof run>[0], k: string) => {
@@ -301,6 +305,28 @@ scene_fade(1, 500)
       expect(rects(g, -0.5e6)).toEqual([]);
     });
 
+    it("long words stay inside the window: box, bubble and caption", async () => {
+      const { game: g } = await game();
+      const w = py(g, 'say.__globals__["_screen_size"]()[0]') as number;
+      py(g, `say("${LONG}")`);
+      run(g, 400);
+      let c = longWords(g);
+      expect((c[2] as number) + widest(c)).toBeLessThanOrEqual(w - 12);
+      py(g, "dialogue_clear()");
+      run(g, 2);
+      // A bubble: inside its own box.
+      py(g, `say("${LONG}", "Oona", above=${a})`);
+      run(g, 400);
+      c = longWords(g);
+      const box = g.engine.guiList.find((r) => r[0] === "rect" && r[1] === -1e6) as number[];
+      expect((c[2] as number) + widest(c)).toBeLessThanOrEqual(box[4]!);
+      py(g, "dialogue_clear()");
+      // A caption is centred, so it's only too wide when it's wider than the window.
+      py(g, `scene_caption("${LONG}", 60, size=28)`);
+      run(g, 20);
+      expect(widest(longWords(g))).toBeLessThanOrEqual(w);
+    });
+
     it("a caption waits, fades in and out, and shows over a fade", async () => {
       const { game: g } = await game();
       py(g, 'screen_fade(1, 0); scene_caption("Later", 60); scene_wait(1)');
@@ -445,6 +471,14 @@ scene_wait(500)
     const extra = { sprites: [{ name: "Face", width: 32, height: 16, originX: 0, originY: 0, frameCount: 1, mask: { kind: "rect" } }, { name: "Tall", width: 16, height: 32, originX: 8, originY: 32, frameCount: 1, mask: { kind: "rect" } }] };
     const texts = (g: Parameters<typeof run>[0]) => g.engine.guiList.filter((c) => c[0] === "text") as unknown[][];
     const boxes = (g: Parameters<typeof run>[0]) => g.engine.guiList.filter((c) => c[0] === "rect" && c[1] === -1e6) as number[][];
+
+    it("long words beside a portrait stay inside the window", async () => {
+      const { game: g } = await game("    pass\n", extra);
+      py(g, `say("${LONG}", "Ann", picture="Face")`);
+      run(g, 400);
+      const c = longWords(g);
+      expect((c[2] as number) + widest(c)).toBeLessThanOrEqual((py(g, 'say.__globals__["_screen_size"]()[0]') as number) - 12);
+    });
 
     it("a portrait is drawn fitted, and the words move over for it", async () => {
       const { game: g } = await game("    pass\n", extra);

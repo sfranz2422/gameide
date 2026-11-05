@@ -184,6 +184,8 @@ class DrawLayer {
           if (t.style.fontSize !== size) t.style.fontSize = size;
           if (t.text !== text) t.text = text;
           if (t.style.fill !== color) t.style.fill = color;
+          // The anchor only moves the whole block: without this, a centred text's second line started at the first's left edge.
+          if (t.style.align !== halign) t.style.align = halign;
           t.position.set(x, y);
           t.anchor.set(halign === "center" ? 0.5 : halign === "right" ? 1 : 0, valign === "middle" ? 0.5 : valign === "bottom" ? 1 : 0);
           t.zIndex = -depth + this.order * CALL_ORDER;

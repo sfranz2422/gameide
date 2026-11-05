@@ -134,8 +134,8 @@ def block(size, colour, words=""):
 
 
 def walk_frames(key, view):
-    """Two walking frames of one view, from the hero's sheet when it's been cut."""
-    frames = [art(f"{key}_{view}_{n}", BIG["walk"]) for n in (0, 1)]
+    """The walking frames of one view (cut_sheets.py makes them), the first being a person standing still."""
+    frames = [art(f"{key}_{view}_{n}", BIG["walk"]) for n in range(4)]
     if all(frames):
         return frames
     a = figure(BIG["walk"], HERO_COLOURS[key])
@@ -227,7 +227,7 @@ def build(out):
     # The party on the map. Only Wren is seen: the others walk with her, out of sight.
     box = (8, 34, 24, 44)
     for view in ("down", "up", "side"):
-        P.sprite(f"wren_{view}", walk_frames("wren", view), (16, 40), mask=box, fps=6)
+        P.sprite(f"wren_{view}", walk_frames("wren", view), (16, 40), mask=box, fps=8)
     for key, colour in NPC_COLOURS.items():
         P.sprite(f"npc_{key}", [art(f"npc_{key}", BIG["npc"]) or figure(BIG["npc"], colour, key[:5])], (16, 40), mask=box)
     for key, colour in HERO_COLOURS.items():

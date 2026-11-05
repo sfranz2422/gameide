@@ -1416,12 +1416,24 @@ def _screen_size():
 
 
 _DLG_PICTURE = 64   # the portrait's box, on the screen
+_char_widths = {}
+
+
+def _char_width(size):
+    """How wide a letter of the built-in font is, measured: words were wrapped by a guess
+    that was too narrow, and a long line ran off the window's edge, with no error."""
+    got = _char_widths.get(size)
+    if got is None:
+        got = _char_widths[size] = _js.text_size("0" * 20, -1, size, 0) / 20
+    return got
+
+
 _CAPTION_FADE = 15  # steps a caption takes to appear, and to go
 
 
 def _dlg_layout(name, text, choices, picture, w, h):
     """How wide the words run, and where the box's top is: both its reader and its drawing need them to agree."""
-    cols = max(12, int((w - 56 - (_DLG_PICTURE + 12 if picture else 0)) / 8.6))
+    cols = max(12, int((w - 56 - (_DLG_PICTURE + 12 if picture else 0)) / _char_width(16)))
     top = h - 20 - 24 * len(_wrap(text, cols)) - (26 if name else 12) - (24 * len(choices) + 8 if choices else 0)
     return cols, min(top, h - 12 - _DLG_PICTURE - 20) if picture else top
 
@@ -1429,11 +1441,11 @@ def _dlg_layout(name, text, choices, picture, w, h):
 def _dlg_bubble(who, name, text, w, h, d):
     """The line in a bubble over who's head. In screen pixels, worked out each frame, so it stays there as the camera moves."""
     zoom = _g[_L.G.ZOOM] or 1.0
-    cols = max(8, min(28, int((w - 40) / 8.6)))
+    cols = max(8, min(28, int((w - 40) / _char_width(16))))
     all_lines = _wrap(text, cols)
     lines = _wrap(text[: int(_dlg_chars)], cols)
     # Sized for the whole line, so it doesn't grow as the letters arrive.
-    bw = 8.6 * max(len(l) for l in all_lines + [name or ""]) + 20
+    bw = _char_width(16) * max(len(l) for l in all_lines + [name or ""]) + 20
     bh = 24 * len(all_lines) + (24 if name else 0) + 12
     box = _sprite_box.get(who.sprite, (0, 0, 0, 0))
     size = abs(who.image_yscale)
@@ -1574,7 +1586,7 @@ def _overlays():
     # Over the fade: "Three days later..." is usually on black.
     if _scene_now is not None and _scene_now[0] == "caption":
         _, text, steps, color, size, done = _scene_now
-        cols = max(8, int((w - 40) / (size * 0.54)))
+        cols = max(8, int((w - 40) / _char_width(size)))
         alpha = max(0.0, min(1.0, done / _CAPTION_FADE, (steps - done) / _CAPTION_FADE))
         _gui.append(["text", -4e6, w / 2, h / 2, "\n".join(_wrap(text, cols)), color, -1, size, alpha, "center", "middle"])
 

@@ -17,11 +17,16 @@ def newest_menu():
     return boxes[-1] if boxes else None
 
 
-def open_menu(title, options, on_pick, on_back=None, left=20, top=20, w=260, note="", on_move=None):
-    """options is a list of words, or of (words, can it be picked). Returns the box."""
+def open_menu(title, options, on_pick, on_back=None, left=20, top=20, w=260, note="", on_move=None, back_words="Back"):
+    """options is a list of words, or of (words, can it be picked). Returns the box.
+    A menu you can back out of ends with a row that says so: Esc is easy to miss, and a phone hasn't got one."""
     box = instance_create(0, 0, "MenuBox")
     box.title = title
     box.options = [o if isinstance(o, tuple) else (o, True) for o in options]
+    box.back_row = None
+    if on_back:
+        box.back_row = len(box.options)
+        box.options.append((back_words, True))
     box.on_pick, box.on_back, box.on_move = on_pick, on_back, on_move
     box.left, box.top, box.w = left, top, w
     box.note = note
@@ -134,7 +139,7 @@ def quests_menu():
     if not words:
         say("Nothing to do yet.")
         return
-    open_menu("Quests", words, lambda i: None, lambda: newest_menu().destroy(), left=30, w=590)
+    open_menu("Quests", words, lambda i: None, lambda: newest_menu().destroy(), left=10, w=620)
 
 
 def shop_menu():
@@ -157,7 +162,7 @@ def shop_menu():
         newest_menu().destroy()
         shop_menu()
 
-    open_menu(f"{S['gold']} gold", [label(k) for k in wares], pick, lambda: newest_menu().destroy(), left=40, w=560)
+    open_menu(f"{S['gold']} gold", [label(k) for k in wares], pick, lambda: newest_menu().destroy(), left=40, w=560, back_words="Leave")
 
 
 def owned_gear():
