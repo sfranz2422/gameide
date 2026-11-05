@@ -3,6 +3,7 @@ ground: .
 camera: yes
 # . grass  : path  , cobbles  # edge
 # Q Bram  j Jory, home again  l the second lantern  2 mine road  E the mine's mouth
+# a the third lantern  3 the south road, to the Mistfen
 # R,B cottages  I inn  S smithy  M market stall  W well  F fence  C crates  f flowers  b bench  t tree  p pine
 # @ start  L big lantern  O Oona  P Pip  D Dot  K Tam  H shopkeeper  N innkeeper  1 gate to the wood
 ####################1#####################
@@ -22,7 +23,7 @@ camera: yes
 #...F...........,,,,,,,,,............F...#
 #...F...........,,,@,,,,,.....K...l..F...#
 #...............,,,,,,,,,:::::::::::::2E.#
-#.t....C.........:::::.........W.........#
+#.t....C.........:::::.a.......W.........#
 #...........f....:::::........f..........#
 #.t.......t......:::::.......t........t..#
-##########################################
+###################3######################

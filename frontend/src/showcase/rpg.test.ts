@@ -87,7 +87,7 @@ function fight(g: PythonGame, steps = 8000) {
 }
 
 /** Plays as a careful person: Pip heals whoever's under half, everyone else attacks. Returns the room it ended in, and how many turns it took. */
-function fightWell(g: PythonGame, steps = 20000) {
+function fightWell(g: PythonGame, steps = 20000, burns = false) {
   let turns = 0;
   for (let i = 0; i < steps && room(g) === "Battle"; i++) {
     if (py(g, "dialogue_open()")) {
@@ -114,6 +114,14 @@ function fightWell(g: PythonGame, steps = 20000) {
       step(g, 2);
       for (let k = 0; k < hurt; k++) tap(g, "down");
       tap(g, "z");
+    } else if (burns && who === "Pip" && mp >= 3 && (py(g, 'any(f.shielded or FOES[f.key].get("ghost") for f in instances("FoeFighter") if f.hp > 0)') as boolean)) {
+      tap(g, "down"); // Skill
+      tap(g, "z");
+      step(g, 2);
+      tap(g, "down"); // Ember
+      tap(g, "z");
+      step(g, 2);
+      tap(g, "z"); // the first foe
     } else {
       tap(g, "z"); // Attack
       step(g, 2);
@@ -141,6 +149,45 @@ async function inTheMine() {
   clear(g);
   return g;
 }
+/** A game as chapter 2 leaves it: two lanterns lit, all three in the party, about level 7. */
+async function chapterThree() {
+  const g = await newGame();
+  py(g, 'S["lit"] = 2; S["done"].extend(["thorn_road", "ember_mine"]); S["quests"]["ember_marsh"] = 0; S["party"].extend([new_hero("pip"), new_hero("bram")]); S["gold"] = 400; set_flag("golem_beaten"); set_flag("bram_joined")');
+  py(g, '[give_xp(h, sum(xp_to_next(n) for n in range(1, 7))) for h in S["party"]]; rest_party()');
+  return g;
+}
+/** Into the Mistfen, past its first scene. */
+async function inTheFen() {
+  const g = await chapterThree();
+  goThrough(g, "Marsh");
+  clear(g);
+  return g;
+}
+/** Stands below the n-th of something and presses Z. */
+function useNth(g: PythonGame, name: string, n: number) {
+  py(g, `p = instances("Player")[0]; o = instances("${name}")[${n}]; p.x, p.y = o.x, o.y + 30`);
+  step(g, 2);
+  tap(g, "z");
+  step(g, 2);
+}
+/** Into a fight with these foes, and the director's name for py. */
+function battleWith(g: PythonGame, foes: string) {
+  py(g, `start_battle(${foes}, 100, 100)`);
+  for (let i = 0; i < 6 && room(g) !== "Battle"; i++) step(g, 1);
+  step(g, 2);
+  expect(room(g)).toBe("Battle");
+  py(g, 'd = instances("BattleDirector")[0]; f = instances("FoeFighter")[0]; h = instances("HeroFighter")[0]; f.hp = f.max_hp = 9999');
+}
+const DIRECTOR = 'instances("BattleDirector")[0]';
+const FOE = 'instances("FoeFighter")[0]';
+const HERO = 'instances("HeroFighter")[0]';
+/** What one blow of 40 takes off the foe, with steel ("atk") or fire ("mag"). */
+function blow(g: PythonGame, kind: string) {
+  const before = py(g, `${FOE}.hp`) as number;
+  py(g, `${DIRECTOR}.do_hit(${HERO}, ${FOE}, 40, "${kind}")`);
+  return before - (py(g, `${FOE}.hp`) as number);
+}
+
 /** Walks with a key held, the real way, for so many steps. */
 function walk(g: PythonGame, k: string, steps: number) {
   g.engine.input.keyDown(KEY_CODE.get(k)!);
@@ -344,14 +391,301 @@ describe.skipIf(!have)("The Lanterns of Hollowmere", () => {
     useIt(g, "Oona");
     clear(g);
     expect(py(g, 'S["lit"]')).toBe(2);
-    expect(py(g, '[l.lit for l in instances("Lantern")]')).toEqual([true, true]);
+    expect(py(g, 'sorted(l.number for l in instances("Lantern") if l.lit)')).toEqual([1, 2]);
     expect(py(g, '"ember_mine" in S["done"]')).toBe(true);
-    expect(py(g, '"next" in S["quests"]')).toBe(true);
+    expect(py(g, 'S["quests"]["ember_marsh"]')).toBe(0);
     // Still lit after going away and coming back, when the room is built afresh.
     goThrough(g, "Mine");
     goThrough(g, "Town");
     step(g, 2);
-    expect(py(g, '[l.image_index for l in instances("Lantern")]')).toEqual([1, 1]);
+    expect(py(g, 'sorted(l.number for l in instances("Lantern") if l.image_index == 1)')).toEqual([1, 2]);
+  });
+
+  it("a beaten boss is gone as soon as the fight's over, and stays gone", { timeout: 120_000 }, async () => {
+    for (const [boss, key, foe, there] of [["Thornback", "thornback", "Forest", "Forest"], ["Golem", "golem", "MineDeep", "MineDeep"], ["Knight", "knight", "Chapel", "Chapel"]] as const) {
+      const g = await chapterThree();
+      py(g, 'S["quests"].update({"thorn_road": 0}); set_flag("lift_open"); set_flag("mine_entered"); set_flag("marsh_entered"); set_flag("golem_beaten", False)');
+      if (there === "Forest") goThrough(g, "Forest");
+      if (there === "MineDeep") {
+        goThrough(g, "Mine");
+        useIt(g, "Lift");
+        step(g, 4);
+      }
+      if (there === "Chapel") {
+        goThrough(g, "Marsh");
+        goThrough(g, "Chapel");
+      }
+      clear(g);
+      expect(room(g), foe).toBe(there);
+      expect(py(g, `instance_number("${boss}")`), boss).toBe(1);
+      py(g, `set_flag("met_${key}")`);
+      bump(g, boss);
+      expect(room(g), boss).toBe("Battle");
+      py(g, '[setattr(f, "hp", 1) for f in instances("FoeFighter")]');
+      expect(fight(g), boss).toBe(there);
+      clear(g);
+      expect(py(g, `flag("${key}_beaten")`), boss).toBe(true);
+      expect(py(g, `instance_number("${boss}")`), `${boss} right after the fight`).toBe(0);
+      // Walking over where it stood starts nothing.
+      step(g, 100);
+      expect(room(g), boss).toBe(there);
+    }
+  });
+
+  it("skipping a scene that a wheel or a person started doesn't open the menu", { timeout: 60_000 }, async () => {
+    const g = await inTheFen();
+    useIt(g, "Sedge");
+    clear(g);
+    useNth(g, "Sluice", 0);
+    clear(g);
+    useNth(g, "Sluice", 1);
+    clear(g);
+    useNth(g, "Sluice", 2);
+    expect(py(g, "scene_playing()")).toBe(true);
+    clear(g);
+    step(g, 6);
+    expect(py(g, 'instance_exists("MenuBox")')).toBe(false);
+  });
+
+  it("a save with a quest run off its end, from a boss beaten twice, loads and can go on", { timeout: 60_000 }, async () => {
+    const g = await newGame();
+    py(g, 'S["quests"]["thorn_road"] = 2; S["items"]["ember_shard"] = 2; save_game(); load_game()');
+    expect(py(g, 'S["quests"]["thorn_road"]')).toBe(1);
+    step(g, 3); // The Hud reads the quest's words every frame: this was the IndexError.
+    useIt(g, "Oona");
+    clear(g);
+    expect(py(g, 'S["lit"]')).toBe(1);
+    expect(py(g, '"thorn_road" in S["done"]')).toBe(true);
+  });
+
+  it("the south road waits for Oona's word, and Oona and Sedge point the way", { timeout: 60_000 }, async () => {
+    const g = await newGame();
+    py(g, 'p = instances("Player")[0]; d = [o for o in instances("Door") if o.to == "Marsh"][0]; p.x, p.y = d.x + 16, d.y + 24');
+    step(g, 6);
+    expect(room(g)).toBe("Town");
+    clear(g);
+    const h = await chapterThree();
+    useIt(h, "Oona");
+    clear(h);
+    goThrough(h, "Marsh");
+    clear(h);
+    expect(py(h, 'flag("marsh_entered")')).toBe(true);
+    py(h, 'S["party"][0]["hp"] = 1');
+    useIt(h, "Sedge");
+    clear(h);
+    expect(py(h, 'S["quests"]["ember_marsh"]')).toBe(1);
+    expect(py(h, '"lilies" in S["quests"]')).toBe(true);
+    // Her stew heals and saves, whatever stage you're at.
+    expect(py(h, 'S["party"][0]["hp"] == stat(S["party"][0], "hp")')).toBe(true);
+    expect(py(h, 'save_get(SAVE_KEY)["quests"]["ember_marsh"]')).toBe(1);
+  });
+
+  it("the causeway is under water until all three sluices turn, and stays drained", { timeout: 90_000 }, async () => {
+    const g = await inTheFen();
+    expect(py(g, 'instance_number("Sluice")')).toBe(3);
+    const floods = py(g, 'instance_number("Flood")') as number;
+    expect(floods).toBeGreaterThan(0);
+    // Before Sedge has said why, a wheel stays shut.
+    useNth(g, "Sluice", 0);
+    clear(g);
+    expect(py(g, 'instances("Sluice")[0].image_index')).toBe(0);
+    useIt(g, "Sedge");
+    clear(g);
+    const walkSouth = () => {
+      py(g, 'p = instances("Player")[0]; p.x, p.y = 18 * 32 + 16, 13 * 32 - 2');
+      step(g, 2);
+      walk(g, "down", 60); // Far enough to cross, short of the chapel's door.
+      return py(g, 'instances("Player")[0].y') as number;
+    };
+    expect(walkSouth()).toBeLessThan(14 * 32);
+    for (const n of [0, 1]) {
+      useNth(g, "Sluice", n);
+      clear(g);
+      expect(py(g, `instances("Sluice")[${n}].image_index`)).toBe(1);
+      expect(py(g, 'instance_number("Flood")')).toBe(floods);
+      expect(walkSouth()).toBeLessThan(14 * 32);
+    }
+    useNth(g, "Sluice", 2);
+    clear(g);
+    step(g, 2);
+    expect(py(g, 'instance_number("Flood")')).toBe(0);
+    expect(py(g, 'S["quests"]["ember_marsh"]')).toBe(2);
+    expect(walkSouth()).toBeGreaterThan(16 * 32);
+    goThrough(g, "Chapel");
+    clear(g);
+    goThrough(g, "Marsh");
+    clear(g);
+    expect(py(g, 'instance_number("Flood")')).toBe(0);
+    expect(py(g, 'sorted(s.image_index for s in instances("Sluice"))')).toEqual([1, 1, 1]);
+  });
+
+  it("deep bog stops you in the fen", { timeout: 60_000 }, async () => {
+    const g = await inTheFen();
+    // West along the top of the first bank, into the water.
+    py(g, 'p = instances("Player")[0]; p.x, p.y = 4 * 32, 3 * 32');
+    step(g, 2);
+    walk(g, "left", 200);
+    expect(py(g, 'instances("Player")[0].x')).toBeGreaterThan(2 * 32 - 4);
+  });
+
+  it("steel slides off a wisp and fire doesn't", { timeout: 60_000 }, async () => {
+    const g = await chapterThree();
+    battleWith(g, '["wisp"]');
+    const steel = blow(g, "atk");
+    const fire = blow(g, "mag");
+    expect(steel).toBeLessThanOrEqual(14);
+    expect(fire).toBeGreaterThanOrEqual(32);
+    py(g, `${DIRECTOR}.attack(${HERO}, ${FOE})`);
+    expect(py(g, `${DIRECTOR}.line`)).toContain("slides off");
+    // Slimes are ordinary: steel does the lot.
+    const h = await chapterThree();
+    battleWith(h, '["slime"]');
+    expect(blow(h, "atk")).toBeGreaterThanOrEqual(30);
+  });
+
+  it("the knight raises a shield that steel can't pass, fire breaks it, and it comes down by itself", { timeout: 60_000 }, async () => {
+    const g = await chapterThree();
+    battleWith(g, '["knight"]');
+    const plain = blow(g, "atk");
+    expect(plain).toBeGreaterThanOrEqual(28);
+    py(g, `f = ${FOE}; f.turns = 2; ${DIRECTOR}.foe_turn(f)`);
+    expect(py(g, `${FOE}.shielded`)).toBe(true);
+    expect(py(g, `${DIRECTOR}.line`)).toContain("shield");
+    const shielded = blow(g, "atk");
+    expect(shielded).toBeLessThanOrEqual(Math.ceil(plain / 2));
+    expect(py(g, `${FOE}.shielded`)).toBe(true);
+    expect(blow(g, "mag")).toBeGreaterThanOrEqual(28);
+    expect(py(g, `${FOE}.shielded`)).toBe(false);
+    expect(py(g, `${FOE}.image_blend`)).toBe("#ffffff");
+    // Pip's real Ember, through the menu's own function, does it too.
+    py(g, `f = ${FOE}; f.turns = 2; ${DIRECTOR}.foe_turn(f)`);
+    py(g, `p = instances("HeroFighter")[1]; p.mp = 99; ${DIRECTOR}.use_skill(p, "ember", ${FOE})`);
+    expect(py(g, `${FOE}.shielded`)).toBe(false);
+    expect(py(g, `${DIRECTOR}.line`)).toContain("cracks the shield");
+    // Raised again and left alone, it comes down after two of the knight's own turns.
+    py(g, `f = ${FOE}; f.turns = 2; ${DIRECTOR}.foe_turn(f)`);
+    py(g, `[setattr(h, "hp", 9999) or setattr(h, "max_hp", 9999) for h in instances("HeroFighter")]`);
+    py(g, `f = ${FOE}; f.turns = 3; ${DIRECTOR}.foe_turn(f)`);
+    expect(py(g, `${FOE}.shielded`)).toBe(true);
+    py(g, `f = ${FOE}; f.turns = 3; ${DIRECTOR}.foe_turn(f)`);
+    expect(py(g, `${FOE}.shielded`)).toBe(false);
+  });
+
+  it("Sedge's lilies and Dot's slimes pay", { timeout: 90_000 }, async () => {
+    const g = await inTheFen();
+    useIt(g, "Sedge");
+    clear(g);
+    expect(py(g, 'instance_number("Lily")')).toBeGreaterThan(0);
+    useIt(g, "Lily");
+    clear(g);
+    expect(py(g, 'count_item("lily")')).toBe(1);
+    const gold = py(g, 'S["gold"]') as number;
+    const ethers = py(g, 'count_item("ether")') as number;
+    py(g, 'add_item("lily", 3)');
+    useIt(g, "Sedge");
+    clear(g);
+    expect(py(g, '"lilies" in S["quests"]')).toBe(true);
+    py(g, 'add_item("lily")');
+    useIt(g, "Sedge");
+    clear(g);
+    expect(py(g, '"lilies" in S["done"]')).toBe(true);
+    expect(py(g, 'S["gold"]')).toBe(gold + 100);
+    expect(py(g, 'count_item("ether")')).toBe(ethers + 3);
+    expect(py(g, 'count_item("lily")')).toBe(0);
+    goThrough(g, "Town");
+    useIt(g, "Dot");
+    clear(g);
+    expect(py(g, '"slimes" in S["quests"]')).toBe(true);
+    // Beating them for real counts them: one fight's two, through the battle's own win.
+    goThrough(g, "Marsh");
+    clear(g);
+    bump(g, "Slime");
+    expect(fightWell(g).end).toBe("Marsh");
+    clear(g);
+    expect(py(g, 'S["beaten"].get("slime", 0)')).toBe(2);
+    goThrough(g, "Town");
+    const money = py(g, 'S["gold"]') as number;
+    useIt(g, "Dot");
+    clear(g);
+    expect(py(g, '"slimes" in S["quests"]')).toBe(true);
+    py(g, 'S["beaten"]["slime"] = 6');
+    useIt(g, "Dot");
+    clear(g);
+    expect(py(g, '"slimes" in S["done"]')).toBe(true);
+    expect(py(g, 'S["gold"]')).toBe(money + 140);
+  });
+
+  it("the shop's new stock comes with the second lantern, and still fits", { timeout: 60_000 }, async () => {
+    const g = await chapterThree();
+    py(g, "shop_menu()");
+    step(g);
+    const words = py(g, '" ".join(w for w, _ in newest_menu().options)') as string;
+    expect(words).toContain("Moon Sword");
+    expect(words).toContain("Potion");
+    expect(py(g, "newest_menu().top + newest_menu().height() <= VIEW_H")).toBe(true);
+  });
+
+  it("a save from before the marsh carries on into the marsh's quest", { timeout: 60_000 }, async () => {
+    const g = await newGame();
+    py(g, 'S["done"].append("ember_mine"); S["quests"]["next"] = 0; save_game(); load_game()');
+    expect(py(g, '"next" in S["quests"]')).toBe(false);
+    expect(py(g, 'S["quests"]["ember_marsh"]')).toBe(0);
+  });
+
+  it("the whole of chapter 3: the fen drained, the knight beaten, the third lantern lit", { timeout: 300_000 }, async () => {
+    const g = await inTheFen();
+    useIt(g, "Sedge");
+    clear(g);
+    const beat = () => {
+      for (let n = 0; n < 8; n++) {
+        for (const foe of ["Slime", "Frog", "Wisp"]) {
+          if (py(g, `instance_number("${foe}")`)) {
+            const before = room(g);
+            bump(g, foe);
+            expect(fightWell(g, 20000, true).end, foe).toBe(before);
+            clear(g);
+          }
+        }
+        py(g, "rest_party()"); // As if Sedge's stew.
+      }
+    };
+    beat();
+    process.stderr.write(`Fen cleared: ${JSON.stringify(py(g, '[(h["key"], h["level"]) for h in S["party"]]'))} gold ${py(g, 'S["gold"]')}\n`);
+    for (const n of [0, 1, 2]) {
+      useNth(g, "Sluice", n);
+      clear(g);
+    }
+    expect(py(g, 'S["quests"]["ember_marsh"]')).toBe(2);
+    goThrough(g, "Chapel");
+    clear(g);
+    beat();
+    py(g, "rest_party()");
+    bump(g, "Knight");
+    clear(g);
+    for (let i = 0; i < 40 && room(g) !== "Battle"; i++) step(g, 1);
+    expect(room(g)).toBe("Battle");
+    const boss = fightWell(g, 30000, true);
+    process.stderr.write(`Knight: ${JSON.stringify(boss)} ${JSON.stringify(py(g, '[(h["key"], h["level"], h["hp"], h["mp"]) for h in S["party"]]'))}\n`);
+    expect(boss.end).toBe("Chapel");
+    clear(g);
+    expect(py(g, 'flag("knight_beaten")')).toBe(true);
+    expect(py(g, 'S["quests"]["ember_marsh"]')).toBe(3);
+    expect(py(g, 'count_item("ember_shard")')).toBe(1);
+    goThrough(g, "Marsh");
+    clear(g);
+    goThrough(g, "Town");
+    useIt(g, "Oona");
+    clear(g);
+    expect(py(g, 'S["lit"]')).toBe(3);
+    expect(py(g, 'sorted(l.number for l in instances("Lantern") if l.lit)')).toEqual([1, 2, 3]);
+    expect(py(g, '"ember_marsh" in S["done"]')).toBe(true);
+    expect(py(g, '"next" in S["quests"]')).toBe(true);
+    expect(py(g, 'count_item("ember_shard")')).toBe(0);
+    goThrough(g, "Marsh");
+    clear(g);
+    goThrough(g, "Chapel");
+    clear(g);
+    expect(py(g, 'instance_number("Knight")')).toBe(0);
   });
 
   it("every menu's words fit inside it", { timeout: 60_000 }, async () => {
@@ -372,19 +706,21 @@ describe.skipIf(!have)("The Lanterns of Hollowmere", () => {
     }
   });
 
-  it("the map's edge stops you and no other ground does", () => {
+  it("the map's edge and deep bog stop you, and no other ground does", () => {
     // Each ground is a block of tiles, so a mistake in the numbering makes the wrong ground solid, silently.
     const project = JSON.parse(readFileSync(BUILT, "utf8")) as Project;
     const solid = new Set(project.tilesets[0]!.solid);
-    const town = readFileSync(resolve(__dirname, "../../../showcase/rpg/maps/Town.txt"), "utf8").split("\n").filter((l) => !/^# |: /.test(l) && l.trim());
-    const layer = project.rooms.find((r) => r.name === "Town")!.layers.find((l) => l.kind === "tiles") as unknown as { tiles: Record<string, number> };
     let edges = 0;
-    town.forEach((row, r) => {
-      [...row].forEach((ch, c) => {
-        if (ch === "#") edges++;
-        expect(solid.has(layer.tiles[`${c},${r}`]!), `${ch} at ${c},${r}`).toBe(ch === "#");
+    for (const name of ["Town", "Marsh", "Chapel"]) {
+      const rows = readFileSync(resolve(__dirname, `../../../showcase/rpg/maps/${name}.txt`), "utf8").split("\n").filter((l) => !/^# |: /.test(l) && l.trim());
+      const layer = project.rooms.find((r) => r.name === name)!.layers.find((l) => l.kind === "tiles") as unknown as { tiles: Record<string, number> };
+      rows.forEach((row, r) => {
+        [...row].forEach((ch, c) => {
+          if (ch === "#" || ch === "w") edges++;
+          expect(solid.has(layer.tiles[`${c},${r}`]!), `${name}: ${ch} at ${c},${r}`).toBe(ch === "#" || ch === "w");
+        });
       });
-    });
+    }
     expect(edges).toBeGreaterThan(0);
   });
 

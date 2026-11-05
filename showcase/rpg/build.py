@@ -38,10 +38,12 @@ ART = HERE / "art"
 _tw = _load("thornwood_build", HERE.parent / "build.py")
 TILE = 32
 VIEW_W, VIEW_H = 640, 360
-GROUND = ["grass", "path", "cobble", "planks", "forest", "cave", "mud", "flag", "edge"]
+GROUND = ["grass", "path", "cobble", "planks", "forest", "cave", "mud", "flag", "edge", "bog"]
 GROUND_COLOURS = {"grass": (92, 148, 74), "path": (176, 142, 98), "cobble": (138, 138, 146), "planks": (150, 106, 66),
-                  "forest": (52, 84, 58), "cave": (66, 62, 70), "mud": (70, 88, 62), "flag": (86, 76, 104), "edge": (20, 26, 30)}
-GROUND_CHAR = {".": "grass", ":": "path", ",": "cobble", "=": "planks", "g": "forest", "n": "cave", "~": "mud", "%": "flag", "#": "edge"}
+                  "forest": (52, 84, 58), "cave": (66, 62, 70), "mud": (70, 88, 62), "flag": (86, 76, 104), "edge": (20, 26, 30), "bog": (24, 58, 60)}
+GROUND_CHAR = {".": "grass", ":": "path", ",": "cobble", "=": "planks", "g": "forest", "n": "cave", "~": "mud", "%": "flag", "#": "edge", "w": "bog"}
+# The ground that stops you: rock walls, and water too deep to wade.
+SOLID_GROUND = ("edge", "bog")
 
 # Scenery: the map character, its object, its picture's size and the solid part at its feet.
 PROPS = {
@@ -50,18 +52,19 @@ PROPS = {
     "M": ("Stall", (72, 56), (66, 26)), "W": ("Well", (44, 48), (40, 24)), "F": ("Fence", (32, 32), (32, 12)), "C": ("Crates", (40, 40), (38, 20)),
     "f": ("Flowers", (32, 24), (0, 0)), "b": ("Bench", (48, 28), (46, 14)),
     "A": ("Beam", (32, 64), (12, 10)), "Y": ("Cart", (56, 44), (50, 18)), "G": ("GlowRock", (48, 48), (30, 16)), "E": ("MineMouth", (96, 80), (0, 0)),
+    "d": ("DeadTree", (64, 80), (18, 14)), "q": ("Reeds", (32, 32), (24, 12)), "i": ("Pillar", (40, 88), (22, 14)),
 }
 PICTURE = {"Tree": "prop_tree", "Pine": "prop_pine", "Bush": "prop_bush", "Boulder": "prop_boulder", "CottageRed": "prop_cottage_red", "CottageBlue": "prop_cottage_blue",
            "Inn": "prop_inn", "Smithy": "prop_smithy", "Stall": "prop_stall", "Well": "prop_well", "Fence": "prop_fence", "Crates": "prop_crates", "Flowers": "prop_flowers", "Bench": "prop_bench",
-           "Beam": "prop_beam", "Cart": "prop_cart", "GlowRock": "prop_crystal", "MineMouth": "prop_mine"}
+           "Beam": "prop_beam", "Cart": "prop_cart", "GlowRock": "prop_crystal", "MineMouth": "prop_mine", "DeadTree": "prop_dead_tree", "Reeds": "prop_reeds", "Pillar": "prop_pillar"}
 PROP_COLOURS = {"Tree": (40, 110, 60), "Pine": (28, 84, 66), "Bush": (58, 130, 70), "Boulder": (120, 120, 126), "CottageRed": (176, 70, 60), "CottageBlue": (70, 96, 170), "Inn": (150, 110, 70),
                 "Smithy": (96, 90, 90), "Stall": (190, 150, 70), "Well": (130, 130, 140), "Fence": (130, 96, 60), "Crates": (150, 116, 70), "Flowers": (210, 110, 170), "Bench": (120, 86, 56),
-                "Beam": (110, 76, 46), "Cart": (90, 90, 96), "GlowRock": (230, 130, 60), "MineMouth": (70, 66, 70)}
+                "Beam": (110, 76, 46), "Cart": (90, 90, 96), "GlowRock": (230, 130, 60), "MineMouth": (70, 66, 70), "DeadTree": (60, 50, 44), "Reeds": (90, 120, 60), "Pillar": (110, 104, 110)}
 
 # Everyone and everything else on a map: character → (object, creation code).
 THINGS = {
     "O": ("Oona", ""), "P": ("Pip", ""), "D": ("Dot", ""), "K": ("Tam", ""), "H": ("Shopkeeper", ""), "N": ("Innkeeper", ""), "L": ("Lantern", ""),
-    "l": ("Lantern", "self.number = 2\n"), "Q": ("Bram", ""), "j": ("Jory", ""),
+    "l": ("Lantern", "self.number = 2\n"), "a": ("Lantern", "self.number = 3\n"), "Q": ("Bram", ""), "j": ("Jory", ""),
 }
 FOREST_THINGS = {
     "K": ("Mittens", ""), "e": ("Thornling", ""), "v": ("Bat", ""), "m": ("Shroom", ""), "h": ("Herb", ""), "X": ("Thornback", ""),
@@ -71,21 +74,31 @@ MINE_THINGS = {
     "J": ("Jory", ""), "e": ("Beetle", ""), "v": ("Rockling", ""), "m": ("Mole", ""), "x": ("GlowCrystal", ""), "r": ("Rubble", ""), "Z": ("Lift", ""), "X": ("Golem", ""),
     "c": ("Chest", 'self.item = "ether"\n'), "k": ("Chest", 'self.item = "mine_key"\n'), "h": ("Chest", 'self.gear = "foreman_hammer"\n'),
 }
+MARSH_THINGS = {
+    "K": ("Sedge", ""), "s": ("Sluice", ""), "x": ("Lily", ""), "$": ("Flood", ""), "e": ("Slime", ""), "v": ("Frog", ""), "m": ("Wisp", ""), "X": ("Knight", ""),
+    "c": ("Chest", 'self.gold = 150\n'),
+}
+CHAPEL_THINGS = {**MARSH_THINGS, "c": ("Chest", 'self.gear = "drowned_mail"\n')}
 DOORS = {
     ("Town", "1"): ("Forest", "self.to, self.at_x, self.at_y = \"Forest\", 18 * 32 + 16, 20 * 32 + 16\nself.needs = \"thorn_road\"\nself.sorry = \"Whisper Wood is no place to wander alone. Talk to Oona in the square first.\"\n"),
     ("Forest", "1"): ("Town", "self.to, self.at_x, self.at_y = \"Town\", 20 * 32 + 16, 2 * 32\n"),
     ("Town", "2"): ("Mine", "self.to, self.at_x, self.at_y = \"Mine\", 2 * 32 + 16, 13 * 32 + 24\nself.needs_flag = \"bram_joined\"\nself.sorry = \"The old mine road. Those tunnels are dangerous. Better ask someone who knows them.\"\n"),
     ("Mine", "1"): ("Town", "self.to, self.at_x, self.at_y = \"Town\", 37 * 32 + 16, 16 * 32 + 24\n"),
     ("MineDeep", "1"): ("Mine", "self.to, self.at_x, self.at_y = \"Mine\", 22 * 32 + 16, 6 * 32\n"),
+    ("Town", "3"): ("Marsh", "self.to, self.at_x, self.at_y = \"Marsh\", 6 * 32 + 16, 2 * 32 + 24\nself.needs = \"ember_marsh\"\nself.sorry = \"The south road goes down to the Mistfen, and nobody goes there without a reason.\"\n"),
+    ("Marsh", "1"): ("Town", "self.to, self.at_x, self.at_y = \"Town\", 19 * 32 + 16, 19 * 32 + 16\n"),
+    ("Marsh", "2"): ("Chapel", "self.to, self.at_x, self.at_y = \"Chapel\", 12 * 32 + 16, 14 * 32 + 24\n"),
+    ("Chapel", "1"): ("Marsh", "self.to, self.at_x, self.at_y = \"Marsh\", 18 * 32 + 16, 21 * 32 + 16\n"),
 }
 BIG = {"npc": (32, 44), "foe": (72, 72), "boss": (240, 160), "hero": (64, 72), "walk": (32, 44), "face": (64, 64)}
 HERO_COLOURS = {"wren": (190, 60, 50), "pip": (70, 110, 200), "bram": (70, 140, 80)}
-NPC_COLOURS = {"bram": (70, 140, 80), "miner": (150, 130, 90), "oona": (220, 220, 230), "pip": (70, 110, 200), "baker": (230, 200, 150), "child": (240, 170, 80), "cat": (130, 90, 60), "shop": (150, 120, 180), "inn": (200, 140, 110)}
+NPC_COLOURS = {"bram": (70, 140, 80), "miner": (150, 130, 90), "oona": (220, 220, 230), "pip": (70, 110, 200), "baker": (230, 200, 150), "child": (240, 170, 80), "cat": (130, 90, 60), "shop": (150, 120, 180), "inn": (200, 140, 110), "witch": (90, 130, 80)}
 FOE_COLOURS = {"thornling": (70, 120, 50), "bat": (90, 70, 120), "shroom": (170, 90, 90), "thornback": (120, 70, 50),
-               "beetle": (60, 60, 130), "rockling": (90, 90, 96), "mole": (120, 80, 50), "golem": (110, 70, 50)}
-BOSSES = ("thornback", "golem")
-BACKS = {"back_fields": (70, 90, 110), "back_forest": (34, 60, 50), "back_mine": (50, 40, 36)}
-FACES = {"bram": (70, 140, 80), "miner": (150, 130, 90), "golem": (110, 70, 50), "wren": (190, 60, 50), "pip": (70, 110, 200), "oona": (220, 220, 230), "baker": (230, 200, 150), "cat": (130, 90, 60), "thornback": (120, 70, 50)}
+               "beetle": (60, 60, 130), "rockling": (90, 90, 96), "mole": (120, 80, 50), "golem": (110, 70, 50),
+               "slime": (70, 150, 70), "frog": (90, 120, 70), "wisp": (150, 150, 230), "knight": (90, 80, 70)}
+BOSSES = ("thornback", "golem", "knight")
+BACKS = {"back_fields": (70, 90, 110), "back_forest": (34, 60, 50), "back_mine": (50, 40, 36), "back_marsh": (40, 60, 50)}
+FACES = {"bram": (70, 140, 80), "miner": (150, 130, 90), "golem": (110, 70, 50), "wren": (190, 60, 50), "pip": (70, 110, 200), "oona": (220, 220, 230), "baker": (230, 200, 150), "cat": (130, 90, 60), "thornback": (120, 70, 50), "witch": (90, 130, 80), "knight": (90, 80, 70)}
 
 
 class Hollowmere(_tw.Project):
@@ -165,6 +178,29 @@ def ground_tile(name, c, r):
     return (r % BLOCK) * BLOCK * len(GROUND) + GROUND.index(name) * BLOCK + c % BLOCK
 
 
+def deep_water(mud):
+    """The marsh's mud under dark green water: there's no water picture, and this sits right beside it."""
+    return Image.blend(mud.convert("RGBA"), Image.new("RGBA", mud.size, (14, 58, 62, 255)), 0.68)
+
+
+def sluice_wheel():
+    """An old wheel on a post, shut and open: the one thing here Gemini wasn't asked for."""
+    frames = []
+    for turned in (0, 30):
+        wheel = Image.new("RGBA", (40, 40), (0, 0, 0, 0))
+        d = ImageDraw.Draw(wheel)
+        d.ellipse((3, 3, 36, 36), outline=(58, 42, 34, 255), width=5)
+        d.ellipse((5, 5, 34, 34), outline=(146, 88, 52, 255), width=2)
+        d.line((20, 4, 20, 36), fill=(96, 62, 42, 255), width=4)
+        d.line((4, 20, 36, 20), fill=(96, 62, 42, 255), width=4)
+        d.ellipse((15, 15, 25, 25), fill=(58, 42, 34, 255))
+        im = Image.new("RGBA", (40, 52), (0, 0, 0, 0))
+        ImageDraw.Draw(im).rectangle((15, 16, 24, 52), fill=(92, 70, 52, 255), outline=(40, 30, 26, 255))
+        im.alpha_composite(wheel.rotate(turned), (0, 0))
+        frames.append(im)
+    return frames
+
+
 def ground_tileset(P):
     size = TILE * BLOCK
     im = Image.new("RGBA", (size * len(GROUND), size))
@@ -174,6 +210,8 @@ def ground_tileset(P):
         if name == "edge" and art("ground_cave", (size, size)):
             t = art("ground_cave", (size, size)).point(lambda v: v // 3)
             t.putalpha(255)
+        if name == "bog" and art("ground_mud", (size, size)):
+            t = deep_water(art("ground_mud", (size, size)))
         if t is None:
             t = Image.new("RGBA", (size, size), GROUND_COLOURS[name] + (255,))
             d = ImageDraw.Draw(t)
@@ -182,7 +220,7 @@ def ground_tileset(P):
                 d.point((k, (k * 7) % size), fill=shade + (255,))
                 d.point(((k * 5) % size, k), fill=shade + (255,))
         im.paste(t, (i * size, 0))
-    t = P.tileset("Ground", im, [ground_tile("edge", c, r) for c in range(BLOCK) for r in range(BLOCK)])
+    t = P.tileset("Ground", im, [ground_tile(name, c, r) for name in SOLID_GROUND for c in range(BLOCK) for r in range(BLOCK)])
     t["tileWidth"], t["tileHeight"] = TILE, TILE
     return t
 
@@ -210,7 +248,7 @@ def reach(rows, start, solid_props):
             n = (c + dc, r + dr)
             if n in seen or not (0 <= n[1] < len(rows) and 0 <= n[0] < len(rows[0])):
                 continue
-            if rows[n[1]][n[0]] == "#" or n in solid_props:
+            if rows[n[1]][n[0]] in "#w" or n in solid_props:
                 continue
             seen.add(n)
             todo.append(n)
@@ -263,7 +301,9 @@ def build(out):
     for name, (size, colour, words) in {"map_thornling": ((36, 36), FOE_COLOURS["thornling"], "tho"), "map_bat": ((36, 36), FOE_COLOURS["bat"], "bat"),
                                         "map_shroom": ((36, 36), FOE_COLOURS["shroom"], "shr"), "map_thornback": ((120, 80), FOE_COLOURS["thornback"], "BOSS"),
                                         "map_beetle": ((36, 36), FOE_COLOURS["beetle"], "bee"), "map_rockling": ((36, 36), FOE_COLOURS["rockling"], "roc"),
-                                        "map_mole": ((36, 36), FOE_COLOURS["mole"], "mol"), "map_golem": ((120, 80), FOE_COLOURS["golem"], "BOSS")}.items():
+                                        "map_mole": ((36, 36), FOE_COLOURS["mole"], "mol"), "map_golem": ((120, 80), FOE_COLOURS["golem"], "BOSS"),
+                                        "map_slime": ((36, 36), FOE_COLOURS["slime"], "sli"), "map_frog": ((36, 36), FOE_COLOURS["frog"], "fro"),
+                                        "map_wisp": ((36, 36), FOE_COLOURS["wisp"], "wis"), "map_knight": ((120, 80), FOE_COLOURS["knight"], "BOSS")}.items():
         pic = art(name, size) or art(name.replace("map_", "foe_"), size) or blob(size, colour, words)
         w, h = size
         P.sprite(name, [pic], (w // 2, h - 4), mask=(4, h // 2, w - 4, h))
@@ -279,6 +319,10 @@ def build(out):
     P.sprite("rubble", [art("prop_boulder", (40, 34)) or blob((40, 34), (120, 120, 126), "rock")], (20, 34), mask=(4, 10, 36, 34))
     P.sprite("lift", [art("prop_arch", (64, 88)) or block((64, 88), (70, 60, 56), "lift")], (32, 88), mask=(4, 60, 60, 88))
     P.sprite("glow_crystal", [art("prop_crystal", (28, 28)) or blob((28, 28), (230, 130, 60))], (14, 24), mask=(2, 8, 26, 28))
+    P.sprite("sluice", sluice_wheel(), (20, 48), mask=(8, 34, 32, 52))
+    P.sprite("lily", [art("prop_flowers", (24, 18)) or blob((24, 18), (230, 230, 240))], (12, 16), mask=(2, 2, 22, 18))
+    flood = art("ground_mud", (32, 32))
+    P.sprite("flood", [deep_water(flood) if flood else block((32, 32), GROUND_COLOURS["bog"])], (16, 32), mask=(0, 0, 32, 32))
     make_sounds(P)
     ground = ground_tileset(P)
 
@@ -290,7 +334,7 @@ def build(out):
     parsed = {f.stem: _tw.read_code(f) for f in files}
     for name, (head, _) in parsed.items():
         P.obj(name, depth=int(head.get("depth", 0)))
-    for name in ("Thornling", "Bat", "Shroom", "Beetle", "Rockling", "Mole"):
+    for name in ("Thornling", "Bat", "Shroom", "Beetle", "Rockling", "Mole", "Slime", "Frog", "Wisp"):
         P.obj(name, sprite=P.sprite_id(f"map_{name.lower()}"), parent=P.obj_id("MapFoe"))
     for ch, (name, size, feet) in PROPS.items():
         w, h = size
@@ -313,6 +357,8 @@ def build(out):
             o["events"].append({"id": _tw.new_id(), "key": {"type": "create"}, "mode": "python", "code": "super().on_create()\nself.solid = False\n"})
         if o["name"] == "GlowRock":
             o["events"].append({"id": _tw.new_id(), "key": {"type": "step"}, "mode": "python", "code": "light(self.x, self.y - 20, 130, \"#ff9a4a\", 1)\n"})
+        if o["name"] == "Wisp":
+            o["events"].append({"id": _tw.new_id(), "key": {"type": "step"}, "mode": "python", "code": "super().on_step()\nlight(self.x, self.y - 16, 90, \"#a8b4ff\", 1)\n"})
 
     def plain_room(name, colour, objects):
         lid = _tw.new_id()
@@ -340,8 +386,8 @@ def build(out):
                 x, y = c * TILE + TILE // 2, (r + 1) * TILE
                 # Under a person or a tree, the ground of whatever's next to it: a patch of the
                 # map's main ground would show round them on a cobbled square.
-                nearby = [rows[y2][x2] for x2, y2 in ((c - 1, r), (c + 1, r), (c, r - 1), (c, r + 1)) if 0 <= y2 < len(rows) and 0 <= x2 < len(row) and rows[y2][x2] in GROUND_CHAR and rows[y2][x2] != "#"]
-                tiles[f"{c},{r}"] = ground_tile(GROUND_CHAR[ch] if ch in GROUND_CHAR else GROUND_CHAR[nearby[0]] if nearby else base, c, r)
+                nearby = [rows[y2][x2] for x2, y2 in ((c - 1, r), (c + 1, r), (c, r - 1), (c, r + 1)) if 0 <= y2 < len(rows) and 0 <= x2 < len(row) and rows[y2][x2] in GROUND_CHAR and rows[y2][x2] not in "#w"]
+                tiles[f"{c},{r}"] = ground_tile("planks" if ch == "$" else GROUND_CHAR[ch] if ch in GROUND_CHAR else GROUND_CHAR[nearby[0]] if nearby else base, c, r)
                 if ch in PROPS:
                     place(PROPS[ch][0], x, y)
                     if PROPS[ch][2][0]:
@@ -385,6 +431,8 @@ def build(out):
     map_room(HERE / "maps" / "Forest.txt", FOREST_THINGS)
     map_room(HERE / "maps" / "Mine.txt", MINE_THINGS)
     map_room(HERE / "maps" / "MineDeep.txt", MINE_THINGS)
+    map_room(HERE / "maps" / "Marsh.txt", MARSH_THINGS)
+    map_room(HERE / "maps" / "Chapel.txt", CHAPEL_THINGS)
     plain_room("Battle", "#202838", ["BattleDirector"])
     plain_room("GameOver", "#000000", ["GameOver"])
     if problems:

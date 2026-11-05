@@ -44,6 +44,9 @@ near = instance_nearest(self.x, self.y, "Usable")
 self.near = near if near and point_distance(self.x, self.y, near.x, near.y) < near.reach else None
 if self.near and (confirm_pressed() or mouse_check_pressed("left")):
     self.near.use()
+    # A scene started just now holds the game before this object sees it's busy, and the
+    # Esc that skips it, in the same frame it ends, would open the menu too.
+    self.settling = 3
 elif back_pressed():
     pause_menu()
 

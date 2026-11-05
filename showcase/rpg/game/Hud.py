@@ -10,6 +10,8 @@ if not flag("opening") and S["room"] == "Town":
     opening()
 if S["room"] == "Mine" and not flag("mine_entered"):
     mine_entered()
+if S["room"] == "Marsh" and not flag("marsh_entered"):
+    marsh_entered()
 after = S.pop("after_battle", None)
 if after:
     STORY_AFTER[after]()

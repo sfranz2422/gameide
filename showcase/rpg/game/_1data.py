@@ -39,6 +39,7 @@ ITEMS = {
     "ember_shard": {"name": "Ember Shard", "price": 0, "says": "Warm to the touch. A lantern would take this."},
     "mine_key": {"name": "Foreman's Key", "price": 0, "says": "Heavy, and it smells of old tea. It fits the mine's lift."},
     "glow_crystal": {"name": "Glow Crystal", "price": 0, "says": "Warm and orange. The shopkeeper wants these."},
+    "lily": {"name": "Marsh Lily", "price": 0, "says": "Pale, and smells of rain. Sedge wants these."},
 }
 
 GEAR = {
@@ -56,6 +57,11 @@ GEAR = {
     "war_hammer": {"name": "War Hammer", "slot": "weapon", "atk": 7, "price": 130, "who": ("bram",)},
     "foreman_hammer": {"name": "Foreman's Hammer", "slot": "weapon", "atk": 5, "price": 0, "who": ("bram",)},
     "iron_armour": {"name": "Iron Armour", "slot": "armour", "dfn": 6, "price": 140, "who": ("wren", "pip", "bram")},
+    "moon_sword": {"name": "Moon Sword", "slot": "weapon", "atk": 14, "price": 300, "who": ("wren",)},
+    "fen_staff": {"name": "Fen Staff", "slot": "weapon", "mag": 13, "price": 280, "who": ("pip",)},
+    "great_maul": {"name": "Great Maul", "slot": "weapon", "atk": 12, "price": 260, "who": ("bram",)},
+    "scale_armour": {"name": "Scale Armour", "slot": "armour", "dfn": 10, "price": 260, "who": ("wren", "pip", "bram")},
+    "drowned_mail": {"name": "Drowned Mail", "slot": "armour", "dfn": 8, "price": 0, "who": ("wren", "pip", "bram")},
     "cat_ring": {"name": "Silver Ring", "slot": "armour", "dfn": 2, "spd": 3, "price": 0, "who": ("wren", "pip", "bram")},
 }
 
@@ -72,6 +78,13 @@ FOES = {
     # "charge": every so many of its turns it glows, and its next turn is this. Defend!
     "golem": {"name": "Ashdeep Golem", "hp": 190, "atk": 17, "dfn": 7, "spd": 2, "xp": 150, "gold": 150, "boss": True, "charge": (3, "Molten Burst", 1.5),
               "moves": [("Slam", 1.2, "one"), ("Slam", 1.2, "one"), ("Rockfall", 0.7, "all")]},
+    "slime": {"name": "Bog Slime", "hp": 46, "atk": 16, "dfn": 5, "spd": 3, "xp": 24, "gold": 16, "moves": [("Ooze", 1.0, "one"), ("Splash", 0.6, "all")]},
+    "frog": {"name": "Rust Frog", "hp": 40, "atk": 18, "dfn": 10, "spd": 7, "xp": 28, "gold": 20, "moves": [("Spear", 1.1, "one")]},
+    # "ghost": steel only does a third. Pip's fire does it all.
+    "wisp": {"name": "Pale Wisp", "hp": 26, "atk": 17, "dfn": 2, "spd": 10, "xp": 30, "gold": 22, "ghost": True, "moves": [("Scorch", 1.0, "one")]},
+    # "shield": every so many of its turns it raises this, and steel does a third until fire breaks it.
+    "knight": {"name": "Drowned Knight", "hp": 230, "atk": 22, "dfn": 9, "spd": 4, "xp": 280, "gold": 220, "boss": True, "shield": 3,
+               "moves": [("Rusty Cleave", 1.2, "one"), ("Rusty Cleave", 1.2, "one"), ("Tide of Mud", 0.7, "all")]},
 }
 
 # What each foe on the map brings to a fight, by the name of its object.
@@ -84,16 +97,24 @@ MAP_GROUPS = {
     "Rockling": ["rockling", "beetle"],
     "Mole": ["mole", "rockling"],
     "Golem": ["golem"],
+    "Slime": ["slime", "slime"],
+    "Frog": ["frog", "slime"],
+    "Wisp": ["wisp", "wisp"],
+    "Knight": ["knight"],
 }
 
 # Later goods come in with each lantern lit: the road's a bit safer, so the carts get through.
 SHOP = {"Goods": ["potion", "ether", "bread", "iron_sword", "ash_staff", "leather"],
-        "After a lantern": ["great_sword", "silver_staff", "war_hammer", "iron_armour"]}
+        "After a lantern": ["great_sword", "silver_staff", "war_hammer", "iron_armour"],
+        "After two lanterns": ["moon_sword", "fen_staff", "great_maul", "scale_armour"]}
 INN_PRICE = 8
 BEETLES_FOR_MARTA = 6
+SLIMES_FOR_DOT = 6
+LILIES_FOR_SEDGE = 5
+SLUICES = 3
 
 # The picture behind a battle, by the room it started in.
-BATTLE_BACK = {"Town": "back_fields", "Forest": "back_forest", "Mine": "back_mine", "MineDeep": "back_mine"}
+BATTLE_BACK = {"Town": "back_fields", "Forest": "back_forest", "Mine": "back_mine", "MineDeep": "back_mine", "Marsh": "back_marsh", "Chapel": "back_marsh"}
 
 # Each quest: its title, then what to do at each stage. A quest's stage is kept in S["quests"].
 QUESTS = {
@@ -112,5 +133,13 @@ QUESTS = {
     ]},
     "crystals": {"title": "Four Glow Crystals", "stages": ["Bring 4 Glow Crystals from the mine to Hob."]},
     "beetles": {"title": "The Inn's Beetles", "stages": ["Beat 6 Cave Beetles in the mine for Marta."]},
+    "ember_marsh": {"title": "The Drowned Light", "main": True, "stages": [
+        "Go south to the Mistfen and find Sedge.",
+        "Turn the three old sluices to drain the fen.",
+        "Cross the causeway. Find what's drowned there.",
+        "Bring the third Ember Shard back to Oona.",
+    ]},
+    "lilies": {"title": "Five Marsh Lilies", "stages": ["Pick 5 Marsh Lilies in the Mistfen for Sedge."]},
+    "slimes": {"title": "Slime in the Well", "stages": ["Beat 6 Bog Slimes in the Mistfen for Dot."]},
     "next": {"title": "To be continued", "main": True, "stages": ["More of the valley comes in the next chapter."]},
 }

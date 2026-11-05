@@ -38,12 +38,29 @@ def alive(side):
 self.alive = alive
 
 
-def do_hit(user, target, power, stat_name=""):
+def drop_shield(foe):
+    foe.shielded = False
+    foe.tint(None)
+
+self.drop_shield = drop_shield
+
+
+def do_hit(user, target, power, stat_name="atk"):
+    """Lands a blow. Says "slid" if steel did little, "broke" if fire broke a shield."""
     guard = target.guard()
     n = hit_for(power, guard)
     if target.guarding:
         n = max(1, n // 2)
+    what = None
+    if not target.is_hero:
+        if stat_name == "atk" and (target.shielded or FOES[target.key].get("ghost")):
+            n = max(1, n // 3)
+            what = "slid"
+        elif stat_name == "mag" and target.shielded:
+            drop_shield(target)
+            what = "broke"
     target.hurt(n)
+    return what
 
 self.do_hit = do_hit
 
@@ -58,8 +75,8 @@ self.finish_turn = finish_turn
 def attack(user, target):
     user.lunge()
     sound_play("hit")
-    do_hit(user, target, user.power())
-    say_line(f"{user.name} strikes {target.name}!")
+    what = do_hit(user, target, user.power())
+    say_line(f"The steel slides off {target.name}!" if what == "slid" else f"{user.name} strikes {target.name}!")
     finish_turn()
 
 self.attack = attack
@@ -70,12 +87,13 @@ def use_skill(user, key, target=None):
     user.spend(skill["mp"])
     user.lunge()
     power = user.stat_of(skill["stat"]) * skill["power"]
+    what = None
     if skill["kind"] == "foe":
-        do_hit(user, target, power)
+        what = do_hit(user, target, power, skill["stat"])
         sound_play("magic" if skill["stat"] == "mag" else "hit")
     elif skill["kind"] == "foes":
         for f in alive(self.foes):
-            do_hit(user, f, power)
+            what = do_hit(user, f, power, skill["stat"]) or what
         sound_play("magic" if skill["stat"] == "mag" else "hit")
     elif skill["kind"] == "ally":
         target.heal(int(power))
@@ -84,7 +102,7 @@ def use_skill(user, key, target=None):
         for f in alive(self.heroes):
             f.heal(int(power))
         sound_play("heal")
-    say_line(f"{user.name} uses {skill['name']}!")
+    say_line({"slid": f"{skill['name']}: the steel slides off!", "broke": f"{skill['name']} cracks the shield!"}.get(what, f"{user.name} uses {skill['name']}!"))
     finish_turn()
 
 self.use_skill = use_skill
@@ -194,6 +212,19 @@ def foe_turn(foe):
         sound_play("magic")
         say_line(f"{foe.name} is glowing white-hot! Defend!", 70)
         return
+    shield = FOES[foe.key].get("shield")
+    if shield and not foe.shielded and foe.turns % shield == 0:
+        # It costs a turn, and it's up for two more of its own unless fire breaks it first.
+        foe.shielded = True
+        foe.shield_left = 2
+        foe.tint("#8fa8c8")
+        sound_play("magic")
+        say_line(f"{foe.name} raises a rusted shield! Steel won't bite now!", 70)
+        return
+    if foe.shielded:
+        foe.shield_left -= 1
+        if foe.shield_left <= 0:
+            drop_shield(foe)
     move = random.choice(FOES[foe.key]["moves"])
     foe.lunge()
     sound_play("foe_hit")
@@ -249,6 +280,9 @@ if self.state == "won":
     if not dialogue_open():
         then = self.info.get("then")
         if then:
+            # The flag first, by the same name: the room is rebuilt before its Hud runs the
+            # story, so a boss whose flag came later stood there, and could be beaten twice.
+            set_flag(then)
             S["after_battle"] = then
         self.leave()
     return

@@ -1,0 +1,23 @@
+room: Chapel
+ground: %
+camera: yes
+# % old flagstones  ~ mud  w deep bog  i broken pillar  d dead tree  q reeds
+# @ start  1 back to the fen  X the Drowned Knight  e slime  v frog  m wisp  c the knight's mail
+wwwwwwwwwwwwwwwwwwwwwwwwwwwwww
+wwwwwww%%%%%%%%%%%%%%%%wwwwwww
+wwwww%%i%%%%%%%%%%%%i%%%%wwwww
+wwww%%%%%%%%%%X%%%%%%%%%%%wwww
+wwww%%%%%%%%%%%%%%%%%%%%%%wwww
+wwwww%%i%%%%%%%%%%%%i%%%%wwwww
+wwwwwww%%%%%%%%%%%%%%%%wwwwwww
+wwwwwwwwwwww~~~~~~wwwwwwwwwwww
+wwwwwwwwwwww~~~~~~wwwwwwwwwwww
+wwww~~~~~~~~~~~~~~~~~~~~wwwwww
+wwww~d~~~~v~~~~~~~~~~~q~wwwwww
+wwww~~~~~~~~~~~~~m~~~~~~wwwwww
+wwww~c~e~~~~~~~~~~~~~v~~wwwwww
+wwww~~~~~~~~~~~~~~~~~~~~wwwwww
+wwwwwwwww~~~~~~~wwwwwwwwwwwwww
+wwwwwwwww~~~@~~~wwwwwwwwwwwwww
+wwwwwwwww~~~1~~~wwwwwwwwwwwwww
+wwwwwwwwwwwwwwwwwwwwwwwwwwwwww

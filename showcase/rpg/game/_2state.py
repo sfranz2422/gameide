@@ -31,10 +31,14 @@ def has_save():
 def load_game():
     S.clear()
     S.update(save_get(SAVE_KEY))
-    # A save from before the mine was built, whose "next" is now the mine's quest.
+    # A save from before a chapter was built: its "next" is now that chapter's quest.
     S.setdefault("beaten", {})
-    if S["quests"].pop("next", None) is not None and "ember_mine" not in S["done"]:
-        S["quests"]["ember_mine"] = 0
+    if S["quests"].pop("next", None) is not None:
+        S["quests"]["ember_mine" if "ember_mine" not in S["done"] else "ember_marsh"] = 0
+    # A boss beaten twice, when that could happen, ran its quest off the end and every
+    # frame after was an IndexError. Those saves are brought back to the quest's last stage.
+    for key in S["quests"]:
+        S["quests"][key] = min(S["quests"][key], len(QUESTS[key]["stages"]) - 1)
 
 
 def flag(name):
@@ -107,7 +111,7 @@ def start_quest(key):
 
 
 def advance_quest(key):
-    S["quests"][key] += 1
+    S["quests"][key] = min(S["quests"][key] + 1, len(QUESTS[key]["stages"]) - 1)
 
 
 def reach_stage(key, stage):

@@ -14,6 +14,8 @@ def setup(key):
     self.sprite = f"foe_{key}"
     self.turns = 0
     self.charged = False
+    self.shielded = False
+    self.shield_left = 0
     self.home_x = self.x
 
 self.setup = setup

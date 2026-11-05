@@ -1,0 +1,29 @@
+room: Marsh
+ground: ~
+camera: yes
+# ~ marsh mud  = rotted planks  w deep bog  $ a causeway still under water
+# d dead tree  q reeds  R Sedge's hut  K Sedge  s an old sluice  x Marsh Lily
+# @ start  1 road back to town  2 the Sunk Isle's chapel  e slime  v frog  m wisp  c chest
+wwwwww1wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww
+www~~~~~~~wwwwwwwwwwwwwwwwwww~~~~~~~~~~~wwwww
+ww~~~~@~~~~~wwwwwwwwwwwwwwww~~d~~~e~~~~~~wwww
+ww~~d~~~~~~~wwwwwwwwwwwwwwww~~~~~~~~~q~~~~www
+ww~~~~~q~~~~====~~~~~~======~~~~v~~~~~~~s~www
+www~~~~~~~~~wwww~~~x~~wwwwww~~~~~~~~~~~~~~www
+wwww~~~~e~~wwwww~~~~~~wwwwwww~~x~~~d~~~~wwwww
+wwwwww=wwwwwwwww~~~R~~wwwwwwwwww=wwwwwwwwwwww
+wwwwww=wwwwwwwww~~~~~~wwwwwwwwww=wwwwwwwwwwww
+wwww~~~~~~~wwwww~~K~~~wwwwwwww~~~~~~~~wwwwwww
+www~~~~x~~~~wwwwww=wwwwwwwwww~~v~~~~~~~~wwwww
+ww~~~m~~~~~~wwwwww=wwwwwwwww~~~~~~~q~~~~~wwww
+ww~~~~~q~~~~======~======~~~~~~~e~~~~~s~~wwww
+www~~d~~~~~~wwwwww$wwwwwwww~~~~~~x~~~~~~wwwww
+wwww~~~~s~~~wwwwww$wwwwwwwwwww~~~~~~wwwwwwwww
+wwwwww~~~~~wwwwwww$wwwwwwwwwwwwwwwwwwwwwwwwww
+wwwwwwwwwwwwwwwwww$wwwwwwwwwwwwwwwwwwwwwwwwww
+wwwwwwwwwwwwwwwwww$wwwwwwwwwwwwwwwwwwwwwwwwww
+wwwwwwwwwwwwwww~~~~~~~wwwwwwwwwwwwwwwwwwwwwww
+wwwwwwwwwwwwww~~d~m~~~~wwwwwwwwwwwwwwwwwwwwww
+wwwwwwwwwwwwww~~x~~~c~~wwwwwwwwwwwwwwwwwwwwww
+wwwwwwwwwwwwwww~~~~~~~wwwwwwwwwwwwwwwwwwwwwww
+wwwwwwwwwwwwwwwwww2wwwwwwwwwwwwwwwwwwwwwwwwww
