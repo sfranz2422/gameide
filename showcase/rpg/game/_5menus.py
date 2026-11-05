@@ -2,6 +2,7 @@
 # Opening menus. Each is a MenuBox instance, stacked: the newest answers.
 
 ROW_H = 26
+QUEST_ROWS = 10
 
 
 def confirm_pressed():
@@ -135,7 +136,14 @@ def party_menu():
 
 
 def quests_menu():
-    words = [(QUESTS[k]["title"] + ": " + quest_text(k), True) for k in S["quests"]] + [(QUESTS[k]["title"] + " (done)", False) for k in S["done"]]
+    # What's still to do comes first, and only what fits: by the tower, a whole game's
+    # finished quests ran the list off the bottom of the screen.
+    active = [(QUESTS[k]["title"] + ": " + quest_text(k), True) for k in S["quests"]]
+    done = [(QUESTS[k]["title"] + " (done)", False) for k in reversed(S["done"])]
+    words = (active + done)[:QUEST_ROWS]
+    hidden = len(active) + len(done) - len(words)
+    if hidden:
+        words[-1] = (f"...and {hidden + 1} more", False)
     if not words:
         say("Nothing to do yet.")
         return
@@ -144,7 +152,8 @@ def quests_menu():
 
 def shop_menu():
     # Each lantern's carts bring better things, and the old stock makes way so the list still fits.
-    wares = SHOP["Goods"][:3] + SHOP["After two lanterns"] if S["lit"] >= 2 else SHOP["Goods"] + (SHOP["After a lantern"] if S["lit"] >= 1 else [])
+    newest = "After three lanterns" if S["lit"] >= 3 else "After two lanterns"
+    wares = SHOP["Goods"][:3] + SHOP[newest] if S["lit"] >= 2 else SHOP["Goods"] + (SHOP["After a lantern"] if S["lit"] >= 1 else [])
 
     def label(k):
         data = ITEMS.get(k) or GEAR[k]

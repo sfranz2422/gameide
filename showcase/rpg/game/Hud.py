@@ -12,6 +12,10 @@ if S["room"] == "Mine" and not flag("mine_entered"):
     mine_entered()
 if S["room"] == "Marsh" and not flag("marsh_entered"):
     marsh_entered()
+if S["room"] == "Tower1" and not flag("tower_entered"):
+    tower_entered()
+if S["room"] == "Tower2":
+    reach_stage("ember_tower", 1)
 after = S.pop("after_battle", None)
 if after:
     STORY_AFTER[after]()
@@ -32,7 +36,7 @@ draw_rect(0, 0, VIEW_W, 24)
 draw_set_alpha(1)
 draw_set_color("#ffd166")
 key = main_quest()
-draw_text(8, 4, quest_text(key) if key else "Talk to people. Press Z.")
+draw_text(8, 4, quest_text(key) if key else "The valley's alight. Thank you for playing." if flag("won") else "Talk to people. Press Z.")
 draw_set_color("#ffffff")
 draw_text(VIEW_W - 60, 4, "Menu")
 y = VIEW_H - 22 * len(S["party"]) - 4

@@ -195,6 +195,26 @@ on("mystery")("the mystery's board", () => {
   }, 60_000);
 });
 
+on("rpg")("Hollowmere's board", () => {
+  it("is the time the whole journey took, once, and lowest wins", async () => {
+    const g = await start(builtAt("rpg"));
+    expect(g.project.settings.scoreboard).toEqual({ lowest: true, unit: "time" });
+    g.py('new_game(); S["steps"] = 36000; S["lit"] = 4; room_goto("Ending")');
+    g.step(3);
+    expect(g.scores).toEqual([600]);
+    // Seeing the ending again later doesn't send a slower time.
+    g.py('S["steps"] = 72000; room_goto("Ending")');
+    g.step(3);
+    expect(g.scores).toEqual([600]);
+  }, 60_000);
+  it("sends nothing before the end", async () => {
+    const g = await start(builtAt("rpg"));
+    g.py('new_game(); S["steps"] = 36000; room_goto("Town")');
+    g.step(30);
+    expect(g.scores).toEqual([]);
+  }, 60_000);
+});
+
 on("smash")("Jelly Jailbreak's board", () => {
   it("is points", async () => {
     const g = await start(builtAt("smash"));

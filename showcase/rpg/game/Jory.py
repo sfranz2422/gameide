@@ -12,7 +12,19 @@ if home != flag("golem_beaten"):
 
 def talk():
     if home:
-        say("Bram's got me sweeping up. It's the best thing that's ever happened to me.", "Jory", picture="face_miner")
+        left = max(0, ARMOURS_FOR_JORY - S["beaten"].get("armour", 0))
+        if "armours" in S["quests"] and not left:
+            finish_quest("armours")
+            S["gear"].append("star_hammer")
+            say("That's plenty of scrap! Bram, I made you this. All by myself. Well, mostly. Look in your Gear.", "Jory", picture="face_miner")
+            say("...That's a proper hammer, lad. That's a proper hammer.", "Bram", picture="face_bram")
+        elif "armours" in S["quests"]:
+            say(f"Those walking armours are the best iron in the valley. {left} more and I can make something.", "Jory", picture="face_miner")
+        elif S["lit"] >= 3 and "armours" not in S["done"]:
+            say("Is it true there's armour walking about in that tower? Beat six for me. I want the scrap.", "Jory", picture="face_miner")
+            start_quest("armours")
+        else:
+            say("Bram's got me sweeping up. It's the best thing that's ever happened to me.", "Jory", picture="face_miner")
     elif not flag("found_jory"):
         set_flag("found_jory")
         say("Bram? BRAM! I knew you'd come! I've been eating my boots.", "Jory", picture="face_miner")

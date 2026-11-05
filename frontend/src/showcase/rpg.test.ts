@@ -106,7 +106,11 @@ function fightWell(g: PythonGame, steps = 20000, burns = false) {
     const who = py(g, "newest_menu().title") as string;
     const hurt = py(g, 'next((i for i, h in enumerate(f for f in instances("HeroFighter") if f.hp > 0) if h.hp < h.max_hp * 0.5), -1)') as number;
     const mp = py(g, 'next(f.mp for f in instances("HeroFighter") if f.name == "Pip")' .replace('next(f.mp', 'next((f.mp').replace('== "Pip")', '== "Pip"), 0)')) as number;
-    if (who === "Pip" && hurt >= 0 && mp >= 3) {
+    const defend = burns && (py(g, 'any(f.charged for f in instances("FoeFighter") if f.hp > 0)') as boolean) ? (py(g, 'next(i for i, (w, _) in enumerate(newest_menu().options) if w == "Defend")') as number) : -1;
+    if (defend >= 0 && who !== "Fight") {
+      for (let k = 0; k < defend; k++) tap(g, "down");
+      tap(g, "z");
+    } else if (who === "Pip" && hurt >= 0 && mp >= 3) {
       tap(g, "down"); // Skill
       tap(g, "z");
       step(g, 2);
@@ -155,6 +159,29 @@ async function chapterThree() {
   py(g, 'S["lit"] = 2; S["done"].extend(["thorn_road", "ember_mine"]); S["quests"]["ember_marsh"] = 0; S["party"].extend([new_hero("pip"), new_hero("bram")]); S["gold"] = 400; set_flag("golem_beaten"); set_flag("bram_joined")');
   py(g, '[give_xp(h, sum(xp_to_next(n) for n in range(1, 7))) for h in S["party"]]; rest_party()');
   return g;
+}
+/** A game as chapter 3 leaves it: three lanterns lit, about level 9, in what the shop had. */
+async function chapterFour() {
+  const g = await newGame();
+  py(g, 'S["lit"] = 3; S["done"].extend(["thorn_road", "ember_mine", "ember_marsh"]); S["quests"]["ember_tower"] = 0; S["party"].extend([new_hero("pip"), new_hero("bram")]); S["gold"] = 600; [set_flag(f) for f in ("golem_beaten", "bram_joined", "knight_beaten", "drained")]');
+  py(g, '[give_xp(h, sum(xp_to_next(n) for n in range(1, 9))) for h in S["party"]]');
+  py(g, 'S["party"][0]["weapon"], S["party"][1]["weapon"], S["party"][2]["weapon"] = "moon_sword", "fen_staff", "great_maul"');
+  py(g, 'S["party"][0]["armour"] = S["party"][1]["armour"] = "scale_armour"; S["party"][2]["armour"] = "iron_armour"; rest_party()');
+  return g;
+}
+/** Up or down the tower, by the stairs that go there. */
+function climb(g: PythonGame, to: string) {
+  py(g, `p = instances("Player")[0]; o = [s for s in instances("Stairs") if s.to == "${to}"][0]; p.x, p.y = o.x, o.y + 30`);
+  step(g, 2);
+  tap(g, "z");
+  step(g, 4);
+}
+/** Stands below the chest with this in it, and opens it. */
+function openChest(g: PythonGame, what: string) {
+  py(g, `p = instances("Player")[0]; c = [o for o in instances("Chest") if o.item == "${what}"][0]; p.x, p.y = c.x, c.y + 30`);
+  step(g, 2);
+  tap(g, "z");
+  clear(g);
 }
 /** Into the Mistfen, past its first scene. */
 async function inTheFen() {
@@ -458,6 +485,225 @@ describe.skipIf(!have)("The Lanterns of Hollowmere", () => {
     expect(py(g, '"thorn_road" in S["done"]')).toBe(true);
   });
 
+  it("the west road waits for Oona's word, and a new floor moves the quest on", { timeout: 60_000 }, async () => {
+    const g = await chapterThree();
+    py(g, 'p = instances("Player")[0]; d = [o for o in instances("Door") if o.to == "Tower1"][0]; p.x, p.y = d.x + 16, d.y + 24');
+    step(g, 6);
+    expect(room(g)).toBe("Town");
+    clear(g);
+    const h = await chapterFour();
+    useIt(h, "Oona");
+    clear(h);
+    goThrough(h, "Tower1");
+    clear(h);
+    expect(py(h, 'flag("tower_entered")')).toBe(true);
+    climb(h, "Tower2");
+    expect(room(h)).toBe("Tower2");
+    expect(py(h, 'S["quests"]["ember_tower"]')).toBe(1);
+    // The stairs to the top wait for the wizard, even walking round it.
+    climb(h, "Tower3");
+    expect(room(h)).toBe("Tower2");
+    clear(h);
+    py(h, 'set_flag("wizard_beaten")');
+    climb(h, "Tower3");
+    expect(room(h)).toBe("Tower3");
+    climb(h, "Tower2");
+    expect(room(h)).toBe("Tower2");
+    climb(h, "Tower1");
+    expect(room(h)).toBe("Tower1");
+    goThrough(h, "Town");
+  });
+
+  it("an old lamp heals and saves", { timeout: 60_000 }, async () => {
+    const g = await chapterFour();
+    goThrough(g, "Tower1");
+    clear(g);
+    py(g, 'S["party"][0]["hp"] = 1; S["party"][1]["mp"] = 0; save_game()');
+    useIt(g, "OldLamp");
+    clear(g);
+    expect(py(g, 'S["party"][0]["hp"] == stat(S["party"][0], "hp") and S["party"][1]["mp"] == stat(S["party"][1], "mp")')).toBe(true);
+    expect(py(g, 'save_get(SAVE_KEY)["party"][0]["hp"] > 1')).toBe(true);
+  });
+
+  it("fire fizzles on a hollow armour and steel doesn't", { timeout: 60_000 }, async () => {
+    const g = await chapterFour();
+    battleWith(g, '["armour"]');
+    const steel = blow(g, "atk");
+    const fire = blow(g, "mag");
+    expect(steel).toBeGreaterThanOrEqual(28);
+    expect(fire).toBeLessThanOrEqual(14);
+    py(g, `p = instances("HeroFighter")[1]; p.mp = 99; ${DIRECTOR}.use_skill(p, "ember", ${FOE})`);
+    expect(py(g, `${DIRECTOR}.line`)).toContain("fizzles");
+  });
+
+  it("the Shadow King has a shield, then at half health a second fight that burns and must be defended", { timeout: 60_000 }, async () => {
+    const g = await chapterFour();
+    py(g, 'start_battle(["king"], 100, 100, run=False)');
+    for (let i = 0; i < 6 && room(g) !== "Battle"; i++) step(g, 1);
+    step(g, 2);
+    py(g, `[setattr(h, "hp", 9999) or setattr(h, "max_hp", 9999) for h in instances("HeroFighter")]`);
+    expect(py(g, `${FOE}.second`)).toBe(false);
+    py(g, `f = ${FOE}; f.turns = 2; ${DIRECTOR}.foe_turn(f)`);
+    expect(py(g, `${FOE}.shielded`)).toBe(true);
+    // Half gone: the shield falls, the turn goes on saying so, and the picture darkens.
+    py(g, `f = ${FOE}; f.hp = f.max_hp // 2; ${DIRECTOR}.foe_turn(f)`);
+    expect(py(g, `${FOE}.second`)).toBe(true);
+    expect(py(g, `${FOE}.shielded`)).toBe(false);
+    expect(py(g, `${DIRECTOR}.line`)).toContain("growing");
+    expect(py(g, 'instances("BattleBack")[0].image_blend')).not.toBe("#ffffff");
+    expect(py(g, `${FOE}.power()`)).toBe(33);
+    // Its second self has no shield: its third turn burns instead, and the next is the Black Flame.
+    for (let i = 0; i < 2; i++) py(g, `${DIRECTOR}.foe_turn(${FOE})`);
+    expect(py(g, `${FOE}.charged`)).toBe(false);
+    py(g, `${DIRECTOR}.foe_turn(${FOE})`);
+    expect(py(g, `${FOE}.charged`)).toBe(true);
+    expect(py(g, `${FOE}.shielded`)).toBe(false);
+    // Everyone's hit, and whoever Defends takes half what they'd have taken.
+    py(g, 'H = instances("HeroFighter"); [setattr(h, "hp", 9999) for h in H]; H[0].guarding = True');
+    py(g, `${DIRECTOR}.foe_turn(${FOE})`);
+    expect(py(g, `${DIRECTOR}.line`)).toContain("Black Flame");
+    const taken = py(g, '[9999 - h.hp for h in instances("HeroFighter")]') as number[];
+    expect(taken[1]!).toBeGreaterThan(0);
+    expect(taken[0]!).toBeLessThan(taken[1]! * 0.75);
+    // It only changes the once.
+    py(g, `${DIRECTOR}.foe_turn(${FOE})`);
+    expect(py(g, `${DIRECTOR}.line`)).not.toContain("growing");
+  });
+
+  it("Tam's kite and Jory's scrap pay", { timeout: 120_000 }, async () => {
+    const g = await chapterFour();
+    // Town was built before this save's flags: Jory comes home when it's built again.
+    goThrough(g, "Tower1");
+    clear(g);
+    goThrough(g, "Town");
+    useIt(g, "Tam");
+    clear(g);
+    expect(py(g, '"kite" in S["quests"]')).toBe(true);
+    py(g, 'S["beaten"]["armour"] = 5');
+    useIt(g, "Jory");
+    clear(g);
+    expect(py(g, '"armours" in S["quests"]')).toBe(true);
+    goThrough(g, "Tower1");
+    clear(g);
+    climb(g, "Tower2");
+    openChest(g, "kite");
+    expect(py(g, 'count_item("kite")')).toBe(1);
+    climb(g, "Tower1");
+    goThrough(g, "Town");
+    useIt(g, "Tam");
+    clear(g);
+    expect(py(g, '"kite" in S["done"] and "kite_string" in S["gear"] and not count_item("kite")')).toBe(true);
+    useIt(g, "Jory");
+    clear(g);
+    expect(py(g, '"armours" in S["quests"]')).toBe(true);
+    expect(py(g, '"star_hammer" in S["gear"]')).toBe(false);
+    goThrough(g, "Tower1");
+    clear(g);
+    bump(g, "Armour");
+    expect(fightWell(g).end).toBe("Tower1");
+    clear(g);
+    expect(py(g, 'S["beaten"]["armour"]')).toBe(6);
+    goThrough(g, "Town");
+    useIt(g, "Jory");
+    clear(g);
+    expect(py(g, '"armours" in S["done"] and "star_hammer" in S["gear"]')).toBe(true);
+  });
+
+  it("the shop's last stock comes with the third lantern, and still fits", { timeout: 60_000 }, async () => {
+    const g = await chapterFour();
+    py(g, "shop_menu()");
+    step(g);
+    const words = py(g, '" ".join(w for w, _ in newest_menu().options)') as string;
+    expect(words).toContain("Star Sword");
+    expect(words).toContain("Potion");
+    expect(words).not.toContain("Moon Sword");
+    expect(py(g, "newest_menu().top + newest_menu().height() <= VIEW_H")).toBe(true);
+  });
+
+  it("a save from before the tower carries on into the tower's quest", { timeout: 60_000 }, async () => {
+    const g = await newGame();
+    py(g, 'S["done"].extend(["ember_mine", "ember_marsh"]); S["quests"]["next"] = 0; save_game(); load_game()');
+    expect(py(g, '"next" in S["quests"]')).toBe(false);
+    expect(py(g, 'S["quests"]["ember_tower"]')).toBe(0);
+    step(g, 3);
+  });
+
+  it("the whole of chapter 4 and the ending: the wizard, the king, the last lantern, and back to the title", { timeout: 400_000 }, async () => {
+    const g = await chapterFour();
+    useIt(g, "Oona");
+    clear(g);
+    goThrough(g, "Tower1");
+    clear(g);
+    const beat = () => {
+      for (let n = 0; n < 5; n++) {
+        for (const foe of ["Wolf", "Armour"]) {
+          if (py(g, `instance_number("${foe}")`)) {
+            const before = room(g);
+            bump(g, foe);
+            expect(fightWell(g, 20000, true).end, foe).toBe(before);
+            clear(g);
+          }
+        }
+        py(g, "rest_party()"); // As if the old lamp.
+      }
+    };
+    beat();
+    climb(g, "Tower2");
+    beat();
+    process.stderr.write(`Tower cleared: ${JSON.stringify(py(g, '[(h["key"], h["level"]) for h in S["party"]]'))} gold ${py(g, 'S["gold"]')}\n`);
+    bump(g, "Wizard");
+    clear(g);
+    for (let i = 0; i < 40 && room(g) !== "Battle"; i++) step(g, 1);
+    expect(room(g)).toBe("Battle");
+    const wizard = fightWell(g, 30000, true);
+    process.stderr.write(`Wizard: ${JSON.stringify(wizard)} ${JSON.stringify(py(g, '[(h["key"], h["level"], h["hp"], h["mp"]) for h in S["party"]]'))}\n`);
+    expect(wizard.end).toBe("Tower2");
+    clear(g);
+    expect(py(g, 'S["quests"]["ember_tower"]')).toBe(2);
+    expect(py(g, 'instance_number("Wizard")')).toBe(0);
+    py(g, "rest_party()");
+    climb(g, "Tower3");
+    expect(room(g)).toBe("Tower3");
+    bump(g, "King");
+    clear(g);
+    for (let i = 0; i < 40 && room(g) !== "Battle"; i++) step(g, 1);
+    expect(room(g)).toBe("Battle");
+    const king = fightWell(g, 40000, true);
+    process.stderr.write(`King: ${JSON.stringify(king)} ${JSON.stringify(py(g, '[(h["key"], h["level"], h["hp"], h["mp"]) for h in S["party"]]'))}\n`);
+    expect(king.end).toBe("Tower3");
+    clear(g);
+    expect(py(g, 'S["quests"]["ember_tower"]')).toBe(3);
+    expect(py(g, 'instance_number("King")')).toBe(0);
+    climb(g, "Tower2");
+    climb(g, "Tower1");
+    goThrough(g, "Town");
+    useIt(g, "Oona");
+    clear(g);
+    for (let i = 0; i < 200 && room(g) !== "Ending"; i++) step(g, 1);
+    expect(room(g)).toBe("Ending");
+    expect(py(g, 'S["lit"]')).toBe(4);
+    expect(py(g, '"ember_tower" in S["done"] and flag("won")')).toBe(true);
+    // A word on the ending's screen waits a moment, so the key that skipped here doesn't leave it.
+    tap(g, "z");
+    expect(room(g)).toBe("Ending");
+    step(g, 130);
+    tap(g, "z");
+    step(g, 3);
+    expect(room(g)).toBe("Title");
+    // Continue comes back to a valley at peace, every lantern lit, and nothing to crash on.
+    tap(g, "down");
+    tap(g, "enter");
+    step(g, 6);
+    expect(room(g)).toBe("Town");
+    clear(g);
+    step(g, 4);
+    expect(py(g, 'sorted(l.number for l in instances("Lantern") if l.lit)')).toEqual([1, 2, 3, 4]);
+    expect(py(g, "main_quest() is None")).toBe(true);
+    useIt(g, "Oona");
+    clear(g);
+    expect(room(g)).toBe("Town");
+  });
+
   it("the south road waits for Oona's word, and Oona and Sedge point the way", { timeout: 60_000 }, async () => {
     const g = await newGame();
     py(g, 'p = instances("Player")[0]; d = [o for o in instances("Door") if o.to == "Marsh"][0]; p.x, p.y = d.x + 16, d.y + 24');
@@ -679,7 +925,7 @@ describe.skipIf(!have)("The Lanterns of Hollowmere", () => {
     expect(py(g, 'S["lit"]')).toBe(3);
     expect(py(g, 'sorted(l.number for l in instances("Lantern") if l.lit)')).toEqual([1, 2, 3]);
     expect(py(g, '"ember_marsh" in S["done"]')).toBe(true);
-    expect(py(g, '"next" in S["quests"]')).toBe(true);
+    expect(py(g, 'S["quests"]["ember_tower"]')).toBe(0);
     expect(py(g, 'count_item("ember_shard")')).toBe(0);
     goThrough(g, "Marsh");
     clear(g);
@@ -704,6 +950,15 @@ describe.skipIf(!have)("The Lanterns of Hollowmere", () => {
       py(g, "close_menus()");
       step(g);
     }
+  });
+
+  it("the Quests list fits however many are done, with what's still to do first", { timeout: 60_000 }, async () => {
+    const g = await newGame();
+    py(g, 'S["done"] = [k for k in QUESTS if k != "kite"]; S["quests"] = {"kite": 0}; quests_menu()');
+    step(g);
+    expect(py(g, "newest_menu().options[0][0]")).toContain("Tam's Kite");
+    expect(py(g, "newest_menu().top + newest_menu().height() <= VIEW_H")).toBe(true);
+    expect(py(g, "newest_menu().options[-2][0]")).toContain("more");
   });
 
   it("the map's edge and deep bog stop you, and no other ground does", () => {

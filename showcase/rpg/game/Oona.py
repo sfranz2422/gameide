@@ -35,14 +35,24 @@ def talk():
         say("Aldric. He carried the old flame's heart out of the great flood, sixty years ago, and he never came home.", "Oona", picture="face_oona")
         say("He said he'd keep it safe. He always did as he said, the stubborn, stubborn man.", "Oona", picture="face_oona")
         say("Come. The lantern by the south road. It looks out his way.", "Oona", picture="face_oona")
-        light_town_lantern(lantern_to_light(), "ember_marsh", "next")
+        light_town_lantern(lantern_to_light(), "ember_marsh", "ember_tower")
     elif "ember_marsh" in S["quests"]:
         if S["quests"]["ember_marsh"] == 0:
             say("Two lit. The third ember fell in the Mistfen, past the south road.", "Oona", picture="face_oona")
             say("Sedge lives out there. She's a witch, and she's rude, and she's never once been wrong. Find her.", "Oona", picture="face_oona")
         else:
             say("Do as Sedge tells you. It's annoying, but it works.", "Oona", picture="face_oona")
+    elif S["quests"].get("ember_tower") == 3:
+        say("You've seen him, then. And you've got it. Oh, child, you've got it.", "Oona", picture="face_oona")
+        say("Come on. The last lantern's on the west road. Let's finish this.", "Oona", picture="face_oona")
+        light_town_lantern(lantern_to_light(), "ember_tower", None)
+    elif "ember_tower" in S["quests"]:
+        if S["quests"]["ember_tower"] == 0:
+            say("Three lit. The last ember went up the Hollow Tower, along the west road.", "Oona", picture="face_oona")
+            say("Something up there is doing this on purpose. Sleep first. Buy the good armour. I mean it.", "Oona", picture="face_oona")
+        else:
+            say("The Hollow Tower, west of here. It's a long climb. Rest when you can.", "Oona", picture="face_oona")
     else:
-        say("Three lit. The last ember's further off than I can see. Rest up, child.", "Oona", picture="face_oona")
+        say("All four, burning like they never stopped. Go on, child, have a look round. You've earned it.", "Oona", picture="face_oona")
 
 self.use = talk

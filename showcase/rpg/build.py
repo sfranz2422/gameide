@@ -52,19 +52,19 @@ PROPS = {
     "M": ("Stall", (72, 56), (66, 26)), "W": ("Well", (44, 48), (40, 24)), "F": ("Fence", (32, 32), (32, 12)), "C": ("Crates", (40, 40), (38, 20)),
     "f": ("Flowers", (32, 24), (0, 0)), "b": ("Bench", (48, 28), (46, 14)),
     "A": ("Beam", (32, 64), (12, 10)), "Y": ("Cart", (56, 44), (50, 18)), "G": ("GlowRock", (48, 48), (30, 16)), "E": ("MineMouth", (96, 80), (0, 0)),
-    "d": ("DeadTree", (64, 80), (18, 14)), "q": ("Reeds", (32, 32), (24, 12)), "i": ("Pillar", (40, 88), (22, 14)),
+    "T": ("Throne", (72, 112), (60, 22)), "d": ("DeadTree", (64, 80), (18, 14)), "q": ("Reeds", (32, 32), (24, 12)), "i": ("Pillar", (40, 88), (22, 14)),
 }
 PICTURE = {"Tree": "prop_tree", "Pine": "prop_pine", "Bush": "prop_bush", "Boulder": "prop_boulder", "CottageRed": "prop_cottage_red", "CottageBlue": "prop_cottage_blue",
            "Inn": "prop_inn", "Smithy": "prop_smithy", "Stall": "prop_stall", "Well": "prop_well", "Fence": "prop_fence", "Crates": "prop_crates", "Flowers": "prop_flowers", "Bench": "prop_bench",
-           "Beam": "prop_beam", "Cart": "prop_cart", "GlowRock": "prop_crystal", "MineMouth": "prop_mine", "DeadTree": "prop_dead_tree", "Reeds": "prop_reeds", "Pillar": "prop_pillar"}
+           "Beam": "prop_beam", "Cart": "prop_cart", "GlowRock": "prop_crystal", "MineMouth": "prop_mine", "DeadTree": "prop_dead_tree", "Reeds": "prop_reeds", "Pillar": "prop_pillar", "Throne": "prop_throne"}
 PROP_COLOURS = {"Tree": (40, 110, 60), "Pine": (28, 84, 66), "Bush": (58, 130, 70), "Boulder": (120, 120, 126), "CottageRed": (176, 70, 60), "CottageBlue": (70, 96, 170), "Inn": (150, 110, 70),
                 "Smithy": (96, 90, 90), "Stall": (190, 150, 70), "Well": (130, 130, 140), "Fence": (130, 96, 60), "Crates": (150, 116, 70), "Flowers": (210, 110, 170), "Bench": (120, 86, 56),
-                "Beam": (110, 76, 46), "Cart": (90, 90, 96), "GlowRock": (230, 130, 60), "MineMouth": (70, 66, 70), "DeadTree": (60, 50, 44), "Reeds": (90, 120, 60), "Pillar": (110, 104, 110)}
+                "Beam": (110, 76, 46), "Cart": (90, 90, 96), "GlowRock": (230, 130, 60), "MineMouth": (70, 66, 70), "DeadTree": (60, 50, 44), "Reeds": (90, 120, 60), "Pillar": (110, 104, 110), "Throne": (40, 30, 50)}
 
 # Everyone and everything else on a map: character → (object, creation code).
 THINGS = {
     "O": ("Oona", ""), "P": ("Pip", ""), "D": ("Dot", ""), "K": ("Tam", ""), "H": ("Shopkeeper", ""), "N": ("Innkeeper", ""), "L": ("Lantern", ""),
-    "l": ("Lantern", "self.number = 2\n"), "a": ("Lantern", "self.number = 3\n"), "Q": ("Bram", ""), "j": ("Jory", ""),
+    "l": ("Lantern", "self.number = 2\n"), "a": ("Lantern", "self.number = 3\n"), "y": ("Lantern", "self.number = 4\n"), "Q": ("Bram", ""), "j": ("Jory", ""),
 }
 FOREST_THINGS = {
     "K": ("Mittens", ""), "e": ("Thornling", ""), "v": ("Bat", ""), "m": ("Shroom", ""), "h": ("Herb", ""), "X": ("Thornback", ""),
@@ -79,6 +79,17 @@ MARSH_THINGS = {
     "c": ("Chest", 'self.gold = 150\n'),
 }
 CHAPEL_THINGS = {**MARSH_THINGS, "c": ("Chest", 'self.gear = "drowned_mail"\n')}
+
+
+def stairs(to, c, r, extra=""):
+    return ("Stairs", f"self.to, self.at_x, self.at_y = \"{to}\", {c} * 32 + 16, {r} * 32 + 24\n{extra}")
+
+
+TOWER_FOES = {"e": ("Wolf", ""), "v": ("Armour", ""), "h": ("OldLamp", "")}
+TOWER1_THINGS = {**TOWER_FOES, "U": stairs("Tower2", 16, 15), "c": ("Chest", 'self.item = "potion"\n')}
+TOWER2_THINGS = {**TOWER_FOES, "U": stairs("Tower3", 16, 13, 'self.needs_flag = "wizard_beaten"\nself.sorry = "Something is holding these stairs shut. It feels like being stared at."\n'),
+                 "D": stairs("Tower1", 14, 3), "k": ("Wizard", ""), "c": ("Chest", 'self.item = "kite"\n'), "K": ("Chest", 'self.gold = 250\n')}
+TOWER3_THINGS = {**TOWER_FOES, "D": stairs("Tower2", 14, 3), "X": ("King", "")}
 DOORS = {
     ("Town", "1"): ("Forest", "self.to, self.at_x, self.at_y = \"Forest\", 18 * 32 + 16, 20 * 32 + 16\nself.needs = \"thorn_road\"\nself.sorry = \"Whisper Wood is no place to wander alone. Talk to Oona in the square first.\"\n"),
     ("Forest", "1"): ("Town", "self.to, self.at_x, self.at_y = \"Town\", 20 * 32 + 16, 2 * 32\n"),
@@ -88,6 +99,8 @@ DOORS = {
     ("Town", "3"): ("Marsh", "self.to, self.at_x, self.at_y = \"Marsh\", 6 * 32 + 16, 2 * 32 + 24\nself.needs = \"ember_marsh\"\nself.sorry = \"The south road goes down to the Mistfen, and nobody goes there without a reason.\"\n"),
     ("Marsh", "1"): ("Town", "self.to, self.at_x, self.at_y = \"Town\", 19 * 32 + 16, 19 * 32 + 16\n"),
     ("Marsh", "2"): ("Chapel", "self.to, self.at_x, self.at_y = \"Chapel\", 12 * 32 + 16, 14 * 32 + 24\n"),
+    ("Town", "4"): ("Tower1", "self.to, self.at_x, self.at_y = \"Tower1\", 17 * 32 + 16, 13 * 32 + 24\nself.needs = \"ember_tower\"\nself.sorry = \"The west road climbs to the Hollow Tower. Nobody goes up there. Nobody ever has.\"\n"),
+    ("Tower1", "1"): ("Town", "self.to, self.at_x, self.at_y = \"Town\", 1 * 32 + 16, 16 * 32 + 24\n"),
     ("Chapel", "1"): ("Marsh", "self.to, self.at_x, self.at_y = \"Marsh\", 18 * 32 + 16, 21 * 32 + 16\n"),
 }
 BIG = {"npc": (32, 44), "foe": (72, 72), "boss": (240, 160), "hero": (64, 72), "walk": (32, 44), "face": (64, 64)}
@@ -95,10 +108,13 @@ HERO_COLOURS = {"wren": (190, 60, 50), "pip": (70, 110, 200), "bram": (70, 140, 
 NPC_COLOURS = {"bram": (70, 140, 80), "miner": (150, 130, 90), "oona": (220, 220, 230), "pip": (70, 110, 200), "baker": (230, 200, 150), "child": (240, 170, 80), "cat": (130, 90, 60), "shop": (150, 120, 180), "inn": (200, 140, 110), "witch": (90, 130, 80)}
 FOE_COLOURS = {"thornling": (70, 120, 50), "bat": (90, 70, 120), "shroom": (170, 90, 90), "thornback": (120, 70, 50),
                "beetle": (60, 60, 130), "rockling": (90, 90, 96), "mole": (120, 80, 50), "golem": (110, 70, 50),
-               "slime": (70, 150, 70), "frog": (90, 120, 70), "wisp": (150, 150, 230), "knight": (90, 80, 70)}
-BOSSES = ("thornback", "golem", "knight")
-BACKS = {"back_fields": (70, 90, 110), "back_forest": (34, 60, 50), "back_mine": (50, 40, 36), "back_marsh": (40, 60, 50)}
-FACES = {"bram": (70, 140, 80), "miner": (150, 130, 90), "golem": (110, 70, 50), "wren": (190, 60, 50), "pip": (70, 110, 200), "oona": (220, 220, 230), "baker": (230, 200, 150), "cat": (130, 90, 60), "thornback": (120, 70, 50), "witch": (90, 130, 80), "knight": (90, 80, 70)}
+               "slime": (70, 150, 70), "frog": (90, 120, 70), "wisp": (150, 150, 230), "knight": (90, 80, 70),
+               "wolf": (70, 50, 110), "armour": (150, 160, 180), "wizard": (60, 40, 90), "king": (40, 30, 50)}
+BOSSES = ("thornback", "golem", "knight", "king")
+# Bigger than an ordinary foe, smaller than a boss, and square.
+MID_FOES = {"wizard": (120, 120)}
+BACKS = {"back_fields": (70, 90, 110), "back_forest": (34, 60, 50), "back_mine": (50, 40, 36), "back_marsh": (40, 60, 50), "back_tower": (50, 36, 70), "ending": (40, 40, 60)}
+FACES = {"bram": (70, 140, 80), "miner": (150, 130, 90), "golem": (110, 70, 50), "wren": (190, 60, 50), "pip": (70, 110, 200), "oona": (220, 220, 230), "baker": (230, 200, 150), "cat": (130, 90, 60), "thornback": (120, 70, 50), "witch": (90, 130, 80), "knight": (90, 80, 70), "king": (40, 30, 50)}
 
 
 class Hollowmere(_tw.Project):
@@ -289,7 +305,7 @@ def build(out):
         frames = [art(f"fight_{key}_{n}", BIG["hero"]) or figure(BIG["hero"], colour, f"{key[:4]}{n}") for n in range(4)]
         P.sprite(f"fight_{key}", frames, (32, 68))
     for key, colour in FOE_COLOURS.items():
-        size = BIG["boss"] if key in BOSSES else BIG["foe"]
+        size = BIG["boss"] if key in BOSSES else MID_FOES.get(key, BIG["foe"])
         P.sprite(f"foe_{key}", [art(f"foe_{key}", size) or blob(size, colour, key[:6])], (size[0] // 2, size[1] - 4))
     for key, colour in FACES.items():
         P.sprite(f"face_{key}", [art(f"face_{key}", BIG["face"]) or block(BIG["face"], colour, key[:6])], (0, 0))
@@ -303,7 +319,9 @@ def build(out):
                                         "map_beetle": ((36, 36), FOE_COLOURS["beetle"], "bee"), "map_rockling": ((36, 36), FOE_COLOURS["rockling"], "roc"),
                                         "map_mole": ((36, 36), FOE_COLOURS["mole"], "mol"), "map_golem": ((120, 80), FOE_COLOURS["golem"], "BOSS"),
                                         "map_slime": ((36, 36), FOE_COLOURS["slime"], "sli"), "map_frog": ((36, 36), FOE_COLOURS["frog"], "fro"),
-                                        "map_wisp": ((36, 36), FOE_COLOURS["wisp"], "wis"), "map_knight": ((120, 80), FOE_COLOURS["knight"], "BOSS")}.items():
+                                        "map_wisp": ((36, 36), FOE_COLOURS["wisp"], "wis"), "map_knight": ((120, 80), FOE_COLOURS["knight"], "BOSS"),
+                                        "map_wolf": ((40, 36), FOE_COLOURS["wolf"], "wol"), "map_armour": ((36, 36), FOE_COLOURS["armour"], "arm"),
+                                        "map_wizard": ((48, 48), FOE_COLOURS["wizard"], "wiz"), "map_king": ((120, 80), FOE_COLOURS["king"], "BOSS")}.items():
         pic = art(name, size) or art(name.replace("map_", "foe_"), size) or blob(size, colour, words)
         w, h = size
         P.sprite(name, [pic], (w // 2, h - 4), mask=(4, h // 2, w - 4, h))
@@ -323,6 +341,8 @@ def build(out):
     P.sprite("lily", [art("prop_flowers", (24, 18)) or blob((24, 18), (230, 230, 240))], (12, 16), mask=(2, 2, 22, 18))
     flood = art("ground_mud", (32, 32))
     P.sprite("flood", [deep_water(flood) if flood else block((32, 32), GROUND_COLOURS["bog"])], (16, 32), mask=(0, 0, 32, 32))
+    P.sprite("stairs", [art("prop_stairs", (64, 80)) or block((64, 80), (70, 60, 80), "stairs")], (32, 80))
+    P.sprite("old_lamp", [art("prop_big_lantern", (44, 88)) or block((44, 88), (60, 50, 50), "lamp")], (22, 88), mask=(6, 70, 38, 88))
     make_sounds(P)
     ground = ground_tileset(P)
 
@@ -334,7 +354,7 @@ def build(out):
     parsed = {f.stem: _tw.read_code(f) for f in files}
     for name, (head, _) in parsed.items():
         P.obj(name, depth=int(head.get("depth", 0)))
-    for name in ("Thornling", "Bat", "Shroom", "Beetle", "Rockling", "Mole", "Slime", "Frog", "Wisp"):
+    for name in ("Thornling", "Bat", "Shroom", "Beetle", "Rockling", "Mole", "Slime", "Frog", "Wisp", "Wolf", "Armour"):
         P.obj(name, sprite=P.sprite_id(f"map_{name.lower()}"), parent=P.obj_id("MapFoe"))
     for ch, (name, size, feet) in PROPS.items():
         w, h = size
@@ -357,6 +377,9 @@ def build(out):
             o["events"].append({"id": _tw.new_id(), "key": {"type": "create"}, "mode": "python", "code": "super().on_create()\nself.solid = False\n"})
         if o["name"] == "GlowRock":
             o["events"].append({"id": _tw.new_id(), "key": {"type": "step"}, "mode": "python", "code": "light(self.x, self.y - 20, 130, \"#ff9a4a\", 1)\n"})
+        # A dark wolf on a dark floor needs something to give it away before it's on you.
+        if o["name"] == "Wolf":
+            o["events"].append({"id": _tw.new_id(), "key": {"type": "step"}, "mode": "python", "code": "super().on_step()\nlight(self.x, self.y - 12, 60, \"#b9a0ff\", 1)\n"})
         if o["name"] == "Wisp":
             o["events"].append({"id": _tw.new_id(), "key": {"type": "step"}, "mode": "python", "code": "super().on_step()\nlight(self.x, self.y - 16, 90, \"#a8b4ff\", 1)\n"})
 
@@ -433,8 +456,12 @@ def build(out):
     map_room(HERE / "maps" / "MineDeep.txt", MINE_THINGS)
     map_room(HERE / "maps" / "Marsh.txt", MARSH_THINGS)
     map_room(HERE / "maps" / "Chapel.txt", CHAPEL_THINGS)
+    map_room(HERE / "maps" / "Tower1.txt", TOWER1_THINGS)
+    map_room(HERE / "maps" / "Tower2.txt", TOWER2_THINGS)
+    map_room(HERE / "maps" / "Tower3.txt", TOWER3_THINGS)
     plain_room("Battle", "#202838", ["BattleDirector"])
     plain_room("GameOver", "#000000", ["GameOver"])
+    plain_room("Ending", "#000000", ["Ending"])
     if problems:
         raise SystemExit("The maps:\n  " + "\n  ".join(problems))
 

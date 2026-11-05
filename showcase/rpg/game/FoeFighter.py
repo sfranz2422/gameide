@@ -16,6 +16,7 @@ def setup(key):
     self.charged = False
     self.shielded = False
     self.shield_left = 0
+    self.second = False
     self.home_x = self.x
 
 self.setup = setup
@@ -25,7 +26,9 @@ def tint(colour):
     self.image_blend = colour or "#ffffff"
 
 self.tint = tint
-self.power = lambda: FOES[self.key]["atk"]
+# Its numbers now: a foe with a "second" half has those on top, once that half has begun.
+self.info = lambda: {**FOES[self.key], **FOES[self.key]["second"]} if self.second else FOES[self.key]
+self.power = lambda: self.info()["atk"]
 self.guard = lambda: FOES[self.key]["dfn"]
 self.quickness = lambda: FOES[self.key]["spd"]
 

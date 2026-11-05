@@ -46,7 +46,7 @@ self.drop_shield = drop_shield
 
 
 def do_hit(user, target, power, stat_name="atk"):
-    """Lands a blow. Says "slid" if steel did little, "broke" if fire broke a shield."""
+    """Lands a blow. Says "slid" if steel did little, "fizzled" if fire did, "broke" if fire broke a shield."""
     guard = target.guard()
     n = hit_for(power, guard)
     if target.guarding:
@@ -56,6 +56,9 @@ def do_hit(user, target, power, stat_name="atk"):
         if stat_name == "atk" and (target.shielded or FOES[target.key].get("ghost")):
             n = max(1, n // 3)
             what = "slid"
+        elif stat_name == "mag" and FOES[target.key].get("fireproof"):
+            n = max(1, n // 3)
+            what = "fizzled"
         elif stat_name == "mag" and target.shielded:
             drop_shield(target)
             what = "broke"
@@ -102,7 +105,7 @@ def use_skill(user, key, target=None):
         for f in alive(self.heroes):
             f.heal(int(power))
         sound_play("heal")
-    say_line({"slid": f"{skill['name']}: the steel slides off!", "broke": f"{skill['name']} cracks the shield!"}.get(what, f"{user.name} uses {skill['name']}!"))
+    say_line({"slid": f"{skill['name']}: the steel slides off!", "broke": f"{skill['name']} cracks the shield!", "fizzled": f"{skill['name']}: the fire fizzles out!"}.get(what, f"{user.name} uses {skill['name']}!"))
     finish_turn()
 
 self.use_skill = use_skill
@@ -193,12 +196,25 @@ self.hero_menu = hero_menu
 
 
 def foe_turn(foe):
-    charge = FOES[foe.key].get("charge")
+    second = FOES[foe.key].get("second")
+    if second and not foe.second and foe.hp <= foe.max_hp / 2:
+        # Half gone: the fight changes, and takes the foe's turn to say so.
+        foe.second = True
+        foe.turns = 0
+        drop_shield(foe)
+        foe.tint("#c9a8ff")
+        instances("BattleBack")[0].image_blend = "#8a7aa8"
+        camera_shake(6, 40)
+        sound_play("light")
+        say_line(second["says"], 90)
+        return
+    info = foe.info()
+    charge = info.get("charge")
     foe.turns += 1
     if charge and foe.charged:
         # It glowed last turn, and everyone was told. Defending halves this, as ever.
         foe.charged = False
-        foe.tint(None)
+        foe.tint("#c9a8ff" if foe.second else None)
         foe.lunge()
         sound_play("foe_hit")
         camera_shake(5, 20)
@@ -212,7 +228,7 @@ def foe_turn(foe):
         sound_play("magic")
         say_line(f"{foe.name} is glowing white-hot! Defend!", 70)
         return
-    shield = FOES[foe.key].get("shield")
+    shield = info.get("shield")
     if shield and not foe.shielded and foe.turns % shield == 0:
         # It costs a turn, and it's up for two more of its own unless fire breaks it first.
         foe.shielded = True
@@ -225,7 +241,7 @@ def foe_turn(foe):
         foe.shield_left -= 1
         if foe.shield_left <= 0:
             drop_shield(foe)
-    move = random.choice(FOES[foe.key]["moves"])
+    move = random.choice(info["moves"])
     foe.lunge()
     sound_play("foe_hit")
     targets = alive(self.heroes)

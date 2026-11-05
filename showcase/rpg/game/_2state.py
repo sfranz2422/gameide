@@ -34,7 +34,7 @@ def load_game():
     # A save from before a chapter was built: its "next" is now that chapter's quest.
     S.setdefault("beaten", {})
     if S["quests"].pop("next", None) is not None:
-        S["quests"]["ember_mine" if "ember_mine" not in S["done"] else "ember_marsh"] = 0
+        S["quests"][next(k for k in ("ember_mine", "ember_marsh", "ember_tower") if k not in S["done"])] = 0
     # A boss beaten twice, when that could happen, ran its quest off the end and every
     # frame after was an IndexError. Those saves are brought back to the quest's last stage.
     for key in S["quests"]:
@@ -150,6 +150,16 @@ def go_to(room, x=None, y=None):
     S["at"] = None if x is None else [x, y]
     save_game()
     room_goto(room)
+
+
+def finish_seconds():
+    """The whole journey, by the game's own clock: sixty steps of walking or fighting a second."""
+    return round(S["steps"] / 60, 2)
+
+
+def clock_words(seconds):
+    hours, left = divmod(int(seconds), 3600)
+    return f"{hours} h {left // 60} min" if hours else f"{left // 60} min {left % 60} s"
 
 
 def busy():

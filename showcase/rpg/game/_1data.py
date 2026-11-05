@@ -39,6 +39,7 @@ ITEMS = {
     "ember_shard": {"name": "Ember Shard", "price": 0, "says": "Warm to the touch. A lantern would take this."},
     "mine_key": {"name": "Foreman's Key", "price": 0, "says": "Heavy, and it smells of old tea. It fits the mine's lift."},
     "glow_crystal": {"name": "Glow Crystal", "price": 0, "says": "Warm and orange. The shopkeeper wants these."},
+    "kite": {"name": "Tam's Kite", "price": 0, "says": "Red, patched, and a long way from home."},
     "lily": {"name": "Marsh Lily", "price": 0, "says": "Pale, and smells of rain. Sedge wants these."},
 }
 
@@ -62,6 +63,12 @@ GEAR = {
     "great_maul": {"name": "Great Maul", "slot": "weapon", "atk": 12, "price": 260, "who": ("bram",)},
     "scale_armour": {"name": "Scale Armour", "slot": "armour", "dfn": 10, "price": 260, "who": ("wren", "pip", "bram")},
     "drowned_mail": {"name": "Drowned Mail", "slot": "armour", "dfn": 8, "price": 0, "who": ("wren", "pip", "bram")},
+    "star_sword": {"name": "Star Sword", "slot": "weapon", "atk": 20, "price": 420, "who": ("wren",)},
+    "star_staff": {"name": "Star Staff", "slot": "weapon", "mag": 18, "price": 400, "who": ("pip",)},
+    "titan_maul": {"name": "Titan Maul", "slot": "weapon", "atk": 17, "price": 380, "who": ("bram",)},
+    "star_mail": {"name": "Star Mail", "slot": "armour", "dfn": 14, "price": 380, "who": ("wren", "pip", "bram")},
+    "star_hammer": {"name": "Jory's Hammer", "slot": "weapon", "atk": 21, "price": 0, "who": ("bram",)},
+    "kite_string": {"name": "Lucky String", "slot": "armour", "dfn": 12, "spd": 5, "price": 0, "who": ("wren", "pip", "bram")},
     "cat_ring": {"name": "Silver Ring", "slot": "armour", "dfn": 2, "spd": 3, "price": 0, "who": ("wren", "pip", "bram")},
 }
 
@@ -83,6 +90,16 @@ FOES = {
     # "ghost": steel only does a third. Pip's fire does it all.
     "wisp": {"name": "Pale Wisp", "hp": 26, "atk": 17, "dfn": 2, "spd": 10, "xp": 30, "gold": 22, "ghost": True, "moves": [("Scorch", 1.0, "one")]},
     # "shield": every so many of its turns it raises this, and steel does a third until fire breaks it.
+    "wolf": {"name": "Shadow Wolf", "hp": 60, "atk": 23, "dfn": 7, "spd": 11, "xp": 40, "gold": 26, "moves": [("Bite", 1.0, "one"), ("Bite", 1.0, "one"), ("Howl", 0.6, "all")]},
+    # "fireproof": the other way about from a ghost. Fire does a third, and steel does it all.
+    "armour": {"name": "Hollow Armour", "hp": 84, "atk": 25, "dfn": 13, "spd": 4, "xp": 48, "gold": 32, "fireproof": True, "moves": [("Clang", 1.1, "one")]},
+    "wizard": {"name": "Shadow Wizard", "hp": 200, "atk": 27, "dfn": 7, "spd": 8, "xp": 240, "gold": 200, "boss": True, "charge": (3, "Shadow Storm", 1.3),
+               "moves": [("Dark Bolt", 1.1, "one"), ("Dark Bolt", 1.1, "one"), ("Black Rain", 0.7, "all")]},
+    # "second": at half health it stops being one fight and becomes another: these numbers take over.
+    "king": {"name": "Shadow King", "hp": 460, "atk": 29, "dfn": 11, "spd": 6, "xp": 0, "gold": 0, "boss": True, "shield": 3,
+             "moves": [("Grasp", 1.2, "one"), ("Grasp", 1.2, "one"), ("Cold Wind", 0.7, "all")],
+             "second": {"atk": 33, "shield": None, "charge": (3, "Black Flame", 1.4), "says": "The shadows rush in! The Shadow King is growing!",
+                        "moves": [("Crushing Dark", 1.2, "one"), ("Night Falls", 0.8, "all")]}},
     "knight": {"name": "Drowned Knight", "hp": 230, "atk": 22, "dfn": 9, "spd": 4, "xp": 280, "gold": 220, "boss": True, "shield": 3,
                "moves": [("Rusty Cleave", 1.2, "one"), ("Rusty Cleave", 1.2, "one"), ("Tide of Mud", 0.7, "all")]},
 }
@@ -101,20 +118,26 @@ MAP_GROUPS = {
     "Frog": ["frog", "slime"],
     "Wisp": ["wisp", "wisp"],
     "Knight": ["knight"],
+    "Wolf": ["wolf", "wolf"],
+    "Armour": ["armour", "wolf"],
+    "Wizard": ["wizard"],
+    "King": ["king"],
 }
 
 # Later goods come in with each lantern lit: the road's a bit safer, so the carts get through.
 SHOP = {"Goods": ["potion", "ether", "bread", "iron_sword", "ash_staff", "leather"],
         "After a lantern": ["great_sword", "silver_staff", "war_hammer", "iron_armour"],
-        "After two lanterns": ["moon_sword", "fen_staff", "great_maul", "scale_armour"]}
+        "After two lanterns": ["moon_sword", "fen_staff", "great_maul", "scale_armour"],
+        "After three lanterns": ["star_sword", "star_staff", "titan_maul", "star_mail"]}
 INN_PRICE = 8
 BEETLES_FOR_MARTA = 6
 SLIMES_FOR_DOT = 6
 LILIES_FOR_SEDGE = 5
 SLUICES = 3
+ARMOURS_FOR_JORY = 6
 
 # The picture behind a battle, by the room it started in.
-BATTLE_BACK = {"Town": "back_fields", "Forest": "back_forest", "Mine": "back_mine", "MineDeep": "back_mine", "Marsh": "back_marsh", "Chapel": "back_marsh"}
+BATTLE_BACK = {"Town": "back_fields", "Forest": "back_forest", "Mine": "back_mine", "MineDeep": "back_mine", "Marsh": "back_marsh", "Chapel": "back_marsh", "Tower1": "back_tower", "Tower2": "back_tower", "Tower3": "back_tower"}
 
 # Each quest: its title, then what to do at each stage. A quest's stage is kept in S["quests"].
 QUESTS = {
@@ -141,5 +164,12 @@ QUESTS = {
     ]},
     "lilies": {"title": "Five Marsh Lilies", "stages": ["Pick 5 Marsh Lilies in the Mistfen for Sedge."]},
     "slimes": {"title": "Slime in the Well", "stages": ["Beat 6 Bog Slimes in the Mistfen for Dot."]},
-    "next": {"title": "To be continued", "main": True, "stages": ["More of the valley comes in the next chapter."]},
+    "ember_tower": {"title": "The Last Ember", "main": True, "stages": [
+        "Climb the Hollow Tower, west of town.",
+        "Find the way to the top of the tower.",
+        "Climb to the top. Find who put the lights out.",
+        "Bring the last Ember Shard back to Oona.",
+    ]},
+    "kite": {"title": "Tam's Kite", "stages": ["Find Tam's kite in the Hollow Tower."]},
+    "armours": {"title": "Scrap for Jory", "stages": ["Beat 6 Hollow Armours in the tower for Jory."]},
 }
