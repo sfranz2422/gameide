@@ -8,6 +8,8 @@ self.tick = 0
 set_darkness()
 if not flag("opening") and S["room"] == "Town":
     opening()
+if S["room"] == "Mine" and not flag("mine_entered"):
+    mine_entered()
 after = S.pop("after_battle", None)
 if after:
     STORY_AFTER[after]()

@@ -125,13 +125,241 @@ function fightWell(g: PythonGame, steps = 20000) {
   return { end: room(g), turns };
 }
 
+/** A game as chapter 1 leaves it: a lantern lit, Pip in the party, everyone about level 4. */
+async function chapterTwo() {
+  const g = await newGame();
+  py(g, 'S["lit"] = 1; S["done"].append("thorn_road"); S["quests"]["ember_mine"] = 0; S["party"].append(new_hero("pip")); S["gold"] = 200');
+  py(g, '[give_xp(h, sum(xp_to_next(n) for n in range(1, 4))) for h in S["party"]]; rest_party()');
+  return g;
+}
+/** Bram joins, and into the mine. */
+async function inTheMine() {
+  const g = await chapterTwo();
+  useIt(g, "Bram");
+  clear(g);
+  goThrough(g, "Mine");
+  clear(g);
+  return g;
+}
+/** Walks with a key held, the real way, for so many steps. */
+function walk(g: PythonGame, k: string, steps: number) {
+  g.engine.input.keyDown(KEY_CODE.get(k)!);
+  step(g, steps);
+  g.engine.input.keyUp(KEY_CODE.get(k)!);
+  step(g, 1);
+}
+
 describe.skipIf(!have)("The Lanterns of Hollowmere", () => {
+  it("the mine road waits for Bram, and Oona and Bram both point the way", { timeout: 60_000 }, async () => {
+    const g = await chapterTwo();
+    py(g, 'p = instances("Player")[0]; d = [o for o in instances("Door") if o.to == "Mine"][0]; p.x, p.y = d.x + 16, d.y + 24');
+    step(g, 6);
+    expect(room(g)).toBe("Town");
+    clear(g);
+    useIt(g, "Oona");
+    clear(g);
+    useIt(g, "Bram");
+    clear(g);
+    expect(py(g, '[h["key"] for h in S["party"]]')).toEqual(["wren", "pip", "bram"]);
+    expect(py(g, 'S["party"][2]["level"]')).toBe(py(g, 'S["party"][0]["level"]'));
+    expect(py(g, 'S["quests"]["ember_mine"]')).toBe(1);
+    goThrough(g, "Mine");
+    expect(py(g, "scene_playing()")).toBe(true);
+  });
+
+  it("a rockfall stops you until Bram breaks it, and stays broken", { timeout: 60_000 }, async () => {
+    const g = await inTheMine();
+    const at = 'p = instances("Player")[0]; p.safe = 9999; r = instance_nearest(16 * 32, 13 * 32, "Rubble"); p.x, p.y = r.x - 48, r.y - 8';
+    py(g, at);
+    walk(g, "right", 60);
+    expect(py(g, 'instances("Player")[0].x < instance_nearest(16 * 32, 13 * 32, "Rubble").x')).toBe(true);
+    const before = py(g, 'instance_number("Rubble")') as number;
+    tap(g, "z");
+    clear(g);
+    expect(py(g, 'instance_number("Rubble")')).toBe(before - 1);
+    goThrough(g, "Town");
+    goThrough(g, "Mine");
+    expect(py(g, 'instance_number("Rubble")')).toBe(before - 1);
+  });
+
+  it("the lift wants the foreman's key from the chest, and Jory's tea heals", { timeout: 60_000 }, async () => {
+    const g = await inTheMine();
+    py(g, 'S["party"][0]["hp"] = 1');
+    useIt(g, "Jory");
+    clear(g);
+    expect(py(g, 'S["party"][0]["hp"]')).toBeGreaterThan(1);
+    expect(py(g, 'S["quests"]["ember_mine"]')).toBe(2);
+    useIt(g, "Lift");
+    clear(g);
+    expect(room(g)).toBe("Mine");
+    py(g, 'p = instances("Player")[0]; c = [o for o in instances("Chest") if o.item == "mine_key"][0]; p.x, p.y = c.x, c.y + 30');
+    step(g, 2);
+    tap(g, "z");
+    clear(g);
+    expect(py(g, 'count_item("mine_key")')).toBe(1);
+    expect(py(g, 'S["quests"]["ember_mine"]')).toBe(3);
+    useIt(g, "Lift");
+    step(g, 4);
+    expect(room(g)).toBe("MineDeep");
+    expect(py(g, 'count_item("mine_key")')).toBe(0);
+  });
+
+  it("the golem glows and warns, then its Molten Burst hits everyone, and Defend halves it", { timeout: 60_000 }, async () => {
+    const g = await inTheMine();
+    py(g, 'start_battle(["golem"], 0, 0, run=False)');
+    step(g, 4);
+    const lines: string[] = [];
+    let hurt: number[] = [];
+    let guarded = false;
+    for (let i = 0; i < 6000 && !lines.some((l) => l.includes("Molten Burst")); i++) {
+      if (py(g, 'instance_exists("MenuBox")') && !py(g, "newest_menu().age < 2")) {
+        const glowing = py(g, 'instances("FoeFighter")[0].charged') as boolean;
+        // Everyone defends once it's glowing. Defend is the last row, as a fight can't be run from.
+        if (glowing) {
+          guarded = true;
+          tap(g, "up");
+          tap(g, "z");
+        } else {
+          tap(g, "z");
+          step(g, 2);
+          tap(g, "z");
+        }
+        py(g, 'rest_party(); [setattr(f, "hp", f.max_hp) for f in instances("HeroFighter")]');
+        hurt = py(g, '[f.hp for f in instances("HeroFighter")]') as unknown as number[];
+      } else step(g, 1);
+      const line = py(g, "instances('BattleDirector')[0].line") as string;
+      if (lines[lines.length - 1] !== line) lines.push(line);
+    }
+    expect(lines.some((l) => l.includes("glowing white-hot"))).toBe(true);
+    expect(lines.some((l) => l.includes("Molten Burst"))).toBe(true);
+    expect(guarded).toBe(true);
+    const after = py(g, '[f.hp for f in instances("HeroFighter")]') as unknown as number[];
+    const lost = after.map((n, i) => hurt[i]! - n);
+    // Everyone was hit, and by far less than the undefended burst's 25 or so.
+    expect(Math.min(...lost)).toBeGreaterThan(0);
+    expect(Math.max(...lost)).toBeLessThan(18);
+  });
+
+  it("Hob's crystals pay, Marta counts beetles and gives free beds", { timeout: 60_000 }, async () => {
+    const g = await inTheMine();
+    goThrough(g, "Town");
+    useIt(g, "Shopkeeper");
+    clear(g);
+    py(g, "close_menus()");
+    step(g, 2);
+    expect(py(g, '"crystals" in S["quests"]')).toBe(true);
+    py(g, 'add_item("glow_crystal", 4)');
+    const gold = py(g, 'S["gold"]') as number;
+    useIt(g, "Shopkeeper");
+    clear(g);
+    py(g, "close_menus()");
+    step(g, 2);
+    expect(py(g, '"crystals" in S["done"]')).toBe(true);
+    expect(py(g, 'S["gold"]')).toBe(gold + 120);
+    expect(py(g, 'count_item("glow_crystal")')).toBe(0);
+
+    useIt(g, "Innkeeper");
+    clear(g);
+    py(g, "close_menus()");
+    step(g, 2);
+    expect(py(g, '"beetles" in S["quests"]')).toBe(true);
+    goThrough(g, "Mine");
+    for (let n = 0; n < 3; n++) {
+      py(g, 'start_battle(["beetle", "beetle"], instances("Player")[0].x, instances("Player")[0].y)');
+      step(g, 4);
+      fight(g);
+      clear(g);
+      py(g, "rest_party()");
+    }
+    expect(py(g, 'S["beaten"]["beetle"]')).toBe(6);
+    goThrough(g, "Town");
+    useIt(g, "Innkeeper");
+    clear(g);
+    expect(py(g, '"beetles" in S["done"]')).toBe(true);
+    expect(py(g, "newest_menu().title")).toBe("A bed is free, love");
+    const money = py(g, 'S["gold"]') as number;
+    py(g, 'S["party"][0]["hp"] = 1');
+    step(g, 3);
+    tap(g, "z");
+    clear(g);
+    expect(py(g, 'S["gold"]')).toBe(money);
+    expect(py(g, 'S["party"][0]["hp"]')).toBeGreaterThan(1);
+  });
+
+  it("a save from before the mine carries on into the mine's quest", { timeout: 60_000 }, async () => {
+    const g = await newGame();
+    py(g, 'S["quests"]["next"] = 0; S.pop("beaten"); save_game(); load_game()');
+    expect(py(g, 'S["quests"]')).toBeDefined();
+    expect(py(g, '"next" in S["quests"]')).toBe(false);
+    expect(py(g, 'S["quests"]["ember_mine"]')).toBe(0);
+    expect(py(g, 'S["beaten"] == {}')).toBe(true);
+  });
+
+  it("the whole of chapter 2: Jory found, the golem beaten, the second lantern lit", { timeout: 300_000 }, async () => {
+    const g = await inTheMine();
+    const beat = () => {
+      for (let n = 0; n < 12; n++) {
+        for (const foe of ["Beetle", "Rockling", "Mole"]) {
+          if (py(g, `instance_number("${foe}")`)) {
+            const before = room(g);
+            bump(g, foe);
+            expect(fightWell(g).end, foe).toBe(before);
+            clear(g);
+          }
+        }
+        py(g, "rest_party()"); // As if Jory's tea, or a walk back to the inn.
+      }
+    };
+    useIt(g, "Rubble");
+    clear(g);
+    useIt(g, "Jory");
+    clear(g);
+    useIt(g, "Rubble");
+    clear(g);
+    beat();
+    process.stderr.write(`Mine cleared: ${JSON.stringify(py(g, '[(h["key"], h["level"]) for h in S["party"]]'))} gold ${py(g, 'S["gold"]')}\n`);
+    py(g, 'p = instances("Player")[0]; c = [o for o in instances("Chest") if o.item == "mine_key"][0]; p.x, p.y = c.x, c.y + 30');
+    step(g, 2);
+    tap(g, "z");
+    clear(g);
+    useIt(g, "Lift");
+    step(g, 4);
+    expect(room(g)).toBe("MineDeep");
+    beat();
+    py(g, "rest_party()");
+    bump(g, "Golem");
+    clear(g);
+    for (let i = 0; i < 40 && room(g) !== "Battle"; i++) step(g, 1);
+    expect(room(g)).toBe("Battle");
+    const boss = fightWell(g);
+    process.stderr.write(`Golem: ${JSON.stringify(boss)} ${JSON.stringify(py(g, '[(h["key"], h["level"], h["hp"], h["mp"]) for h in S["party"]]'))}\n`);
+    expect(boss.end).toBe("MineDeep");
+    clear(g);
+    expect(py(g, 'flag("golem_beaten")')).toBe(true);
+    expect(py(g, 'S["quests"]["ember_mine"]')).toBe(4);
+    goThrough(g, "Mine");
+    expect(py(g, 'instance_number("Jory")')).toBe(0);
+    goThrough(g, "Town");
+    expect(py(g, 'instance_number("Jory")')).toBe(1);
+    useIt(g, "Oona");
+    clear(g);
+    expect(py(g, 'S["lit"]')).toBe(2);
+    expect(py(g, '[l.lit for l in instances("Lantern")]')).toEqual([true, true]);
+    expect(py(g, '"ember_mine" in S["done"]')).toBe(true);
+    expect(py(g, '"next" in S["quests"]')).toBe(true);
+    // Still lit after going away and coming back, when the room is built afresh.
+    goThrough(g, "Mine");
+    goThrough(g, "Town");
+    step(g, 2);
+    expect(py(g, '[l.image_index for l in instances("Lantern")]')).toEqual([1, 1]);
+  });
+
   it("every menu's words fit inside it", { timeout: 60_000 }, async () => {
     const g = await start();
     tap(g, "enter");
     step(g, 4);
     clear(g);
-    py(g, 'S["party"].extend([new_hero("pip"), new_hero("bram")]); S["gear"] = list(GEAR); S["items"] = {k: 9 for k in ITEMS}; [start_quest(k) for k in QUESTS]');
+    py(g, 'S["lit"] = 1; S["party"].extend([new_hero("pip"), new_hero("bram")]); S["gear"] = list(GEAR); S["items"] = {k: 9 for k in ITEMS}; [start_quest(k) for k in QUESTS]');
     for (const menu of ["items_menu", "gear_menu", "party_menu", "quests_menu", "shop_menu"]) {
       py(g, `${menu}()`);
       step(g);

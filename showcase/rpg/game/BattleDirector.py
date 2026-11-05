@@ -175,6 +175,25 @@ self.hero_menu = hero_menu
 
 
 def foe_turn(foe):
+    charge = FOES[foe.key].get("charge")
+    foe.turns += 1
+    if charge and foe.charged:
+        # It glowed last turn, and everyone was told. Defending halves this, as ever.
+        foe.charged = False
+        foe.tint(None)
+        foe.lunge()
+        sound_play("foe_hit")
+        camera_shake(5, 20)
+        for h in alive(self.heroes):
+            do_hit(foe, h, foe.power() * charge[2])
+        say_line(f"{foe.name}: {charge[1]}!", 60)
+        return
+    if charge and foe.turns % charge[0] == 0:
+        foe.charged = True
+        foe.tint("#ff9a4a")
+        sound_play("magic")
+        say_line(f"{foe.name} is glowing white-hot! Defend!", 70)
+        return
     move = random.choice(FOES[foe.key]["moves"])
     foe.lunge()
     sound_play("foe_hit")
@@ -196,6 +215,8 @@ def win():
     xp = sum(FOES[f.key]["xp"] for f in self.foes)
     gold = sum(FOES[f.key]["gold"] for f in self.foes)
     S["gold"] += gold
+    for f in self.foes:
+        S["beaten"][f.key] = S["beaten"].get(f.key, 0) + 1
     lines = [f"Won! {xp} XP and {gold} gold."]
     for h in self.heroes:
         h.hero["hp"] = max(h.hp, 1)    # Everyone gets up after a win.

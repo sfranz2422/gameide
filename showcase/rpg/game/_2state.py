@@ -16,7 +16,7 @@ def new_game():
     S.update({
         "party": [new_hero("wren")], "gold": 30, "items": {"potion": 3}, "gear": [],
         "flags": {}, "quests": {}, "done": [], "lit": 0, "steps": 0,
-        "cleared": [], "room": "Town", "at": None,
+        "cleared": [], "room": "Town", "at": None, "beaten": {},
     })
 
 
@@ -31,6 +31,10 @@ def has_save():
 def load_game():
     S.clear()
     S.update(save_get(SAVE_KEY))
+    # A save from before the mine was built, whose "next" is now the mine's quest.
+    S.setdefault("beaten", {})
+    if S["quests"].pop("next", None) is not None and "ember_mine" not in S["done"]:
+        S["quests"]["ember_mine"] = 0
 
 
 def flag(name):
@@ -104,6 +108,12 @@ def start_quest(key):
 
 def advance_quest(key):
     S["quests"][key] += 1
+
+
+def reach_stage(key, stage):
+    """Moves a quest on to a stage, never back: things can be done out of order."""
+    if key in S["quests"]:
+        S["quests"][key] = max(S["quests"][key], stage)
 
 
 def finish_quest(key):

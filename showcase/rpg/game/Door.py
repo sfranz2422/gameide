@@ -8,6 +8,7 @@ self.visible = False
 self.to = None
 self.at_x, self.at_y = 0, 0
 self.needs = None
+self.needs_flag = None
 self.sorry = "Not yet."
 self.nag = 0
 
@@ -15,7 +16,7 @@ self.nag = 0
 self.nag -= 1
 hero = instance_place(self.x, self.y, "Player")
 if hero and not busy():
-    if self.needs and self.needs not in S["quests"] and self.needs not in S["done"]:
+    if (self.needs and self.needs not in S["quests"] and self.needs not in S["done"]) or (self.needs_flag and not flag(self.needs_flag)):
         if self.nag <= 0:
             self.nag = 90
             hero.y += 8 if hero.y >= self.y else -8

@@ -319,6 +319,7 @@ def people():
     group(im, boxes, names, WALK)
     # Pip stands about the town before joining, as on Pip's own walking sheet.
     Image.open(ART / "pip_down_0.png").save(ART / "npc_pip.png")
+    Image.open(ART / "bram_down_0.png").save(ART / "npc_bram.png")
 
 
 def monsters():

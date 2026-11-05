@@ -1,0 +1,23 @@
+room: MineDeep
+ground: n
+camera: yes
+# n cave floor  # rock  G glowing crystals  A beam  Y minecart
+# @ start  1 the lift back up  e beetle  v rockling  m mole  x Glow Crystal  X the golem
+##############################
+#####nnnnnnnnnnnnnnnnnnnn#####
+###nnGnnnnnnnnnnnnnnnnnnGnn###
+##nnnnnnnnnnnnXnnnnnnnnnnnnn##
+##nnnnnnnnnnnnnnnnnnnnnnnnnn##
+###nnGnnnnnnnnnnnnnnnnnnGnn###
+#####nnnnnnnnnnnnnnnnnnnn#####
+############nnnnnn############
+############nnnnxn############
+####nnnnnnnnnnnnnnnnnnnn######
+####nAnnnnvnnnnnnnnnnnAn######
+####nnnnnnnnnnnnnmnnnnnn######
+####nnnennnnnnnnnnnnnvnn######
+####nnnnnnnnnnnnnnnnnnnn######
+#########nnnnnnn##############
+#########nnn@nnn##############
+#########nnn1nnn##############
+##############################

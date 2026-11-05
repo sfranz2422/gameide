@@ -49,30 +49,43 @@ PROPS = {
     "R": ("CottageRed", (112, 104), (104, 56)), "B": ("CottageBlue", (112, 104), (104, 56)), "I": ("Inn", (160, 128), (152, 70)), "S": ("Smithy", (128, 112), (120, 62)),
     "M": ("Stall", (72, 56), (66, 26)), "W": ("Well", (44, 48), (40, 24)), "F": ("Fence", (32, 32), (32, 12)), "C": ("Crates", (40, 40), (38, 20)),
     "f": ("Flowers", (32, 24), (0, 0)), "b": ("Bench", (48, 28), (46, 14)),
+    "A": ("Beam", (32, 64), (12, 10)), "Y": ("Cart", (56, 44), (50, 18)), "G": ("GlowRock", (48, 48), (30, 16)), "E": ("MineMouth", (96, 80), (0, 0)),
 }
 PICTURE = {"Tree": "prop_tree", "Pine": "prop_pine", "Bush": "prop_bush", "Boulder": "prop_boulder", "CottageRed": "prop_cottage_red", "CottageBlue": "prop_cottage_blue",
-           "Inn": "prop_inn", "Smithy": "prop_smithy", "Stall": "prop_stall", "Well": "prop_well", "Fence": "prop_fence", "Crates": "prop_crates", "Flowers": "prop_flowers", "Bench": "prop_bench"}
+           "Inn": "prop_inn", "Smithy": "prop_smithy", "Stall": "prop_stall", "Well": "prop_well", "Fence": "prop_fence", "Crates": "prop_crates", "Flowers": "prop_flowers", "Bench": "prop_bench",
+           "Beam": "prop_beam", "Cart": "prop_cart", "GlowRock": "prop_crystal", "MineMouth": "prop_mine"}
 PROP_COLOURS = {"Tree": (40, 110, 60), "Pine": (28, 84, 66), "Bush": (58, 130, 70), "Boulder": (120, 120, 126), "CottageRed": (176, 70, 60), "CottageBlue": (70, 96, 170), "Inn": (150, 110, 70),
-                "Smithy": (96, 90, 90), "Stall": (190, 150, 70), "Well": (130, 130, 140), "Fence": (130, 96, 60), "Crates": (150, 116, 70), "Flowers": (210, 110, 170), "Bench": (120, 86, 56)}
+                "Smithy": (96, 90, 90), "Stall": (190, 150, 70), "Well": (130, 130, 140), "Fence": (130, 96, 60), "Crates": (150, 116, 70), "Flowers": (210, 110, 170), "Bench": (120, 86, 56),
+                "Beam": (110, 76, 46), "Cart": (90, 90, 96), "GlowRock": (230, 130, 60), "MineMouth": (70, 66, 70)}
 
 # Everyone and everything else on a map: character → (object, creation code).
 THINGS = {
     "O": ("Oona", ""), "P": ("Pip", ""), "D": ("Dot", ""), "K": ("Tam", ""), "H": ("Shopkeeper", ""), "N": ("Innkeeper", ""), "L": ("Lantern", ""),
+    "l": ("Lantern", "self.number = 2\n"), "Q": ("Bram", ""), "j": ("Jory", ""),
 }
 FOREST_THINGS = {
     "K": ("Mittens", ""), "e": ("Thornling", ""), "v": ("Bat", ""), "m": ("Shroom", ""), "h": ("Herb", ""), "X": ("Thornback", ""),
     "c": ("Chest", 'self.item = "ether"\n'),
 }
+MINE_THINGS = {
+    "J": ("Jory", ""), "e": ("Beetle", ""), "v": ("Rockling", ""), "m": ("Mole", ""), "x": ("GlowCrystal", ""), "r": ("Rubble", ""), "Z": ("Lift", ""), "X": ("Golem", ""),
+    "c": ("Chest", 'self.item = "ether"\n'), "k": ("Chest", 'self.item = "mine_key"\n'), "h": ("Chest", 'self.gear = "foreman_hammer"\n'),
+}
 DOORS = {
     ("Town", "1"): ("Forest", "self.to, self.at_x, self.at_y = \"Forest\", 18 * 32 + 16, 20 * 32 + 16\nself.needs = \"thorn_road\"\nself.sorry = \"Whisper Wood is no place to wander alone. Talk to Oona in the square first.\"\n"),
     ("Forest", "1"): ("Town", "self.to, self.at_x, self.at_y = \"Town\", 20 * 32 + 16, 2 * 32\n"),
+    ("Town", "2"): ("Mine", "self.to, self.at_x, self.at_y = \"Mine\", 2 * 32 + 16, 13 * 32 + 24\nself.needs_flag = \"bram_joined\"\nself.sorry = \"The old mine road. Those tunnels are dangerous. Better ask someone who knows them.\"\n"),
+    ("Mine", "1"): ("Town", "self.to, self.at_x, self.at_y = \"Town\", 37 * 32 + 16, 16 * 32 + 24\n"),
+    ("MineDeep", "1"): ("Mine", "self.to, self.at_x, self.at_y = \"Mine\", 22 * 32 + 16, 6 * 32\n"),
 }
 BIG = {"npc": (32, 44), "foe": (72, 72), "boss": (240, 160), "hero": (64, 72), "walk": (32, 44), "face": (64, 64)}
 HERO_COLOURS = {"wren": (190, 60, 50), "pip": (70, 110, 200), "bram": (70, 140, 80)}
-NPC_COLOURS = {"oona": (220, 220, 230), "pip": (70, 110, 200), "baker": (230, 200, 150), "child": (240, 170, 80), "cat": (130, 90, 60), "shop": (150, 120, 180), "inn": (200, 140, 110)}
-FOE_COLOURS = {"thornling": (70, 120, 50), "bat": (90, 70, 120), "shroom": (170, 90, 90), "thornback": (120, 70, 50)}
-BACKS = {"back_fields": (70, 90, 110), "back_forest": (34, 60, 50)}
-FACES = {"wren": (190, 60, 50), "pip": (70, 110, 200), "oona": (220, 220, 230), "baker": (230, 200, 150), "cat": (130, 90, 60), "thornback": (120, 70, 50)}
+NPC_COLOURS = {"bram": (70, 140, 80), "miner": (150, 130, 90), "oona": (220, 220, 230), "pip": (70, 110, 200), "baker": (230, 200, 150), "child": (240, 170, 80), "cat": (130, 90, 60), "shop": (150, 120, 180), "inn": (200, 140, 110)}
+FOE_COLOURS = {"thornling": (70, 120, 50), "bat": (90, 70, 120), "shroom": (170, 90, 90), "thornback": (120, 70, 50),
+               "beetle": (60, 60, 130), "rockling": (90, 90, 96), "mole": (120, 80, 50), "golem": (110, 70, 50)}
+BOSSES = ("thornback", "golem")
+BACKS = {"back_fields": (70, 90, 110), "back_forest": (34, 60, 50), "back_mine": (50, 40, 36)}
+FACES = {"bram": (70, 140, 80), "miner": (150, 130, 90), "golem": (110, 70, 50), "wren": (190, 60, 50), "pip": (70, 110, 200), "oona": (220, 220, 230), "baker": (230, 200, 150), "cat": (130, 90, 60), "thornback": (120, 70, 50)}
 
 
 class Hollowmere(_tw.Project):
@@ -157,6 +170,10 @@ def ground_tileset(P):
     im = Image.new("RGBA", (size * len(GROUND), size))
     for i, name in enumerate(GROUND):
         t = art(f"ground_{name}", (size, size))
+        # Rock walls: the cave's own floor, nearly black, so the tunnels have an edge to them.
+        if name == "edge" and art("ground_cave", (size, size)):
+            t = art("ground_cave", (size, size)).point(lambda v: v // 3)
+            t.putalpha(255)
         if t is None:
             t = Image.new("RGBA", (size, size), GROUND_COLOURS[name] + (255,))
             d = ImageDraw.Draw(t)
@@ -234,7 +251,7 @@ def build(out):
         frames = [art(f"fight_{key}_{n}", BIG["hero"]) or figure(BIG["hero"], colour, f"{key[:4]}{n}") for n in range(4)]
         P.sprite(f"fight_{key}", frames, (32, 68))
     for key, colour in FOE_COLOURS.items():
-        size = BIG["boss"] if key == "thornback" else BIG["foe"]
+        size = BIG["boss"] if key in BOSSES else BIG["foe"]
         P.sprite(f"foe_{key}", [art(f"foe_{key}", size) or blob(size, colour, key[:6])], (size[0] // 2, size[1] - 4))
     for key, colour in FACES.items():
         P.sprite(f"face_{key}", [art(f"face_{key}", BIG["face"]) or block(BIG["face"], colour, key[:6])], (0, 0))
@@ -244,7 +261,9 @@ def build(out):
 
     # Things on the map.
     for name, (size, colour, words) in {"map_thornling": ((36, 36), FOE_COLOURS["thornling"], "tho"), "map_bat": ((36, 36), FOE_COLOURS["bat"], "bat"),
-                                        "map_shroom": ((36, 36), FOE_COLOURS["shroom"], "shr"), "map_thornback": ((120, 80), FOE_COLOURS["thornback"], "BOSS")}.items():
+                                        "map_shroom": ((36, 36), FOE_COLOURS["shroom"], "shr"), "map_thornback": ((120, 80), FOE_COLOURS["thornback"], "BOSS"),
+                                        "map_beetle": ((36, 36), FOE_COLOURS["beetle"], "bee"), "map_rockling": ((36, 36), FOE_COLOURS["rockling"], "roc"),
+                                        "map_mole": ((36, 36), FOE_COLOURS["mole"], "mol"), "map_golem": ((120, 80), FOE_COLOURS["golem"], "BOSS")}.items():
         pic = art(name, size) or art(name.replace("map_", "foe_"), size) or blob(size, colour, words)
         w, h = size
         P.sprite(name, [pic], (w // 2, h - 4), mask=(4, h // 2, w - 4, h))
@@ -256,6 +275,10 @@ def build(out):
     P.sprite("herb", [art("herb", (24, 24)) or blob((24, 24), (130, 220, 150))], (12, 20), mask=(2, 6, 22, 24))
     P.sprite("chest", [art("chest_shut", (32, 28)) or block((32, 28), (150, 106, 50), "?"), art("chest_open", (32, 28)) or block((32, 28), (90, 66, 40))], (16, 24), mask=(0, 8, 32, 28))
     P.sprite("door", [block((32, 32), (255, 255, 0))], (0, 0), mask=(0, 0, 32, 32))
+    # A rockfall fills its tunnel from wall to wall: the mask is a whole tile wide.
+    P.sprite("rubble", [art("prop_boulder", (40, 34)) or blob((40, 34), (120, 120, 126), "rock")], (20, 34), mask=(4, 10, 36, 34))
+    P.sprite("lift", [art("prop_arch", (64, 88)) or block((64, 88), (70, 60, 56), "lift")], (32, 88), mask=(4, 60, 60, 88))
+    P.sprite("glow_crystal", [art("prop_crystal", (28, 28)) or blob((28, 28), (230, 130, 60))], (14, 24), mask=(2, 8, 26, 28))
     make_sounds(P)
     ground = ground_tileset(P)
 
@@ -267,7 +290,7 @@ def build(out):
     parsed = {f.stem: _tw.read_code(f) for f in files}
     for name, (head, _) in parsed.items():
         P.obj(name, depth=int(head.get("depth", 0)))
-    for name in ("Thornling", "Bat", "Shroom"):
+    for name in ("Thornling", "Bat", "Shroom", "Beetle", "Rockling", "Mole"):
         P.obj(name, sprite=P.sprite_id(f"map_{name.lower()}"), parent=P.obj_id("MapFoe"))
     for ch, (name, size, feet) in PROPS.items():
         w, h = size
@@ -284,10 +307,12 @@ def build(out):
             o["parent"] = P.obj_id(head["parent"])
         for ev, code in events:
             o["events"].append({"id": _tw.new_id(), "key": _tw.event_key(ev, P), "mode": "python", "code": code})
-    # Flowers don't stop you.
+    # Flowers and the mine's mouth don't stop you, and the crystals light the tunnels.
     for o in P.p["objects"]:
-        if o["name"] == "Flowers":
+        if o["name"] in ("Flowers", "MineMouth"):
             o["events"].append({"id": _tw.new_id(), "key": {"type": "create"}, "mode": "python", "code": "super().on_create()\nself.solid = False\n"})
+        if o["name"] == "GlowRock":
+            o["events"].append({"id": _tw.new_id(), "key": {"type": "step"}, "mode": "python", "code": "light(self.x, self.y - 20, 130, \"#ff9a4a\", 1)\n"})
 
     def plain_room(name, colour, objects):
         lid = _tw.new_id()
@@ -358,6 +383,8 @@ def build(out):
     plain_room("Title", "#10142c", ["Title"])
     map_room(HERE / "maps" / "Town.txt", THINGS)
     map_room(HERE / "maps" / "Forest.txt", FOREST_THINGS)
+    map_room(HERE / "maps" / "Mine.txt", MINE_THINGS)
+    map_room(HERE / "maps" / "MineDeep.txt", MINE_THINGS)
     plain_room("Battle", "#202838", ["BattleDirector"])
     plain_room("GameOver", "#000000", ["GameOver"])
     if problems:

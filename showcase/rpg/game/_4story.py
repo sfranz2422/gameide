@@ -50,12 +50,12 @@ def thornback_beaten():
     scene_do(save_game)
 
 
-def light_town_lantern(lantern):
-    """Oona lights the big lantern in the square, and the night gets a little less dark."""
+def light_town_lantern(lantern, quest, next_quest):
+    """Oona lights a lantern, and the night gets a little less dark."""
     take_item("ember_shard")
-    finish_quest("thorn_road")
+    finish_quest(quest)
     S["lit"] += 1
-    start_quest("next")
+    start_quest(next_quest)
     scene_bars()
     scene_camera(lantern.x, lantern.y, 45)
     scene_say("Hold it up to the glass. There.", "Oona", picture="face_oona")
@@ -63,14 +63,55 @@ def light_town_lantern(lantern):
     scene_sound("light")
     scene_do(lantern.light_up)
     scene_wait(40)
-    scene_caption("One lantern lit. Three to go.", 150)
+    scene_caption(["", "One lantern lit. Three to go.", "Two lanterns lit. Two to go."][S["lit"]], 150)
+    scene_do(save_game)
+
+
+def mine_entered():
+    """The first steps into the Ashdeep."""
+    set_flag("mine_entered")
+    scene_bars()
+    scene_say("Smell that? Hot rock. This hill should be cold.", "Bram", picture="face_bram")
+    scene_say("Jory! JORY! ...Those rockfalls are new. Point me at them.", "Bram", picture="face_bram")
+    scene_do(save_game)
+
+
+def golem_meets(foe):
+    """Walking up to the golem, once."""
+    set_flag("met_golem")
+    hero = instances("Player")[0]
+    scene_bars()
+    scene_shake(6, 50)
+    scene_camera(foe.x, foe.y, 45)
+    scene_say("...MINE. MINE. MINE.", "Ashdeep Golem", picture="face_golem", above=foe)
+    scene_say("It's just rock from the mine walls! The ember's woken it up.", "Pip", picture="face_pip")
+    scene_say("Then we'll knock it back down. When it starts to glow, cover yourselves!", "Bram", picture="face_bram")
+    scene_camera(hero.x, hero.y, 30)
+    scene_do(lambda: start_battle(["golem"], hero.x, hero.y + 40, run=False, then="golem_beaten"))
+
+
+def golem_beaten():
+    set_flag("golem_beaten")
+    add_item("ember_shard")
+    reach_stage("ember_mine", 4)
+    scene_bars()
+    scene_shake(4, 30)
+    scene_say("It's falling apart. It's just a heap of stones again.", "Wren", picture="face_wren")
+    scene_flash("orange", 30)
+    scene_sound("quest")
+    scene_say("Wren found an Ember Shard!", None)
+    scene_say("I'll get Jory home. You take that up to Oona. And Wren? Thanks.", "Bram", picture="face_bram")
     scene_do(save_game)
 
 
 # What to run after a fight, by the name start_battle was given.
-STORY_AFTER = {"thornback_beaten": thornback_beaten}
+STORY_AFTER = {"thornback_beaten": thornback_beaten, "golem_beaten": golem_beaten}
 
 
 def set_darkness():
     """The valley's dark, and each lantern lit takes a little of it away."""
-    lighting(max(0.0, 0.62 - 0.15 * S["lit"]), "#0a1030")
+    # Underground, no lantern makes any difference, whatever's been lit up top.
+    if S["room"] in ("Mine", "MineDeep"):
+        lighting(0.7, "#1a0c08")
+    else:
+        lighting(max(0.0, 0.62 - 0.15 * S["lit"]), "#0a1030")

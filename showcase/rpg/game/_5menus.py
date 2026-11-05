@@ -143,7 +143,7 @@ def quests_menu():
 
 
 def shop_menu():
-    wares = SHOP["Goods"]
+    wares = SHOP["Goods"] + (SHOP["After a lantern"] if S["lit"] >= 1 else [])
 
     def label(k):
         data = ITEMS.get(k) or GEAR[k]

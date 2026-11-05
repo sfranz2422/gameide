@@ -1,0 +1,25 @@
+room: Mine
+ground: n
+camera: yes
+# n cave floor  : rails  # rock  A beam  Y minecart  G glowing crystals  o boulder
+# @ start  1 way out to town  e beetle  v rockling  m mole  x Glow Crystal  r cave-in
+# J Jory  c chest of ethers  k the foreman's key  h Bram's hammer  Z the lift
+#############################################
+#######nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn######
+#######nnGnnnnnnnnnnennnAnnnnnnnnnnvnnn######
+#######nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn######
+#######nnnn#########nnZnn##########nnnn######
+#######nvnn#########nnnnn##########nnxn######
+#######nnnn#######################nnhnn######
+########nnn#######################nnnnn######
+########nnn##################################
+###nnnnnnnnnnn#####nnnnnnnnnnnn#####nnnnnnn#
+###nAnnnnnnnnn#####nnnGnnnnnnnn#####nnnnGnn#
+###nnnnenxnnnn#####nnnnnnnnYnnn#####nnennnn#
+###nnnnnnnnnnn#####nnnnJnnnnnnn#####nnnnnnn#
+1n@nnnnnnnnnnn:::r:nnnnnnnnnnnn::r::nnnnnnn#
+###nnnnnnnnvnn#####nnnnnnnnnnnn#####nnnknnn#
+###nnnAnnnnnnn#####nnnnnnnennnn#####nmnnnnn#
+###nnnnnnnnnnn#####nnnnnxnnnnnn#####nnnnvnn#
+###nnnnnnnnnnn#####nnnnnnnnnnnn#####nxnnncn#
+#############################################

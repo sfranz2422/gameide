@@ -37,6 +37,8 @@ ITEMS = {
     "bread": {"name": "Bread", "price": 6, "heal": 12, "says": "Heals 12 HP. Fresh this morning."},
     "herb": {"name": "Moonherb", "price": 0, "says": "The baker wants these."},
     "ember_shard": {"name": "Ember Shard", "price": 0, "says": "Warm to the touch. A lantern would take this."},
+    "mine_key": {"name": "Foreman's Key", "price": 0, "says": "Heavy, and it smells of old tea. It fits the mine's lift."},
+    "glow_crystal": {"name": "Glow Crystal", "price": 0, "says": "Warm and orange. The shopkeeper wants these."},
 }
 
 GEAR = {
@@ -49,6 +51,11 @@ GEAR = {
     "robe": {"name": "Robe", "slot": "armour", "dfn": 0, "price": 0, "who": ("pip",)},
     "apron": {"name": "Apron", "slot": "armour", "dfn": 0, "price": 0, "who": ("bram",)},
     "leather": {"name": "Leather Armour", "slot": "armour", "dfn": 3, "price": 50, "who": ("wren", "pip", "bram")},
+    "great_sword": {"name": "Great Sword", "slot": "weapon", "atk": 9, "price": 170, "who": ("wren",)},
+    "silver_staff": {"name": "Silver Staff", "slot": "weapon", "mag": 8, "price": 150, "who": ("pip",)},
+    "war_hammer": {"name": "War Hammer", "slot": "weapon", "atk": 7, "price": 130, "who": ("bram",)},
+    "foreman_hammer": {"name": "Foreman's Hammer", "slot": "weapon", "atk": 5, "price": 0, "who": ("bram",)},
+    "iron_armour": {"name": "Iron Armour", "slot": "armour", "dfn": 6, "price": 140, "who": ("wren", "pip", "bram")},
     "cat_ring": {"name": "Silver Ring", "slot": "armour", "dfn": 2, "spd": 3, "price": 0, "who": ("wren", "pip", "bram")},
 }
 
@@ -59,6 +66,12 @@ FOES = {
     "shroom": {"name": "Cross Mushroom", "hp": 20, "atk": 6, "dfn": 2, "spd": 2, "xp": 8, "gold": 6, "moves": [("Bonk", 1.0, "one"), ("Spores", 0.6, "all")]},
     "thornback": {"name": "Thornback", "hp": 80, "atk": 11, "dfn": 3, "spd": 5, "xp": 60, "gold": 60, "boss": True,
                   "moves": [("Gore", 1.2, "one"), ("Gore", 1.2, "one"), ("Bramble Storm", 0.7, "all")]},
+    "beetle": {"name": "Cave Beetle", "hp": 26, "atk": 11, "dfn": 7, "spd": 5, "xp": 13, "gold": 9, "moves": [("Pinch", 1.0, "one")]},
+    "rockling": {"name": "Rockling", "hp": 34, "atk": 12, "dfn": 5, "spd": 3, "xp": 16, "gold": 11, "moves": [("Thump", 1.0, "one"), ("Pebbles", 0.6, "all")]},
+    "mole": {"name": "Lantern Mole", "hp": 30, "atk": 14, "dfn": 3, "spd": 8, "xp": 18, "gold": 16, "moves": [("Pickaxe", 1.1, "one")]},
+    # "charge": every so many of its turns it glows, and its next turn is this. Defend!
+    "golem": {"name": "Ashdeep Golem", "hp": 190, "atk": 17, "dfn": 7, "spd": 2, "xp": 150, "gold": 150, "boss": True, "charge": (3, "Molten Burst", 1.5),
+              "moves": [("Slam", 1.2, "one"), ("Slam", 1.2, "one"), ("Rockfall", 0.7, "all")]},
 }
 
 # What each foe on the map brings to a fight, by the name of its object.
@@ -67,13 +80,20 @@ MAP_GROUPS = {
     "Bat": ["bat", "bat", "thornling"],
     "Shroom": ["shroom", "bat"],
     "Thornback": ["thornback"],
+    "Beetle": ["beetle", "beetle"],
+    "Rockling": ["rockling", "beetle"],
+    "Mole": ["mole", "rockling"],
+    "Golem": ["golem"],
 }
 
-SHOP = {"Goods": ["potion", "ether", "bread", "iron_sword", "ash_staff", "leather"]}
+# Later goods come in with each lantern lit: the road's a bit safer, so the carts get through.
+SHOP = {"Goods": ["potion", "ether", "bread", "iron_sword", "ash_staff", "leather"],
+        "After a lantern": ["great_sword", "silver_staff", "war_hammer", "iron_armour"]}
 INN_PRICE = 8
+BEETLES_FOR_MARTA = 6
 
 # The picture behind a battle, by the room it started in.
-BATTLE_BACK = {"Town": "back_fields", "Forest": "back_forest"}
+BATTLE_BACK = {"Town": "back_fields", "Forest": "back_forest", "Mine": "back_mine", "MineDeep": "back_mine"}
 
 # Each quest: its title, then what to do at each stage. A quest's stage is kept in S["quests"].
 QUESTS = {
@@ -83,5 +103,14 @@ QUESTS = {
     ]},
     "herbs": {"title": "Five Moonherbs", "stages": ["Pick 5 Moonherbs in Whisper Wood for Dot."]},
     "cat": {"title": "Where's Mittens?", "stages": ["Find Mittens in Whisper Wood, and tell Tam."]},
+    "ember_mine": {"title": "The Ashdeep Ember", "main": True, "stages": [
+        "Ask Bram the smith about the old mine.",
+        "Find Jory in the Ashdeep Mine, east of town.",
+        "Find the foreman's key for the mine's lift.",
+        "Take the lift down. Find what's glowing.",
+        "Bring the second Ember Shard back to Oona.",
+    ]},
+    "crystals": {"title": "Four Glow Crystals", "stages": ["Bring 4 Glow Crystals from the mine to Hob."]},
+    "beetles": {"title": "The Inn's Beetles", "stages": ["Beat 6 Cave Beetles in the mine for Marta."]},
     "next": {"title": "To be continued", "main": True, "stages": ["More of the valley comes in the next chapter."]},
 }
