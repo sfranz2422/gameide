@@ -57,7 +57,7 @@ FOES = {
     "thornling": {"name": "Thornling", "hp": 14, "atk": 6, "dfn": 1, "spd": 4, "xp": 6, "gold": 4, "moves": [("Prickle", 1.0, "one")]},
     "bat": {"name": "Big-Ear Bat", "hp": 10, "atk": 5, "dfn": 0, "spd": 9, "xp": 5, "gold": 3, "moves": [("Bite", 1.0, "one")]},
     "shroom": {"name": "Cross Mushroom", "hp": 20, "atk": 6, "dfn": 2, "spd": 2, "xp": 8, "gold": 6, "moves": [("Bonk", 1.0, "one"), ("Spores", 0.6, "all")]},
-    "thornback": {"name": "Thornback", "hp": 130, "atk": 11, "dfn": 3, "spd": 5, "xp": 60, "gold": 60, "boss": True,
+    "thornback": {"name": "Thornback", "hp": 80, "atk": 11, "dfn": 3, "spd": 5, "xp": 60, "gold": 60, "boss": True,
                   "moves": [("Gore", 1.2, "one"), ("Gore", 1.2, "one"), ("Bramble Storm", 0.7, "all")]},
 }
 
