@@ -249,3 +249,20 @@ on("", "Thornwood")("Thornwood's board", () => {
     expect(g.scores).toEqual([12]);
   }, 60_000);
 });
+
+on("climber")("Snowcap Scramble's board", () => {
+  it("is the best height in metres, only when it's a new best", async () => {
+    const g = await start(builtAt("climber"), { best: 30 });
+    expect(g.project.settings.scoreboard).toEqual({ unit: "m" });
+    g.py('room_goto("Mountain")');
+    g.step(3);
+    g.py("me = global_vars.player\nme.y = GROUND_Y - 20 * METER\nme.on = None");
+    g.step(2);
+    expect(g.scores).toEqual([]);
+    g.py("me = global_vars.player\nme.y = GROUND_Y - 45 * METER\nme.on = None");
+    g.step();
+    expect(g.scores.length).toBe(1);
+    expect(g.scores[0]).toBeGreaterThanOrEqual(44);
+    expect(g.scores[0]).toBe(g.py("global_vars.best"));
+  });
+});

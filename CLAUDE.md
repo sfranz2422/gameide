@@ -296,7 +296,7 @@ code (the harness turns bytecode caching off for that reason), or a
 mistyped case name ran nothing and still reported success (the harness now
 refuses unknown names).
 
-**The showcase games' runners** (`GM`, `MM`, `FB`, `GF`, `BB`, `HC`, `KT`, `TD`, `SM`) rebuild
+**The showcase games' runners** (`GM`, `MM`, `FB`, `GF`, `BB`, `HC`, `KT`, `TD`, `SM`, `RP`, `CLIMB` — not `CL`, which is classes.py) rebuild
 that game from the sabotaged source before its playtest and again after. A
 build that **refuses** (Greenside's course checks, Ridgeline Rally's stage
 checks) leaves the old `out/project.json`, and the test passes on it: a
@@ -553,6 +553,17 @@ and students' own games are untouched.
 - **How a game's scores rank is `settings.scoreboard`** (`lowest`, `unit`; set in Game settings or by a showcase build), and the server reads it from the published game, never from the page, or one student could turn a board upside down. Unit `time` is seconds, kept as hundredths.
 - Every showcase game reports (`src/showcase/scores.test.ts`). Thornwood and Greymire can't be built without their art, so `showcase/patch_zip.py` puts new code into a zip that already has the pictures, writing `-patched` files beside it. **Their runners can't test a sabotage here; a build that lacks art also overwrites `out/` with stand-ins for the games that allow that (mystery, football, baseball). Check `~/Downloads` before rebuilding those.**
 - It goes Python → `_commands` "score" → worker → `GameHost.events.score` → at most one POST per 2 s, because a game may call it every step.
+
+## Multiplayer rooms
+
+`backend/multiplayer.py`, `player/net.ts` + `NetLobby.tsx`, the `net_` section of runtime.py. A published game whose code uses `net_` gets a lobby instead of Play: make a room (a 4-letter code) or join one by its code, for **one GameIDE class**; or play alone.
+
+- **No websockets: HTTP sync.** The page POSTs `/api/net/sync` every `SYNC_MS` (the server says, so it can be slowed without a build), one request at a time. Rooms live in Postgres (`gameide_net_*`), because gunicorn's two workers share no memory. A sync is token **and** session: a copied token does nothing.
+- **Into the game: one call a frame still.** The worker keeps what arrived (`PythonGame.netArrive`) and hands it to the next `_frame(net)`; messages last one step. Out: `net_send`/`net_shout`/`net_away` go with the frame's commands as `net`, and `GameHost.events.net` passes them to the session.
+- **Away hides you and deafens you** (the teacher's rule: nothing affects a player answering a question): `holdForQuestion` → `events.held` → `NetSession.hold`; a hidden tab; `net_away()`. The server leaves away players out and moves their `after` past what they missed, and the page drops messages while held.
+- Names are `_board_name` (students by first name), never an email; a wrong class gets the same answer as a wrong code. A new route handing out players needs a leak check.
+- Syncing isn't activity (`_counts_as_activity`), or playing would pay XP's working time.
+- Outside a room (the editor, exports) every `net_` function quietly does nothing.
 
 ## XP
 

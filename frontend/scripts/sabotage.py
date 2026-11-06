@@ -47,6 +47,8 @@ PC, PCP, PCT = "../backend/pycheck.py", "../backend/publishing.py", "src/pycheck
 TD = "towers"     # …or Fort Bramble's, rebuilt the same way
 SM = "smash"      # …or Jelly Jailbreak's, rebuilt the same way
 RP = "rpg"        # …or The Lanterns of Hollowmere's, rebuilt the same way
+CLIMB = "climber"  # …or Snowcap Scramble's, rebuilt the same way (not CL: that's classes.py)
+def _cl(n): return f"../showcase/climber/game/{n}.py"
 SMR, SML, SMB = "../showcase/smash/game/_2rules.py", "../showcase/smash/game/_1levels.py", "../showcase/smash/build.py"
 def _sm(n): return f"../showcase/smash/game/{n}.py"
 def _rp(n): return f"../showcase/rpg/game/{n}.py"
@@ -80,6 +82,7 @@ TU, TUP, TP = "../backend/tutorials.py", "src/tutorials/tutorial.ts", "src/tutor
 FX, FEEL, BRG = "src/engine/effects.ts", "src/engine/render/feel.ts", "src/python/bridge.ts"
 PXR = "src/engine/render/pixiRenderer.ts"
 PH = "src/engine/physics.ts"
+MP, NETS = "../backend/multiplayer.py", "src/player/net.ts"
 CASES = [
  ("layout drift", RT, '"x": boxy(F.X)', '"x": boxy(F.Y)', "every built-in property"),
  ("no polar sync", RT, "            _st[b + i] = v\n            set_polar(b)", "            _st[b + i] = v", "two views of one motion"),
@@ -1528,6 +1531,68 @@ CASES = [
  ("hillclimb: a stage bought isn't kept", HCG, '    save_set("stages", owned_stages() + [name])', '    pass', "keeps coins, upgrades", HC),
  ("hillclimb: a cliff builds", HCB, "                if math.sin(slope) > most:", "                if False:", "won't build a stage", HC),
  ("hillclimb: a stage longer than the room builds", HCB, '        if len(hs) * GAME["STEP"] > ROOM_W - VIEW_W:', '        if False:', "won't build a stage", HC),
+ # Multiplayer rooms (backend/multiplayer.py, runtime.py's net_, player/net.ts)
+ ('rooms: any class joins', MP, '        if room is None or not any(c.id == room.class_id for c in classes_of(db, user)):', '        if room is None:', "rooms: another class can't join", PY),
+ ('rooms: another class told it exists', MP, '        if room is None or not any(c.id == room.class_id for c in classes_of(db, user)):', '        if room is not None and not any(c.id == room.class_id for c in classes_of(db, user)):\n            return err("That room is for another class.", 404)\n        if room is None:', "…and is told just what a wrong code is told", PY),
+ ('rooms: emails go out', MP, '    me.name, me.seen_at, me.away = _board_name(user), t, 0', '    me.name, me.seen_at, me.away = user.email, t, 0', "rooms: no email, last name or token goes out", PY),
+ ('rooms: a token is enough', MP, '        if me is None or me.user_id != uid:\n            return err("You\'re not in this room', '        if me is None:\n            return err("You\'re not in this room', "rooms: someone else's token does nothing", PY),
+ ('rooms: no cap', MP, '        if len(present) >= MAX_PLAYERS:', '        if len(present) >= MAX_PLAYERS + 5:', "rooms: twenty at most", PY),
+ ('rooms: away still shown', MP, '                   for r in rows if r.id != me.id and not r.away]', '                   for r in rows if r.id != me.id]', "rooms: an away player is hidden", PY),
+ ('rooms: away still hears', MP, '        out = [] if away else [', '        out = [] if False else [', "rooms: an away player gets no messages", PY),
+ ('rooms: back to a backlog', MP, '        last = new[-1].id if new else after', '        last = after', "…and none of what they missed", PY),
+ ('rooms: away still shouts', MP, '            if not away:\n                db.add(NetMessage', '            if True:\n                db.add(NetMessage', "rooms: an away player's messages go nowhere", PY),
+ ('rooms: shouts echo', MP, '                               for m in new if m.sender != me.number]', '                               for m in new]', "rooms: …and not its sender", PY),
+ ('rooms: leaving does nothing', MP, '            me.seen_at, me.token = 0, secrets.token_urlsafe(24)', '            me.token = secrets.token_urlsafe(24)', "rooms: leaving is at once", PY),
+ ('rooms: a late sync rejoins', MP, '            me.seen_at, me.token = 0, secrets.token_urlsafe(24)', '            me.seen_at = 0', "late sync doesn't bring them back", PY),
+ ('rooms: an old tab keeps going', MP, '    me.token = secrets.token_urlsafe(24)    # a new page', '    pass    # a new page', "the old page's token stops", PY),
+ ('rooms: a number never comes back', MP, '    taken = {p.number for p in present if me is None or p.id != me.id}', '    taken = {p.number for p in db.query(NetPlayer).filter_by(room_id=room.id) if me is None or p.id != me.id}', "their number is given out again", PY),
+ ('rooms: in two at once', MP, '    for p in others:\n        p.seen_at = 0', '    for p in others:\n        pass', "rooms: one room per game", PY),
+ ('rooms: idle rooms kept', MP, 'NetRoom.active_at < t - ROOM_IDLE_SECONDS).all()', 'NetRoom.active_at < t - ROOM_IDLE_SECONDS * 1000).all()', "rooms: a room idle half an hour", PY),
+ ('rooms: unpublishing leaves rooms', PCP, '    import multiplayer\n    multiplayer.delete_rooms(db, pub.id)', '    import multiplayer\n    multiplayer.delete_rooms(db, -1 + 0 * pub.id)', "rooms: unpublishing takes its rooms", PY),
+ ('rooms: a code opens any game', MP, 'db.query(NetRoom).filter_by(published_id=pub.id, code=code).first()', 'db.query(NetRoom).filter_by(code=code).first()', "rooms: a code is for its own game", PY),
+ ('rooms: any size of state', MP, 'MAX_STATE = 2000 ', 'MAX_STATE = 200000 ', "rooms: a state is a small dict", PY),
+ ('rooms: playing is working', APP, '    if request.path in ("/api/net/sync", "/api/net/leave"):\n        return False', '    if request.path in ("/api/net/nothing",):\n        return False', "rooms: playing isn't working", PY),
+ ('net: messages linger', RT, '        _net_messages.clear()\n        if net is not None:', '        if net is not None:', "a message lasts the one step"),
+ ('net: state every step', RT, '        if text != _net_state:', '        if True:', "only when it changed"),
+ ('net: away still hears', RT, '    if not _net_away:\n        _net_messages.extend', '    if True:\n        _net_messages.extend', "away: hidden, deaf"),
+ ('net: away still shouts', RT, '    if _net is not None and not _net_away:\n        _net_out.setdefault', '    if _net is not None:\n        _net_out.setdefault', "away: hidden, deaf"),
+ ('net: shouts outside a room', RT, '    if _net is not None and not _net_away:\n        _net_out.setdefault', '    if not _net_away:\n        _net_out.setdefault', "outside a room everything quietly does nothing"),
+ ('net: lost between steps', BRG, '    this.netMessages.push(...messages);', '    this.netMessages = [...messages];', "none is lost between steps"),
+ ('net: any name sent', RT, 'key in ("number", "name", "get"):', 'key in ("get",):', "refuses what it couldn't send"),
+ ('net: a question isn\'t away', NETS, '    return this.held || this.gameAway || document.visibilityState === "hidden";', '    return this.gameAway || document.visibilityState === "hidden";', "a room: made by one student", E2E),
+ ('net: the page never hears of a question', HOST, '    this.events.held?.(on);\n', '', "a room: made by one student", E2E),
+ ('net: closing isn\'t leaving', NETS, '    addEventListener("pagehide", this.onLeave);', '    addEventListener("pagehide", () => undefined);', "a room: made by one student", E2E),
+ ('net: the game starts alone', PA, '    const def = net.current ? { ...built, net: net.current.forGame } : built;', '    const def = built;', "a room: made by one student", E2E),
+ ('net: a lobby for every game', PA, '  const multi = !!id && !!pkg && usesNet(pkg.project);', '  const multi = !!id && !!pkg && (usesNet(pkg.project) || true);', "a game with no net_ calls just has its Play button", E2E),
+
+ ('music outlives the editor', HOST, '    this.showTouch(null);\n    this.canvas?.remove();\n    this.sound.close();\n', '    this.showTouch(null);\n    this.canvas?.remove();\n', "leaving the editor silences", E2E),
+ # Snowcap Scramble (showcase/climber)
+ ('climber: unreachable ledges allowed', _cl("_1rules"), '                if can_reach(a, b):\n                    break', '                if True:\n                    break', "four ways up that can each be climbed", CLIMB),
+ ('climber: reach overrated', _cl("_1rules"), '    return 0 if t is None else t * RUN * 0.72', '    return 0 if t is None else t * RUN * 1.6', "a bot climbs 150 metres", CLIMB),
+ ('climber: a different mountain each time', _cl("_1rules"), '        self.rng = random.Random(seed)', '        self.rng = random.Random()', "the same seed makes the same mountain", CLIMB),
+ ('climber: landing from below', _cl("Player"), '            if self.y <= ledge.y - ledge.dy + 0.01 and new_y >= ledge.y:', '            if abs(new_y - ledge.y) < 12:', "never from below", CLIMB, ('    if self.vy > 0:\n        for ledge', '    if True:\n        for ledge')),
+ ('climber: jump too high', _cl("_1rules"), 'JUMP_V = -9.2 ', 'JUMP_V = -10.4 ', "a jump is about four metres high", CLIMB),
+ ('climber: ice grips', _cl("IceLedge"), 'self.slippery = True', 'self.slippery = False', "ice: slow to get going", CLIMB),
+ ('climber: cracks never break', _cl("CrumbleLedge"), '    if self.cracking >= CRUMBLE_STAND:', '    if self.cracking >= CRUMBLE_STAND * 100:', "a cracked ledge breaks under you", CLIMB),
+ ('climber: broken for good', _cl("CrumbleLedge"), '    if self.away <= 0:', '    if False:', "a cracked ledge breaks under you", CLIMB),
+ ('climber: planks don\'t carry', _cl("Player"), 'if self.on is not None:\n    self.x += self.on.dx\n', '', "a swinging plank carries", CLIMB),
+ ('climber: picker ignored', _cl("Player"), 'self.pic = save_get("climber", "red")', 'self.pic = "red"', "the climber picked on the title", CLIMB),
+ ('climber: best not kept', _cl("Player"), '    save_set("best", metres)\n', '', "the best height is kept", CLIMB),
+ ('climber: best not on the board', _cl("Player"), '    high_score(metres)\n', '', "the best height is kept", CLIMB),
+ ('climber: best forgotten', _cl("Player"), 'self.best = save_get("best", 0)', 'self.best = 0', "the best height is kept", CLIMB),
+ ('climber: snowballs pass through', _cl("Snowball"), '        hit = True', '        hit = hit', "X throws a snowball", CLIMB),
+ ('climber: snowballs nonstop', _cl("Player"), '    self.throw_wait = THROW_EVERY', '    self.throw_wait = 0', "X throws a snowball", CLIMB),
+ ('climber: no wind', _cl("Mountain"), 'if metres >= WIND_FROM:', 'if metres >= WIND_FROM * 100:', "the wind blows on Windy Ridge", CLIMB),
+ ('climber: wind everywhere', _cl("_1rules"), 'WIND_FROM = 150 ', 'WIND_FROM = 0 ', "the wind blows on Windy Ridge", CLIMB),
+ ('climber: the whole mountain kept', _cl("Mountain"), '        if instance_exists(ledge) and ledge.stood == 0:\n            ledge.destroy()', '        if instance_exists(ledge) and ledge.stood == 0:\n            pass', "only the mountain near the camera", CLIMB),
+ ('climber: no ground', _cl("Ground"), 'self.half = ROOM_W / 2', 'self.half = 10', "the ground at base camp catches", CLIMB),
+ ('climber: pause does nothing', _cl("Hud"), '    game_pause(not game_paused())', '    game_pause(False)', "P pauses", CLIMB),
+ ('climber: long falls forgotten', _cl("Player"), '        self.top_of_fall = self.y\n        if fell > BIG_FALL:', '        if fell > BIG_FALL:', "a long fall lands", CLIMB),
+
+ ('climber: notices on every climb back', _cl("Hud"), 'elif zone_at(global_vars.best) != self.reached:\n    self.reached = zone_at(global_vars.best)', 'elif zone_at(global_vars.height) != self.reached:\n    self.reached = zone_at(global_vars.height)', "each part of the mountain is named once", CLIMB),
+ ('climber: one screen wide', _cl("_1rules"), 'ROOM_W = 3200 ', 'ROOM_W = 640 ', "five screens wide", CLIMB),
+ ('climber: routes bunched up', _cl("_1rules"), '        left = max(WALL_L, self.lanes[k][0] - VIEW_W / 2)', '        left = max(WALL_L, ROOM_W / 2 - VIEW_W)', "five screens wide", CLIMB),
+
 ]
 only = sys.argv[1:]
 # A name that matches no case would otherwise run nothing and still say
@@ -1562,7 +1627,7 @@ for name, f, old, new, test, *extra in CASES:
             failed = any(l.startswith("FAIL") and test in l for l in out.splitlines())
             ran = "ok   " in out or "FAIL " in out
         else:
-            if runner in ([GM], [MM], [FB], [GF], [BB], [HC], [KT], [TD], [SM], [RP]):
+            if runner in ([GM], [MM], [FB], [GF], [BB], [HC], [KT], [TD], [SM], [RP], [CLIMB]):
                 subprocess.run(["python3", str(ROOT.parent / f"showcase/{runner[0]}/build.py")], capture_output=True)
             cmd = ["npx", "playwright", "test", "-g", test] if runner == [E2E] else ["npx", "vitest", "run", "-t", test]
             r = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True)
@@ -1573,6 +1638,6 @@ for name, f, old, new, test, *extra in CASES:
         if not failed: bad.append(name)
     finally:
         p.write_text(src)
-        if runner in ([GM], [MM], [FB], [GF], [BB], [HC], [KT], [TD], [SM], [RP]):
+        if runner in ([GM], [MM], [FB], [GF], [BB], [HC], [KT], [TD], [SM], [RP], [CLIMB]):
             subprocess.run(["python3", str(ROOT.parent / f"showcase/{runner[0]}/build.py")], capture_output=True)
 print("ALL SABOTAGES CAUGHT" if not bad else f"NOT CAUGHT: {bad}")
