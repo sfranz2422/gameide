@@ -1771,6 +1771,151 @@ check("high scores: a game that says nothing is highest wins", _bp["lowest"] is 
 check("high scores: …and the game's gone", client(f"pat@{M}").get(f"/api/play/{HS}/scores").status_code == 404)
 _sdb.close()
 
+# ---------------------------------------------------------------- multiplayer rooms (multiplayer.py)
+import multiplayer  # noqa: E402
+S = "net.example"
+_ndb = server.SessionLocal()
+_tid = _ndb.query(accounts.User).filter_by(email="teacher@example.com").first().id
+_k1 = accounts.Course(teacher_id=_tid, name="Net K1", app="gameide")
+_k2 = accounts.Course(teacher_id=_tid, name="Net K2", app="gameide")
+_kpy = accounts.Course(teacher_id=_tid, name="Net Python", app="pyide")
+_ndb.add_all([_k1, _k2, _kpy])
+_ndb.flush()
+K1, K2, KPY = _k1.id, _k2.id, _kpy.id
+for _e in ["nia", "oli"] + [f"k{i}" for i in range(20)]:
+    _ndb.add(accounts.Enrollment(class_id=K1, email=f"{_e}@{S}", name=_e))
+_ndb.add(accounts.Enrollment(class_id=K2, email=f"pam@{S}", name="pam"))
+_ndb.add(accounts.Enrollment(class_id=KPY, email=f"pyo@{S}", name="pyo"))
+_ndb.commit()
+_nia, _oli, _pam, _quinn, _pyo = (client(f"{n}@{S}") for n in ("nia", "oli", "pam", "quinn", "pyo"))
+_nteach = client("teacher@example.com")
+for _email, _first, _last in ((f"nia@{S}", "Nia", "Quartermain"), (f"oli@{S}", "Oli", "Vandersloot")):
+    _u = _ndb.query(accounts.User).filter_by(email=_email).first()
+    _u.first_name, _u.last_name, _u.name = _first, _last, f"{_first} {_last}"
+_ndb.commit()
+put(_nia, "net1", project("net1", "Climb"), 0)
+NG = _nia.post("/api/projects/net1/publish", json={"title": "Climb", "visibility": "unlisted"}).get_json()["published"]["id"]
+put(_nia, "net2", project("net2", "Other"), 0)
+NG2 = _nia.post("/api/projects/net2/publish", json={"title": "Other", "visibility": "unlisted"}).get_json()["published"]["id"]
+
+
+def _sync(c, tok, **kw):
+    return c.post("/api/net/sync", json={"token": tok, **kw})
+
+
+def _others(c, tok, **kw):
+    return {p["number"]: p for p in (_sync(c, tok, **kw).get_json() or {}).get("players", [])}
+
+
+check("rooms: signing in comes first", client().post(f"/api/play/{NG}/net/create", json={}).status_code == 401)
+check("rooms: a student is offered their own GameIDE classes", [c["name"] for c in _nia.get(f"/api/play/{NG}/net").get_json()["classes"]] == ["Net K1"])
+check("rooms: …never another editor's", _pyo.get(f"/api/play/{NG}/net").get_json()["classes"] == [])
+check("rooms: no class, no room", _quinn.post(f"/api/play/{NG}/net/create", json={}).status_code == 403
+      and _pyo.post(f"/api/play/{NG}/net/create", json={}).status_code == 403)
+check("rooms: a teacher of two classes says which", _nteach.post(f"/api/play/{NG}/net/create", json={}).status_code == 400)
+check("rooms: …and only one of theirs", _nteach.post(f"/api/play/{NG}/net/create", json={"classId": KPY}).status_code == 403
+      and _nia.post(f"/api/play/{NG}/net/create", json={"classId": K2}).status_code == 403)
+_r = _nia.post(f"/api/play/{NG}/net/create", json={}).get_json()
+CODE, NT = _r["code"], _r["token"]
+check("rooms: a room has a four-letter code with no vowels", re.fullmatch(r"[B-DF-HJ-NP-TV-XZ]{4}", CODE) is not None, CODE)
+check("rooms: its maker is player 1, by first name", _r["number"] == 1 and _r["name"] == "Nia" and _r["state"] == {}, _r)
+_r = _oli.post(f"/api/play/{NG}/net/join", json={"code": " " + CODE.lower()[:2] + " " + CODE.lower()[2:]}).get_json()
+OT = _r["token"]
+check("rooms: a classmate joins by the code, typed any old way", _r["number"] == 2 and _r["code"] == CODE, _r)
+_no_class = _pam.post(f"/api/play/{NG}/net/join", json={"code": CODE})
+_no_room = _pam.post(f"/api/play/{NG}/net/join", json={"code": "ZZZZ" if CODE != "ZZZZ" else "BBBB"})
+check("rooms: another class can't join", _no_class.status_code == 404)
+check("rooms: …and is told just what a wrong code is told", _no_class.get_json()["error"].replace(CODE, "X") == _no_room.get_json()["error"].replace("ZZZZ", "X").replace("BBBB", "X"),
+      (_no_class.get_json(), _no_room.get_json()))
+check("rooms: no one in the PyIDE class either", _pyo.post(f"/api/play/{NG}/net/join", json={"code": CODE}).status_code == 404)
+check("rooms: a code is for its own game", _oli.post(f"/api/play/{NG2}/net/join", json={"code": CODE}).status_code == 404)
+_tj = _nteach.post(f"/api/play/{NG}/net/join", json={"code": CODE}).get_json()
+check("rooms: the class's teacher joins, by last name", _tj.get("number") == 3 and _tj.get("name") != "", _tj)
+_nteach.post("/api/net/leave", json={"token": _tj["token"]})
+
+_sync(_nia, NT, state={"x": 10, "y": -400, "pic": 2})
+_seen = _others(_oli, OT)
+check("rooms: a player's state reaches the others", _seen.get(1) == {"number": 1, "name": "Nia", "state": {"x": 10, "y": -400, "pic": 2}}, _seen)
+check("rooms: …and not themselves", 1 not in _others(_nia, NT) and 2 in _others(_nia, NT))
+_raw = _sync(_oli, OT).get_data(as_text=True)
+check("rooms: no email, last name or token goes out", "@" not in _raw and "Quartermain" not in _raw and "Vandersloot" not in _raw and NT not in _raw and "user" not in _raw, _raw)
+check("rooms: someone else's token does nothing", _sync(_pam, NT).status_code == 410 and _sync(client(), NT).status_code == 401)
+check("rooms: a state is a small dict", _sync(_nia, NT, state=[1]).status_code == 400
+      and _sync(_nia, NT, state={"a": "x" * 3000}).status_code == 400 and _sync(_nia, NT, msgs=[{}] * 11).status_code == 400)
+
+_a = _sync(_oli, OT).get_json()["after"]
+_sync(_nia, NT, msgs=[{"snowball": [1, 2]}])
+_got = _sync(_oli, OT, after=_a).get_json()
+check("rooms: a message reaches the others once", [m["data"] for m in _got["msgs"]] == [{"snowball": [1, 2]}] and _got["msgs"][0]["from"] == 1, _got)
+check("rooms: …once", _sync(_oli, OT, after=_got["after"]).get_json()["msgs"] == [])
+check("rooms: …and not its sender", _sync(_nia, NT, after=_a).get_json()["msgs"] == [])
+
+_a = _sync(_oli, OT).get_json()["after"]
+_held = _sync(_oli, OT, away=True, after=_a).get_json()
+check("rooms: an away player is hidden from the others", 2 not in _others(_nia, NT))
+_sync(_nia, NT, msgs=[{"snowball": [3, 4]}])
+_held2 = _sync(_oli, OT, away=True, after=_held["after"]).get_json()
+check("rooms: an away player gets no messages", _held2["msgs"] == [] and _held2["after"] > _held["after"], _held2)
+_back = _sync(_oli, OT, away=False, after=_held2["after"]).get_json()
+check("rooms: …and none of what they missed when they're back", _back["msgs"] == [] and 2 in _others(_nia, NT), _back)
+_sync(_oli, OT, away=True, msgs=[{"snowball": [9, 9]}])
+check("rooms: an away player's messages go nowhere", _sync(_nia, NT, after=_back["after"]).get_json()["msgs"] == [])
+_sync(_oli, OT, away=False)
+
+_sync(_oli, OT, state={"best": 1234})
+with _oli.session_transaction() as sess:
+    sess["act"], sess["busy"] = int(time.time()) - 600, 0
+_sync(_oli, OT)
+_oli.post("/api/net/leave", json={"token": "nothing"})
+with _oli.session_transaction() as sess:
+    _act, _busy = sess["act"], sess.get("busy", 0)
+check("rooms: playing isn't working: a sync adds no XP working time", _busy == 0 and int(time.time()) - _act >= 599, (_act, _busy))
+_oli.post("/api/net/leave", json={"token": OT})
+check("rooms: leaving is at once", 2 not in _others(_nia, NT))
+check("rooms: …and a closing page's late sync doesn't bring them back", _sync(_oli, OT, away=True).status_code == 410 and _sync(_nia, NT).get_json()["here"] == 1)
+_r = _oli.post(f"/api/play/{NG}/net/join", json={"code": CODE}).get_json()
+check("rooms: coming back keeps your number and state", _r["number"] == 2 and _r["state"] == {"best": 1234}, _r)
+check("rooms: …and the old page's token stops", _sync(_oli, OT).status_code == 410)
+OT = _r["token"]
+_r2 = _oli.post(f"/api/play/{NG}/net/join", json={"code": CODE}).get_json()
+check("rooms: a second tab takes over from the first", _sync(_oli, OT).status_code == 410 and _sync(_oli, _r2["token"]).status_code == 200)
+OT = _r2["token"]
+
+_kids = [client(f"k{i}@{S}") for i in range(20)]
+_kt = [k.post(f"/api/play/{NG}/net/join", json={"code": CODE}).get_json() for k in _kids]
+check("rooms: twenty at most", [bool(t.get("token")) for t in _kt].count(True) == 18 and _kids[18].post(f"/api/play/{NG}/net/join", json={"code": CODE}).status_code == 409,
+      [t.get("number") for t in _kt])
+check("rooms: numbers 1 to 20, each once", sorted([1, 2] + [t["number"] for t in _kt if t.get("token")]) == list(range(1, 21)))
+check("rooms: everyone sees the other nineteen", len(_others(_nia, NT)) == 19 and _sync(_nia, NT).get_json()["here"] == 20)
+_kids[0].post("/api/net/leave", json={"token": _kt[0]["token"]})
+_r = _kids[19].post(f"/api/play/{NG}/net/join", json={"code": CODE}).get_json()
+check("rooms: someone leaving makes room, and their number is given out again", _r.get("number") == _kt[0]["number"], _r)
+for k, t in zip(_kids, _kt):
+    if t.get("token"):
+        k.post("/api/net/leave", json={"token": t["token"]})
+
+_r = _oli.post(f"/api/play/{NG}/net/create", json={}).get_json()
+check("rooms: one room per game: making another leaves the first", 2 not in _others(_nia, NT) and _r["number"] == 1)
+_rdb = server.SessionLocal()
+_old = _rdb.query(gamestore.NetRoom).filter_by(code=_r["code"], published_id=_rdb.query(gamestore.Published).filter_by(slug=NG).first().id).first()
+_old.active_at = time.time() - multiplayer.ROOM_IDLE_SECONDS - 5
+_old_id = _old.id
+_rdb.commit()
+_rdb.close()
+_nia.post(f"/api/play/{NG}/net/join", json={"code": CODE})
+_rdb = server.SessionLocal()
+check("rooms: a room idle half an hour is deleted, players and all", _rdb.get(gamestore.NetRoom, _old_id) is None
+      and _rdb.query(gamestore.NetPlayer).filter_by(room_id=_old_id).count() == 0)
+_pid = _rdb.query(gamestore.Published).filter_by(slug=NG).first().id
+_rdb.close()
+_sync(_nia, _nia.post(f"/api/play/{NG}/net/join", json={"code": CODE}).get_json()["token"], msgs=[{"a": 1}])
+check("rooms: unpublishing takes its rooms with it", _nia.delete("/api/projects/net1/publish").status_code == 200)
+_rdb = server.SessionLocal()
+check("rooms: …all of them", _rdb.query(gamestore.NetRoom).filter_by(published_id=_pid).count() == 0
+      and _rdb.query(gamestore.NetPlayer).count() == _rdb.query(gamestore.NetPlayer).join(gamestore.NetRoom, gamestore.NetRoom.id == gamestore.NetPlayer.room_id).count())
+_rdb.close()
+_ndb.close()
+
 print()
 if failures:
     print(f"FAILED: {len(failures)} — " + "; ".join(failures))

@@ -11,7 +11,7 @@
  * is input going in; stats and output come out a few times a second.
  */
 import type { PythonGameError, TouchSpec } from "../engine/engine";
-import type { GameDefinition, SoundOrder } from "../engine/game";
+import type { GameDefinition, NetMessageIn, NetOut, NetPlayerState, SoundOrder } from "../engine/game";
 import type { PadState } from "../engine/input";
 
 export type InputMessage =
@@ -34,6 +34,8 @@ export type ToWorker =
   /** The debugger: stop the game's steps (still drawn), take one step, look inside an instance. */
   | { type: "freeze"; on: boolean }
   | { type: "step" }
+  /** What a multiplayer room sent back (player/net.ts): the others' state, and new messages. */
+  | { type: "net"; players: NetPlayerState[] | null; msgs: NetMessageIn[] }
   | { type: "inspect"; id: number; at: { x: number; y: number } | { slot: number } };
 
 export interface WorkerStats {
@@ -61,4 +63,5 @@ export type FromWorker =
   | { type: "snapshot"; id: number; png: Blob | null }
   | { type: "save"; data: Record<string, unknown> }
   | { type: "score"; score: number }
+  | { type: "net"; out: NetOut }
   | { type: "touch"; spec: TouchSpec | null };

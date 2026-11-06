@@ -57,6 +57,7 @@ export const COLOURS: Record<Category | "Variables" | "Logic" | "Loops" | "Math"
   Camera: "#2E7FA8",
   Sound: "#CF63CF", // Scratch's Sound
   Saving: "#8D6E63",
+  Multiplayer: "#26A69A",
   Effects: "#E8578B",
   Cutscenes: "#7E57C2",
   Debug: "#7A8699",

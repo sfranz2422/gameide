@@ -21,7 +21,7 @@
  * Without that, switching tabs for a minute would "rescue" a healthy game.
  */
 import type { PythonGameError, TouchSpec } from "../engine/engine";
-import type { GameDefinition } from "../engine/game";
+import type { GameDefinition, NetMessageIn, NetOut, NetPlayerState } from "../engine/game";
 import { attachInput, KEY_CODE, readPads, type InputSink } from "../engine/input";
 import { SoundPlayer } from "./sound";
 import type { FromWorker, GameState, InputMessage, ToWorker, WorkerStats } from "../python/protocol";
@@ -38,6 +38,10 @@ export interface HostEvents {
   ready: (ready: boolean) => void;
   /** A better score from high_score(): only the published player listens. */
   score?: (score: number) => void;
+  /** net_send / net_shout / net_away: only the published player listens (player/net.ts). */
+  net?: (out: NetOut) => void;
+  /** The game was held for a Python check, or let go: a player is away from their room meanwhile. */
+  held?: (on: boolean) => void;
 }
 
 /** Where a game keeps what it saves (save_set), in this browser. */
@@ -231,6 +235,9 @@ export class GameHost {
         break;
       case "score":
         this.events.score?.(m.score);
+        break;
+      case "net":
+        this.events.net?.(m.out);
         break;
       case "save":
         if (this.saveId)
@@ -493,7 +500,13 @@ export class GameHost {
   holdForQuestion(on: boolean) {
     this.freeze(on);
     this.sound.hold(on);
+    this.events.held?.(on);
     if (!on) this.canvas?.focus();
+  }
+
+  /** What the game's multiplayer room sent back, for the game's next step. */
+  netArrive(players: NetPlayerState[] | null, msgs: NetMessageIn[]) {
+    this.send({ type: "net", players, msgs });
   }
 
   /** One step of a frozen game. */
@@ -529,10 +542,19 @@ export class GameHost {
     });
   }
 
+  /**
+   * Done with this host (leaving the editor or the play page). The sound plays on
+   * the page, not in the worker, so ending the worker alone left the music
+   * playing over My Games until a reload; the gamepad loop kept running too.
+   */
   dispose() {
     clearInterval(this.timer);
+    cancelAnimationFrame(this.padTimer);
     document.removeEventListener("visibilitychange", this.onVisible);
     this.detachInput?.();
+    this.showTouch(null);
+    this.canvas?.remove();
+    this.sound.close();
     this.worker.terminate();
   }
 

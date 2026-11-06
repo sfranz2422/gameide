@@ -123,4 +123,11 @@ export class SoundPlayer {
     this.stopSounds();
     this.stopMusic();
   }
+
+  /** The page is done with games (leaving the editor): silence, and the audio context let go. */
+  close() {
+    this.stopAll();
+    void this.ctx?.close().catch(() => undefined);
+    this.ctx = null;
+  }
 }

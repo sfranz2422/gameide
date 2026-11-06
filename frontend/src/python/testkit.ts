@@ -3,7 +3,7 @@
  * and helpers to step them and read Python values back.
  */
 import type { PythonGameError } from "../engine/engine";
-import type { GameDefinition, ObjectDef, RoomInstance, SpriteDef, TilesetDef } from "../engine/game";
+import type { GameDefinition, NetJoined, NetOut, ObjectDef, RoomInstance, SpriteDef, TilesetDef } from "../engine/game";
 import { KEY_CODE } from "../engine/input";
 import { PythonGame } from "./bridge";
 
@@ -21,6 +21,8 @@ export interface MiniGame {
   instances?: RoomInstance[];
   rooms?: GameDefinition["rooms"];
   scripts?: Record<string, string>;
+  /** A multiplayer room, as if the page had joined one (player/net.ts). */
+  net?: NetJoined;
 }
 
 export interface Loaded {
@@ -28,11 +30,14 @@ export interface Loaded {
   error: PythonGameError | null;
   out: string[];
   warnings: string[];
+  /** What the game asked of its room, frame by frame. */
+  nets: NetOut[];
 }
 
 export async function load(m: MiniGame): Promise<Loaded> {
   const out: string[] = [];
   const warnings: string[] = [];
+  const nets: NetOut[] = [];
   const code = m.code ?? {};
   const objects = m.objects ?? Object.keys(code).map((name) => ({ name, sprite: "box" }));
   const def: GameDefinition = {
@@ -42,13 +47,15 @@ export async function load(m: MiniGame): Promise<Loaded> {
     ...(m.tilesets ? { tilesets: m.tilesets } : {}),
     code,
     ...(m.scripts ? { scripts: m.scripts } : {}),
+    ...(m.net ? { net: m.net } : {}),
   };
   const { game, error } = await PythonGame.load(def, {
     stdout: (s) => out.push(s),
     stderr: (s) => out.push(s),
     warning: (s) => warnings.push(s),
+    net: (n) => nets.push(n),
   });
-  return { game, error, out, warnings };
+  return { game, error, out, warnings, nets };
 }
 
 /** Steps n times; throws if the game raised, so a test shows the Python error. */

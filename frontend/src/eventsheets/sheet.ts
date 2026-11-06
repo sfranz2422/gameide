@@ -71,7 +71,7 @@ export const CONDITION_FUNCTIONS = API.filter((e): e is ApiFunction => e.kind ==
 export const ACTION_FUNCTIONS = API.filter((e): e is ApiFunction => e.kind === "function" && (e.returns === "nothing" || !!e.alsoStatement));
 
 /** The pickers' order: input and collisions first, as conditions mostly are. */
-export const PICKER_ORDER: Category[] = ["Input", "Collision", "Instances", "Motion", "Physics", "Drawing", "Sound", "Saving", "Rooms", "Camera", "Effects", "Cutscenes", "Debug"];
+export const PICKER_ORDER: Category[] = ["Input", "Collision", "Instances", "Motion", "Physics", "Drawing", "Sound", "Saving", "Multiplayer", "Rooms", "Camera", "Effects", "Cutscenes", "Debug"];
 
 const NUMBER_DEFAULTS: Record<string, string> = { speed: "4", strength: "4", steps: "15", x2: "100", y2: "100" };
 

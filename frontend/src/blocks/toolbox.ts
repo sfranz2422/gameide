@@ -157,6 +157,7 @@ export function toolbox(kind: BlocksKind = "event"): Blockly.utils.toolbox.Toolb
       category("Effects", COLOURS.Effects, catalogItems("Effects")),
       category("Sound", COLOURS.Sound, catalogItems("Sound")),
       category("Saving", COLOURS.Saving, catalogItems("Saving")),
+      category("Multiplayer", COLOURS.Multiplayer, catalogItems("Multiplayer")),
       category("Cutscenes", COLOURS.Cutscenes, catalogItems("Cutscenes")),
       category("Debug", COLOURS.Debug, [{ kind: "block", type: "text_print", inputs: { TEXT: shadow("text", { TEXT: "Hello" }) } }, ...catalogItems("Debug")]),
       functions,

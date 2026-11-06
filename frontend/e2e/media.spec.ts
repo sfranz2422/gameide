@@ -44,6 +44,26 @@ test("a starter sound plays when the game says so", async ({ page }) => {
   expect(errors).toEqual([]);
 });
 
+test("leaving the editor silences the game's music", async ({ page }) => {
+  await emptyGame(page);
+  await add(page, "sounds", "ding");
+  await page.getByTestId("starter-sound-coin").click();
+  await expect(page.getByTestId("sound-info")).toContainText("WAV");
+  await objectWithCode(page, "Band", "create", 'music_play("ding")\n');
+  await placeInRoom(page, "Room1 start", "Band", 50, 50);
+  await playAndWait(page);
+  await expect.poll(() => host(page, "host.sound.log")).toContain("music ding");
+  // The sound plays on the page, not in the game's worker: ending the worker
+  // alone left the music playing over My Games until a reload.
+  await page.evaluate(() => ((window as any).__keptSound = (window as any).__gameide.host.sound));
+  await page.goto("/#/games");
+  await expect(page.getByTestId("import-file")).toBeAttached();
+  await expect.poll(() => page.evaluate(() => {
+    const s = (window as any).__keptSound;
+    return s.music === null && s.ctx === null;
+  })).toBe(true);
+});
+
 test("a sheet's sound_play starts with one of the game's own sounds", async ({ page }) => {
   await fromTemplate(page, "platformer");
   await add(page, "objects", "Bell");

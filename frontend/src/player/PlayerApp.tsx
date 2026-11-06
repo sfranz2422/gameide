@@ -25,6 +25,8 @@ async function post<T>(path: string, json: unknown): Promise<{ ok: true; data: T
 // Only a showcase game loads it: the questions need the notes' renderer, and most games don't need that.
 const PythonCheck = lazy(() => import("./PythonCheck"));
 import { Scoreboard, useScores, usesScores } from "./Scoreboard";
+import { NetSession, usesNet, type Joined } from "./net";
+import { NetBar, NetLobby } from "./NetLobby";
 import { loadExported, loadPublished, PlayError, type GamePackage, type PublishedInfo } from "./source";
 
 /** /play/<id> on our server; anywhere else, an exported game's own folder. */
@@ -76,6 +78,14 @@ export function PlayerApp() {
   const scores = useScores(hasBoards ? id : null);
   const sendScore = useRef(scores.send);
   sendScore.current = scores.send;
+  // A game whose code uses net_ functions asks for a room before it starts (published games only, for now).
+  const multi = !!id && !!pkg && usesNet(pkg.project);
+  const net = useRef<NetSession | null>(null);
+  const [joined, setJoined] = useState<Joined | null>(null);
+  const [alone, setAlone] = useState(false);
+  const [here, setHere] = useState(1);
+  const [netGone, setNetGone] = useState<string | null>(null);
+  useEffect(() => () => net.current?.stop(), []);
 
   // Python starts loading at once, alongside the game's files.
   useEffect(() => {
@@ -95,6 +105,8 @@ export function PlayerApp() {
       stats: () => undefined,
       ready: setPythonReady,
       score: (n) => sendScore.current(n),
+      net: (o) => net.current?.out(o),
+      held: (on) => net.current?.hold(on),
     });
     host.current = h;
     (window as unknown as Record<string, unknown>).__gameide = { host: h };
@@ -116,7 +128,9 @@ export function PlayerApp() {
 
   const start = () => {
     if (!pkg || !host.current) return;
-    const { def } = buildGame(pkg.project, pkg.assets);
+    const { def: built } = buildGame(pkg.project, pkg.assets);
+    // In a room, the game starts knowing who it is there (net_room, net_me).
+    const def = net.current ? { ...built, net: net.current.forGame } : built;
     // Saves are per game, kept apart from the same game in the editor.
     if (isPhone() && !autostart) {
       setPhone(true);
@@ -146,9 +160,19 @@ export function PlayerApp() {
   }, [autostart, pythonReady, phase.kind]);
 
   const title = info?.title ?? pkg?.project.name ?? "";
+  const onJoined = (j: Joined) => {
+    if (!host.current) return;
+    net.current?.stop();
+    net.current = new NetSession(j, host.current, setHere, setNetGone);
+    setJoined(j);
+    setNetGone(null);
+    start();
+  };
+  const lobby = multi && !joined && !alone;
   return (
     <div className={`player-page${info ? " published" : ""}${hasBoards ? " has-boards" : ""}${phone ? " phone" : ""}`} data-testid="player-page">
       {info && <PublishedHeader info={info} setInfo={setInfo} host={host.current} />}
+      {joined && <NetBar joined={joined} here={here} gone={netGone} />}
       <div className={`player-middle${hasBoards ? " with-boards" : ""}`}>
       {hasBoards && <Scoreboard side="left" board={scores.board} />}
       <div className="player-stage" ref={stage} data-testid="player-stage">
@@ -171,7 +195,20 @@ export function PlayerApp() {
         {phase.kind !== "playing" && (
           <div className="player-overlay">
             {phase.kind === "loading" && <p>Loading…</p>}
-            {phase.kind === "ready" && (
+            {phase.kind === "ready" && lobby && (
+              <NetLobby
+                slug={id!}
+                title={title}
+                signedIn={!!info?.signedIn}
+                ready={pythonReady}
+                onJoined={onJoined}
+                onAlone={() => {
+                  setAlone(true);
+                  start();
+                }}
+              />
+            )}
+            {phase.kind === "ready" && !lobby && (
               <button className="btn primary player-start" onClick={start} disabled={!pythonReady} data-testid="player-start">
                 {pythonReady ? `▶ Play ${title}` : "Getting Python ready…"}
               </button>

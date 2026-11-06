@@ -19,7 +19,7 @@ row is backed up with everything else.
 """
 import json
 
-from sqlalchemy import BigInteger, Column, DateTime, ForeignKey, Integer, LargeBinary, String, Text, UniqueConstraint
+from sqlalchemy import BigInteger, Column, DateTime, Float, ForeignKey, Integer, LargeBinary, String, Text, UniqueConstraint
 
 import accounts
 from accounts import Base, now
@@ -302,6 +302,53 @@ class HighScore(Base):
     score = Column(BigInteger, nullable=False, default=0)
     updated_at = Column(DateTime, nullable=False, default=now)
 
+
+
+# ---------------------------------------------------------------- multiplayer rooms (multiplayer.py)
+# A room lives as long as someone is in it, and a while after (multiplayer.py
+# deletes the idle ones), so these tables stay small. Times are epoch seconds
+# (time.time()): a sync compares them several times a second, and floats need
+# no timezone.
+
+class NetRoom(Base):
+    """A room in one published game, for one GameIDE class: joined by its code."""
+    __tablename__ = "gameide_net_rooms"
+    __table_args__ = (UniqueConstraint("published_id", "code", name="uq_gameide_net_room"),)
+
+    id = Column(Integer, primary_key=True)
+    published_id = Column(Integer, ForeignKey("gameide_published.id"), index=True, nullable=False)
+    class_id = Column(Integer, nullable=False)
+    code = Column(String(8), nullable=False)
+    created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+    active_at = Column(Float, nullable=False, default=0)
+
+
+class NetPlayer(Base):
+    """One person in a room. `token` is what their page syncs with; `state` is the
+    last thing their game sent (JSON), kept so coming back picks up where they were."""
+    __tablename__ = "gameide_net_players"
+    __table_args__ = (UniqueConstraint("room_id", "user_id", name="uq_gameide_net_player"),)
+
+    id = Column(Integer, primary_key=True)
+    room_id = Column(Integer, ForeignKey("gameide_net_rooms.id"), index=True, nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True, nullable=False)
+    token = Column(String(48), unique=True, index=True, nullable=False)
+    number = Column(Integer, nullable=False)
+    name = Column(String(30), nullable=False)
+    state = Column(Text, nullable=False, default="{}")
+    away = Column(Integer, nullable=False, default=0)
+    seen_at = Column(Float, nullable=False, default=0)
+
+
+class NetMessage(Base):
+    """A one-off message to everyone else in a room (net_shout): kept a few seconds."""
+    __tablename__ = "gameide_net_messages"
+
+    id = Column(Integer, primary_key=True)
+    room_id = Column(Integer, ForeignKey("gameide_net_rooms.id"), index=True, nullable=False)
+    sender = Column(Integer, nullable=False)   # the player's number
+    data = Column(Text, nullable=False)
+    sent_at = Column(Float, nullable=False, default=0)
 
 class Report(Base):
     """Someone's "Report" on a game. Its owner's teachers and the admins see it until handled."""

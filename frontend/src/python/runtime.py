@@ -126,6 +126,8 @@ __all__ = [
     "sound_play", "sound_stop", "sound_playing", "music_play", "music_stop",
     # saving
     "save_set", "save_get", "save_delete", "save_clear", "high_score",
+    # multiplayer
+    "net_room", "net_me", "net_players", "net_send", "net_shout", "net_messages", "net_away",
     # game feel
     "particles", "effect", "weather", "particles_clear", "hit_pause", "lighting", "light", "screen_effect",
     "screen_flash", "screen_fade", "tween", "tween_stop", "ease", "say", "ask", "answer", "dialogue_open", "dialogue_clear",
@@ -2356,6 +2358,138 @@ def high_score(score):
         _score_last = _score_new = score
 
 
+# ---------------------------------------------------------------- multiplayer
+#
+# A published game's room (multiplayer.py on the server, player/net.ts on the
+# page). The page joins the room before the game starts and hands it over as
+# `def.net`; then, a few times a second, it sends this player's state and
+# messages and brings back everyone else's. Those arrive with a frame
+# (`_frame(net)`) — still one call from JavaScript a frame — and go out with
+# the frame's commands. Outside a room (the editor, an exported game) every
+# net_ function quietly does nothing, so a game can be built and tested
+# alone: net_room() is None and net_players() is empty.
+
+NET_STATE_LIMIT = 2000      # characters of JSON, as the server allows
+NET_MESSAGE_LIMIT = 500
+_net = None                 # {"code", "number", "name", "state"} once in a room
+_net_players = []
+_net_messages = []          # what arrived this step: kept one step only
+_net_state = None           # JSON text of the last net_send, to send only a change
+_net_out = {}
+_net_away = False
+
+
+class NetPlayer:
+    """
+    Another player in the room: .number and .name, and whatever their game
+    last sent with net_send, by name — p.x for net_send({"x": ...}). A name
+    they never sent is an error naming what they did send; p.get("x", 0)
+    gives a default instead.
+    """
+
+    def __init__(self, number, name, state):
+        self.number, self.name, self._state = number, name, state
+
+    def __getattr__(self, key):
+        state = self.__dict__.get("_state", {})
+        if key in state:
+            return state[key]
+        sent = ", ".join(sorted(state)) or "nothing yet"
+        raise AttributeError(f"Player {self.__dict__.get('number')} didn't send {key!r} with net_send. They sent: {sent}.")
+
+    def get(self, key, default=None):
+        return self._state.get(key, default)
+
+    def __repr__(self):
+        return f"<player {self.number} {self.name!r} {self._state!r}>"
+
+
+class NetMessage:
+    """A message another player sent with net_shout: .sender (their number), .data, and .age in seconds."""
+
+    def __init__(self, sender, data, age):
+        self.sender, self.data, self.age = sender, data, age
+
+    def __repr__(self):
+        return f"<message from {self.sender}: {self.data!r}>"
+
+
+def _net_json(value, limit, what, example):
+    try:
+        text = json.dumps(value, separators=(",", ":"))
+    except (TypeError, ValueError):
+        raise TypeError(f"{what} can send numbers, text, True/False, None and lists or dicts of those — not {value!r}. "
+                        f"For example {example}.") from None
+    if len(text) > limit:
+        raise ValueError(f"That's too much for {what}: {limit} characters of JSON at most. Send less, more often.")
+    return text
+
+
+def net_room():
+    """The room's code, like "KXTD" — or None when the game isn't in a room (in the editor, it never is)."""
+    return _net["code"] if _net else None
+
+
+def net_me():
+    """You, as the others see you: .number, .name, and what you last sent (kept by the room, so it's there again after a reload). None outside a room."""
+    return NetPlayer(_net["number"], _net["name"], _net["state"]) if _net else None
+
+
+def net_players():
+    """Everyone else in the room right now (not you, and not anyone away), each with .number, .name and what they net_send."""
+    return list(_net_players)
+
+
+def net_send(state):
+    """What the others see of you, as a dict: net_send({"x": self.x, "y": self.y}). The newest one counts; send it every step."""
+    global _net_state
+    if not isinstance(state, dict):
+        raise TypeError(f'net_send takes a dict, like net_send({{"x": self.x, "y": self.y}}), not {state!r}.')
+    for key in state:
+        if not isinstance(key, str) or not key.isidentifier() or key in ("number", "name", "get"):
+            raise ValueError(f"{key!r} can't be a name in net_send: use plain names like \"x\" or \"height\" "
+                             f"(not number, name or get, which every player has already).")
+    text = _net_json(state, NET_STATE_LIMIT, "net_send", 'net_send({"x": self.x, "y": self.y})')
+    if _net is not None:
+        _net["state"] = json.loads(text)
+        if text != _net_state:
+            _net_state = text
+            _net_out["state"] = _net["state"]
+
+
+def net_shout(message):
+    """Sends a message once to everyone else in the room: net_shout({"snowball": [self.x, self.y]}). They get it from net_messages()."""
+    text = _net_json(message, NET_MESSAGE_LIMIT, "net_shout", 'net_shout({"snowball": [self.x, self.y]})')
+    if _net is not None and not _net_away:
+        _net_out.setdefault("msgs", []).append(json.loads(text))
+
+
+def net_messages():
+    """The messages that arrived this step from other players (net_shout), oldest first. Each has .sender, .data and .age."""
+    return list(_net_messages)
+
+
+def net_away(away=True):
+    """Hides you from the others (a pause menu, say): they don't see you, and their messages don't reach you. net_away(False) to come back."""
+    global _net_away
+    away = bool(away)
+    if away != _net_away:
+        _net_away = away
+        _net_out["away"] = away
+        if away:
+            _net_out.pop("msgs", None)
+
+
+def _net_arrive(text):
+    """What the page brought back from the room: everyone's state, and new messages."""
+    global _net_players
+    got = json.loads(text)
+    if "players" in got:
+        _net_players = [NetPlayer(p["number"], p["name"], p.get("state") or {}) for p in got["players"]]
+    if not _net_away:
+        _net_messages.extend(NetMessage(m["from"], m["data"], m.get("age", 0)) for m in got.get("msgs", []))
+
+
 def save_set(key, value):
     """Keeps a value (number, text, True/False, None, or a list/dict of those) under a name, for next time."""
     global _save_changed
@@ -2840,6 +2974,9 @@ def _commands():
     if _score_new is not None:
         out["score"] = _score_new
         _score_new = None
+    if _net_out:
+        out["net"] = dict(_net_out)
+        _net_out.clear()
     if _draw:
         out["draw"] = _draw
         _draw = []
@@ -2858,15 +2995,19 @@ def _commands():
     return json.dumps(out) if out else None
 
 
-def _frame():
+def _frame(net=None):
     """
     One step of the game. Called by JavaScript, once per frame, after the
     engine's beginStep(). Never raises: a student's error comes back as
-    {"error": ...} so the engine can stop and show it.
+    {"error": ...} so the engine can stop and show it. `net` is what came
+    back from a multiplayer room since the last step, as JSON, if anything.
     """
     global _cur, _in_draw, _step_count
     try:
         _step_count += 1
+        _net_messages.clear()
+        if net is not None:
+            _net_arrive(net)
         _publish_globals()
         # Paused (game_pause): only instances that ignore the pause run their
         # events; the engine holds everyone else still. Tweens wait too.
@@ -3046,6 +3187,12 @@ def _setup(layout_json, game_json):
         _font_index[f["name"]] = i
     _font = -1
     _save = json.loads(json.dumps(game.get("save") or {}))
+    global _net, _net_players, _net_state, _net_away
+    net = game.get("net")
+    _net = {"code": net["code"], "number": net["number"], "name": net["name"], "state": net.get("state") or {}} if net else None
+    _net_players, _net_state, _net_away = [], None, False
+    _net_messages.clear()
+    _net_out.clear()
     _PAD_BUTTONS.clear()
     _PAD_BUTTONS.update({b: i for i, b in enumerate(_L.PAD_BUTTONS)})
     for name in ("on_begin_step", "on_step", "on_end_step", "on_draw", "on_draw_gui", "keyboard", "global_mouse"):

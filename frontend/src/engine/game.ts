@@ -206,6 +206,38 @@ export interface GameDefinition {
   fonts?: FontDef[];
   /** What the game saved last time it was played here (save_set), handed back as it starts. */
   save?: Record<string, unknown>;
+  /** The multiplayer room the page joined before starting (player/net.ts): net_room() and net_me(). */
+  net?: NetJoined;
+}
+
+/** Who this player is in a room, as the server said on joining. */
+export interface NetJoined {
+  code: string;
+  number: number;
+  name: string;
+  /** What they last sent, kept by the room: back again after a reload. */
+  state: Record<string, unknown>;
+}
+
+/** Another player, as the room's sync hands them out. */
+export interface NetPlayerState {
+  number: number;
+  name: string;
+  state: Record<string, unknown>;
+}
+
+/** A net_shout from another player. `age` is how long ago it was sent, in seconds. */
+export interface NetMessageIn {
+  from: number;
+  data: unknown;
+  age: number;
+}
+
+/** What a frame's net_send / net_shout / net_away asked for. */
+export interface NetOut {
+  state?: Record<string, unknown>;
+  msgs?: unknown[];
+  away?: boolean;
 }
 
 export interface SoundDef {

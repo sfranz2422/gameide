@@ -299,6 +299,8 @@ def unpublish(slug):
 
 
 def _delete(db, pub):
+    import multiplayer
+    multiplayer.delete_rooms(db, pub.id)
     for table in (PublishedAsset, Like, Report, HighScore):
         db.query(table).filter_by(published_id=pub.id).delete()
     db.delete(pub)

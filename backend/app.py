@@ -35,6 +35,7 @@ import grades
 import gamestore
 import publishing
 import pycheck
+import multiplayer
 from gamestore import GameAsset, GameProject, GameVersion
 
 APP_NAME = "gameide"
@@ -325,6 +326,10 @@ BUSY_STEP_SECONDS = 6 * 60
 
 
 def _counts_as_activity() -> bool:
+    # A multiplayer game syncs several times a second for as long as it's open:
+    # playing isn't working, and it mustn't add up to XP's working time.
+    if request.path in ("/api/net/sync", "/api/net/leave"):
+        return False
     return not (request.method == "GET" and request.path.startswith("/api/"))
 
 
@@ -867,6 +872,8 @@ def blockly_media(name):
 publishing.init(app, _db, current_user)
 # The Python check that stops a showcase game for a question (pycheck.py).
 app.register_blueprint(pycheck.bp)
+# Multiplayer rooms in published games (multiplayer.py).
+app.register_blueprint(multiplayer.bp)
 # Classes, assignments, turning in, comments and Google Classroom (classes.py).
 classes.init(app, _db, current_user, _scheme, _problem)
 # XP, levels, leaderboards, avatars, the token shop and random events (rewards.py).

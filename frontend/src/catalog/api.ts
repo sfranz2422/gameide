@@ -25,6 +25,7 @@ export type Category =
   | "Camera"
   | "Sound"
   | "Saving"
+  | "Multiplayer"
   | "Effects"
   | "Cutscenes"
   | "Debug";
@@ -34,7 +35,7 @@ export type Category =
  * blocks palette and the sheet pickers each list categories; catalog.test.ts
  * holds all three to this, so a new category can't go missing from one.
  */
-export const CATEGORIES: Category[] = ["Instances", "Collision", "Input", "Motion", "Physics", "Drawing", "Sound", "Saving", "Rooms", "Camera", "Effects", "Cutscenes", "Debug"];
+export const CATEGORIES: Category[] = ["Instances", "Collision", "Input", "Motion", "Physics", "Drawing", "Sound", "Saving", "Multiplayer", "Rooms", "Camera", "Effects", "Cutscenes", "Debug"];
 
 export type ParamType =
   | "number" | "string" | "object" | "sprite" | "key" | "button" | "color" | "boolean" | "room" | "instance" | "layer" | "any"
@@ -263,6 +264,22 @@ export const API: ApiEntry[] = [
   fn("Saving", "save_clear", [], "nothing", "Forgets everything this game saved."),
   fn("Saving", "high_score", [p("score", "number")], "nothing",
     "Puts a score on the board beside your game once it's published: high_score(score). Each player's best shows, by first name, to others at the same school. Nothing happens while you're playing it in the editor. If lowest wins, or the score is a time in seconds, say so in the game's Settings."),
+
+  // Multiplayer: a published game's room (runtime.py, player/net.ts)
+  fn("Multiplayer", "net_room", [], "the room's code, or None",
+    'The code of the room this game is in, like "KXTD", or None. A published game asks for a room before it starts, if its code uses net_ functions. In the editor it is always None, and every net_ function does nothing — so build the game alone first.'),
+  fn("Multiplayer", "net_me", [], "you as a player, or None",
+    "You, as the others see you: net_me().number (the number over your head), net_me().name, and what you last sent. The room keeps what you sent, so after a reload net_me().best is your best again."),
+  fn("Multiplayer", "net_players", [], "a list of players",
+    'Everyone else in the room now — not you, and not anyone away. Each has .number, .name, and what their game sent with net_send: for p in net_players(): draw_sprite("ghost", 0, p.x, p.y)'),
+  fn("Multiplayer", "net_send", [p("state", "any")], "nothing",
+    'What the others see of you, as a dict of names and values: net_send({"x": self.x, "y": self.y}). Send it every step; the newest is what counts. Up to 2000 characters.'),
+  fn("Multiplayer", "net_shout", [p("message", "any")], "nothing",
+    'Sends a message once to everyone else in the room, for something that happens once: net_shout({"snowball": [self.x, self.y]}). They read it with net_messages().'),
+  fn("Multiplayer", "net_messages", [], "a list of messages",
+    "The messages other players shouted that arrived this step. Each has .sender (their number), .data (what they sent) and .age (how many seconds ago). Read them every step: they are only there for one."),
+  fn("Multiplayer", "net_away", [p("away", "boolean", "True")], "nothing",
+    "Hides you from the others, for a pause menu: they don't see you, and their messages don't reach you. net_away(False) brings you back. A Python check question does this by itself."),
 
   // Effects: game feel (engine/effects.ts, render/feel.ts)
   fn("Effects", "effect", [p("kind", "string"), p("x", "number"), p("y", "number"), p("color", "color", "None"), p("scale", "number", "1")], "nothing",

@@ -23,7 +23,7 @@
  * the frame still crosses the bridge only once from the JavaScript side.
  */
 import { EV, EVENTS_HEADER, F, G, HANDLES, STRIDE } from "./layout";
-import type { GameDefinition, SoundOrder } from "./game";
+import type { GameDefinition, NetOut, SoundOrder } from "./game";
 import { InputState } from "./input";
 import { Effects, type FxOrder, type Light } from "./effects";
 import { SpatialHash } from "./spatialHash";
@@ -109,6 +109,8 @@ export interface FrameCommands {
   camera?: [string, number, number][];
   /** A better score from high_score(), for the board beside a published game. */
   score?: number;
+  /** What net_send / net_shout / net_away asked the room for (player/net.ts). */
+  net?: NetOut;
   /** Particles, weather, lighting and screen-effect orders (effects.ts). */
   fx?: FxOrder[];
   /** This step's lights (light()); none sent is none shining. */

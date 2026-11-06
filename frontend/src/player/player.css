@@ -215,3 +215,19 @@ body.phone-play {
 .player-check-result { margin-top: 10px; }
 .player-check-result pre { white-space: pre-wrap; background: var(--code-bg, #17212a); padding: 8px; border-radius: 6px; margin: 6px 0; }
 .player-check-note { position: absolute; left: 8px; top: 8px; z-index: 50; background: #7a2b2b; color: #fff; padding: 4px 8px; border-radius: 6px; font-size: 13px; }
+
+/* A multiplayer game's room: the lobby before it starts, and the bar above it while in one (NetLobby.tsx). */
+.net-lobby { background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 10px; padding: 18px 22px; width: min(380px, 92%); display: flex; flex-direction: column; align-items: stretch; gap: 10px; text-align: center; }
+.net-lobby h2 { margin: 0 0 4px; font-size: 20px; }
+.net-join { display: flex; gap: 8px; align-items: flex-end; }
+.net-join label { flex: 1; display: flex; flex-direction: column; gap: 4px; text-align: left; font-size: 13px; color: var(--muted); }
+.net-join input { font: 600 24px/1 ui-monospace, monospace; letter-spacing: 0.3em; text-transform: uppercase; padding: 8px 10px; background: var(--type-bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; width: 100%; box-sizing: border-box; }
+.net-or { color: var(--muted); font-size: 13px; }
+.net-make { display: flex; gap: 8px; justify-content: center; }
+.net-make select { flex: 1; background: var(--type-bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 4px 6px; }
+.net-alone { align-self: center; margin-top: 4px; }
+.net-error { color: var(--warn); margin: 0; }
+.net-bar { display: flex; gap: 18px; align-items: center; padding: 4px 10px; background: var(--panel-2); border-radius: 6px; font-size: 14px; }
+.net-bar b { font-family: ui-monospace, monospace; letter-spacing: 0.1em; }
+.net-bar.gone { background: var(--panel); color: var(--warn); }
+.player-page.phone .net-bar { display: none; }

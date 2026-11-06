@@ -18,7 +18,7 @@
 import type { PyodideInterface } from "pyodide";
 import type { PyBuffer, PyProxy } from "pyodide/ffi";
 import { Engine, type FrameCommands, type PythonGameError, type SharedViews } from "../engine/engine";
-import type { GameDefinition, SoundOrder } from "../engine/game";
+import type { GameDefinition, NetMessageIn, NetOut, NetPlayerState, SoundOrder } from "../engine/game";
 import type { TouchSpec } from "../engine/engine";
 import { layoutForPython } from "../engine/layout";
 import runtimeSource from "./runtime.py?raw";
@@ -60,6 +60,8 @@ export interface GameCallbacks {
   score?: (score: number) => void;
   /** touch_controls(): what to show on the screen, or null to hide it. */
   touch?: (spec: TouchSpec | null) => void;
+  /** net_send / net_shout / net_away: for the page, which talks to the room. */
+  net?: (out: NetOut) => void;
 }
 
 /** Timings of the last step, for the FPS readout. */
@@ -128,7 +130,7 @@ export class PythonGame {
   private constructor(
     private readonly py: PyodideInterface,
     private readonly module: PyProxy,
-    private readonly frameFn: () => string | undefined,
+    private readonly frameFn: (net?: string) => string | undefined,
     def: GameDefinition,
     private readonly callbacks: GameCallbacks,
     bindEngine: (e: Engine) => void,
@@ -196,7 +198,7 @@ export class PythonGame {
     const module = fresh(runtimeSource);
     fresh.destroy();
 
-    const frameFn = module._frame as (() => string | undefined) & PyProxy;
+    const frameFn = module._frame as ((net?: string) => string | undefined) & PyProxy;
     const game = new PythonGame(py, module, frameFn, def, callbacks, (en) => (engine = en));
     game.readMotionMs = () => motionMs;
 
@@ -248,7 +250,30 @@ export class PythonGame {
     if (cmds?.save) this.callbacks.save?.(cmds.save);
     if (cmds?.score !== undefined) this.callbacks.score?.(cmds.score);
     if (cmds && cmds.touch !== undefined) this.callbacks.touch?.(cmds.touch);
+    if (cmds?.net) this.callbacks.net?.(cmds.net);
     return this.engine.endStep(cmds);
+  }
+
+  private netPlayers: NetPlayerState[] | null = null;
+  private netMessages: NetMessageIn[] = [];
+
+  /**
+   * What the room sent back (player/net.ts, through the worker). Kept until
+   * the next step takes it: the players are replaced, the messages pile up,
+   * so a step never misses one that came between two steps.
+   */
+  netArrive(players: NetPlayerState[] | null, messages: NetMessageIn[]) {
+    if (players) this.netPlayers = players;
+    this.netMessages.push(...messages);
+  }
+
+  /** The room's news for this step, as JSON for _frame — or undefined, with none. */
+  private takeNet(): string | undefined {
+    if (!this.netPlayers && !this.netMessages.length) return undefined;
+    const out = JSON.stringify({ ...(this.netPlayers ? { players: this.netPlayers } : {}), msgs: this.netMessages });
+    this.netPlayers = null;
+    this.netMessages = [];
+    return out;
   }
 
   get isStopped() {
@@ -272,7 +297,7 @@ export class PythonGame {
     const t0 = performance.now();
     let out: string | undefined;
     try {
-      out = this.frameFn();
+      out = this.frameFn(this.takeNet());
     } catch (err) {
       // _frame catches every student error itself, so this is the runtime
       // failing — still shown, never swallowed.
