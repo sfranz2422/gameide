@@ -18,6 +18,7 @@ Snowball, Splat, Hud, Title.
 import importlib.util
 import io
 import json
+import math
 import sys
 import zipfile
 from pathlib import Path
@@ -104,6 +105,74 @@ def ledge_picture(kind, w):
     return out
 
 
+# Where a climber's legs start, down from the top of its picture.
+LEGS = {"penguin": 0.8, "fox": 0.66}
+
+
+def other_stride(pic, legs_from):
+    """The same runner a step later: the legs (below `legs_from` of the height) flipped about their middle."""
+    w, h = pic.size
+    top = round(h * legs_from)
+    legs = pic.crop((0, top, w, h))
+    box = legs.getbbox()
+    if box is None:
+        return pic.copy()
+    part = legs.crop(box).transpose(Image.FLIP_LEFT_RIGHT)
+    out = pic.copy()
+    out.paste((0, 0, 0, 0), (box[0], top + box[1], box[2], top + box[3]))
+    out.alpha_composite(part, (box[0], top + box[1]))
+    return out
+
+
+def fade_ends(im, band):
+    """The picture fading out at its left and right ends, so it melts into the snow either side."""
+    out = im.copy()
+    a = out.getchannel("A")
+    px = a.load()
+    for x in range(band):
+        k = (x + 0.5) / band
+        for xx in (x, im.width - 1 - x):
+            for y in range(im.height):
+                px[xx, y] = round(px[xx, y] * k)
+    out.putalpha(a)
+    return out
+
+
+def snow_strip(camp, width=128, height=64):
+    """
+    A strip of snowy ground that repeats left to right, for either side of the camp:
+    a thin dark edge, bright snow under it shading to blue, a gently bumpy top and a
+    little sparkle, in the picture's style. Returns it and the camp row its top
+    lines up with (where the camp's own ground starts at its right-hand end, which
+    is only snow: the left has a pine tree on it).
+    """
+    import random
+    a = camp.getchannel("A")
+    cols = list(range(int(camp.width * 0.94), int(camp.width * 0.99)))
+    tops = sorted(next(y for y in range(camp.height) if a.getpixel((x, y)) > 128) for x in cols)
+    top = tops[len(tops) // 2]
+    edge, light, white, low = (34, 64, 118), (210, 242, 255), (247, 252, 255), (150, 204, 238)
+    out = Image.new("RGBA", (width, height))
+    rng = random.Random(3)
+    for x in range(width):
+        # Bumps that join up at the ends: whole waves across the strip.
+        lift = round(2 + 1.5 * math.sin(2 * math.pi * x / 64) + math.sin(2 * math.pi * x / 32 + 1))
+        for y in range(lift, height):
+            k = y - lift
+            if k < 2:
+                c = edge
+            elif k < 5:
+                c = light
+            else:
+                t = min(1.0, (k - 5) / (height - 12))
+                c = tuple(round(white[i] + (low[i] - white[i]) * t * t) for i in range(3))
+            out.putpixel((x, y), c + (255,))
+    for _ in range(width // 5):
+        x, y = rng.randrange(width), rng.randrange(10, height - 8)
+        out.putpixel((x, y), (190, 225, 248, 255) if rng.random() < 0.6 else (255, 255, 255, 255))
+    return out, top
+
+
 def fitted(name, width):
     im = Image.open(ART / f"{name}.png").convert("RGBA")
     return im.resize((width, max(1, round(im.height * width / im.width))), Image.LANCZOS)
@@ -169,6 +238,9 @@ def build(out):
     # The climbers: one sprite each, its frames the poses. Feet at the origin.
     for c in CLIMBERS:
         frames = [art(f"climber_{c}_{p}") for p in POSES]
+        # Gemini's two running frames came back nearly the same, so running looked
+        # like sliding: the second is the first with its legs the other way round.
+        frames[2] = other_stride(frames[1], LEGS.get(c, 0.72))
         sprite(f"climber_{c}", frames, (24, 56), mask=(15, 14, 33, 56))
         sprite(f"face_{c}", [art(f"face_{c}")], (0, 0))
     sprite("climber_red_0", [art("climber_red_stand")], (24, 56), mask=(15, 14, 33, 56))
@@ -218,7 +290,11 @@ def build(out):
     # (right of the fire is a tent, whose top isn't the ground).
     a = camp.getchannel("A")
     snow = max(next(y for y in range(camp.height) if a.getpixel((x, y)) > 128) for x in range(int(camp.width * 0.45), int(camp.width * 0.49)))
-    picture("camp", camp, (camp.width // 2, snow + 6))
+    picture("camp", fade_ends(camp, 60), (camp.width // 2, snow + 6))
+    # The snow either side of the camp: its own ground, row by row, made to repeat.
+    strip, top = snow_strip(camp)
+    picture("snow_ground", strip)
+    ground_top = top - (snow + 6)
     for side in ("left", "right"):
         picture(f"wall_{side}", wall_picture(side))
     P.font("Ubuntu", HERE / "fonts" / "ubuntu-latin-700-normal.woff2")
@@ -229,7 +305,9 @@ def build(out):
         head, _ = _tw.read_code(f)
         P.script(head.get("script", f.stem.strip("_")), f.read_text())
     P.script("art", "# script: art\n# Written by build.py: how big each picture is, for drawing them to fit the screen.\n"
-             f"SIZES = {json.dumps({k: list(v) for k, v in sorted(sizes.items())})}\n")
+             f"SIZES = {json.dumps({k: list(v) for k, v in sorted(sizes.items())})}\n"
+             "# Where the snow beside the camp starts, down from the ground's top (the camp's snow line).\n"
+             f"GROUND_TOP = {ground_top}\n")
 
     files = sorted(f for f in (HERE / "game").glob("*.py") if not f.name.startswith("_"))
     parsed = {f.stem: _tw.read_code(f) for f in files}

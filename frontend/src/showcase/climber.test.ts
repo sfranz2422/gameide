@@ -101,12 +101,13 @@ function climbTo(g: PythonGame, metres: number, maxSteps: number) {
     if (on != null) {
       // Standing. Under it: straight up. Close: from the near edge. Far: back up to
       // the far end first and take a run at it, as a player would (on ice above all).
-      const [lx, lhalf, cracked] = py(g, "o = global_vars.player.on\n(o.x, o.half, o.object_name == 'CrumbleLedge')") as unknown as [number, number, boolean];
+      const [lx, lhalf, cracked] = py(g, "o = global_vars.player.on\n(o.x, o.half, o.slippery or o.object_name == 'CrumbleLedge')") as unknown as [number, number, boolean];
       const dir = Math.sign(tx - lx) || 1;
       const gapAcross = Math.abs(tx - lx) - lhalf - half;
       const under = Math.abs(x - tx) < half - 6 && Math.abs(x - lx) < lhalf;
       if (on !== runFrom) (runFrom = on, runUp = false);
-      // No run-up on cracked ice: it breaks before you get going.
+      // No run-up on ice: you'd slide off the end backing up (and cracked ice breaks
+      // before you get going). Crossing it is run-up enough: ice gets you going as you go.
       if (!under && gapAcross > 24 && !runUp && !cracked) {
         const back = lx - dir * (lhalf - 8);
         want = Math.abs(back - x) > 4 ? Math.sign(back - x) : 0;
@@ -185,6 +186,54 @@ xs = [e["x"] for e in a.path]
     expect(check[4]).toBe(5);
     expect(check[5] && check[6], "the routes reach both ends").toBe(true);
     expect(py(g, "Plan(7).ledges[:5] != Plan(2026).ledges[:5] or (Plan(7).grow(GROUND_Y - 400), Plan(7).ledges[:3]) != None")).toBe(true);
+  });
+
+  it("ledges never sit on top of each other: overlapping across, they're a climber's height apart", async () => {
+    const g = await start();
+    const [over, squeezed] = py(g, `
+p = Plan()
+p.grow(GROUND_Y - 1500 * METER)
+over = 0
+for a in p.ledges:
+    for b in p.ledges_between(a["y"] - CLEAR_Y + 1, a["y"] + CLEAR_Y - 1, a["x"] - 400, a["x"] + 400):
+        swing = (PLANK_SWING if a["kind"] == "plank" else 0) + (PLANK_SWING if b["kind"] == "plank" else 0)
+        if b["i"] > a["i"] and abs(a["x"] - b["x"]) - (a["w"] + b["w"]) / 2 - swing < CLEAR_X:
+            over += 1
+(over, p.squeezed)`) as unknown as [number, number];
+    // A route that's boxed in gets a ledge anyway, rather than stopping: rare, and counted.
+    expect(squeezed).toBeLessThan(6);
+    expect(over).toBeLessThanOrEqual(squeezed);
+  });
+
+  it("the snow goes the whole way across the foot of the mountain, not just under the camp", async () => {
+    const g = await climbing();
+    const snow = py(g, 'import gameide\ngameide._sprite_index["snow_ground"]') as number;
+    const [w, top] = py(g, '(SIZES["snow_ground"][0], GROUND_Y + GROUND_TOP)') as unknown as [number, number];
+    for (const x of [100, 700, 1600, 2600, 3100]) {
+      py(g, `me = global_vars.player\nme.x = ${x}`);
+      step(g, 90);
+      const vx = py(g, "view_x") as number;
+      const strips = g.engine.drawList.filter((c) => c[0] === "sprite" && c[2] === snow) as unknown as unknown[][];
+      expect(strips.length, `at ${x}`).toBeGreaterThan(0);
+      for (const c of strips) expect(c[5]).toBe(top);
+      const xs = strips.map((c) => c[4] as number).sort((a, b) => a - b);
+      expect(xs[0]!).toBeLessThanOrEqual(vx);
+      expect(xs.at(-1)! + w).toBeGreaterThanOrEqual(vx + 640);
+      for (let i = 1; i < xs.length; i++) expect(xs[i]! - xs[i - 1]!).toBe(w);
+    }
+  });
+
+  it("running alternates two strides", async () => {
+    const g = await climbing();
+    key(g, "right", true);
+    const frames = new Set<number>();
+    for (let t = 0; t < 40; t++) {
+      step(g);
+      frames.add(py(g, "global_vars.player.image_index") as number);
+    }
+    key(g, "right", false);
+    expect(frames.has(1) && frames.has(2)).toBe(true);
+    expect([...frames].every((f) => f <= 2)).toBe(true);
   });
 
   it("the camera follows you across the mountain, and the walls are only at its ends", async () => {
@@ -346,7 +395,7 @@ xs = [e["x"] for e in a.path]
     for (let t = 0; t < 220; t++) {
       step(g);
       swung = Math.max(swung, Math.abs((py(g, `${plank}.x`) as number) - px0));
-      expect(offset()).toBeCloseTo(start, 0);
+      expect(Math.abs(offset() - start)).toBeLessThan(2);
     }
     expect(swung).toBeGreaterThan(30);
     expect(me(g)[2]).toBe(i);

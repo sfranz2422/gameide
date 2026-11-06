@@ -1,11 +1,11 @@
 # object: CrumbleLedge
 # parent: Ledge
 # sprite: crumble
-# Cracked ice. Stand on it too long and it breaks; a while later it's back.
+# Cracked ice. Stand on it too long and it breaks; a while later it's back. It
+# isn't slippery: you have to be quick, and slipping as well was too much.
 
 # === create
 super().on_create()
-self.slippery = True
 self.half = CRUMBLE_W / 2
 self.cracking = 0
 self.away = 0

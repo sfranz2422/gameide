@@ -1567,7 +1567,7 @@ CASES = [
 
  ('music outlives the editor', HOST, '    this.showTouch(null);\n    this.canvas?.remove();\n    this.sound.close();\n', '    this.showTouch(null);\n    this.canvas?.remove();\n', "leaving the editor silences", E2E),
  # Snowcap Scramble (showcase/climber)
- ('climber: unreachable ledges allowed', _cl("_1rules"), '                if can_reach(a, b):\n                    break', '                if True:\n                    break', "four ways up that can each be climbed", CLIMB),
+ ('climber: unreachable ledges allowed', _cl("_1rules"), '                if can_reach(a, b) and self.clear(b):\n                    break', '                if self.clear(b):\n                    break', "four ways up that can each be climbed", CLIMB),
  ('climber: reach overrated', _cl("_1rules"), '    return 0 if t is None else t * RUN * 0.72', '    return 0 if t is None else t * RUN * 1.6', "a bot climbs 150 metres", CLIMB),
  ('climber: a different mountain each time', _cl("_1rules"), '        self.rng = random.Random(seed)', '        self.rng = random.Random()', "the same seed makes the same mountain", CLIMB),
  ('climber: landing from below', _cl("Player"), '            if self.y <= ledge.y - ledge.dy + 0.01 and new_y >= ledge.y:', '            if abs(new_y - ledge.y) < 12:', "never from below", CLIMB, ('    if self.vy > 0:\n        for ledge', '    if True:\n        for ledge')),
@@ -1592,6 +1592,10 @@ CASES = [
  ('climber: notices on every climb back', _cl("Hud"), 'elif zone_at(global_vars.best) != self.reached:\n    self.reached = zone_at(global_vars.best)', 'elif zone_at(global_vars.height) != self.reached:\n    self.reached = zone_at(global_vars.height)', "each part of the mountain is named once", CLIMB),
  ('climber: one screen wide', _cl("_1rules"), 'ROOM_W = 3200 ', 'ROOM_W = 640 ', "five screens wide", CLIMB),
  ('climber: routes bunched up', _cl("_1rules"), '        left = max(WALL_L, self.lanes[k][0] - VIEW_W / 2)', '        left = max(WALL_L, ROOM_W / 2 - VIEW_W)', "five screens wide", CLIMB),
+
+ ('climber: ledges piled up', _cl("_1rules"), '        """Is there room for ledge `e`: nothing overlapping it across within CLEAR_Y up or down?"""\n', '        """Is there room for ledge `e`: nothing overlapping it across within CLEAR_Y up or down?"""\n        return True\n', "ledges never sit on top of each other", CLIMB),
+ ('climber: snow only by the camp', _cl("Ground"), '    draw_sprite("snow_ground", 0, x, top)\n    x += w', '    draw_sprite("snow_ground", 0, x, top)\n    x += 10 * w', "the snow goes the whole way across", CLIMB),
+ ('climber: one stride', _cl("Player"), '    self.image_index = 1 + int(self.run_t) % 2', '    self.image_index = 1', "running alternates two strides", CLIMB),
 
 ]
 only = sys.argv[1:]

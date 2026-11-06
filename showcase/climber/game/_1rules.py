@@ -36,6 +36,8 @@ SEED = 2026                # the same mountain for everyone, every time
 ROUTES = 4                 # separate ways up, side by side, each one climbable
 WIDTHS = (64, 96, 128, 160)
 RISE_MIN = 50
+CLEAR_Y = 90               # ledges that overlap across are at least this far apart up and down: room for a climber
+CLEAR_X = 16               # ...unless there's at least this much gap between them across
 CRUMBLE_W, PLANK_W, BLOCK_W = 72, 92, 50
 CRUMBLE_STAND = 40         # steps standing on a cracking ledge before it breaks
 CRUMBLE_BACK = 240         # steps until it's back
@@ -153,6 +155,7 @@ class Plan:
         self.lanes = [(WALL_L + k * lane, WALL_L + (k + 1) * lane) for k in range(ROUTES)]
         self.last = [{"kind": "rock", "x": round((a + b) / 2), "y": GROUND_Y, "w": 400} for a, b in self.lanes]
         self.top = GROUND_Y
+        self.squeezed = 0     # ledges put where there wasn't really room (to keep a route going); the tests watch it
 
     def grow(self, until_y):
         """Makes the mountain up to height `until_y` (a smaller y is higher)."""
@@ -178,23 +181,44 @@ class Plan:
         b = None
         for _ in range(30):
             # Higher up, the gaps get longer: up to the whole of what a jump can do.
-            gap = rng.uniform(-w * 0.3, reach(rise) * (0.5 + 0.5 * d))
+            gap = rng.uniform(CLEAR_X, max(CLEAR_X + 4, reach(rise) * (0.5 + 0.5 * d)))
             side = rng.choice((-1, 1))
             x = a["x"] + side * (a["w"] / 2 + gap + w / 2)
             if left + w / 2 + 6 <= x <= right - w / 2 - 6:
                 b = {"kind": kind, "x": round(x), "y": round(a["y"] - rise), "w": w}
-                if can_reach(a, b):
+                if can_reach(a, b) and self.clear(b):
                     break
                 b = None
         if b is None:
-            # Nothing fitted: a plain ledge straight up, which always works.
-            b = {"kind": "rock", "x": round(min(max(a["x"], left + 40), right - 40)), "y": round(a["y"] - RISE_MIN), "w": 64}
+            # Nothing fitted: a plain small ledge just beside it, a short step up, on
+            # whichever side has room (and, failing that, anyway: it always works).
+            tries = [(side, r, far) for r in (RISE_MIN, RISE_MIN + 12, RISE_MIN + 24) for far in (0, 24, 48) for side in (1, -1)]
+            for side, r, far in tries:
+                x = min(max(a["x"] + side * (a["w"] / 2 + CLEAR_X + 32 + far), left + 40), right - 40)
+                c = {"kind": "rock", "x": round(x), "y": round(a["y"] - r), "w": 64}
+                if can_reach(a, c) and self.clear(c):
+                    b = c
+                    break
+            if b is None:
+                self.squeezed += 1
+                b = {"kind": "rock", "x": round(min(max(a["x"], left + 40), right - 40)), "y": round(a["y"] - RISE_MIN), "w": 64}
         b["route"] = k
         self.path.append(b)
         self.routes[k].append(b)
         self._add(b)
         self.last[k] = b
         return b
+
+    def clear(self, e):
+        """Is there room for ledge `e`: nothing overlapping it across within CLEAR_Y up or down?"""
+        i0 = bisect.bisect_left(self._ledge_order, (-(e["y"] + CLEAR_Y), -1))
+        i1 = bisect.bisect_right(self._ledge_order, (-(e["y"] - CLEAR_Y), len(self.ledges)))
+        for _, i in self._ledge_order[i0:i1]:
+            o = self.ledges[i]
+            swing = (PLANK_SWING if o["kind"] == "plank" else 0) + (PLANK_SWING if e["kind"] == "plank" else 0)
+            if abs(o["x"] - e["x"]) - (o["w"] + e["w"]) / 2 - swing < CLEAR_X:
+                return False
+        return True
 
     def _add(self, e):
         e["i"] = len(self.ledges)
@@ -211,7 +235,9 @@ class Plan:
         if not WALL_L + w / 2 + 6 <= x <= WALL_R - w / 2 - 6:
             return
         kind = "ice" if rng.random() < 0.3 + 0.4 * d else "rock"
-        self._add({"kind": kind, "x": round(x), "y": round(b["y"] + rng.uniform(-16, 16)), "w": w})
+        e = {"kind": kind, "x": round(x), "y": round(b["y"] + rng.uniform(-16, 16)), "w": w}
+        if self.clear(e):
+            self._add(e)
 
     def _decorate(self, b):
         rng = self.rng
@@ -219,6 +245,10 @@ class Plan:
             return
         sprite = rng.choice(("pine_small", "pine_tall", "snowball_pile", "bird") if b["kind"] == "rock" else ("crystals", "crystals", "bird"))
         x = b["x"] + rng.choice((-1, 1)) * (b["w"] / 2 - 26)
+        # Not under another ledge: a tree would stick up through it.
+        for o in self.ledges_between(b["y"] - 100, b["y"] - 1, x - 200, x + 200):
+            if abs(o["x"] - x) < o["w"] / 2 + 30:
+                return
         d = {"sprite": sprite, "x": round(x), "y": b["y"], "i": len(self.decor)}
         self.decor.append(d)
         bisect.insort(self._decor_order, (-d["y"], d["i"]))
