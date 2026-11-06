@@ -5,4 +5,4 @@
 
 # === create
 super().on_create()
-self.slippery = True
+self.grip = ICE_ACCEL

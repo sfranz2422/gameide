@@ -6,7 +6,7 @@
 
 # === create
 self.half = 32
-self.slippery = False
+self.grip = RUN_ACCEL     # how quickly you can start and stop on it: less is more slippery
 self.broken = False
 self.dx = 0          # how far it moved this step, to carry whoever stands on it
 self.dy = 0

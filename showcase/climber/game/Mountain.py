@@ -53,7 +53,7 @@ for i in list(self.decor):
 metres = metres_at(view_y + VIEW_H / 2)
 if metres >= WIND_FROM:
     cycle, t = divmod(global_vars.ticks, 420)
-    strength = min(1.0, 0.5 + (metres - WIND_FROM) / 300)
+    strength = min(1.0, 0.75 + (metres - WIND_FROM) / 300)
     side = 1 if cycle % 2 == 0 else -1
     global_vars.wind = side * strength * math.sin(math.pi * t / 140) if t < 140 else 0
     if abs(global_vars.wind) > 0.3 and global_vars.ticks % 3 == 0:

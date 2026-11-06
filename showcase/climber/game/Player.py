@@ -32,16 +32,10 @@ if keyboard_check_pressed("up") or keyboard_check_pressed("w") or keyboard_check
 move = (1 if right else 0) - (1 if left else 0)
 
 # Running. On ice it takes a while to get going, and to stop.
-if self.on is None:
-    accel = AIR_ACCEL
-elif self.on.slippery:
-    accel = ICE_ACCEL
-else:
-    accel = RUN_ACCEL
+accel = AIR_ACCEL if self.on is None else self.on.grip
 self.vx = approach(self.vx, move * RUN, accel)
 if move != 0:
     self.facing = move
-self.vx += global_vars.wind * WIND_PUSH * (0.4 if self.on else 1)
 
 # Jumping: a moment's grace after running off an edge, and a press just before landing counts.
 if self.on is not None:
@@ -63,6 +57,11 @@ if self.vy < JUMP_CUT and not jump_held:
 self.x += self.vx
 if self.on is not None:
     self.x += self.on.dx
+# The wind moves you on top of your own running (added to vx, braking cancelled
+# it out). Standing, your feet hold you: well on rock, hardly at all on ice.
+if global_vars.wind != 0:
+    hold = 1 if self.on is None else 1 - self.on.grip / RUN_ACCEL * 0.6
+    self.x += global_vars.wind * WIND_PUSH * hold
 if self.x < WALL_L + HALF:
     self.x, self.vx = WALL_L + HALF, 0
 if self.x > WALL_R - HALF:

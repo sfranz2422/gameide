@@ -1572,7 +1572,7 @@ CASES = [
  ('climber: a different mountain each time', _cl("_1rules"), '        self.rng = random.Random(seed)', '        self.rng = random.Random()', "the same seed makes the same mountain", CLIMB),
  ('climber: landing from below', _cl("Player"), '            if self.y <= ledge.y - ledge.dy + 0.01 and new_y >= ledge.y:', '            if abs(new_y - ledge.y) < 12:', "never from below", CLIMB, ('    if self.vy > 0:\n        for ledge', '    if True:\n        for ledge')),
  ('climber: jump too high', _cl("_1rules"), 'JUMP_V = -9.2 ', 'JUMP_V = -10.4 ', "a jump is about four metres high", CLIMB),
- ('climber: ice grips', _cl("IceLedge"), 'self.slippery = True', 'self.slippery = False', "ice: slow to get going", CLIMB),
+ ('climber: ice grips', _cl("IceLedge"), 'self.grip = ICE_ACCEL', 'self.grip = RUN_ACCEL', "ice: slow to get going", CLIMB),
  ('climber: cracks never break', _cl("CrumbleLedge"), '    if self.cracking >= CRUMBLE_STAND:', '    if self.cracking >= CRUMBLE_STAND * 100:', "a cracked ledge breaks under you", CLIMB),
  ('climber: broken for good', _cl("CrumbleLedge"), '    if self.away <= 0:', '    if False:', "a cracked ledge breaks under you", CLIMB),
  ('climber: planks don\'t carry', _cl("Player"), 'if self.on is not None:\n    self.x += self.on.dx\n', '', "a swinging plank carries", CLIMB),
@@ -1596,6 +1596,11 @@ CASES = [
  ('climber: ledges piled up', _cl("_1rules"), '        """Is there room for ledge `e`: nothing overlapping it across within CLEAR_Y up or down?"""\n', '        """Is there room for ledge `e`: nothing overlapping it across within CLEAR_Y up or down?"""\n        return True\n', "ledges never sit on top of each other", CLIMB),
  ('climber: snow only by the camp', _cl("Ground"), '    draw_sprite("snow_ground", 0, x, top)\n    x += w', '    draw_sprite("snow_ground", 0, x, top)\n    x += 10 * w', "the snow goes the whole way across", CLIMB),
  ('climber: one stride', _cl("Player"), '    self.image_index = 1 + int(self.run_t) % 2', '    self.image_index = 1', "running alternates two strides", CLIMB),
+
+ ('climber: cracked ledges grip', _cl("CrumbleLedge"), 'self.grip = SLIDY_ACCEL', 'self.grip = RUN_ACCEL', "a little slippery", CLIMB),
+ ('climber: blocks like ice', _cl("IceBlock"), 'self.grip = SLIDY_ACCEL', 'self.grip = ICE_ACCEL', "a little slippery", CLIMB),
+
+ ('climber: wind braked away', _cl("Player"), '    self.x += global_vars.wind * WIND_PUSH * hold', '    self.vx += global_vars.wind * WIND_PUSH * hold * 0.05', "a gust really moves you", CLIMB),
 
 ]
 only = sys.argv[1:]

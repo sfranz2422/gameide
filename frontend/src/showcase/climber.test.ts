@@ -101,7 +101,7 @@ function climbTo(g: PythonGame, metres: number, maxSteps: number) {
     if (on != null) {
       // Standing. Under it: straight up. Close: from the near edge. Far: back up to
       // the far end first and take a run at it, as a player would (on ice above all).
-      const [lx, lhalf, cracked] = py(g, "o = global_vars.player.on\n(o.x, o.half, o.slippery or o.object_name == 'CrumbleLedge')") as unknown as [number, number, boolean];
+      const [lx, lhalf, cracked] = py(g, "o = global_vars.player.on\n(o.x, o.half, o.grip < RUN_ACCEL)") as unknown as [number, number, boolean];
       const dir = Math.sign(tx - lx) || 1;
       const gapAcross = Math.abs(tx - lx) - lhalf - half;
       const under = Math.abs(x - tx) < half - 6 && Math.abs(x - lx) < lhalf;
@@ -367,6 +367,23 @@ for a in p.ledges:
     expect(ice).toBeGreaterThan(3 * rock);
   });
 
+  it("cracked ledges and floating ice blocks are a little slippery: more than rock, less than ice", async () => {
+    const g = await climbing();
+    const slide = (kind: string) => {
+      const i = py(g, `p = plan(); p.grow(GROUND_Y - 8000)\nnext(e['i'] for e in p.path if e['kind'] == '${kind}')`) as number;
+      standOn(g, i, -10);
+      py(g, "global_vars.player.vx = 2");
+      const [x0] = me(g);
+      step(g, 25);   // before a cracked one breaks
+      return me(g)[0] - x0;
+    };
+    const rock = slide("rock"), ice = slide("ice"), cracked = slide("crumble"), block = slide("block");
+    for (const little of [cracked, block]) {
+      expect(little).toBeGreaterThan(1.5 * rock);
+      expect(little).toBeLessThan(ice / 1.5);
+    }
+  });
+
   it("a cracked ledge breaks under you, and is back a while later", async () => {
     const g = await climbing();
     const i = py(g, "p = plan(); p.grow(GROUND_Y - 6000)\nnext(e['i'] for e in p.ledges if e['kind'] == 'crumble')") as number;
@@ -388,6 +405,8 @@ for a in p.ledges:
     const i = py(g, "p = plan(); p.grow(GROUND_Y - 300 * METER)\nnext(e['i'] for e in p.ledges if e['kind'] == 'plank')") as number;
     standOn(g, i);
     const plank = `[o for o in instances('Plank') if o.plan_i == ${i}][0]`;
+    // The first planks are up where the wind blows: no gusts here, only the plank moving you.
+    py(g, "WIND_FROM = 10 ** 6");
     const offset = () => me(g)[0] - (py(g, `${plank}.x`) as number);
     const start = offset();
     let swung = 0;
@@ -469,6 +488,29 @@ for a in p.ledges:
       most = Math.max(most, Math.abs(py(g, "global_vars.wind") as number));
     }
     expect(most).toBeGreaterThan(0.5);
+  });
+
+  it("a gust really moves you: a little standing on rock, a lot in the air", async () => {
+    const g = await climbing();
+    const i = py(g, "p = plan(); p.grow(GROUND_Y - 300 * METER)\nnext(e['i'] for e in p.path if metres_at(e['y']) > 160 and e['kind'] == 'rock' and e['w'] >= 96)") as number;
+    const drift = (air: boolean) => {
+      standOn(g, i);
+      // Wait for a strong gust.
+      for (let t = 0; t < 900 && Math.abs(py(g, "global_vars.wind") as number) < 0.6; t++) step(g);
+      expect(Math.abs(py(g, "global_vars.wind") as number), "a gust came").toBeGreaterThanOrEqual(0.6);
+      const [x0, y0] = me(g);
+      for (let t = 0; t < 20; t++) {
+        // In the air: held up where it is, so only the wind moves it across.
+        if (air) py(g, `me = global_vars.player\nme.on, me.y, me.vy = None, ${y0} - 200, 0`);
+        step(g);
+      }
+      return Math.abs(me(g)[0] - x0);
+    };
+    const standing = drift(false);
+    const flying = drift(true);
+    expect(standing).toBeGreaterThan(3);
+    expect(flying).toBeGreaterThan(15);
+    expect(flying).toBeGreaterThan(2.5 * standing);
   });
 
   it("only the mountain near the camera exists, however high you go", async () => {

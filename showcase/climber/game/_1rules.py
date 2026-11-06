@@ -23,6 +23,7 @@ JUMP_CUT = -3.0            # letting go of jump early stops the rise here
 RUN = 2.8
 RUN_ACCEL = 0.35
 ICE_ACCEL = 0.06           # on ice it takes a while to start, and to stop
+SLIDY_ACCEL = 0.16         # a little slippery: cracked ledges and floating ice blocks
 AIR_ACCEL = 0.22
 COYOTE = 6                 # steps after running off a ledge when a jump still works
 JUMP_BUFFER = 7            # steps before landing when a jump press still counts
@@ -44,7 +45,7 @@ CRUMBLE_BACK = 240         # steps until it's back
 PLANK_SWING, PLANK_STEPS = 44, 220      # how far a plank swings each way, and how long a swing takes
 BLOCK_BOB, BLOCK_STEPS = 14, 160
 WIND_FROM = 150            # metres: the wind starts here
-WIND_PUSH = 0.05           # how hard a gust pushes, each step
+WIND_PUSH = 1.1            # pixels a full gust moves you each step in the air (running is 2.8)
 
 # The bands of the mountain, by height in metres.
 ZONES = [

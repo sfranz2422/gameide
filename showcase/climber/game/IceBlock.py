@@ -5,7 +5,7 @@
 
 # === create
 super().on_create()
-self.slippery = True
+self.grip = SLIDY_ACCEL    # a little slippery
 self.half = BLOCK_W / 2
 self.home_y = self.y
 self.plan_i = 0
