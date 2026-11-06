@@ -18,6 +18,11 @@ self.run_t = 0
 self.top_of_fall = self.y
 self.best = save_get("best", 0)
 global_vars.best = self.best
+# In a room: your number over your head, and your best in this room (kept by the
+# room, so a reload doesn't lose it).
+me = net_me()
+self.number = me.number if me else None
+global_vars.room_best = me.get("best", 0) if me else 0
 global_vars.height = 0
 global_vars.player = self
 camera_follow(self, 0.15)
@@ -120,7 +125,12 @@ if (keyboard_check_pressed("x") or keyboard_check_pressed("j") or aimed) and sel
         ball.vx, ball.vy = 7.5 * math.cos(d), 7.5 * math.sin(d) - 1
     else:
         ball.vx, ball.vy = self.facing * 6.5 + self.vx * 0.5, -3.2
+    # Everyone else's game throws it too (Crowd).
+    net_shout({"ball": [round(ball.x), round(ball.y), round(ball.vx, 2), round(ball.vy, 2)]})
     sound_play("throw", volume=0.4)
+
+if self.dizzy > 0:
+    self.dizzy -= 1
 
 # The pose.
 if self.throwing > 0:
@@ -138,6 +148,7 @@ self.image_xscale = self.facing
 # How high: now, and the best ever (kept, and on the school's board).
 metres = metres_at(self.y)
 global_vars.height = metres
+global_vars.room_best = max(global_vars.room_best, metres)
 if metres > self.best:
     self.best = metres
     global_vars.best = metres

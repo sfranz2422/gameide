@@ -1602,6 +1602,21 @@ CASES = [
 
  ('climber: wind braked away', _cl("Player"), '    self.x += global_vars.wind * WIND_PUSH * hold', '    self.vx += global_vars.wind * WIND_PUSH * hold * 0.05', "a gust really moves you", CLIMB),
 
+ ('climber: no number', _cl("Player"), 'self.number = me.number if me else None', 'self.number = None', "your number over your head", CLIMB),
+ ('climber: not sent', _cl("Crowd"), 'net_send({"x": round(me.x)', 'net_send({"x": 0 * round(me.x)', "where you are sent to the room", CLIMB),
+ ('climber: ghosts jump', _cl("Ghost"), '    self.x += (self.goal_x - self.x) * 0.3', '    self.x = self.goal_x', "gliding to where they are", CLIMB),
+ ('climber: ghosts stay', _cl("Crowd"), '        if instance_exists(g):\n            g.destroy()', '        if instance_exists(g):\n            pass', "gliding to where they are", CLIMB),
+ ('climber: ghosts solid', _cl("Ghost"), 'self.image_alpha = 0.55', 'self.image_alpha = 1', "see-through ghosts", CLIMB),
+ ('climber: throws kept quiet', _cl("Player"), '    net_shout({"ball"', '    0 and net_shout({"ball"', "your snowballs are shouted", CLIMB),
+ ('climber: hit by your own', _cl("Snowball"), 'if self.thrower != 0:\n    if hits(self, me)', 'if True:\n    if hits(self, me)', "burst on a ghost without hurting you", CLIMB),
+ ('climber: snowballs harmless', _cl("Snowball"), '        knock(me, self)\n', '', "knocks you a little", CLIMB),
+ ('climber: knocked flying', _cl("_3room"), 'KNOCK = 3.2 ', 'KNOCK = 12 ', "knocks you a little", CLIMB),
+ ('climber: late snowballs start over', _cl("Crowd"), '        for _ in range(min(40, int(m.age * 60))):', '        for _ in range(0 * min(40, int(m.age * 60))):', "arrives where it has got to", CLIMB),
+ ('climber: pause not away', _cl("Hud"), '    net_away(game_paused())', '    pass', "paused, you're away", CLIMB),
+ ('climber: board unsorted', _cl("Hud"), '    rows.sort(key=lambda r: (-r[0], r[1]))', '    rows.sort(key=lambda r: r[1])', "the room's board", CLIMB),
+ ('climber: room best forgotten', _cl("Player"), 'global_vars.room_best = me.get("best", 0) if me else 0', 'global_vars.room_best = 0', "your number over your head", CLIMB),
+ ('climber: no arrows', _cl("Hud"), '        if 0 <= sx <= VIEW_W and 0 <= sy <= VIEW_H:\n            continue', '        continue', "pointing their way", CLIMB),
+
 ]
 only = sys.argv[1:]
 # A name that matches no case would otherwise run nothing and still say

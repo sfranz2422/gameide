@@ -10,23 +10,26 @@ import { buildGame } from "../python/codegen";
 import { PythonGame } from "../python/bridge";
 import { KEY_CODE } from "../engine/input";
 import type { Project } from "../store/project";
+import type { NetJoined, NetOut, NetPlayerState } from "../engine/game";
 
 const BUILT = resolve(__dirname, "../../../showcase/climber/out/project.json");
 const have = existsSync(BUILT);
 
-async function start(save: Record<string, unknown> = {}) {
+async function start(save: Record<string, unknown> = {}, net?: NetJoined) {
   const project = JSON.parse(readFileSync(BUILT, "utf8")) as Project;
   const { def } = buildGame(project, new Map());
   let saved: Record<string, unknown> = save;
   const scores: number[] = [];
-  const { game, error } = await PythonGame.load({ ...def, save } as typeof def, {
+  const sent: NetOut[] = [];
+  const { game, error } = await PythonGame.load({ ...def, save, ...(net ? { net } : {}) } as typeof def, {
     stdout: () => undefined, stderr: () => undefined, warning: () => undefined,
     save: (d) => (saved = d),
     score: (n) => scores.push(n),
+    net: (o) => sent.push(o),
   });
   if (error) throw new Error(`${error.object} ${error.event} line ${error.line}: ${error.message}`);
   step(game, 2);
-  return Object.assign(game, { saved: () => saved, scores });
+  return Object.assign(game, { saved: () => saved, scores, sent });
 }
 function step(game: PythonGame, n = 1) {
   for (let i = 0; i < n; i++) {
@@ -42,8 +45,8 @@ function tap(g: PythonGame, name: string) {
   key(g, name, false);
   step(g);
 }
-async function climbing(save: Record<string, unknown> = {}) {
-  const g = await start(save);
+async function climbing(save: Record<string, unknown> = {}, net?: NetJoined) {
+  const g = await start(save, net);
   tap(g, "space");
   step(g, 2);
   expect(py(g, "room_name()")).toBe("Mountain");
@@ -536,4 +539,152 @@ for a in p.ledges:
     tap(g, "p");
     expect(py(g, "game_paused()")).toBe(false);
   });
+
+  // ---------------------------------------------------------------- in a room (phase 3)
+  const ROOM: NetJoined = { code: "KXTD", number: 3, name: "Nia", state: { best: 42 } };
+  const other = (n: number, x: number, y: number, extra: Record<string, unknown> = {}): NetPlayerState =>
+    ({ number: n, name: `P${n}`, state: { x, y, pic: "fox", pose: 1, face: -1, best: 10 * n, h: 5, ...extra } });
+
+  it("in a room: your number over your head, and where you are sent to the room every step", async () => {
+    const g = await climbing({}, ROOM);
+    expect(py(g, "global_vars.player.number")).toBe(3);
+    expect(py(g, "global_vars.room_best")).toBe(42);
+    const last = g.sent.filter((o) => o.state).at(-1)!.state!;
+    expect(last).toMatchObject({ pic: "red", best: 42, h: 0 });
+    expect(last.x).toBe(py(g, "round(global_vars.player.x)"));
+    py(g, "global_vars.player.x += 50");
+    step(g);
+    expect(g.sent.filter((o) => o.state).at(-1)!.state!.x).toBe(py(g, "round(global_vars.player.x)"));
+    // The tag is drawn: a box in #3's colour over the head.
+    const color = py(g, "number_color(3)") as string;
+    expect(JSON.stringify(g.engine.drawList)).toContain('"3"');
+    expect(color).toMatch(/^#/);
+  });
+
+  it("outside a room: nobody else, no numbers, nothing sent", async () => {
+    const g = await climbing();
+    g.netArrive([other(1, 1600, 119900)], []);
+    step(g, 5);
+    expect(py(g, "global_vars.player.number")).toBeUndefined();
+    expect(py(g, "instance_number('Ghost')")).toBe(0);
+    expect(g.sent).toEqual([]);
+  });
+
+  it("the others are see-through ghosts with their own picture and number, gliding to where they are", async () => {
+    const g = await climbing({}, ROOM);
+    const [x, y] = me(g);
+    g.netArrive([other(1, x + 100, y), other(7, x - 300, y - 200)], []);
+    step(g);
+    expect(py(g, "sorted(gh.number for gh in instances('Ghost'))")).toEqual([1, 7]);
+    const ghost = "[gh for gh in instances('Ghost') if gh.number == 1][0]";
+    expect(py(g, `(${ghost}.sprite, ${ghost}.image_index, ${ghost}.image_xscale, ${ghost}.image_alpha < 1)`)).toEqual(["climber_fox", 1, -1, true]);
+    g.netArrive([other(1, x + 160, y), other(7, x - 300, y - 200)], []);
+    step(g);
+    const gx = py(g, `${ghost}.x`) as number;
+    expect(gx).toBeGreaterThan(x + 100);
+    expect(gx).toBeLessThan(x + 160);
+    step(g, 30);
+    expect(py(g, `${ghost}.x`)).toBeCloseTo(x + 160, 0);
+    // One leaves (or is away): their ghost goes.
+    g.netArrive([other(7, x - 300, y - 200)], []);
+    step(g);
+    expect(py(g, "[gh.number for gh in instances('Ghost')]")).toEqual([7]);
+  });
+
+  it("your snowballs are shouted to the room, and burst on a ghost without hurting you", async () => {
+    const g = await climbing({}, ROOM);
+    const [x, y] = me(g);
+    g.netArrive([other(1, x + 90, y)], []);
+    step(g, 20);
+    // A click on the ghost's middle throws at it.
+    const [vx0, vy0] = py(g, "(view_x, view_y)") as unknown as [number, number];
+    g.engine.input.mouseMove(x + 90 - vx0, y - 30 - vy0);
+    g.engine.input.mouseDown(0);
+    step(g);
+    g.engine.input.mouseUp(0);
+    const shout = g.sent.flatMap((o) => o.msgs ?? []).at(-1) as { ball: number[] };
+    expect(shout.ball.length).toBe(4);
+    expect(shout.ball[2]).toBeGreaterThan(5);
+    let splat = 0;
+    for (let t = 0; t < 20 && !splat; t++) {
+      step(g);
+      splat = py(g, "instance_number('Splat')") as number;
+    }
+    expect(splat).toBe(1);
+    expect(py(g, "global_vars.player.dizzy")).toBe(0);
+  });
+
+  it("another player's snowball knocks you a little: a shove, a hop and stars", async () => {
+    const g = await climbing({}, ROOM);
+    const [x, y] = me(g);
+    g.netArrive([other(1, x - 120, y)], [{ from: 1, data: { ball: [x - 100, y - 30, 6.5, 0] }, age: 0 }]);
+    let knocked = false;
+    for (let t = 0; t < 30 && !knocked; t++) {
+      step(g);
+      knocked = (py(g, "global_vars.player.dizzy") as number) > 0;
+    }
+    expect(knocked).toBe(true);
+    expect(py(g, "global_vars.player.vx") as number).toBeGreaterThan(1);
+    expect(me(g)[2]).toBeNull();
+    step(g, 90);
+    const moved = me(g)[0] - x;
+    expect(moved).toBeGreaterThan(5);
+    expect(moved, "only slightly").toBeLessThan(80);
+    expect(me(g)[2]).not.toBeNull();
+  });
+
+  it("a snowball thrown a moment ago arrives where it has got to by now", async () => {
+    const g = await climbing({}, ROOM);
+    const [x, y] = me(g);
+    g.netArrive([], [{ from: 1, data: { ball: [x - 400, y - 200, 5, 0] }, age: 0.25 }]);
+    step(g);
+    const bx = py(g, "[b.x for b in instances('Snowball')]") as unknown as number[];
+    expect(bx.length).toBe(1);
+    expect(bx[0]!).toBeGreaterThan(x - 400 + 5 * 14);
+  });
+
+  it("paused, you're away: hidden from the room and no snowball can touch you", async () => {
+    const g = await climbing({}, ROOM);
+    const [x, y] = me(g);
+    tap(g, "p");
+    expect(g.sent.some((o) => o.away === true)).toBe(true);
+    g.netArrive([], [{ from: 1, data: { ball: [x - 30, y - 30, 6.5, 0] }, age: 0 }]);
+    step(g, 30);
+    expect(py(g, "global_vars.player.dizzy")).toBe(0);
+    expect(py(g, "instance_number('Snowball')")).toBe(0);
+    tap(g, "p");
+    expect(g.sent.at(-1)!.away === false || g.sent.some((o) => o.away === false)).toBe(true);
+  });
+
+  it("the room's board: everyone's best since joining, highest first, you among them", async () => {
+    const g = await climbing({}, ROOM);
+    const [x, y] = me(g);
+    g.netArrive([other(1, x, y, { best: 90 }), other(2, x, y, { best: 5 }), other(4, x, y, { best: 60 })], []);
+    step(g, 2);
+    const text = (g.engine.guiList.filter((c) => c[0] === "text").map((c) => String(c[4])));
+    expect(text).toContain("Room KXTD  ·  4 here");
+    const names = text.filter((t) => /^(P\d|You)$/.test(t));
+    // Each word is drawn with an edge, several times over: in order of first appearance.
+    expect([...new Set(names)]).toEqual(["P1", "P4", "You", "P2"]);
+    // Climbing higher than your room best raises it, and it goes to the room.
+    py(g, "me = global_vars.player\nme.y = GROUND_Y - 50 * METER\nme.on = None");
+    step(g);
+    expect(py(g, "global_vars.room_best") as number).toBeGreaterThanOrEqual(49);
+  });
+
+  it("someone out of sight has an arrow at the edge of the screen pointing their way", async () => {
+    const g = await climbing({}, ROOM);
+    const [x, y] = me(g);
+    g.netArrive([other(5, x + 1500, y)], []);
+    step(g, 2);
+    // An arrow on the right edge, pointing right.
+    const tris = g.engine.guiList.filter((c) => c[0] === "tri") as unknown as number[][];
+    expect(tris.length).toBe(1);
+    const [, , tipX, , bx1, , bx2] = tris[0]!;
+    expect(tipX!).toBeGreaterThan(Math.max(bx1!, bx2!));
+    const fives = g.engine.guiList.filter((c) => c[0] === "text" && c[4] === "5") as unknown as number[][];
+    expect(fives.length).toBeGreaterThan(0);
+    expect(Math.max(...fives.map((c) => c[2] as number))).toBeGreaterThan(500);
+  });
 });
+

@@ -213,6 +213,7 @@ def make_sounds(P):
     P.sound("wind", lowpass(tone(2.2, 0, 0, "noise", 0.35, seed=11), 0.12, 0.02))
     P.sound("tweet", join(tone(0.05, 2400, 3200, "sine", 0.2), tone(0.06, 2800, 3600, "sine", 0.2)))
     P.sound("click", tone(0.03, 900, 700, "square", 0.12))
+    P.sound("bonk", mix(tone(0.12, 520, 180, "tri", 0.45), lowpass(tone(0.1, 0, 0, "noise", 0.4, seed=12), 0.5, 0.1)))
     P.sound("zone", join(*[tone(0.1, f, f, "tri", 0.3) for f in (659, 784, 988)], tone(0.4, 1319, 1319, "tri", 0.3)))
     # A slow, cold little tune: A minor, two bars round.
     melody = [69, 0, 72, 0, 76, 74, 72, 0, 71, 0, 72, 74, 76, 0, 0, 0, 69, 0, 72, 0, 77, 76, 74, 0, 72, 0, 71, 0, 69, 0, 0, 0]
@@ -342,7 +343,7 @@ def build(out):
     # Base camp is in the middle of the foot of the mountain.
     middle = ROOM_W // 2
     room("Mountain", ROOM_W, ROOM_H, [("Mountain", 0, 0), ("Walls", 0, 0), ("Hud", 0, 0), ("Camp", middle, GROUND_Y),
-                                      ("Ground", middle, GROUND_Y), ("Player", middle, GROUND_Y)], True)
+                                      ("Ground", middle, GROUND_Y), ("Player", middle, GROUND_Y), ("Crowd", 0, 0)], True)
 
     out.parent.mkdir(parents=True, exist_ok=True)
     P.write(out)

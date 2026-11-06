@@ -7,6 +7,7 @@
  */
 import { expect, test, type Browser, type Page } from "@playwright/test";
 import { strToU8, zipSync } from "fflate";
+import { existsSync } from "node:fs";
 
 async function signedIn(browser: Browser, email: string) {
   const ctx = await browser.newContext({ viewport: { width: 1366, height: 768 } });
@@ -123,4 +124,65 @@ test("a game with no net_ calls just has its Play button", async ({ browser }) =
   await expect(page.getByTestId("player-start")).toBeVisible({ timeout: 60_000 });
   await expect(page.getByTestId("net-lobby")).toHaveCount(0);
   await ctx.close();
+});
+
+// Snowcap Scramble itself, built (python3 showcase/climber/build.py), published and
+// climbed by two classmates at once. Skipped if it hasn't been built here.
+const CLIMBER = new URL("../../showcase/climber/out/Climber.zip", import.meta.url).pathname;
+
+test("Snowcap Scramble in a room: each sees the other, a snowball knocks, a question hides", async ({ browser }) => {
+  test.skip(!existsSync(CLIMBER), "Snowcap Scramble isn't built here");
+  test.setTimeout(240_000);
+  const teacher = await signedIn(browser, "teach6@example.com");
+  const r = await teacher.page.request.post("/api/classes", { data: { name: "Climbing club" } });
+  await teacher.page.request.post(`/api/classes/${(await r.json()).id}/students`, { data: { emails: "rosa@example.com, sami@example.com" } });
+  await teacher.page.goto("/#/games");
+  await teacher.page.getByTestId("import-file").setInputFiles(CLIMBER);
+  await teacher.page.waitForURL(/#\/p\//, { timeout: 60_000 });
+  await expect(teacher.page.getByTestId("save-status")).toHaveText("Saved", { timeout: 60_000 });
+  await teacher.page.getByTestId("publish").click();
+  await teacher.page.getByTestId("publish-title").fill("Snowcap Scramble");
+  await teacher.page.getByTestId("publish-unlisted").check();
+  await teacher.page.getByTestId("publish-go").click();
+  await expect(teacher.page.getByTestId("publish-link")).toHaveValue(/\/play\/[\w-]+$/, { timeout: 60_000 });
+  const url = new URL(await teacher.page.getByTestId("publish-link").inputValue()).pathname;
+
+  const climb = async (page: Page) => {
+    await page.waitForFunction(() => (window as any).__gameide.host.state === "running", null, { timeout: 60_000 });
+    await page.locator("canvas[data-testid=game-canvas]").click({ position: { x: 5, y: 5 } });
+    await page.keyboard.press("Space");
+    await expect.poll(() => py(page, "room_name()"), { timeout: 15_000 }).toBe("Mountain");
+  };
+  const rosa = await signedIn(browser, "rosa@example.com");
+  await rosa.page.goto(url);
+  await rosa.page.getByTestId("net-create").click({ timeout: 60_000 });
+  const code = (await rosa.page.getByTestId("net-room-code").textContent({ timeout: 30_000 }))!;
+  await climb(rosa.page);
+  const sami = await signedIn(browser, "sami@example.com");
+  await sami.page.goto(url);
+  await sami.page.getByTestId("net-code").fill(code);
+  await sami.page.getByTestId("net-join").click({ timeout: 60_000 });
+  await climb(sami.page);
+
+  // Each has the other as a numbered ghost.
+  expect(await py(rosa.page, "global_vars.player.number")).toBe(1);
+  expect(await py(sami.page, "global_vars.player.number")).toBe(2);
+  await expect.poll(() => py(rosa.page, "[g.number for g in instances('Ghost')]"), { timeout: 15_000 }).toEqual([2]);
+  await expect.poll(() => py(sami.page, "[g.number for g in instances('Ghost')]"), { timeout: 15_000 }).toEqual([1]);
+
+  // Sami steps a little to the right of Rosa; Rosa clicks on his ghost to throw at him.
+  await py(sami.page, "global_vars.player.x += 90");
+  await expect.poll(() => py(rosa.page, "round(instances('Ghost')[0].x - global_vars.player.x)"), { timeout: 15_000 }).toBe(90);
+  const [gx, gy, vx, vy] = (await py(rosa.page, "g = instances('Ghost')[0]\n(g.x, g.y, view_x, view_y)")) as number[];
+  const canvas = rosa.page.locator("canvas[data-testid=game-canvas]");
+  const box = (await canvas.boundingBox())!;
+  await rosa.page.mouse.click(box.x + ((gx! - vx!) / 640) * box.width, box.y + ((gy! - 30 - vy!) / 360) * box.height);
+  await expect.poll(() => py(sami.page, "global_vars.player.dizzy > 0"), { timeout: 15_000 }).toBe(true);
+
+  // Held for a Python check question: gone from Rosa's game until he's back.
+  await sami.page.evaluate(() => (window as any).__gameide.host.holdForQuestion(true));
+  await expect.poll(() => py(rosa.page, "instance_number('Ghost')"), { timeout: 15_000 }).toBe(0);
+  await sami.page.evaluate(() => (window as any).__gameide.host.holdForQuestion(false));
+  await expect.poll(() => py(rosa.page, "instance_number('Ghost')"), { timeout: 15_000 }).toBe(1);
+  await Promise.all([teacher.ctx, rosa.ctx, sami.ctx].map((c) => c.close()));
 });

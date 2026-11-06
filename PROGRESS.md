@@ -1,5 +1,15 @@
 # Progress
 
+## Snowcap Scramble, phase 3: climbing with your class (2026-11-06, waiting for review)
+- **Published, the game asks for a room first** (phase 1's lobby): make one for your class, or type its code. In the editor there's never a room, and it plays alone as before.
+- **The others are see-through Ghosts**, in the picture each picked, posed and facing as they are, gliding to where their game last said they were. **Everyone has a number over their head**, you included, each number its own colour, since pictures can repeat.
+- **Snowballs fly in every game**: a throw is shouted to the room, and each game flies it from where it was thrown, caught up for how long ago that was. **Only your own game decides whether you were hit**, so no two computers argue: a hit is a shove the way it was going, a little hop and stars round your head, "only slightly" as asked. Your own snowballs never hit you; they burst on the others.
+- **The room's board**, top right: the code, how many are here, and everyone's best since joining, highest first, you in yellow. It stays as long as the room does: no end, no winner. Everyone is on the height bar in their colour, and someone out of sight has an arrow at the screen's edge with their number.
+- **Away**: paused (P), answering a Python check question, or the tab hidden, you vanish from everyone's game and nothing reaches you.
+- **Also, from the teacher's play:** cracked ledges and floating ice blocks are a little slippery (between rock and ice); the wind now really pushes, fully in the air and less the better your footing.
+- Tests: 9 more in `climber.test.ts` (31 in all), a browser test where two students in two browsers climb the published game together, see each other, one knocks the other with a clicked snowball and a question hides him. 14 sabotage cases for this phase, all caught.
+- **Not tried yet:** a real class of 20 on Render, and phones. Publish it with the Showcase box ticked for the questions.
+
 ## Snowcap Scramble, phase 2: the climb, one player, with the teacher's Gemini art (2026-11-06, waiting for review)
 - **The twelfth showcase game** (`showcase/climber/`, built by `build.py` into `out/Climber.zip`; Import it from the front page). Pick one of eight climbers on the title, then climb an icy mountain from base camp as high as you can. Arrows run, Up or Space jumps (hold for higher), X throws a snowball (a click throws at the pointer), P pauses. Your best height is kept, and it goes to the school's board in metres.
 - **The mountain is made from a seed**, so it's the same for everyone, every time; only the part near the camera exists. It gets harder in bands, each named as you reach it: Base Camp, Pine Slopes, The Icefall (10 m+, cracked ledges), Windy Ridge (150 m+, gusts and swinging planks), Aurora Heights (300 m+, floating ice blocks, night sky) and The Endless Peaks (500 m+). Ice is slippery; cracked ledges break under you and come back; planks carry you. A fall goes until it lands on something, all the way to base camp if nothing's below, as asked. The sky goes from morning to sunset to the northern lights as you climb, with more snow higher up.

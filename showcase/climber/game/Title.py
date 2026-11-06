@@ -51,4 +51,6 @@ for i, (name, _) in enumerate(CLIMBERS):
 draw_set_color("#2e9e6e" if (self.t // 30) % 2 else "#38b57f")
 draw_rect(220, 318, 420, 350)
 words(VIEW_W / 2, 322, "Climb!", 20, "white", "center")
+if net_room() is not None:
+    words(VIEW_W / 2, 118, f"Room {net_room()}  ·  you are #{net_me().number}", 15, "#ffd84a", "center")
 words(VIEW_W / 2, 92, "Arrows run · Up or Space jumps · X or a click throws · P pauses", 13, "#e8f6ff", "center")
