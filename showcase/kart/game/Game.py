@@ -35,6 +35,11 @@ if RACE["count"] > 0:
 else:
     RACE["steps"] += 1
 
+# A Python check question (in a showcase game) waits for a fair moment: never
+# mid-race. The countdown, the line crossed, and every screen between are fine.
+racing = self.mode == "race" and RACE["count"] == 0 and RACE["karts"][0].done is None
+question_ok(not racing)
+
 if self.mode == "title" or self.mode == "menu":
     if RACE["steps"] > 3600 or (RACE["karts"] and race_over()):
         new_race(0)

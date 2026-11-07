@@ -245,6 +245,13 @@ def build(out):
         sprite(f"climber_{c}", frames, (24, 56), mask=(15, 14, 33, 56))
         sprite(f"face_{c}", [art(f"face_{c}")], (0, 0))
     sprite("climber_red_0", [art("climber_red_stand")], (24, 56), mask=(15, 14, 33, 56))
+    # The game's picture on My Games and in Explore: a sprite called "icon" (GameIDE's
+    # rule, as in microStudio). The red-jacket climber's face, on a sky-blue tile.
+    face = art("face_red", 1).resize((96, 96), Image.LANCZOS)
+    tile = Image.new("RGBA", (128, 128), (0, 0, 0, 0))
+    ImageDraw.Draw(tile).rounded_rectangle((0, 0, 127, 127), radius=22, fill=(143, 201, 239, 255))
+    tile.alpha_composite(face, (16, 24))
+    sprite("icon", [tile], (64, 64))
 
     # Ledges: every width the plan uses, each kind. The origin is the middle of the top of the snow.
     for kind in ("rock", "ice"):

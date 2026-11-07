@@ -226,7 +226,7 @@ export const API: ApiEntry[] = [
   fn("Rooms", "game_pause", [p("paused", "boolean", "True")], "nothing",
     "Pauses the game (or carries on, with False): nothing moves, animates, counts down or collides, and Step and key events run only for instances with self.ignore_pause = True — a pause menu. Everything is still drawn."),
   fn("Rooms", "question_ok", [p("ok", "boolean", "True")], "nothing",
-    "In a showcase game, which stops for a Python question now and then: says whether now is a fair moment to stop. Call it every step, question_ok(standing_still), and a question never lands mid-jump. (After 15 seconds of not OK it's asked anyway.) Elsewhere it does nothing."),
+    "In a showcase game, which stops for a Python question now and then: says whether now is a fair moment to stop. Call it every step, question_ok(standing_still), and a question never lands mid-jump. (After two minutes of not OK it's asked anyway.) Elsewhere it does nothing."),
   fn("Rooms", "question_waiting", [], "True or False",
     'Is a Python question waiting for a fair moment (question_ok)? Show "Question coming!" so the player can find somewhere safe.'),
   fn("Rooms", "game_paused", [], "True or False", "Is the game paused?"),

@@ -1508,9 +1508,12 @@ def wrong_response(block):
 
 due()
 n1 = cs.post(f"{base}/next", json={})
+check("the page is told how long a question may wait for a fair moment", cs.post(f"{base}/start", json={}).get_json().get("fairWait") == pycheck.FAIR_WAIT and pycheck.FAIR_WAIT >= 60)
 check("when it's due, a question comes", n1.status_code == 200 and "block" in n1.get_json())
 leak = json.dumps(n1.get_json())
-check("no answer in it", "secret" not in leak and "2222" not in leak and "[x]" not in leak)
+# The question is picked at random. A matching question shows its options (that's the
+# question); its answer is which goes with which, so that is what mustn't be here.
+check("no answer in it", not any(w in leak for w in ("secretwhile", "2222", "secretblank", "[x]", "-> secretpair")), leak)
 check("asked again, it's the same one: reloading doesn't change the question", cs.post(f"{base}/next", json={}).get_json()["block"] == n1.get_json()["block"])
 check("reloading finds a question waiting", cs.post(f"{base}/start", json={}).get_json()["dueIn"] == 0)
 check("…and the student isn't told it's practice", cs.post(f"{base}/start", json={}).get_json()["practice"] is False)

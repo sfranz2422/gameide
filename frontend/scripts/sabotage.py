@@ -1202,6 +1202,7 @@ CASES = [
  ("smash: a level with no shots allowed", SML, 'if not level["shots"]:', 'if False:', "the build refuses a level", SM),
  ("smash: too near the sling allowed", SML, 'if left < SLING_X + 160 or right > VIEW_W - 10:', 'if False:', "the build refuses a level", SM),
  ("smash: out of the sky allowed", SML, 'if bottom < 0 or GROUND_Y - top < 40:', 'if False:', "the build refuses a level", SM),
+ ('check: the next question carries its key', PC, 'shown = quiz.redact("\\n".join([opener] + keep + [closer])).split("\\n")', 'shown = "\\n".join([opener] + keep + [closer]).split("\\n")', "no answer in it", PY),
  ('check: the key goes to the student', PC, 'shown = quiz.redact("\\n".join([opener] + keep + [closer])).split("\\n")', 'shown = "\\n".join([opener] + keep + [closer]).split("\\n")', "a choice question's right answer isn't in", PY),
  ('check: an explain line left in the question', PC, '        if m:\n            explain = m.group(1).strip()\n        else:\n            keep.append(ln)', '        keep.append(ln)', 'an explain line is kept apart', PY),
  ('check: a long answer allowed', PC, 'if q["kind"] == "long":\n            problems', 'if False:\n            problems', 'a long answer is refused', PY),
@@ -1625,6 +1626,14 @@ CASES = [
  ('question: the page never waits', "src/player/PythonCheck.tsx", '      await host.whenQuestionOk(QUESTION_WAIT_MS);\n', '      void QUESTION_WAIT_MS;\n', "a question waits for the game", E2E),
  ('climber: questions mid-jump', _cl("Player"), 'question_ok(self.on is not None and self.dizzy == 0)', 'question_ok(True)', "a Python check question waits until you're standing", CLIMB),
  ('climber: no heads-up', _cl("Hud"), 'if question_waiting():\n', 'if False:\n', "a Python check question waits until you're standing", CLIMB),
+
+ # Each game's fair moment for a question (question_ok). Zoomtown Cup, Under the Lights,
+ # Moonshot and Thornwood can't be rebuilt here without their art: watched by hand,
+ # patching a zip (2026-11-07, PROGRESS.md).
+ ('questions: mid-stage', "../showcase/hillclimb/game/Game.py", 'question_ok(car is None or bool(RUN["end"]) or (abs(car.speed()) < 0.3 and all(w.on for w in car.wheels)))', 'question_ok(True)', "never while the car's moving", HC),
+ ('questions: mid-swing', "../showcase/golf/game/Game.py", 'question_ok(self.mode not in ("swing", "rolling"))', 'question_ok(True)', "never mid-swing or while the ball rolls", GF),
+ ('questions: mid-wave', "../showcase/towers/game/Director.py", "question_ok(global_vars.mode != \"playing\" or not wave_busy())", "question_ok(True)", "between waves, never while one's on its way", TD),
+ ('questions: mid-flight', "../showcase/smash/game/Director.py", 'question_ok(global_vars.mode != "flying" and not mouse_check("left"))', 'question_ok(True)', "never while a shot flies", SM),
 
 ]
 only = sys.argv[1:]

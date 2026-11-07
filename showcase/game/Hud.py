@@ -83,3 +83,5 @@ if game_paused():
     draw_words_centered(240, 100, "Paused", size=2, gold=True)
     draw_words_centered(240, 132, "Esc or P carries on")
     draw_words_centered(240, 146, "R goes back to the last stone")
+if question_waiting():
+    draw_words_centered(view_width // 2, view_height - 16, "PYTHON QUESTION WHEN YOU LAND", 1, True)

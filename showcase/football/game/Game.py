@@ -25,6 +25,9 @@ go_title(self)
 music_play("fight", volume=0.45)
 
 # === step
+# A Python check question (in a showcase game) waits for a fair moment: never during a
+# live play.
+question_ok(self.mode != "live")
 self.t += 1
 if self.mascot > 0:
     self.mascot -= 1
@@ -170,3 +173,5 @@ elif self.mode == "live" and c is not None and car is not None and car.human == 
             draw_hint("  ".join(left).replace("stiff", "stiff-arm"))
 elif self.mode in ("set", "live") and d is not None and c is None:
     draw_hint(f"{button_name(d, 0)} to dive, {button_name(d, 1)} to switch player")
+if question_waiting():
+    draw_centered(VIEW_W / 2, VIEW_H - 14, "PYTHON QUESTION AFTER THIS PLAY", "#ffd23f")

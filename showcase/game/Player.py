@@ -28,6 +28,9 @@ self.dash_cool = 0
 self.dust = 0
 
 # === step
+# A Python check question (in a showcase game) waits for a fair moment: standing on the
+# ground, never mid-jump, mid-swing or knocked back.
+question_ok(self.on_ground and self.state == "move")
 global_vars.frames += 1
 if self.invincible > 0:
     self.invincible -= 1

@@ -19,6 +19,9 @@ global_vars.mode = "aim"
 load_shot(self)
 
 # === step
+# A Python check question (in a showcase game) waits for a fair moment: never while a
+# shot flies, or while the sling's pulled back.
+question_ok(global_vars.mode != "flying" and not mouse_check("left"))
 if keyboard_check_pressed("r"):
     room_restart()
 if keyboard_check_pressed("escape"):
@@ -71,3 +74,5 @@ if global_vars.mode in ("won", "lost"):
         left = instance_number("Jar")
         text(VIEW_W / 2, 170, "Out of shots", RED, 40, "center")
         text(VIEW_W / 2, 240, f"{left} jelly still in a jar" if left == 1 else f"{left} jellies still in jars", INK, 20, "center")
+if question_waiting():
+    text(VIEW_W / 2, VIEW_H - 40, "Python question after this shot", GOLD, 15, "center")

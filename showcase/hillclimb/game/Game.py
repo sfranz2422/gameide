@@ -20,6 +20,10 @@ start_run("Countryside", "Jeep", {})
 touch_controls(True, ("g", "b", "space"))
 
 # === step
+# A Python check question (in a showcase game) waits for a fair moment: never while
+# driving, unless the car is standing still on all its wheels (a stage can be long).
+car = RUN.get("car") if self.mode == "race" else None
+question_ok(car is None or bool(RUN["end"]) or (abs(car.speed()) < 0.3 and all(w.on for w in car.wheels)))
 self.t += 1
 go = keyboard_check_pressed("space") or keyboard_check_pressed("enter") or gamepad_check_pressed("a")
 gas = keyboard_check("right") or keyboard_check("d") or keyboard_check("g") or gamepad_check("right") or gamepad_check("rt")
@@ -146,3 +150,5 @@ elif self.mode == "race":
     draw_hud(self.t)
 elif self.mode == "over":
     draw_over(self, self.t - self.since)
+if question_waiting():
+    text(VIEW_W / 2, VIEW_H - 40, "Python question when you stop", GOLD, 15, "center")

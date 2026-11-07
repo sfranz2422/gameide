@@ -47,6 +47,11 @@ bp = Blueprint("pycheck", __name__)
 EVERY = int(os.environ.get("GAMEIDE_CHECK_SECONDS") or 300)
 STRIKES_OUT = 3            # this many wrong in a row, and they're out
 LOCK_SECONDS = int(os.environ.get("GAMEIDE_CHECK_LOCK_SECONDS") or 120)
+#: How long a question that's due waits for the game to say it's a fair moment
+#: (question_ok: Snowcap Scramble when you're standing, a racer between races)
+#: before it's asked anyway, so no game can put questions off for ever. Long
+#: enough for a race to finish. A test sets it low.
+FAIR_WAIT = int(os.environ.get("GAMEIDE_CHECK_FAIR_SECONDS") or 120)
 #: What a teacher may set them to: (lowest, highest), and what to call it when refusing.
 LIMITS = {"everyMinutes": (1, 60, "Minutes between questions"), "strikesOut": (1, 10, "Wrong answers in a row"), "lockMinutes": (1, 60, "Minutes out")}
 MAX_BANK = 400_000         # characters of markdown
@@ -236,7 +241,7 @@ def start(slug):
         if st.due_at is None:
             st.due_at = now() + timedelta(seconds=cfg["every"])
         out = {"every": cfg["every"], "dueIn": _due_in(st), "locked": 0 if practising(user) else lock_left(st),
-               "practice": practising(user), "strikes": st.strikes}
+               "practice": practising(user), "strikes": st.strikes, "fairWait": FAIR_WAIT}
         db.commit()
         return jsonify(out)
     finally:

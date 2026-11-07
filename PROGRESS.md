@@ -1,5 +1,18 @@
 # Progress
 
+## Fair moments in the other showcase games; Snowcap Scramble's icon (2026-11-07, waiting for review)
+- **The teacher's ask: players get frustrated when a question lands at a bad time.** Eight showcase games now say when a question is fair (`question_ok`), and say one's coming:
+  - Zoomtown Cup: never mid-race (the countdown, after the finish and every screen between are fine). "Python question after this race".
+  - Ridgeline Rally: never while driving, unless the car is standing still on all its wheels (a stage can be long). "Python question when you stop".
+  - Greenside: never mid-swing or while the ball rolls. Under the Lights: never during a live play. Moonshot: never from the windup to the end of the play. Jelly Jailbreak: never while a shot flies or the sling's pulled back. Fort Bramble: between waves. Thornwood: standing on the ground, not attacking or knocked back.
+  - Hollowmere, the mystery and Greymire are turn-based or slow: any moment is fine, unchanged.
+- **The longest a question waits is now 2 minutes** (was 15 s), long enough for a race to finish, and the server says it (`pycheck.FAIR_WAIT`, sent at start). The tests set 15 s.
+- **Snowcap Scramble has an icon** for My Games and Explore: the red-jacket climber's face.
+- **New zips to import and publish again (Showcase box ticked):** Zoomtown Cup `kart/out/Kart-patched.zip`, Under the Lights `football/out/Football-export-patched.zip`, Moonshot `baseball/out/Moonshot-export-patched.zip`, Thornwood `out/Thornwood-patched.zip` (all patched into zips that have the art), Greenside `golf/out/Golf.zip`, Fort Bramble `towers/out/Towers.zip`, Jelly Jailbreak `smash/out/Smash.zip`, Snowcap Scramble `climber/out/Climber.zip`. **Ridgeline Rally can't be made here**: its Gemini pictures are no longer on this computer and every zip of it here has stand-ins. Export it from GameIDE and it can be patched.
+- **Zoomtown Cup's art is no longer in ~/Downloads either.** `Kart.zip` (with it) is backed up as `Kart-gemini-backup.zip`; don't run Zoomtown's sabotage runner (`KT`), which rebuilds it with stand-ins.
+- Tests: `src/showcase/questions.test.ts` (8, one per game). Sabotage cases for the four that can be rebuilt; the four that can't (Zoomtown Cup, Under the Lights, Moonshot, Thornwood) watched by hand, patching a broken copy into their zip: all caught.
+- **Fixed an old flaky check**: "no answer in it" failed now and then. The question is random, and a matching question's options (which it shows, rightly) contain the test's word "secret". It now looks for the answer itself. Watched to fail.
+
 ## Questions wait for a fair moment (2026-11-07, waiting for review)
 - **The teacher's ask: a showcase game's Python question shouldn't land mid-jump.** Two new functions any game can use: `question_ok(yes)`, called every step to say whether stopping now is fair, and `question_waiting()`, so the game can say one's coming. When a question is due, the page fetches it, waits for the game to say yes, then freezes the game. **At most 15 seconds**, then it's asked anyway, so no game can put questions off for ever (the tech director's requirement stands). A game that never calls it is asked at once, as before. The questions are the same: the server's, from the teacher's Python Check list, with the same timing, strikes and XP.
 - **Snowcap Scramble** says yes only while you're standing on something and not knocked dizzy, and shows "Question coming: land somewhere safe!" while one waits.

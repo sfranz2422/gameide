@@ -20,6 +20,9 @@ self.stars = 0
 self.was_busy = False
 
 # === step
+# A Python check question (in a showcase game) waits for a fair moment: between waves,
+# never while one's on its way.
+question_ok(global_vars.mode != "playing" or not wave_busy())
 level = LEVELS[self.level]
 if global_vars.selected is not None and not global_vars.selected._alive:
     global_vars.selected = None
@@ -84,3 +87,5 @@ if global_vars.mode != "playing":
     else:
         text(VIEW_W / 2, 186, "The fort has fallen", RED, 36, "center")
         text(VIEW_W / 2, 246, f"You got to wave {global_vars.wave} of {len(level['waves'])}", INK, 18, "center")
+if question_waiting():
+    text(VIEW_W / 2, VIEW_H - 40, "Python question after this wave", GOLD, 15, "center")

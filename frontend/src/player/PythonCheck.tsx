@@ -14,10 +14,10 @@ import { QuestionCard, type Reply } from "../notes/NotesPane";
 import { parseQuiz } from "../notes/quiz";
 import { api } from "../store/api";
 
-/** The longest a question waits for the game to say it's a fair moment. */
-export const QUESTION_WAIT_MS = 15_000;
+/** The longest a question waits for the game to say it's a fair moment, if the server doesn't say (it does: pycheck.FAIR_WAIT). */
+export const QUESTION_WAIT_MS = 120_000;
 
-interface Start { every: number; dueIn: number; locked: number; practice: boolean; strikes: number }
+interface Start { every: number; dueIn: number; locked: number; practice: boolean; strikes: number; fairWait?: number }
 interface Answered extends Reply { rightAnswer?: string; explain?: string; strikes?: number; strikesOut?: number; locked?: number }
 
 type View =
@@ -30,6 +30,7 @@ export default function PythonCheck({ slug, host }: { slug: string; host: GameHo
   const [note, setNote] = useState<string | null>(null);
   const [practice, setPractice] = useState(false);
   const every = useRef(300);
+  const fairWait = useRef(QUESTION_WAIT_MS);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const asked = useRef(0);
   const base = `/api/play/${encodeURIComponent(slug)}/check`;
@@ -38,8 +39,8 @@ export default function PythonCheck({ slug, host }: { slug: string; host: GameHo
     try {
       const q = await api<{ block: string }>(`${base}/next`, { json: {} });
       // Not in the middle of a jump: the game says when stopping is fair (question_ok),
-      // and after QUESTION_WAIT_MS it's asked anyway, so no game can put it off for ever.
-      await host.whenQuestionOk(QUESTION_WAIT_MS);
+      // and after the server's fairWait it's asked anyway, so no game can put it off for ever.
+      await host.whenQuestionOk(fairWait.current);
       host.holdForQuestion(true);
       setView({ kind: "question", block: q.block, n: ++asked.current, reply: null });
     } catch {
@@ -56,6 +57,7 @@ export default function PythonCheck({ slug, host }: { slug: string; host: GameHo
   useEffect(() => {
     void api<Start>(`${base}/start`, { json: {} }).then((s) => {
       every.current = s.every;
+      if (s.fairWait) fairWait.current = s.fairWait * 1000;
       setPractice(s.practice);
       if (s.locked) {
         host.holdForQuestion(true);

@@ -167,6 +167,8 @@ def draw_hud(t):
     draw_rect(14, VIEW_H - 24, 134, VIEW_H - 12)
     draw_set_color("#ff9a2e" if you.boost > 0 else MINT)
     draw_rect(16, VIEW_H - 22, 16 + 116 * min(1, abs(you.v) / STATS["boost_top"]), VIEW_H - 14)
+    if question_waiting():
+        text(VIEW_W / 2, VIEW_H - 44, "Python question after this race", GOLD, 15, "center")
     if r["wrong_way"] > 50 and t % 40 < 26:
         text(VIEW_W / 2, 150, "WRONG WAY", RED, 34, "center")
     if r["count"] > 0:

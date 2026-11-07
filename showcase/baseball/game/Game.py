@@ -16,6 +16,9 @@ go_title(self)
 music_play("organ", volume=0.4)
 
 # === step
+# A Python check question (in a showcase game) waits for a fair moment: never between
+# the windup and the end of the play.
+question_ok(self.mode not in ("windup", "pitch", "hit", "field"))
 self.t += 1
 
 if self.mode == "title":
@@ -93,3 +96,5 @@ if MATCH.get("demo"):
     draw_hint("DEMO  -  press any key")
 elif self.mode in ("ready", "windup", "pitch") and batter_is() is not None and pitcher_is() is None:
     draw_hint(f"Up and down to aim the swing,  {button_name(batter_is(), 0)} to swing")
+if question_waiting():
+    text(VIEW_W / 2, VIEW_H - 40, "Python question after this play", GOLD, 15, "center")

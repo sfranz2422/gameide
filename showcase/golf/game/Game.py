@@ -21,6 +21,9 @@ start_hole()
 touch_controls(True, ("space",))
 
 # === step
+# A Python check question (in a showcase game) waits for a fair moment: never mid-swing
+# or while the ball rolls.
+question_ok(self.mode not in ("swing", "rolling"))
 self.t += 1
 go = keyboard_check_pressed("space") or keyboard_check_pressed("enter") or gamepad_check_pressed("a")
 
@@ -135,3 +138,5 @@ draw_map(hole)
 if self.mode == "swing":
     draw_meter(self.power)
 draw_words(self.words)
+if question_waiting():
+    text(VIEW_W / 2, VIEW_H - 40, "Python question after this shot", GOLD, 15, "center")
