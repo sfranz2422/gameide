@@ -62,6 +62,8 @@ export interface GameCallbacks {
   touch?: (spec: TouchSpec | null) => void;
   /** net_send / net_shout / net_away: for the page, which talks to the room. */
   net?: (out: NetOut) => void;
+  /** question_ok(): whether now is a fair moment for a Python check question. */
+  questionOk?: (ok: boolean) => void;
 }
 
 /** Timings of the last step, for the FPS readout. */
@@ -251,11 +253,18 @@ export class PythonGame {
     if (cmds?.score !== undefined) this.callbacks.score?.(cmds.score);
     if (cmds && cmds.touch !== undefined) this.callbacks.touch?.(cmds.touch);
     if (cmds?.net) this.callbacks.net?.(cmds.net);
+    if (cmds && cmds.question_ok !== undefined) this.callbacks.questionOk?.(cmds.question_ok);
     return this.engine.endStep(cmds);
   }
 
   private netPlayers: NetPlayerState[] | null = null;
   private netMessages: NetMessageIn[] = [];
+  private questionWaiting: boolean | null = null;
+
+  /** A Python check question is waiting for a good moment (question_waiting()), or isn't any more. */
+  setQuestionWaiting(on: boolean) {
+    this.questionWaiting = on;
+  }
 
   /**
    * What the room sent back (player/net.ts, through the worker). Kept until
@@ -269,10 +278,15 @@ export class PythonGame {
 
   /** The room's news for this step, as JSON for _frame — or undefined, with none. */
   private takeNet(): string | undefined {
-    if (!this.netPlayers && !this.netMessages.length) return undefined;
-    const out = JSON.stringify({ ...(this.netPlayers ? { players: this.netPlayers } : {}), msgs: this.netMessages });
+    if (!this.netPlayers && !this.netMessages.length && this.questionWaiting === null) return undefined;
+    const out = JSON.stringify({
+      ...(this.netPlayers ? { players: this.netPlayers } : {}),
+      msgs: this.netMessages,
+      ...(this.questionWaiting === null ? {} : { question: this.questionWaiting }),
+    });
     this.netPlayers = null;
     this.netMessages = [];
+    this.questionWaiting = null;
     return out;
   }
 

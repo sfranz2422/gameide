@@ -115,7 +115,7 @@ __all__ = [
     "clamp", "lerp", "approach", "sign", "choose",
     # rooms and the game
     "room_goto", "room_restart", "room_name", "game_restart", "global_vars", "room_width", "room_height",
-    "game_pause", "game_paused",
+    "game_pause", "game_paused", "question_ok", "question_waiting",
     # the camera
     "scene_move", "scene_wait", "scene_say", "scene_ask", "scene_camera", "scene_zoom", "scene_fade", "scene_shake",
     "scene_sound", "scene_do", "scene_room", "scene_playing", "scene_skip",
@@ -2143,6 +2143,27 @@ def game_paused():
     return _g[_L.G.PAUSED] == 1
 
 
+# The Python check (a showcase game stops for a question now and then): the
+# game says when stopping would be fair. The page waits for that moment, up to
+# a limit, so a question never lands in the middle of a jump. A game that
+# never says is stopped whenever a question is due. Outside a showcase game
+# nothing asks, so this does nothing.
+_question_ok = True          # what the game last said
+_question_ok_sent = True     # what the page last heard
+_question_waiting = False    # the page has a question waiting for a good moment
+
+
+def question_ok(ok=True):
+    """Says whether now is a fair moment for a Python check question: question_ok(self.on_ground). Call it every step."""
+    global _question_ok
+    _question_ok = bool(ok)
+
+
+def question_waiting():
+    """Is a Python check question waiting for a good moment (question_ok)? A game can show "Question coming!"."""
+    return _question_waiting
+
+
 # The engine sets up a new room's camera after Python's frame (endStep), so an
 # order given in a Create event, straight to the engine, was wiped a moment
 # later with no error: camera_follow(self) in Create silently did nothing. While
@@ -2481,9 +2502,11 @@ def net_away(away=True):
 
 
 def _net_arrive(text):
-    """What the page brought back from the room: everyone's state, and new messages."""
-    global _net_players
+    """What the page brought back: from the room, everyone's state and new messages; and whether a question is waiting."""
+    global _net_players, _question_waiting
     got = json.loads(text)
+    if "question" in got:
+        _question_waiting = bool(got["question"])
     if "players" in got:
         _net_players = [NetPlayer(p["number"], p["name"], p.get("state") or {}) for p in got["players"]]
     if not _net_away:
@@ -2977,6 +3000,9 @@ def _commands():
     if _net_out:
         out["net"] = dict(_net_out)
         _net_out.clear()
+    global _question_ok_sent
+    if _question_ok != _question_ok_sent:
+        out["question_ok"] = _question_ok_sent = _question_ok
     if _draw:
         out["draw"] = _draw
         _draw = []
@@ -3191,6 +3217,9 @@ def _setup(layout_json, game_json):
     net = game.get("net")
     _net = {"code": net["code"], "number": net["number"], "name": net["name"], "state": net.get("state") or {}} if net else None
     _net_players, _net_state, _net_away = [], None, False
+    global _question_ok, _question_ok_sent, _question_waiting
+    _question_ok = _question_ok_sent = True
+    _question_waiting = False
     _net_messages.clear()
     _net_out.clear()
     _PAD_BUTTONS.clear()

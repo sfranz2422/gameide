@@ -6,6 +6,7 @@
  * here the seconds are set low in playwright.config.ts.)
  */
 import { expect, test, type Browser, type Page } from "@playwright/test";
+import { strToU8, zipSync } from "fflate";
 import { chooseTemplate, watchErrors } from "./helpers";
 
 const BANK = `# Week 1
@@ -209,6 +210,69 @@ test("a week's questions go up, and a showcase game stops for them", async ({ br
   await teacher.reload();
   await expect(teacher.getByTestId("bank-report")).toContainText("Sam");
   expect(errors.filter((e) => !/40[139]|423/.test(e))).toEqual([]);
+  await sctx.close();
+  await tctx.close();
+});
+
+// A game says when stopping would be fair (question_ok): a question never lands
+// mid-jump. This one says "not now" until the test says otherwise.
+test("a question waits for the game to say it's a fair moment, but not for ever", async ({ browser }) => {
+  test.setTimeout(180_000);
+  const { ctx: tctx, page: teacher } = await signedIn(browser, "teach6@example.com");
+  const klass = await (await teacher.request.post("/api/classes", { data: { name: "Fair moments" } })).json();
+  await teacher.request.post(`/api/classes/${klass.id}/students`, { data: { emails: "fay.check@example.com" } });
+  // Two of the main test's questions (no predict block: that needs this page to run it).
+  const bank = BANK.slice(0, BANK.indexOf("```python predict"));
+  expect((await teacher.request.post("/api/check/bank", { data: { markdown: bank, save: true } })).ok()).toBe(true);
+  const project = {
+    format: "gameide-project", schemaVersion: 8, id: "fairzip", name: "Fair", created: "2026-01-01T00:00:00Z", modified: "2026-01-01T00:00:00Z",
+    settings: { stepsPerSecond: 60 }, sprites: [], tilesets: [], scripts: [], sounds: [], fonts: [],
+    objects: [{ id: "o1", name: "Jumper", sprite: null, visible: true, solid: false, persistent: false, depth: 0, parent: null,
+      events: [{ id: "e1", key: { type: "step" }, mode: "python",
+        code: 'question_ok(getattr(global_vars, "landed", False))\nglobal_vars.waiting = question_waiting()\nglobal_vars.steps = getattr(global_vars, "steps", 0) + 1\n' }] }],
+    rooms: [{ id: "r1", name: "Room1", width: 320, height: 180, background: "#223344", gridWidth: 16, gridHeight: 16, snap: true,
+      layers: [{ id: "L", name: "Instances", kind: "instances", depth: 0, visible: true, locked: false }],
+      camera: { enabled: false, width: 320, height: 180, follow: null, smoothing: 1 },
+      instances: [{ id: "i1", object: "o1", layer: "L", x: 0, y: 0, scaleX: 1, scaleY: 1, angle: 0, code: "" }] }],
+  };
+  await teacher.goto("/#/games");
+  const zip = Buffer.from(zipSync({ "project.json": strToU8(JSON.stringify(project)), "assets/index.json": strToU8("{}") }));
+  await teacher.getByTestId("import-file").setInputFiles({ name: "f.zip", mimeType: "application/zip", buffer: zip });
+  await teacher.waitForURL(/#\/p\//, { timeout: 30_000 });
+  await expect(teacher.getByTestId("save-status")).toHaveText("Saved", { timeout: 30_000 });
+  await teacher.getByTestId("publish").click();
+  await teacher.getByTestId("publish-title").fill("Fair");
+  await teacher.getByTestId("publish-unlisted").check();
+  await teacher.getByTestId("publish-showcase").check();
+  await teacher.getByTestId("publish-go").click();
+  await expect(teacher.getByTestId("publish-link")).toHaveValue(/\/play\/[\w-]+$/);
+  const path = new URL(await teacher.getByTestId("publish-link").inputValue()).pathname;
+
+  const { ctx: sctx, page: student } = await signedIn(browser, "fay.check@example.com");
+  const py = (code: string) => student.evaluate((c) => (window as any).__gameide.host.evalPython(c), code);
+  await student.goto(path);
+  await student.getByTestId("player-start").click({ timeout: 60_000 });
+  const check = student.getByTestId("python-check");
+  // Due after a few seconds (playwright.config.ts), but the game says "not now": it waits, and the game knows.
+  await expect.poll(() => py("global_vars.waiting"), { timeout: 30_000 }).toBe(true);
+  await student.waitForTimeout(2000);
+  await expect(check).toHaveCount(0);
+  const before = await py("global_vars.steps");
+  await student.waitForTimeout(300);
+  expect(await py("global_vars.steps")).not.toBe(before);   // still playing
+  // The moment it says yes, the question comes, and the game is held.
+  await py("global_vars.landed = True");
+  await expect(check).toBeVisible({ timeout: 3000 });
+  await answer(student, true);
+  await student.getByTestId("check-continue").click();
+  await expect.poll(() => py("global_vars.waiting"), { timeout: 5000 }).toBe(false);
+
+  // A game can't put it off for ever: "not now" for 15 seconds, and it's asked anyway.
+  await py("global_vars.landed = False");
+  await expect.poll(() => py("global_vars.waiting"), { timeout: 30_000 }).toBe(true);
+  const waitedFrom = Date.now();
+  await expect(check).toBeVisible({ timeout: 25_000 });
+  expect(Date.now() - waitedFrom).toBeGreaterThan(12_000);
   await sctx.close();
   await tctx.close();
 });

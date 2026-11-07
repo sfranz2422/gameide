@@ -32,12 +32,15 @@ export interface Loaded {
   warnings: string[];
   /** What the game asked of its room, frame by frame. */
   nets: NetOut[];
+  /** Each change of question_ok() that reached the page. */
+  questionOks: boolean[];
 }
 
 export async function load(m: MiniGame): Promise<Loaded> {
   const out: string[] = [];
   const warnings: string[] = [];
   const nets: NetOut[] = [];
+  const questionOks: boolean[] = [];
   const code = m.code ?? {};
   const objects = m.objects ?? Object.keys(code).map((name) => ({ name, sprite: "box" }));
   const def: GameDefinition = {
@@ -54,8 +57,9 @@ export async function load(m: MiniGame): Promise<Loaded> {
     stderr: (s) => out.push(s),
     warning: (s) => warnings.push(s),
     net: (n) => nets.push(n),
+    questionOk: (ok) => questionOks.push(ok),
   });
-  return { game, error, out, warnings, nets };
+  return { game, error, out, warnings, nets, questionOks };
 }
 
 /** Steps n times; throws if the game raised, so a test shows the Python error. */

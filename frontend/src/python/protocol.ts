@@ -36,6 +36,8 @@ export type ToWorker =
   | { type: "step" }
   /** What a multiplayer room sent back (player/net.ts): the others' state, and new messages. */
   | { type: "net"; players: NetPlayerState[] | null; msgs: NetMessageIn[] }
+  /** A Python check question is waiting for a good moment (question_waiting()). */
+  | { type: "questionWaiting"; on: boolean }
   | { type: "inspect"; id: number; at: { x: number; y: number } | { slot: number } };
 
 export interface WorkerStats {
@@ -64,4 +66,5 @@ export type FromWorker =
   | { type: "save"; data: Record<string, unknown> }
   | { type: "score"; score: number }
   | { type: "net"; out: NetOut }
+  | { type: "questionOk"; ok: boolean }
   | { type: "touch"; spec: TouchSpec | null };

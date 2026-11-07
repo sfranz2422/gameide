@@ -14,6 +14,9 @@ import { QuestionCard, type Reply } from "../notes/NotesPane";
 import { parseQuiz } from "../notes/quiz";
 import { api } from "../store/api";
 
+/** The longest a question waits for the game to say it's a fair moment. */
+export const QUESTION_WAIT_MS = 15_000;
+
 interface Start { every: number; dueIn: number; locked: number; practice: boolean; strikes: number }
 interface Answered extends Reply { rightAnswer?: string; explain?: string; strikes?: number; strikesOut?: number; locked?: number }
 
@@ -34,6 +37,9 @@ export default function PythonCheck({ slug, host }: { slug: string; host: GameHo
   const ask = useCallback(async () => {
     try {
       const q = await api<{ block: string }>(`${base}/next`, { json: {} });
+      // Not in the middle of a jump: the game says when stopping is fair (question_ok),
+      // and after QUESTION_WAIT_MS it's asked anyway, so no game can put it off for ever.
+      await host.whenQuestionOk(QUESTION_WAIT_MS);
       host.holdForQuestion(true);
       setView({ kind: "question", block: q.block, n: ++asked.current, reply: null });
     } catch {

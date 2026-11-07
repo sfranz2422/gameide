@@ -543,6 +543,13 @@ and students' own games are untouched.
 - XP is `check:<qid>`, once per question ever. Partly right isn't right here.
 - The game is held by `GameHost.holdForQuestion`: sound plays on the page, so
   freezing the worker alone left the music playing.
+- **A question waits for a fair moment** (the teacher's ask: never mid-jump). A
+  game says when with `question_ok(…)` each step (out as `question_ok` with the
+  frame's commands, only on a change); PythonCheck fetches the question, then
+  `GameHost.whenQuestionOk(QUESTION_WAIT_MS)`, then holds. 15 s at most, so no
+  game can put questions off; a game that never calls it is always ready.
+  `question_waiting()` lets a game say one's coming. Which questions, and when
+  they're due, are the server's as before.
 
 ## High scores
 

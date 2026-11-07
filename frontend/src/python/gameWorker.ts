@@ -138,6 +138,7 @@ async function play(msg: Extract<ToWorker, { type: "play" }>) {
     save: (data) => post({ type: "save", data }),
     score: (score) => post({ type: "score", score }),
     net: (out) => post({ type: "net", out }),
+    questionOk: (ok) => post({ type: "questionOk", ok }),
     touch: (spec) => post({ type: "touch", spec }),
   });
   if (mine !== run) return g.dispose();
@@ -245,6 +246,9 @@ self.onmessage = async (ev: MessageEvent<ToWorker>) => {
         break;
       case "net":
         game?.netArrive(msg.players, msg.msgs);
+        break;
+      case "questionWaiting":
+        game?.setQuestionWaiting(msg.on);
         break;
       case "inspect":
         try {

@@ -111,6 +111,8 @@ export interface FrameCommands {
   score?: number;
   /** What net_send / net_shout / net_away asked the room for (player/net.ts). */
   net?: NetOut;
+  /** question_ok(): a change in whether now is a fair moment for a Python check question. */
+  question_ok?: boolean;
   /** Particles, weather, lighting and screen-effect orders (effects.ts). */
   fx?: FxOrder[];
   /** This step's lights (light()); none sent is none shining. */

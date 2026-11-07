@@ -91,6 +91,13 @@ if self.banner > 0:
     draw_set_alpha(a)
     words(VIEW_W / 2, 70, self.zone, 30, "white", "center")
     draw_set_alpha(1)
+if question_waiting():
+    # A question is waiting for you to land: it comes as soon as you're standing.
+    draw_set_color("#0b1620")
+    draw_set_alpha(0.6)
+    draw_rect(VIEW_W / 2 - 150, VIEW_H - 64, VIEW_W / 2 + 150, VIEW_H - 40)
+    draw_set_alpha(1)
+    words(VIEW_W / 2, VIEW_H - 64, "Question coming: land somewhere safe!", 15, "#ffd84a", "center")
 if global_vars.wind != 0 and abs(global_vars.wind) > 0.2:
     words(VIEW_W / 2, VIEW_H - 34, "wind  " + ("→" if global_vars.wind > 0 else "←"), 16, "#e8f6ff", "center")
 if game_paused():

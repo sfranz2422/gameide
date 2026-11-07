@@ -1,5 +1,11 @@
 # Progress
 
+## Questions wait for a fair moment (2026-11-07, waiting for review)
+- **The teacher's ask: a showcase game's Python question shouldn't land mid-jump.** Two new functions any game can use: `question_ok(yes)`, called every step to say whether stopping now is fair, and `question_waiting()`, so the game can say one's coming. When a question is due, the page fetches it, waits for the game to say yes, then freezes the game. **At most 15 seconds**, then it's asked anyway, so no game can put questions off for ever (the tech director's requirement stands). A game that never calls it is asked at once, as before. The questions are the same: the server's, from the teacher's Python Check list, with the same timing, strikes and XP.
+- **Snowcap Scramble** says yes only while you're standing on something and not knocked dizzy, and shows "Question coming: land somewhere safe!" while one waits.
+- Tests: `python/question.test.ts`, one more in `climber.test.ts`, and a browser test against the real server: a showcase game saying "not now" gets no question though one's due, gets it the moment it says yes, and gets one anyway after 15 seconds of "not now". 7 sabotage cases, all caught.
+- **The other showcase games don't use it yet**; each needs its own fair moment (Greenside between shots, Zoomtown Cup between races, and so on).
+
 ## Snowcap Scramble, phase 3: climbing with your class (2026-11-06, waiting for review)
 - **Published, the game asks for a room first** (phase 1's lobby): make one for your class, or type its code. In the editor there's never a room, and it plays alone as before.
 - **The others are see-through Ghosts**, in the picture each picked, posed and facing as they are, gliding to where their game last said they were. **Everyone has a number over their head**, you included, each number its own colour, since pictures can repeat.

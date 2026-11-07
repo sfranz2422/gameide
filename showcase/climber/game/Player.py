@@ -132,6 +132,10 @@ if (keyboard_check_pressed("x") or keyboard_check_pressed("j") or aimed) and sel
 if self.dizzy > 0:
     self.dizzy -= 1
 
+# A Python check question waits for this: standing on something, not knocked
+# about. Never mid-jump or mid-fall, where stopping would throw you off.
+question_ok(self.on is not None and self.dizzy == 0)
+
 # The pose.
 if self.throwing > 0:
     self.throwing -= 1

@@ -1617,6 +1617,15 @@ CASES = [
  ('climber: room best forgotten', _cl("Player"), 'global_vars.room_best = me.get("best", 0) if me else 0', 'global_vars.room_best = 0', "your number over your head", CLIMB),
  ('climber: no arrows', _cl("Hud"), '        if 0 <= sx <= VIEW_W and 0 <= sy <= VIEW_H:\n            continue', '        continue', "pointing their way", CLIMB),
 
+ # question_ok: a showcase game's question waits for a fair moment
+ ('question: every step sent', RT, '    if _question_ok != _question_ok_sent:', '    if True:', "only a change goes to the page"),
+ ('question: waiting never arrives', BRG, '      ...(this.questionWaiting === null ? {} : { question: this.questionWaiting }),', '', "question_waiting is what the page last said"),
+ ('question: asked mid-jump', HOST, '    if (this.questionOk || this.held || this.state !== "running") return Promise.resolve();', '    if (this.questionOk || this.held || this.state !== "running" || true) return Promise.resolve();', "a question waits for the game", E2E),
+ ('question: put off for ever', HOST, '      const timer = setTimeout(finish, maxMs);', '      const timer = setTimeout(finish, maxMs * 100);', "a question waits for the game", E2E),
+ ('question: the page never waits', "src/player/PythonCheck.tsx", '      await host.whenQuestionOk(QUESTION_WAIT_MS);\n', '      void QUESTION_WAIT_MS;\n', "a question waits for the game", E2E),
+ ('climber: questions mid-jump', _cl("Player"), 'question_ok(self.on is not None and self.dizzy == 0)', 'question_ok(True)', "a Python check question waits until you're standing", CLIMB),
+ ('climber: no heads-up', _cl("Hud"), 'if question_waiting():\n', 'if False:\n', "a Python check question waits until you're standing", CLIMB),
+
 ]
 only = sys.argv[1:]
 # A name that matches no case would otherwise run nothing and still say

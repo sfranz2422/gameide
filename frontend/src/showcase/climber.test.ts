@@ -21,15 +21,17 @@ async function start(save: Record<string, unknown> = {}, net?: NetJoined) {
   let saved: Record<string, unknown> = save;
   const scores: number[] = [];
   const sent: NetOut[] = [];
+  const oks: boolean[] = [];
   const { game, error } = await PythonGame.load({ ...def, save, ...(net ? { net } : {}) } as typeof def, {
     stdout: () => undefined, stderr: () => undefined, warning: () => undefined,
     save: (d) => (saved = d),
     score: (n) => scores.push(n),
     net: (o) => sent.push(o),
+    questionOk: (ok) => oks.push(ok),
   });
   if (error) throw new Error(`${error.object} ${error.event} line ${error.line}: ${error.message}`);
   step(game, 2);
-  return Object.assign(game, { saved: () => saved, scores, sent });
+  return Object.assign(game, { saved: () => saved, scores, sent, oks });
 }
 function step(game: PythonGame, n = 1) {
   for (let i = 0; i < n; i++) {
@@ -525,6 +527,28 @@ for a in p.ledges:
       expect(py(g, "instance_number('Ledge')") as number).toBeLessThan(60);
       expect(py(g, "zone_at(global_vars.height)")).toBe(py(g, `zone_at(${m})`));
     }
+  });
+
+  it("a Python check question waits until you're standing, and says it's coming", async () => {
+    const g = await climbing();
+    // Standing (the start) is a fair moment: nothing to say. A jump isn't; landing is again.
+    expect(g.oks).toEqual([]);
+    key(g, "space", true);
+    step(g, 3);
+    key(g, "space", false);
+    expect(g.oks).toEqual([false]);
+    step(g, 80);
+    expect(me(g)[2]).not.toBeNull();
+    expect(g.oks).toEqual([false, true]);
+    // Waiting, the screen says so; then it doesn't.
+    const says = () => g.engine.guiList.some((c) => c[0] === "text" && String(c[4]).startsWith("Question coming"));
+    expect(says()).toBe(false);
+    g.setQuestionWaiting(true);
+    step(g);
+    expect(says()).toBe(true);
+    g.setQuestionWaiting(false);
+    step(g);
+    expect(says()).toBe(false);
   });
 
   it("P pauses, and P again carries on", async () => {

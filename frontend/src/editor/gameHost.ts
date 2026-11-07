@@ -239,6 +239,10 @@ export class GameHost {
       case "net":
         this.events.net?.(m.out);
         break;
+      case "questionOk":
+        this.questionOk = m.ok;
+        if (m.ok) for (const w of this.okWaiters.splice(0)) w();
+        break;
       case "save":
         if (this.saveId)
           try {
@@ -297,6 +301,7 @@ export class GameHost {
    */
   async play(def: GameDefinition, gameId: string | null = null) {
     this.setState("loading");
+    this.questionOk = true;
     this.sound.stopAll();
     this.saveId = gameId;
     const warn = (text: string) => this.events.output([{ text, kind: "warn" }]);
@@ -498,10 +503,41 @@ export class GameHost {
    * the keyboard goes back to the game, which only listens while it has focus.
    */
   holdForQuestion(on: boolean) {
+    this.held = on;
     this.freeze(on);
     this.sound.hold(on);
     this.events.held?.(on);
     if (!on) this.canvas?.focus();
+  }
+
+  /** What the game last said with question_ok(): a game that never says is always ready. */
+  private questionOk = true;
+  private held = false;
+  private okWaiters: (() => void)[] = [];
+
+  /**
+   * Waits for a fair moment for a Python check question: the game says so with
+   * question_ok() (Snowcap Scramble: standing, not mid-jump), or `maxMs` passes,
+   * so a game can't put questions off for ever. While it waits, the game's
+   * question_waiting() is True, for a "Question coming!" of its own.
+   */
+  whenQuestionOk(maxMs: number): Promise<void> {
+    // Already held (the next question after a wrong answer): nothing's moving to wait for.
+    if (this.questionOk || this.held || this.state !== "running") return Promise.resolve();
+    this.send({ type: "questionWaiting", on: true });
+    return new Promise((resolve) => {
+      let done = false;
+      const finish = () => {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        this.okWaiters = this.okWaiters.filter((w) => w !== finish);
+        this.send({ type: "questionWaiting", on: false });
+        resolve();
+      };
+      const timer = setTimeout(finish, maxMs);
+      this.okWaiters.push(finish);
+    });
   }
 
   /** What the game's multiplayer room sent back, for the game's next step. */
