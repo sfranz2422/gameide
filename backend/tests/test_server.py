@@ -372,6 +372,20 @@ admin.post(f"/api/moderation/{SLUG}", json={"action": "feature"})
 check("…and featured games are on Explore's Featured", [x["id"] for x in anon.get("/api/explore?sort=featured").get_json()["games"]] == [SLUG])
 check("unpublishing takes the link down", alice.delete("/api/projects/pub1/publish").status_code == 200 and anon.get(f"/api/play/{SLUG}").status_code == 404)
 
+# A game whose pictures haven't all reached the server isn't published, rather
+# than published without them (its play page was missing them, with nothing said).
+put(alice, "halfup", project("halfup", "Half up", sprites=[{"name": "hero", "frames": ["hu1", "hu2"]}]), 0)
+alice.put("/api/projects/halfup/assets/hu1", data=PNG)
+r = alice.post("/api/projects/halfup/publish", json={"title": "Half up", "visibility": "unlisted"})
+check("publishing waits for every picture: one missing, and it's refused, saying so", r.status_code == 409 and "1 of this game's 2" in r.get_json()["error"], r.get_json())
+_hdb = server.SessionLocal()
+check("…and nothing was published", _hdb.query(gamestore.Published).filter_by(title="Half up").count() == 0)
+_hdb.close()
+alice.put("/api/projects/halfup/assets/hu2", data=PNG)
+r = alice.post("/api/projects/halfup/publish", json={"title": "Half up", "visibility": "unlisted"})
+_hid = (r.get_json().get("published") or {}).get("id")
+check("…and once it's there, it's published with both", r.status_code == 200 and client().get(f"/api/play/{_hid}/assets/hu2").status_code == 200)
+
 # ---------------------------------------------------------------- classes (classes.py)
 import classes  # noqa: E402
 
@@ -1428,13 +1442,14 @@ db = server.SessionLocal()
 check("a student can't make a showcase game", db.query(_P).filter_by(title="Mine").first().showcase == 0)
 db.close()
 
-check("signed out, a showcase game won't load", client().get(f"/api/play/{show}").status_code == 401)
+_anon = client().get(f"/api/play/{show}")
+check("signed out, a showcase game doesn't ask you to sign in: guests play (the teacher's choice)", _anon.status_code != 401 and "Sign in" not in (_anon.get_json() or {}).get("error", ""), _anon.get_json())
 db = server.SessionLocal()
 db.query(_P).filter_by(slug=show).first().thumbnail = PNG
 db.commit()
 db.close()
 check("…but Explore can still show its picture", client().get(f"/api/play/{show}/thumbnail").status_code == 200)
-check("…nor its files", client().get(f"/api/play/{show}/assets/x").status_code == 401)
+check("…and its files are theirs to load", client().get(f"/api/play/{show}/assets/x").status_code == 404)
 check("a student can't remix it", cs.post(f"/api/play/{show}/remix").status_code == 403)
 r = cs.get(f"/api/play/{show}")
 check("with no questions uploaded, a student can't play it", r.status_code == 423 and "questions" in r.get_json()["error"], r.data[:100])
@@ -1671,6 +1686,44 @@ with old.begin() as conn:
 server.gamestore.create_all(old)
 from sqlalchemy import inspect as _inspect
 check("an old database gains the showcase column", "showcase" in {c["name"] for c in _inspect(old).get_columns("gameide_published")})
+
+# Guests (not signed in) get the questions too, kept in their session.
+_g1 = client()
+_gs = _g1.post(f"{base}/start", json={}).get_json()
+check("a guest gets the Python check, as a guest", _gs.get("guest") is True and _gs["dueIn"] > 0 and _gs["locked"] == 0, _gs)
+check("a guest's question isn't early either", _g1.post(f"{base}/next", json={}).status_code == 409)
+def _guest_due(c):
+    with c.session_transaction() as sess:
+        g = dict(sess.get(pycheck.GuestState.KEY) or {})
+        g["due_at"] = (pycheck.now() - _td(seconds=1)).isoformat()
+        sess[pycheck.GuestState.KEY] = g
+_guest_due(_g1)
+_gq = _g1.post(f"{base}/next", json={}).get_json()
+check("when it's due, a guest's question comes, with no answer in it", "block" in _gq and "-> secretpair" not in json.dumps(_gq) and "[x]" not in json.dumps(_gq), _gq)
+check("…from the bank of the teacher who published the game", _gq["block"] in [q["shown"] for q in questions])
+check("…and asked again, it's the same one", _g1.post(f"{base}/next", json={}).get_json()["block"] == _gq["block"])
+_db = server.SessionLocal()
+_answers_before = _db.query(server.gamestore.CheckAnswer).count()
+_db.close()
+_cfg = pycheck.settings_for(server.SessionLocal(), server.SessionLocal().query(server.accounts.User).filter_by(email=CHECK_TEACHER).first().id)
+for _k in range(_cfg["strikes"]):
+    _guest_due(_g1)
+    _blk = _g1.post(f"{base}/next", json={}).get_json()["block"]
+    _ga = _g1.post(f"{base}/answer", json={"response": wrong_response(_blk)}).get_json()
+check("a guest answering wrong is out, like anyone", _ga.get("locked") == _cfg["lock"], _ga)
+check("…and reloading doesn't get round it", _g1.get(f"/api/play/{show}").status_code == 423)
+check("…another guest isn't out", client().get(f"/api/play/{show}").status_code == 200)
+_db = server.SessionLocal()
+check("a guest's answers aren't on the teacher's report", _db.query(server.gamestore.CheckAnswer).count() == _answers_before)
+_db.close()
+_g2 = client()
+_g2.post(f"{base}/start", json={})
+_guest_due(_g2)
+_blk = _g2.post(f"{base}/next", json={}).get_json()["block"]
+_ga = _g2.post(f"{base}/answer", json={"response": right_response(_blk)}).get_json()
+check("a guest's right answer is right, and pays no XP: there's no one to pay", _ga.get("correct") is True and "xp" not in _ga, _ga)
+check("…and their next question is a whole wait away", _g2.post(f"{base}/start", json={}).get_json()["dueIn"] >= _cfg["every"] - 3)
+check("…and with questions uploaded, a guest plays", client().get(f"/api/play/{show}").status_code == 200)
 
 # High scores: first names, students only, and only your own school.
 M = "mohawk.k12.pa.us"

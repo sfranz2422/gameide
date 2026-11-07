@@ -1453,8 +1453,6 @@ CASES = [
  ('check: a bank with a problem saved', PC, 'if problems or not body.get("save"):', 'if not body.get("save"):', "a bank with a problem isn't saved", PY),
  ('check: a student makes a showcase game', PCP, 'pub.showcase = 1 if body.get("showcase") and (is_teacher(user) or is_admin(user)) else 0', 'pub.showcase = 1 if body.get("showcase") else 0', "a student can't make a showcase game", PY),
  ('check: a showcase game remixable by ticking', PCP, '        if pub.showcase:\n            pub.allow_remix = 0\n', '', "a showcase game can't be remixed", PY),
- ('check: signed out can play', PCP, 'if pub.showcase and user is None:', 'if False:', "signed out, a showcase game won't load", PY),
- ('check: Explore loses the picture', PCP, 'hidden = _viewable(db, pub, user) and not (pub.showcase and user is None)', 'hidden = _viewable(db, pub, user)', 'Explore can still show its picture', PY),
  ('check: a showcase game copied by the remix route', PCP, 'if pub.showcase and pub.owner_id != user.id:\n            return err("This game is play only.", 403)\n        if not pub.allow_remix and pub.owner_id != user.id:', 'if not pub.allow_remix and False:', "a student can't remix it", PY),
  ('check: no questions, playing anyway', PC, 'if bank_for(db, user) is None:\n        return ("This game needs', 'if False:\n        return ("This game needs', 'with no questions uploaded', PY),
  ('check: reloading starts the clock again', PC, 'if st.due_at is None:\n            st.due_at', 'if True:\n            st.due_at', "reloading doesn't start the clock again", PY),
@@ -1634,6 +1632,14 @@ CASES = [
  ('questions: mid-swing', "../showcase/golf/game/Game.py", 'question_ok(self.mode not in ("swing", "rolling"))', 'question_ok(True)', "never mid-swing or while the ball rolls", GF),
  ('questions: mid-wave', "../showcase/towers/game/Director.py", "question_ok(global_vars.mode != \"playing\" or not wave_busy())", "question_ok(True)", "between waves, never while one's on its way", TD),
  ('questions: mid-flight', "../showcase/smash/game/Director.py", 'question_ok(global_vars.mode != "flying" and not mouse_check("left"))', 'question_ok(True)', "never while a shot flies", SM),
+
+ ('publish: pictures left behind', PUB, '        if missing:\n            return err(', '        if missing and False:\n            return err(', "publishing waits for every picture", PY),
+
+ # Guests play showcase games, questions and all (the teacher's choice, 2026-11-07)
+ ('guests: signed-in only again', PCP, "    # A showcase game stops for Python questions. Guests play it too", "    if pub.showcase and user is None:\n        return (\"This game is for signed-in students. Sign in to play it.\", 401)\n    # A showcase game stops for Python questions. Guests play it too", "a showcase game doesn't ask you to sign in", PY),
+ ('guests: out, and a reload lets them in', PC, '    left = lock_left(GuestState() if user is None else db.query(CheckState).get(user.id))', '    left = 0 if user is None else lock_left(db.query(CheckState).get(user.id))', "…and reloading doesn't get round it", PY),
+ ('guests: nothing remembered', PC, '    if isinstance(st, GuestState):\n        st.save()', '    if isinstance(st, GuestState):\n        pass', "…and asked again, it's the same one", PY),
+ ('guests: anyone\'s questions', PC, '        return (q.filter(CheckBank.teacher_id == pub.owner_id).first() if pub else None) or q.first()', '        return q.order_by(CheckBank.id.asc()).first()', "…from the bank of the teacher who published", PY),
 
 ]
 only = sys.argv[1:]

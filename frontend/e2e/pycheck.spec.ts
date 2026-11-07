@@ -136,11 +136,13 @@ test("a week's questions go up, and a showcase game stops for them", async ({ br
   await expect(link).toHaveValue(/\/play\/[\w-]+$/);
   const path = new URL(await link.inputValue()).pathname;
 
-  // Signed out, it asks you to sign in.
+  // Signed out, a guest plays it, and gets the questions too (kept in their session).
   const stranger = await browser.newContext();
   const anon = await stranger.newPage();
   await anon.goto(path);
-  await expect(anon.getByRole("link", { name: "Sign in to play it" })).toBeVisible();
+  await anon.getByTestId("player-start").click({ timeout: 60_000 });
+  await expect(anon.getByTestId("python-check")).toBeVisible({ timeout: 30_000 });
+  await expect(anon.getByTestId("python-check")).not.toContainText("XP");
   await stranger.close();
 
   // A student.

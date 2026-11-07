@@ -10,8 +10,9 @@ Who may see a game, in one place (`_viewable`):
              approves it, or straight away from a teacher or an auto-approve
              class. Until then it plays like unlisted.
   taken down only its owner and its moderators
-  showcase   signed in only, whatever the above says, play only (no remix),
-             and it stops for Python questions (pycheck.py)
+  showcase   play only (no remix), and it stops for Python questions
+             (pycheck.py), signed in or not: a guest's questions are kept in
+             their session
 
 A game's moderators are the teachers of any class its owner is enrolled in,
 and the admins (ADMIN_EMAILS, an environment variable like TEACHER_EMAILS,
@@ -122,9 +123,9 @@ def _viewable(db, pub, user):
     owner = user is not None and user.id == pub.owner_id
     if pub.taken_down and not (owner or moderates(db, user, pub)):
         return ("This game was taken down by a teacher.", 404)
-    # A showcase game stops for Python questions, so it needs to know who's playing.
-    if pub.showcase and user is None:
-        return ("This game is for signed-in students. Sign in to play it.", 401)
+    # A showcase game stops for Python questions. Guests play it too (the teacher's
+    # choice, 2026-11-07): their place in the questions is kept in their session
+    # (pycheck.GuestState).
     if pub.visibility == "class" and not owner:
         if user is None:
             return ("This game is for a class. Sign in to play it.", 401)
@@ -241,6 +242,17 @@ def publish(slug):
                                                   ClassSettings.auto_approve == 1).first()
             status = "approved" if (is_teacher(user) or is_admin(user) or auto) else "pending"
 
+        # Every picture, sound and font the game uses must be here before anything
+        # changes. Publishing copied whichever had arrived and quietly left out the
+        # rest, and a game published while its pictures were still uploading was
+        # missing them on its play page, with nothing said.
+        wanted = gamestore.project_asset_ids(json.loads(p.data))
+        have = {a for (a,) in db.query(GameAsset.asset_id).filter(GameAsset.project_id == p.id, GameAsset.asset_id.in_(wanted or [""])).all()}
+        missing = [a for a in wanted if a not in have]
+        if missing:
+            return err(f"{len(missing)} of this game's {len(wanted)} pictures, sounds and fonts haven't reached the server yet, "
+                       "so it wasn't published. Wait until it says Saved, then publish again.", 409)
+
         pub = db.query(Published).filter_by(project_id=p.id).first()
         if pub is None:
             count = db.query(func.count(Published.id)).filter_by(owner_id=user.id).scalar()
@@ -272,9 +284,8 @@ def publish(slug):
         pub.updated_at = now()
         db.flush()
 
-        # Copies of the files, as they are now.
+        # Copies of the files, as they are now (all of them: checked above).
         db.query(PublishedAsset).filter_by(published_id=pub.id).delete()
-        wanted = gamestore.project_asset_ids(data)
         for a in db.query(GameAsset).filter(GameAsset.project_id == p.id, GameAsset.asset_id.in_(wanted or [""])).all():
             db.add(PublishedAsset(published_id=pub.id, asset_id=a.asset_id, content_type=a.content_type, data=a.data, size=a.size))
         db.commit()
@@ -376,9 +387,7 @@ def play_thumbnail(slug):
     try:
         pub = _pub_or_404(db, slug)
         user = _current_user(db)
-        # Explore shows a showcase game's picture to anyone; only playing it needs signing in.
-        hidden = _viewable(db, pub, user) and not (pub.showcase and user is None)
-        if hidden or not pub.thumbnail:
+        if _viewable(db, pub, user) or not pub.thumbnail:
             return err("No picture.", 404)
         r = Response(pub.thumbnail, mimetype="image/png")
         r.headers["Cache-Control"] = "private, max-age=300"

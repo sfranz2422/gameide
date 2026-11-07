@@ -26,10 +26,10 @@ import json
 import os
 import random
 import re
-from datetime import timedelta
+from datetime import datetime, timedelta
 from types import SimpleNamespace
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, session
 from sqlalchemy import func
 
 import accounts
@@ -143,15 +143,42 @@ def answer_text(q):
 # ---------------------------------------------------------------- whose bank, whose turn
 
 def practising(user):
-    return is_teacher(user) or is_admin(user)
+    return user is not None and (is_teacher(user) or is_admin(user))
 
 
-def bank_for(db, user):
+def bank_for(db, user, pub=None):
     """The questions this person gets: their own if they're a teacher with some;
-    else their class's teacher's; else the newest anyone has uploaded."""
-    teachers = {user.id} | {c.teacher_id for c in classes_of(db, user)}
+    else their class's teacher's; else the newest anyone has uploaded. A guest
+    (not signed in) gets the bank of the teacher who published the game."""
     q = db.query(CheckBank).order_by(CheckBank.id.desc())
+    if user is None:
+        return (q.filter(CheckBank.teacher_id == pub.owner_id).first() if pub else None) or q.first()
+    teachers = {user.id} | {c.teacher_id for c in classes_of(db, user)}
     return q.filter(CheckBank.teacher_id.in_(teachers)).first() or q.first()
+
+
+class GuestState:
+    """
+    A guest's place in the check (someone playing without signing in, the
+    teacher's choice, 2026-11-07): the same fields as CheckState, kept in their
+    session cookie. Flask signs the cookie, so it can't be altered, only thrown
+    away: clearing cookies starts a guest's clock and strikes afresh. That's the
+    price of no account; a guest earns no XP and isn't on any report.
+    """
+    KEY = "check_guest"
+
+    def __init__(self):
+        d = session.get(self.KEY) or {}
+        when = lambda k: datetime.fromisoformat(d[k]) if d.get(k) else None
+        self.due_at, self.locked_until = when("due_at"), when("locked_until")
+        self.strikes = int(d.get("strikes", 0))
+        self.pending = str(d.get("pending", ""))
+        self.recent = str(d.get("recent", "[]"))
+
+    def save(self):
+        iso = lambda t: t.isoformat() if t else None
+        session[self.KEY] = {"due_at": iso(self.due_at), "locked_until": iso(self.locked_until),
+                             "strikes": self.strikes, "pending": self.pending, "recent": self.recent}
 
 
 def settings_for(db, teacher_id):
@@ -167,6 +194,8 @@ def _settings_of(db, bank):
 
 
 def _state(db, user):
+    if user is None:
+        return GuestState()
     st = db.query(CheckState).get(user.id)
     if st is None:
         st = CheckState(user_id=user.id, strikes=0, pending="", recent="[]")
@@ -184,19 +213,19 @@ def lock_left(st):
 
 def play_refusal(db, pub, user):
     """Why this person can't start this showcase game now, or None: (message, status)."""
-    if not pub.showcase or user is None or practising(user):
+    if not pub.showcase or practising(user):
         return None
-    left = lock_left(db.query(CheckState).get(user.id))
+    left = lock_left(GuestState() if user is None else db.query(CheckState).get(user.id))
     if left:
         return (f"Too many wrong answers. You can play again in {left} seconds.", 423)
-    if bank_for(db, user) is None:
+    if bank_for(db, user, pub) is None:
         return ("This game needs Python questions, and your teacher hasn't added any yet.", 423)
     return None
 
 
 def _game(db, slug):
-    """The showcase game and whoever is playing it, or a refusal raised."""
-    user = publishing._need_user(db)
+    """The showcase game and whoever is playing it (None: a guest), or a refusal raised."""
+    user = publishing._current_user(db)
     pub = publishing._pub_or_404(db, slug)
     why = publishing._viewable(db, pub, user)
     if why:
@@ -204,6 +233,13 @@ def _game(db, slug):
     if not pub.showcase:
         publishing.fail("This game has no Python check.", 400)
     return user, pub
+
+
+def _keep(db, st):
+    """Saves where they are: a signed-in person's row, or a guest's cookie."""
+    if isinstance(st, GuestState):
+        st.save()
+    db.commit()
 
 
 def _due_in(st):
@@ -235,14 +271,14 @@ def start(slug):
     """Where this person is, as the page starts a game."""
     db = publishing._db()
     try:
-        user, _ = _game(db, slug)
+        user, pub = _game(db, slug)
         st = _state(db, user)
-        cfg = _settings_of(db, bank_for(db, user))
+        cfg = _settings_of(db, bank_for(db, user, pub))
         if st.due_at is None:
             st.due_at = now() + timedelta(seconds=cfg["every"])
         out = {"every": cfg["every"], "dueIn": _due_in(st), "locked": 0 if practising(user) else lock_left(st),
-               "practice": practising(user), "strikes": st.strikes, "fairWait": FAIR_WAIT}
-        db.commit()
+               "practice": practising(user), "strikes": st.strikes, "fairWait": FAIR_WAIT, "guest": user is None}
+        _keep(db, st)
         return jsonify(out)
     finally:
         db.close()
@@ -252,18 +288,18 @@ def start(slug):
 def next_question(slug):
     db = publishing._db()
     try:
-        user, _ = _game(db, slug)
+        user, pub = _game(db, slug)
         st = _state(db, user)
         if lock_left(st) and not practising(user):
             return err("You're out for now.", 423)
         # A little leeway: the page's clock and this one started a moment apart.
         if not st.pending and st.due_at is not None and st.due_at > now() + timedelta(seconds=3):
             return err("It isn't time for a question yet.", 409)
-        bank = bank_for(db, user)
+        bank = bank_for(db, user, pub)
         if bank is None:
             return err("There are no questions yet.", 404)
         q = _ask(st, bank)
-        db.commit()
+        _keep(db, st)
         return jsonify(q)
     finally:
         db.close()
@@ -275,7 +311,7 @@ def answer(slug):
     try:
         user, pub = _game(db, slug)
         st = _state(db, user)
-        bank = bank_for(db, user)
+        bank = bank_for(db, user, pub)
         q = next((x for x in json.loads(bank.questions) if x["qid"] == st.pending), None) if bank else None
         if q is None:
             return err("That question has gone. Ask for the next one.", 409)
@@ -293,7 +329,7 @@ def answer(slug):
         out = {"response": response, "correct": right, "points": q["points"], "earned": q["points"] if right else 0}
         if q["kind"] == "predict":
             out["output"] = q["answers"][0]
-        if not practice:
+        if not practice and user is not None:
             db.add(CheckAnswer(user_id=user.id, bank_id=bank.id, slug=pub.slug, qid=q["qid"], correct=1 if right else 0, created_at=now()))
         if right:
             st.strikes = 0
@@ -306,9 +342,9 @@ def answer(slug):
                 st.locked_until = now() + timedelta(seconds=cfg["lock"])
                 st.due_at = st.locked_until + timedelta(seconds=cfg["every"])
                 out["locked"] = cfg["lock"]
-        db.commit()
+        _keep(db, st)
         # Once per question, whichever week it comes round: the unique source sees to that.
-        if right and not practice and rewards.earns_xp(user):
+        if right and not practice and user is not None and rewards.earns_xp(user):
             got = xp.award(db, user.id, "check:" + q["qid"], q["points"] * xp.XP_PER_POINT, "Python check in " + pub.title, rewards.APP_NAME)
             if got:
                 out["xp"] = got

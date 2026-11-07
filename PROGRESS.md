@@ -1,5 +1,10 @@
 # Progress
 
+## Guests play showcase games; Publish waits for every picture (2026-11-07, waiting for review)
+- **Anyone can play a showcase game without signing in** (the teacher's choice), and still gets the Python questions. A guest's timing, strikes and lockout are kept in their session cookie, which the server signs, so it can't be edited, only cleared (which starts their clock again: the price of no account). Their questions come from the bank of the teacher who published the game. No XP, and they're not on the report. Signed-in students are as before. Class-only games still need signing in, and making a multiplayer room still needs a class (a guest can play Snowcap Scramble alone).
+- **Publish now refuses a game whose pictures, sounds or fonts haven't all reached the server**, saying how many, instead of quietly publishing it without them. That's the likeliest way a published game ends up missing graphics.
+- Tests: 12 new server checks (guests: the questions, no early question, the same question after a reload, a lockout that a reload doesn't undo, another guest unaffected, no report rows, no XP; Publish refusing a half-uploaded game), the browser test now plays a showcase game as a guest and gets a question. 5 sabotage cases, all caught; two old ones retired with the sign-in rule.
+
 ## Fair moments in the other showcase games; Snowcap Scramble's icon (2026-11-07, waiting for review)
 - **The teacher's ask: players get frustrated when a question lands at a bad time.** Eight showcase games now say when a question is fair (`question_ok`), and say one's coming:
   - Zoomtown Cup: never mid-race (the countdown, after the finish and every screen between are fine). "Python question after this race".

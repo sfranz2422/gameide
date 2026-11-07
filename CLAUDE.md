@@ -521,9 +521,18 @@ header; steps are `---` slides; ` ```check ` blocks gate Next (strict); a
 
 `backend/pycheck.py`, `src/player/PythonCheck.tsx`, `src/pycheck/` (the teacher's
 page, #/python-check). A **showcase** game (`Published.showcase`, a tick when a
-teacher publishes) is signed-in only and play only, and stops for a question; the
-teacher asked for it so that school staff would allow playing at all. Tutorials
-and students' own games are untouched.
+teacher publishes) is play only and stops for a question; the teacher asked for
+it so that school staff would allow playing at all. Tutorials and students' own
+games are untouched.
+
+- **Guests play too** (the teacher's choice, 2026-11-07): not signed in, a
+  player's place in the check (`pycheck.GuestState`: due time, strikes, lockout,
+  the question waiting) is kept in their session cookie, signed so it can't be
+  altered, only cleared (which starts their clock afresh). Their questions are the
+  publishing teacher's bank; no XP, no report rows. Every route goes through
+  `_state`/`_keep`, which pick the row or the cookie.
+- **Publish refuses a game whose files aren't all on the server** (409, saying how
+  many): it used to copy what had arrived and silently leave out the rest.
 
 - **The server runs no uploaded code, ever.** A ```python predict block is run by
   the teacher's own browser (`pycheck/bank.ts`, a worker that can be stopped) and
