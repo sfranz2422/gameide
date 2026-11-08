@@ -124,7 +124,9 @@ if (keyboard_check_pressed("x") or keyboard_check_pressed("j") or aimed) and sel
         d = math.atan2(mouse_y - hand_y, mouse_x - hand_x)
         ball.vx, ball.vy = 7.5 * math.cos(d), 7.5 * math.sin(d) - 1
     else:
-        ball.vx, ball.vy = self.facing * 6.5 + self.vx * 0.5, -3.2
+        # Nearly level, at body height for about 200 pixels: an arc sailed over
+        # the heads of anyone between about 50 and 200 pixels away.
+        ball.vx, ball.vy = self.facing * 7.5 + self.vx * 0.5, -1.2
     # Everyone else's game throws it too (Crowd).
     net_shout({"ball": [round(ball.x), round(ball.y), round(ball.vx, 2), round(ball.vy, 2)]})
     sound_play("throw", volume=0.4)

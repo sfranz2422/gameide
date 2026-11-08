@@ -1,5 +1,11 @@
 # Progress
 
+## Snowcap Scramble: snowballs really knock the other player now (2026-11-08, waiting for review)
+- **The teacher saw snowballs hit, but the other player never moved.** The thrower's game showed the hit; the other player's game, which decides hits on them, heard of the throw a moment late (a quarter of a second, say) and jumped the snowball forward to where it would be by now, without looking at what it passed. Anyone 50 to 150 pixels away, which is most of the time, was skipped. It now flies the late part a step at a time through the same code as any snowball (`fly` in the room script), so a ball that would have hit them does.
+- **X threw over people's heads**: it arced up, so it missed anyone between about 50 and 200 pixels away. It's nearly level now and hits from close up to about 220 pixels. The target is the whole climber, boots to hat.
+- **You can see a hit land**: stars on the ghost you hit, and the player hit has stars in everyone's game. The shove is a little firmer (still "slightly").
+- Tests: three more in `climber.test.ts` (a ball arriving 0.1, 0.25 and 0.4 s late still hits; X hits at 30 to 200 px with stars on the ghost; a hit's stars reach everyone). 4 new sabotage cases, 3 moved with the code. The game needs importing and publishing again.
+
 ## Only playing counts toward the next question (2026-11-08, waiting for review)
 - **The teacher's choice:** a question no longer comes just because time has passed, which brought questions to someone waiting on a menu. The clock now counts only time spent playing: the game running and on show, and a key, click, touch or gamepad used in the last 30 seconds (pressing Play and answering a question count). Idle on a menu, paused, or walked away, the clock stops, and carries on from where it was. It works for every game, with no change inside them.
 - **The server still decides:** the page sends its playing seconds every few seconds (`/check/tick`), and the server never credits more than has really passed or half a minute at once. A page changed with the browser's tools could stop sending them and put questions off, as it could already unfreeze itself; the report shows who plays without answering. The teacher's setting is now "Minutes of play between questions". Databases gain two columns (`play_left`, `ticked_at`) by themselves.

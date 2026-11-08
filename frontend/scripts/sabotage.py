@@ -1577,7 +1577,7 @@ CASES = [
  ('climber: best not kept', _cl("Player"), '    save_set("best", metres)\n', '', "the best height is kept", CLIMB),
  ('climber: best not on the board', _cl("Player"), '    high_score(metres)\n', '', "the best height is kept", CLIMB),
  ('climber: best forgotten', _cl("Player"), 'self.best = save_get("best", 0)', 'self.best = 0', "the best height is kept", CLIMB),
- ('climber: snowballs pass through', _cl("Snowball"), '        hit = True', '        hit = hit', "X throws a snowball", CLIMB),
+ ('climber: snowballs pass through', _cl("_3room"), 'ledge.y - 2 <= ball.y <= ledge.y + 16:\n            hit = True', 'ledge.y - 2 <= ball.y <= ledge.y + 16:\n            hit = hit', "X throws a snowball", CLIMB),
  ('climber: snowballs nonstop', _cl("Player"), '    self.throw_wait = THROW_EVERY', '    self.throw_wait = 0', "X throws a snowball", CLIMB),
  ('climber: no wind', _cl("Mountain"), 'if metres >= WIND_FROM:', 'if metres >= WIND_FROM * 100:', "the wind blows on Windy Ridge", CLIMB),
  ('climber: wind everywhere', _cl("_1rules"), 'WIND_FROM = 150 ', 'WIND_FROM = 0 ', "the wind blows on Windy Ridge", CLIMB),
@@ -1605,9 +1605,9 @@ CASES = [
  ('climber: ghosts stay', _cl("Crowd"), '        if instance_exists(g):\n            g.destroy()', '        if instance_exists(g):\n            pass', "gliding to where they are", CLIMB),
  ('climber: ghosts solid', _cl("Ghost"), 'self.image_alpha = 0.55', 'self.image_alpha = 1', "see-through ghosts", CLIMB),
  ('climber: throws kept quiet', _cl("Player"), '    net_shout({"ball"', '    0 and net_shout({"ball"', "your snowballs are shouted", CLIMB),
- ('climber: hit by your own', _cl("Snowball"), 'if self.thrower != 0:\n    if hits(self, me)', 'if True:\n    if hits(self, me)', "burst on a ghost without hurting you", CLIMB),
- ('climber: snowballs harmless', _cl("Snowball"), '        knock(me, self)\n', '', "knocks you a little", CLIMB),
- ('climber: knocked flying', _cl("_3room"), 'KNOCK = 3.2 ', 'KNOCK = 12 ', "knocks you a little", CLIMB),
+ ('climber: hit by your own', _cl("_3room"), 'if ball.thrower != 0:\n        if hits(ball, me)', 'if True:\n        if hits(ball, me)', "burst on a ghost without hurting you", CLIMB),
+ ('climber: snowballs harmless', _cl("_3room"), '            knock(me, ball)\n', '', "knocks you a little", CLIMB),
+ ('climber: knocked flying', _cl("_3room"), 'KNOCK = 4.5 ', 'KNOCK = 12 ', "knocks you a little", CLIMB),
  ('climber: late snowballs start over', _cl("Crowd"), '        for _ in range(min(40, int(m.age * 60))):', '        for _ in range(0 * min(40, int(m.age * 60))):', "arrives where it has got to", CLIMB),
  ('climber: pause not away', _cl("Hud"), '    net_away(game_paused())', '    pass', "paused, you're away", CLIMB),
  ('climber: board unsorted', _cl("Hud"), '    rows.sort(key=lambda r: (-r[0], r[1]))', '    rows.sort(key=lambda r: r[1])', "the room's board", CLIMB),
@@ -1648,6 +1648,11 @@ CASES = [
  ('playtime: any amount believed', PC, '            claimed = min(claimed, max(0.0, (t - st.ticked_at).total_seconds()) + 1)', '            pass', "never more than has really passed", PY),
  ('playtime: old databases stuck', GS, '        if "play_left" not in have:', '        if False:', "an old database gains the playing-time clock", PY),
  ('playtime: idling counts', HOST, ' && performance.now() - this.lastInput < this.idleMs;', ' && (performance.now() - this.lastInput < this.idleMs || true);', "a question waits for the game", E2E),
+
+ ('climber: late snowballs skip past', _cl("Crowd"), '            if fly(s):\n                break', '            s.x, s.y, s.vy = s.x + s.vx, s.y + s.vy, s.vy + SNOW_GRAVITY', "arrives a moment late still hits you", CLIMB),
+ ('climber: throws sail over heads', _cl("Player"), 'ball.vx, ball.vy = self.facing * 7.5 + self.vx * 0.5, -1.2', 'ball.vx, ball.vy = self.facing * 6.5 + self.vx * 0.5, -3.2', "X hits someone standing anywhere", CLIMB),
+ ('climber: no stars on a hit ghost', _cl("_3room"), '                hit = True\n                g.dizzy = DIZZY', '                hit = True', "X hits someone standing anywhere", CLIMB),
+ ('climber: stars kept to yourself', _cl("Crowd"), '"dz": me.dizzy})', '"dz": 0})', "has stars in everyone's game", CLIMB),
 
 ]
 only = sys.argv[1:]

@@ -638,6 +638,39 @@ for a in p.ledges:
     expect(py(g, "global_vars.player.dizzy")).toBe(0);
   });
 
+  it("X hits someone standing anywhere from close up to about 200 px away: the throw doesn't sail over their head", async () => {
+    for (const dist of [30, 80, 140, 200]) {
+      const g = await climbing({}, ROOM);
+      const [x, y] = me(g);
+      for (let i = 0; i < 10; i++) {
+        g.netArrive([other(1, x + dist, y)], []);
+        step(g);
+      }
+      tap(g, "x");
+      let at: number[] | undefined;
+      for (let t = 0; t < 90 && !at; t++) {
+        step(g);
+        at = (py(g, "[(s.x, s.y) for s in instances('Splat')]") as unknown as number[][])[0];
+      }
+      expect(at, `${dist} px away`).toBeDefined();
+      expect(Math.abs(at![0]! - (x + dist)), `${dist} px away: burst on them`).toBeLessThan(30);
+      // The thrower sees it land: stars on their ghost.
+      expect(py(g, "instances('Ghost')[0].dizzy") as number, `${dist} px: stars on the ghost`).toBeGreaterThan(0);
+    }
+  });
+
+  it("someone hit has stars in everyone's game, not only their own", async () => {
+    const g = await climbing({}, ROOM);
+    const [x, y] = me(g);
+    g.netArrive([other(1, x + 200, y, { dz: 40 })], []);
+    step(g);
+    expect(py(g, "instances('Ghost')[0].dizzy") as number).toBeGreaterThan(30);
+    // And yours go out with where you are.
+    g.netArrive([], [{ from: 1, data: { ball: [x - 60, y - 30, 7.5, 0] }, age: 0 }]);
+    step(g, 15);
+    expect((g.sent.filter((o) => o.state).at(-1)!.state!.dz as number)).toBeGreaterThan(0);
+  });
+
   it("another player's snowball knocks you a little: a shove, a hop and stars", async () => {
     const g = await climbing({}, ROOM);
     const [x, y] = me(g);
@@ -655,6 +688,18 @@ for a in p.ledges:
     expect(moved).toBeGreaterThan(5);
     expect(moved, "only slightly").toBeLessThan(80);
     expect(me(g)[2]).not.toBeNull();
+  });
+
+  it("a snowball that arrives a moment late still hits you if you were in its way", async () => {
+    // The thrower's game hears your position, and yours hears their throw, a
+    // fraction of a second late: the ball is caught up, and must not skip past you.
+    for (const age of [0.1, 0.25, 0.4]) {
+      const g = await climbing({}, ROOM);
+      const [x, y] = me(g);
+      g.netArrive([], [{ from: 1, data: { ball: [x - 90, y - 30, 7.5, -1.2] }, age }]);
+      step(g, 30);
+      expect(py(g, "global_vars.player.dizzy") as number, `${age} s late`).toBeGreaterThan(0);
+    }
   });
 
   it("a snowball thrown a moment ago arrives where it has got to by now", async () => {
