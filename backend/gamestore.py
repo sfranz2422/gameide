@@ -247,7 +247,11 @@ class CheckState(Base):
     __tablename__ = "gameide_check_state"
 
     user_id = Column(Integer, ForeignKey("users.id"), primary_key=True)
-    due_at = Column(DateTime, nullable=True)
+    due_at = Column(DateTime, nullable=True)     # unused since 2026-11-08: the clock is play_left now
+    #: Seconds of PLAYING left before the next question (only playing counts: the
+    #: teacher's choice, 2026-11-08), and when the page last reported playing.
+    play_left = Column(Float, nullable=True)
+    ticked_at = Column(DateTime, nullable=True)
     #: The question they were asked and haven't answered: asked again until they do.
     pending = Column(String(12), nullable=False, default="")
     strikes = Column(Integer, nullable=False, default=0)
@@ -517,3 +521,9 @@ def create_all(engine):
     if "showcase" not in {c["name"] for c in inspect(engine).get_columns("gameide_published")}:
         with engine.begin() as conn:
             conn.execute(text("ALTER TABLE gameide_published ADD COLUMN showcase INTEGER NOT NULL DEFAULT 0"))
+    have = {c["name"] for c in inspect(engine).get_columns("gameide_check_state")}
+    with engine.begin() as conn:
+        if "play_left" not in have:
+            conn.execute(text("ALTER TABLE gameide_check_state ADD COLUMN play_left FLOAT"))
+        if "ticked_at" not in have:
+            conn.execute(text("ALTER TABLE gameide_check_state ADD COLUMN ticked_at TIMESTAMP"))

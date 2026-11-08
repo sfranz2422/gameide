@@ -182,7 +182,7 @@ export function BankPage() {
       <section>
         <h2>Timing and penalty</h2>
         <div className="bank-settings">
-          {field("everyMinutes", "Minutes between questions", 1, 60)}
+          {field("everyMinutes", "Minutes of play between questions", 1, 60)}
           {field("strikesOut", "Wrong answers in a row before they're out", 1, 10)}
           {field("lockMinutes", "Minutes they stay out", 1, 60)}
         </div>

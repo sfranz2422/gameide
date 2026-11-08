@@ -269,6 +269,23 @@ test("a question waits for the game to say it's a fair moment, but not for ever"
   await student.getByTestId("check-continue").click();
   await expect.poll(() => py("global_vars.waiting"), { timeout: 5000 }).toBe(false);
 
+  // Only playing counts: left alone, no question comes; touching the keys again, it does.
+  await student.evaluate(() => ((window as any).__gameide.host.idleMs = 800));
+  await student.waitForTimeout(1500);
+  await py("global_vars.landed = True");
+  await student.waitForTimeout(8000);
+  await expect(check).toHaveCount(0);
+  const canvas = student.locator("canvas[data-testid=game-canvas]");
+  await canvas.click({ position: { x: 5, y: 5 } });
+  for (let i = 0; i < 40 && !(await check.isVisible()); i++) {
+    await student.keyboard.press("ArrowRight");
+    await student.waitForTimeout(250);
+  }
+  await expect(check).toBeVisible({ timeout: 5000 });
+  await answer(student, true);
+  await student.getByTestId("check-continue").click();
+  await student.evaluate(() => ((window as any).__gameide.host.idleMs = 30_000));
+
   // A game can't put it off for ever: "not now" for 15 seconds, and it's asked anyway.
   await py("global_vars.landed = False");
   await expect.poll(() => py("global_vars.waiting"), { timeout: 30_000 }).toBe(true);

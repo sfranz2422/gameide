@@ -23,6 +23,7 @@ on their own page. The teacher's report shows who has played without answering.
 Teachers get the same questions as practice: nothing recorded, no lockout, no XP.
 """
 import json
+import math
 import os
 import random
 import re
@@ -53,7 +54,9 @@ LOCK_SECONDS = int(os.environ.get("GAMEIDE_CHECK_LOCK_SECONDS") or 120)
 #: enough for a race to finish. A test sets it low.
 FAIR_WAIT = int(os.environ.get("GAMEIDE_CHECK_FAIR_SECONDS") or 120)
 #: What a teacher may set them to: (lowest, highest), and what to call it when refusing.
-LIMITS = {"everyMinutes": (1, 60, "Minutes between questions"), "strikesOut": (1, 10, "Wrong answers in a row"), "lockMinutes": (1, 60, "Minutes out")}
+#: The most playing one report from the page can claim: it reports every few seconds.
+TICK_MOST = 30
+LIMITS = {"everyMinutes": (1, 60, "Minutes of play between questions"), "strikesOut": (1, 10, "Wrong answers in a row"), "lockMinutes": (1, 60, "Minutes out")}
 MAX_BANK = 400_000         # characters of markdown
 EXPLAIN = re.compile(r"^explain\s*:\s*(.*)$", re.I)
 
@@ -170,14 +173,15 @@ class GuestState:
     def __init__(self):
         d = session.get(self.KEY) or {}
         when = lambda k: datetime.fromisoformat(d[k]) if d.get(k) else None
-        self.due_at, self.locked_until = when("due_at"), when("locked_until")
+        self.locked_until, self.ticked_at = when("locked_until"), when("ticked_at")
+        self.play_left = d.get("play_left")
         self.strikes = int(d.get("strikes", 0))
         self.pending = str(d.get("pending", ""))
         self.recent = str(d.get("recent", "[]"))
 
     def save(self):
         iso = lambda t: t.isoformat() if t else None
-        session[self.KEY] = {"due_at": iso(self.due_at), "locked_until": iso(self.locked_until),
+        session[self.KEY] = {"play_left": self.play_left, "ticked_at": iso(self.ticked_at), "locked_until": iso(self.locked_until),
                              "strikes": self.strikes, "pending": self.pending, "recent": self.recent}
 
 
@@ -243,10 +247,10 @@ def _keep(db, st):
 
 
 def _due_in(st):
-    """Seconds until the next question. They've always a due_at by now (start sets it)."""
-    if st.pending or st.due_at is None:
+    """Seconds of playing until the next question. They've always a play_left by now (start sets it)."""
+    if st.pending or st.play_left is None:
         return 0
-    return max(0, int((st.due_at - now()).total_seconds()))
+    return max(0, math.ceil(st.play_left))
 
 
 def _ask(st, bank):
@@ -274,10 +278,42 @@ def start(slug):
         user, pub = _game(db, slug)
         st = _state(db, user)
         cfg = _settings_of(db, bank_for(db, user, pub))
-        if st.due_at is None:
-            st.due_at = now() + timedelta(seconds=cfg["every"])
+        if st.play_left is None:
+            st.play_left = cfg["every"]
         out = {"every": cfg["every"], "dueIn": _due_in(st), "locked": 0 if practising(user) else lock_left(st),
                "practice": practising(user), "strikes": st.strikes, "fairWait": FAIR_WAIT, "guest": user is None}
+        _keep(db, st)
+        return jsonify(out)
+    finally:
+        db.close()
+
+
+@bp.post("/api/play/<slug>/check/tick")
+def tick(slug):
+    """
+    The page saying how long they've been PLAYING since it last said (a key, the
+    mouse, a touch or a pad in the last half minute, the game running and on
+    show): only that counts toward the next question, not sitting on a menu.
+    Never more than has really passed, nor TICK_MOST at once. A page could stop
+    sending these and put questions off; the report shows who plays unanswered.
+    """
+    db = publishing._db()
+    try:
+        user, pub = _game(db, slug)
+        st = _state(db, user)
+        try:
+            claimed = max(0.0, min(float((request.get_json(silent=True) or {}).get("seconds") or 0), TICK_MOST))
+        except (TypeError, ValueError):
+            return err("How many seconds is a number.", 400)
+        t = now()
+        if st.ticked_at is not None:
+            claimed = min(claimed, max(0.0, (t - st.ticked_at).total_seconds()) + 1)
+        st.ticked_at = t
+        if st.play_left is None:
+            st.play_left = _settings_of(db, bank_for(db, user, pub))["every"]
+        if not st.pending and not lock_left(st):
+            st.play_left = max(0.0, st.play_left - claimed)
+        out = {"dueIn": _due_in(st)}
         _keep(db, st)
         return jsonify(out)
     finally:
@@ -293,7 +329,7 @@ def next_question(slug):
         if lock_left(st) and not practising(user):
             return err("You're out for now.", 423)
         # A little leeway: the page's clock and this one started a moment apart.
-        if not st.pending and st.due_at is not None and st.due_at > now() + timedelta(seconds=3):
+        if not st.pending and st.play_left is not None and st.play_left > 3:
             return err("It isn't time for a question yet.", 409)
         bank = bank_for(db, user, pub)
         if bank is None:
@@ -333,14 +369,14 @@ def answer(slug):
             db.add(CheckAnswer(user_id=user.id, bank_id=bank.id, slug=pub.slug, qid=q["qid"], correct=1 if right else 0, created_at=now()))
         if right:
             st.strikes = 0
-            st.due_at = now() + timedelta(seconds=cfg["every"])
+            st.play_left = cfg["every"]
         else:
             st.strikes = 0 if practice else st.strikes + 1
             out.update(rightAnswer=answer_text(q), explain=q["explain"], strikes=st.strikes, strikesOut=cfg["strikes"])
             if st.strikes >= cfg["strikes"]:
                 st.strikes = 0
                 st.locked_until = now() + timedelta(seconds=cfg["lock"])
-                st.due_at = st.locked_until + timedelta(seconds=cfg["every"])
+                st.play_left = cfg["every"]
                 out["locked"] = cfg["lock"]
         _keep(db, st)
         # Once per question, whichever week it comes round: the unique source sees to that.

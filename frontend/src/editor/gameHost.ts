@@ -27,6 +27,8 @@ import { SoundPlayer } from "./sound";
 import type { FromWorker, GameState, InputMessage, ToWorker, WorkerStats } from "../python/protocol";
 
 export const HANG_MS = 2000;
+/** No key, click, touch or pad for this long, and the player isn't playing (GameHost.playing). */
+export const IDLE_MS = 30_000;
 export const KILL_MS = 1500;
 
 export interface HostEvents {
@@ -181,6 +183,7 @@ export class GameHost {
       const pads = readPads(navigator.getGamepads?.() ?? []);
       const key = JSON.stringify(pads);
       if (key !== this.lastPads) {
+        if (this.lastPads) this.lastInput = performance.now();
         this.lastPads = key;
         this.send({ type: "input", events: [{ k: "pads", pads }] });
       }
@@ -302,6 +305,7 @@ export class GameHost {
   async play(def: GameDefinition, gameId: string | null = null) {
     this.setState("loading");
     this.questionOk = true;
+    this.lastInput = performance.now();   // pressing Play is playing
     this.sound.stopAll();
     this.saveId = gameId;
     const warn = (text: string) => this.events.output([{ text, kind: "warn" }]);
@@ -504,6 +508,8 @@ export class GameHost {
    */
   holdForQuestion(on: boolean) {
     this.held = on;
+    // Answering a question is being here: the next question's clock carries on at once.
+    if (!on) this.lastInput = performance.now();
     this.freeze(on);
     this.sound.hold(on);
     this.events.held?.(on);
@@ -512,6 +518,20 @@ export class GameHost {
 
   /** What the game last said with question_ok(): a game that never says is always ready. */
   private questionOk = true;
+  /** When the player last pressed, clicked, touched or moved anything (or pressed Play). */
+  private lastInput = 0;
+  /** How long without touching anything is not playing (a test sets it short). */
+  idleMs = IDLE_MS;
+
+  /**
+   * Is someone playing right now? The game running, not held for a question, the
+   * tab on show, and a key, the mouse, a touch or a pad used in the last half
+   * minute. A Python check question's clock counts only these seconds (the
+   * teacher's choice): sitting on a menu, or walked away, doesn't bring one on.
+   */
+  playing(): boolean {
+    return this.state === "running" && !this.held && document.visibilityState === "visible" && performance.now() - this.lastInput < this.idleMs;
+  }
   private held = false;
   private okWaiters: (() => void)[] = [];
 
@@ -599,6 +619,7 @@ export class GameHost {
     let queue: InputMessage[] = [];
     let scheduled = false;
     const push = (m: InputMessage) => {
+      this.lastInput = performance.now();
       // Only the latest mouse position in a batch matters.
       if (m.k === "move" && queue.length && queue[queue.length - 1]!.k === "move") queue[queue.length - 1] = m;
       else queue.push(m);

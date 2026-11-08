@@ -552,6 +552,12 @@ games are untouched.
 - XP is `check:<qid>`, once per question ever. Partly right isn't right here.
 - The game is held by `GameHost.holdForQuestion`: sound plays on the page, so
   freezing the worker alone left the music playing.
+- **Only playing counts toward the next question** (the teacher's choice,
+  2026-11-08): the clock is `play_left`, seconds of play, not a time of day. The
+  page counts a second while `GameHost.playing()` (running, on show, not held, a
+  key/click/touch/pad in the last `IDLE_MS`, 30 s; pressing Play and answering
+  count) and sends them every few seconds to `/check/tick`, which never credits
+  more than has really passed. Sitting on a menu or walking away brings no question.
 - **A question waits for a fair moment** (the teacher's ask: never mid-jump). A
   game says when with `question_ok(…)` each step (out as `question_ok` with the
   frame's commands, only on a change); PythonCheck fetches the question, then

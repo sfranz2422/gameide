@@ -1467,7 +1467,7 @@ info = cs.get(f"/api/play/{show}")
 check("now a student can play it", info.status_code == 200 and info.get_json()["info"]["showcase"] is True)
 check("…and it offers no remix", info.get_json()["info"]["allowRemix"] is False)
 st = cs.post(f"{base}/start", json={}).get_json()
-check("the first question is due in five minutes", 290 <= st["dueIn"] <= 300 and st["every"] == 300 and st["practice"] is False)
+check("the first question is due after five minutes of play", 290 <= st["dueIn"] <= 300 and st["every"] == 300 and st["practice"] is False)
 check("too soon, there's no question to be had", cs.post(f"{base}/next", json={}).status_code == 409)
 check("…and nothing to answer, so no XP to farm", cs.post(f"{base}/answer", json={"response": "5"}).status_code == 409)
 def set_state(**kw):
@@ -1479,14 +1479,27 @@ def set_state(**kw):
     db.commit()
     db.close()
 
-set_state(due_at=pycheck.now() + _td(seconds=100))
+set_state(play_left=100)
 check("reloading doesn't start the clock again", cs.post(f"{base}/start", json={}).get_json()["dueIn"] <= 100)
 put(ct, "show2", project("show2"), 0)
 show2 = ct.post("/api/projects/show2/publish", json=SHOW).get_json()["published"]["id"]
 check("going to another showcase game doesn't either: the clock is the student's", cs.post(f"/api/play/{show2}/check/start", json={}).get_json()["dueIn"] <= 100)
 
+# Only playing counts (the teacher's choice, 2026-11-08): the page reports playing
+# time, and nothing else moves the clock.
+set_state(play_left=60, ticked_at=None)
+check("sitting on a menu brings no question: time alone doesn't move the clock", cs.post(f"{base}/start", json={}).get_json()["dueIn"] == 60)
+check("…playing does", cs.post(f"{base}/tick", json={"seconds": 20}).get_json()["dueIn"] == 40)
+check("…but never more than has really passed", cs.post(f"{base}/tick", json={"seconds": 25}).get_json()["dueIn"] >= 38)
+set_state(ticked_at=pycheck.now() - _td(seconds=100))
+check("…nor more than half a minute at once", cs.post(f"{base}/tick", json={"seconds": 1000}).get_json()["dueIn"] >= 40 - pycheck.TICK_MOST - 1)
+check("…and it's a number", cs.post(f"{base}/tick", json={"seconds": "lots"}).status_code == 400)
+set_state(play_left=2, ticked_at=pycheck.now() - _td(seconds=10))
+check("played out, it's due", cs.post(f"{base}/tick", json={"seconds": 5}).get_json()["dueIn"] == 0)
+set_state(play_left=100, ticked_at=None)
+
 def due():
-    set_state(due_at=pycheck.now() - _td(seconds=1))
+    set_state(play_left=0)
 
 def right_response(block):
     """What a person who knows the answer would send, from the bank's own key."""
@@ -1521,6 +1534,15 @@ def wrong_response(block):
         return json.dumps(list(reversed(q["correct"])))
     return "1"
 
+# Partly right isn't right: the game only goes on for a whole answer. Asked before the
+# questions drawn at random below, which a partly-right-counts bug would derail.
+match = next(x for x in questions if x["kind"] == "match")
+set_state(pending=match["qid"])
+half = json.dumps([match["correct"][0], "nope"])
+r = cs.post(f"{base}/answer", json={"response": half}).get_json()
+check("partly right isn't right here", r["correct"] is False, str(r))
+set_state(strikes=0, pending="")
+
 due()
 n1 = cs.post(f"{base}/next", json={})
 check("the page is told how long a question may wait for a fair moment", cs.post(f"{base}/start", json={}).get_json().get("fairWait") == pycheck.FAIR_WAIT and pycheck.FAIR_WAIT >= 60)
@@ -1535,7 +1557,7 @@ check("…and the student isn't told it's practice", cs.post(f"{base}/start", js
 
 block = n1.get_json()["block"]
 r = cs.post(f"{base}/answer", json={"response": wrong_response(block)}).get_json()
-check("a wrong answer says so, with the answer", r["correct"] is False and r.get("rightAnswer") and r["strikes"] == 1 and r["strikesOut"] == 3, str(r))
+check("a wrong answer says so, with the answer", r["correct"] is False and r.get("rightAnswer") and r.get("strikes") == 1 and r.get("strikesOut") == 3, str(r))
 n2 = cs.post(f"{base}/next", json={})
 check("then a different question", n2.status_code == 200 and n2.get_json()["block"] != block)
 
@@ -1559,7 +1581,7 @@ due()
 for i in range(3):
     b = cs.post(f"{base}/next", json={}).get_json()["block"]
     r = cs.post(f"{base}/answer", json={"response": wrong_response(b)}).get_json()
-    check(f"wrong answer {i + 1} counts", r["correct"] is False and r["strikes"] == i + 1 and ("locked" in r) == (i == 2), str(r))
+    check(f"wrong answer {i + 1} counts", r["correct"] is False and r.get("strikes") == i + 1 and ("locked" in r) == (i == 2), str(r))
     if "locked" in r:
         break
 check("the third puts them out", r.get("locked") == 120, str(r))
@@ -1571,13 +1593,6 @@ set_state(locked_until=pycheck.now() - _td(seconds=5))
 check("when the time's up, they can play", cs.get(f"/api/play/{show}").status_code == 200)
 check("…with a clean slate", cs.post(f"{base}/start", json={}).get_json()["strikes"] == 0)
 
-# Partly right isn't right: the game only goes on for a whole answer.
-match = next(x for x in questions if x["kind"] == "match")
-set_state(pending=match["qid"])
-half = json.dumps([match["correct"][0], "nope"])
-r = cs.post(f"{base}/answer", json={"response": half}).get_json()
-check("partly right isn't right here", r["correct"] is False, str(r))
-set_state(strikes=0)
 
 # A nonsense answer is refused, not counted.
 set_state(pending=match["qid"])
@@ -1595,7 +1610,7 @@ check("the teacher's is practice", tinfo["practice"] is True)
 db = server.SessionLocal()
 tu = db.query(server.accounts.User).filter_by(email=CHECK_TEACHER).first()
 ts = db.query(CheckState).get(tu.id)
-ts.due_at = pycheck.now() - _td(seconds=1)
+ts.play_left = 0
 db.commit()
 db.close()
 before = ct.get("/api/check/report").get_json()["students"][0]["answered"]
@@ -1611,7 +1626,7 @@ check("a teacher is never put out", not teacher_out and ct.get(f"/api/play/{show
 check("nor counted in the report", len(ct.get("/api/check/report").get_json()["students"]) == 1 and ct.get("/api/check/report").get_json()["students"][0]["answered"] == before)
 
 # A new week replaces the old at once; a student's waiting question from last week doesn't break it.
-set_state(pending=questions[0]["qid"], due_at=pycheck.now() - _td(seconds=1))
+set_state(pending=questions[0]["qid"], play_left=0)
 ct.post("/api/check/bank", json={"markdown": "```quiz\nNew week?\n- [x] yes\n- [ ] no\n```\n```quiz\nStill new?\nanswer: yes\n```", "name": "Week 2", "save": True})
 check("the new week's questions are the bank", ct.get("/api/check/bank").get_json()["bank"]["name"] == "Week 2")
 r = cs.post(f"{base}/next", json={}).get_json()
@@ -1630,7 +1645,7 @@ ct.post("/api/check/bank", json={"markdown": BANK, "name": "Week 3", "save": Tru
 check("a student can't change the timing", cs.post("/api/check/settings", json={"everyMinutes": 60}).status_code == 403)
 defaults = ct.get("/api/check/bank").get_json()["settings"]
 check("the defaults are five minutes, three wrong, two minutes out", defaults == {"everyMinutes": 5, "strikesOut": 3, "lockMinutes": 2}, str(defaults))
-for bad, why in (({"everyMinutes": 0}, "Minutes between"), ({"everyMinutes": 61}, "Minutes between"), ({"strikesOut": 0}, "Wrong answers"), ({"strikesOut": 11}, "Wrong answers"),
+for bad, why in (({"everyMinutes": 0}, "Minutes of play between"), ({"everyMinutes": 61}, "Minutes of play between"), ({"strikesOut": 0}, "Wrong answers"), ({"strikesOut": 11}, "Wrong answers"),
                  ({"lockMinutes": 0}, "Minutes out"), ({"lockMinutes": "soon"}, "Minutes out"), ({"strikesOut": True}, "Wrong answers")):
     r = ct.post("/api/check/settings", json=bad)
     check(f"refused, in words: {bad}", r.status_code == 400 and why in r.get_json()["error"], r.data[:100])
@@ -1638,7 +1653,7 @@ check("nothing refused was changed", ct.get("/api/check/bank").get_json()["setti
 r = ct.post("/api/check/settings", json={"strikesOut": 2})
 check("changing one leaves the others", r.get_json()["settings"] == {"everyMinutes": 5, "strikesOut": 2, "lockMinutes": 2}, str(r.get_json()))
 ct.post("/api/check/settings", json={"everyMinutes": 10, "lockMinutes": 7})
-set_state(pending="", strikes=0, locked_until=None, due_at=None)
+set_state(pending="", strikes=0, locked_until=None, play_left=None)
 check("students' next question is that far off", 595 <= cs.post(f"{base}/start", json={}).get_json()["dueIn"] <= 600)
 check("…and the page is told", cs.post(f"{base}/start", json={}).get_json()["every"] == 600)
 due()
@@ -1686,6 +1701,12 @@ with old.begin() as conn:
 server.gamestore.create_all(old)
 from sqlalchemy import inspect as _inspect
 check("an old database gains the showcase column", "showcase" in {c["name"] for c in _inspect(old).get_columns("gameide_published")})
+old_db2 = Path(tempfile.mkdtemp()) / "old2.db"
+old2 = create_engine(f"sqlite:///{old_db2}")
+with old2.begin() as conn:
+    conn.execute(_text("CREATE TABLE gameide_check_state (user_id INTEGER PRIMARY KEY, due_at TIMESTAMP, pending VARCHAR(12), strikes INTEGER, locked_until TIMESTAMP, recent TEXT)"))
+server.gamestore.create_all(old2)
+check("an old database gains the playing-time clock", {"play_left", "ticked_at"} <= {c["name"] for c in _inspect(old2).get_columns("gameide_check_state")})
 
 # Guests (not signed in) get the questions too, kept in their session.
 _g1 = client()
@@ -1695,7 +1716,7 @@ check("a guest's question isn't early either", _g1.post(f"{base}/next", json={})
 def _guest_due(c):
     with c.session_transaction() as sess:
         g = dict(sess.get(pycheck.GuestState.KEY) or {})
-        g["due_at"] = (pycheck.now() - _td(seconds=1)).isoformat()
+        g["play_left"] = 0
         sess[pycheck.GuestState.KEY] = g
 _guest_due(_g1)
 _gq = _g1.post(f"{base}/next", json={}).get_json()

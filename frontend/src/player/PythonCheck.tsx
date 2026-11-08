@@ -14,6 +14,9 @@ import { QuestionCard, type Reply } from "../notes/NotesPane";
 import { parseQuiz } from "../notes/quiz";
 import { api } from "../store/api";
 
+/** Seconds of playing the page counts up before telling the server. */
+const TICK_EVERY = 5;
+
 /** The longest a question waits for the game to say it's a fair moment, if the server doesn't say (it does: pycheck.FAIR_WAIT). */
 export const QUESTION_WAIT_MS = 120_000;
 
@@ -49,10 +52,45 @@ export default function PythonCheck({ slug, host }: { slug: string; host: GameHo
     }
   }, [base, host]);
 
+  // Only PLAYING counts toward the next question (the teacher's choice): a second
+  // counts while host.playing() (running, on show, touched in the last half
+  // minute), and the server hears it every TICK_EVERY of them. It decides when
+  // one's due; this asks when it says so.
+  const dueLeft = useRef<number | null>(null);
+  const played = useRef(0);
+  const sending = useRef(false);
   const wait = useCallback((seconds: number) => {
     if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(() => void ask(), seconds * 1000);
-  }, [ask]);
+    dueLeft.current = seconds;
+    played.current = 0;
+  }, []);
+  useEffect(() => {
+    const beat = setInterval(() => {
+      if (dueLeft.current === null || sending.current) return;
+      if (host.playing()) {
+        played.current++;
+        dueLeft.current--;
+      }
+      if (played.current >= TICK_EVERY || dueLeft.current <= 0) {
+        const seconds = played.current;
+        played.current = 0;
+        sending.current = true;
+        void api<{ dueIn: number }>(`${base}/tick`, { json: { seconds } })
+          .then((r) => {
+            if (dueLeft.current === null) return;
+            dueLeft.current = r.dueIn;
+            if (r.dueIn <= 0) {
+              dueLeft.current = null;
+              void ask();
+            }
+          }, () => {
+            played.current += seconds; // offline for a moment: say it next time
+          })
+          .finally(() => (sending.current = false));
+      }
+    }, 1000);
+    return () => clearInterval(beat);
+  }, [base, host, ask]);
 
   useEffect(() => {
     void api<Start>(`${base}/start`, { json: {} }).then((s) => {
