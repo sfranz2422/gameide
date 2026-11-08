@@ -1,5 +1,10 @@
 # Progress
 
+## Rooms are anyone's, not a class's (2026-11-08, waiting for review)
+- **The teacher's decision:** they use GameIDE for formative assessment across all their classes, not only GameIDE ones, so a multiplayer room isn't tied to a class any more. Anyone signed in, with any email, can make a room in a game, and anyone signed in can join any room of that game with its code. The lobby has no class picker. Signing in is still needed (the room shows names, which come from accounts); a guest can still play alone. Found when the teacher's second account, not on that class's roster, was told the room didn't exist.
+- What that means: anyone who has a code can join, and sees the players' first names (teachers' last names).
+- Tests: server checks for anyone making and joining (another class, a PyIDE class, no class), a wrong code refused; the browser test's other-class student now tries a wrong code. Two sabotage cases for the new rule; two old class ones retired. Rerunning all twenty room cases found one that had gone weak since leaving began to change the token; it now points at the check that still sees it.
+
 ## Guests play showcase games; Publish waits for every picture (2026-11-07, waiting for review)
 - **Anyone can play a showcase game without signing in** (the teacher's choice), and still gets the Python questions. A guest's timing, strikes and lockout are kept in their session cookie, which the server signs, so it can't be edited, only cleared (which starts their clock again: the price of no account). Their questions come from the bank of the teacher who published the game. No XP, and they're not on the report. Signed-in students are as before. Class-only games still need signing in, and making a multiplayer room still needs a class (a guest can play Snowcap Scramble alone).
 - **Publish now refuses a game whose pictures, sounds or fonts haven't all reached the server**, saying how many, instead of quietly publishing it without them. That's the likeliest way a published game ends up missing graphics.

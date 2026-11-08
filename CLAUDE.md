@@ -573,12 +573,12 @@ games are untouched.
 
 ## Multiplayer rooms
 
-`backend/multiplayer.py`, `player/net.ts` + `NetLobby.tsx`, the `net_` section of runtime.py. A published game whose code uses `net_` gets a lobby instead of Play: make a room (a 4-letter code) or join one by its code, for **one GameIDE class**; or play alone.
+`backend/multiplayer.py`, `player/net.ts` + `NetLobby.tsx`, the `net_` section of runtime.py. A published game whose code uses `net_` gets a lobby instead of Play: make a room (a 4-letter code) or join one by its code; or play alone. **Rooms aren't tied to classes** (the teacher's decision, 2026-11-08: GameIDE is their formative assessment across all their classes): anyone signed in, any email, makes and joins any room of that game. Signing in is still needed, for the names.
 
 - **No websockets: HTTP sync.** The page POSTs `/api/net/sync` every `SYNC_MS` (the server says, so it can be slowed without a build), one request at a time. Rooms live in Postgres (`gameide_net_*`), because gunicorn's two workers share no memory. A sync is token **and** session: a copied token does nothing.
 - **Into the game: one call a frame still.** The worker keeps what arrived (`PythonGame.netArrive`) and hands it to the next `_frame(net)`; messages last one step. Out: `net_send`/`net_shout`/`net_away` go with the frame's commands as `net`, and `GameHost.events.net` passes them to the session.
 - **Away hides you and deafens you** (the teacher's rule: nothing affects a player answering a question): `holdForQuestion` → `events.held` → `NetSession.hold`; a hidden tab; `net_away()`. The server leaves away players out and moves their `after` past what they missed, and the page drops messages while held.
-- Names are `_board_name` (students by first name), never an email; a wrong class gets the same answer as a wrong code. A new route handing out players needs a leak check.
+- Names are `_board_name` (students by first name), never an email. A new route handing out players needs a leak check.
 - Syncing isn't activity (`_counts_as_activity`), or playing would pay XP's working time.
 - Outside a room (the editor, exports) every `net_` function quietly does nothing.
 

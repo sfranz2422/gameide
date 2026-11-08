@@ -168,10 +168,7 @@ export class NetSession {
   }
 }
 
-/** The classes this player could make a room for (the lobby asks which, if more than one). */
-export const roomClasses = (slug: string) => api<{ classes: { id: number; name: string }[]; most: number }>(`/api/play/${encodeURIComponent(slug)}/net`);
-
-export const createRoom = (slug: string, classId?: number) =>
-  api<Joined>(`/api/play/${encodeURIComponent(slug)}/net/create`, { json: classId === undefined ? {} : { classId } });
+/** A new room in this game: anyone signed in may make one (rooms aren't tied to classes). */
+export const createRoom = (slug: string) => api<Joined>(`/api/play/${encodeURIComponent(slug)}/net/create`, { json: {} });
 
 export const joinRoom = (slug: string, code: string) => api<Joined>(`/api/play/${encodeURIComponent(slug)}/net/join`, { json: { code } });

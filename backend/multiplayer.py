@@ -1,12 +1,14 @@
 """
-Multiplayer rooms for published games: a few classmates in one game at once,
+Multiplayer rooms for published games: a few players in one game at once,
 each seeing the others (net_* in runtime.py, player/NetLobby.tsx).
 
-A room belongs to one published game and one GameIDE class, and is joined by
-a short code. Only people in that class (enrolled, or its teacher) may join:
-the room shows their names, so it is for classmates only, and the names are
-`publishing._board_name` (students by first name, teachers by last), never an
-email. Twenty at most.
+A room belongs to one published game and is joined by a short code. ANYONE
+SIGNED IN, with any email, may make one and join any one by its code: the
+teacher uses GameIDE across all their classes, not only GameIDE ones, so
+rooms aren't tied to classes (their decision, 2026-11-08; until then a room
+was for one GameIDE class). Signing in is still needed: the room shows names,
+and they come from accounts. The names are `publishing._board_name` (students
+by first name, teachers by last), never an email. Twenty at most.
 
 How it talks: no websockets. Each player's page POSTs /api/net/sync a few
 times a second — "here is my state (and any messages), give me everyone
@@ -35,7 +37,7 @@ from sqlalchemy.exc import IntegrityError
 
 import publishing
 from gamestore import NetMessage, NetPlayer, NetRoom
-from publishing import _board_name, _need_user, _pub_or_404, _viewable, classes_of, err
+from publishing import _board_name, _need_user, _pub_or_404, _viewable, err
 
 bp = Blueprint("multiplayer", __name__)
 
@@ -137,41 +139,18 @@ def _enter(db, room, user):
                    state=json.loads(me.state or "{}"), after=after, every=SYNC_MS)
 
 
-@bp.get("/api/play/<slug>/net")
-def net_classes(slug):
-    """The classes the user could make a room for: the lobby asks which, if there's more than one."""
-    db = publishing._db()
-    try:
-        user, _ = _playable(db, slug)
-        return jsonify(classes=[{"id": c.id, "name": c.name} for c in sorted(classes_of(db, user), key=lambda c: c.name.lower())],
-                       most=MAX_PLAYERS)
-    finally:
-        db.close()
-
-
 @bp.post("/api/play/<slug>/net/create")
 def create(slug):
     db = publishing._db()
     try:
         user, pub = _playable(db, slug)
-        mine = classes_of(db, user)
-        want = (request.get_json(silent=True) or {}).get("classId")
-        if not mine:
-            return err("A room is for a class, and you aren't in a GameIDE class yet.", 403)
-        if want is None:
-            if len(mine) > 1:
-                return err("Which class is this room for?", 400)
-            course = mine[0]
-        else:
-            course = next((c for c in mine if c.id == want), None)
-            if course is None:
-                return err("You can only make a room for a class you're in.", 403)
         _tidy(db, pub.id)
         used = {r.code for r in db.query(NetRoom.code).filter_by(published_id=pub.id).all()}
         code = next((c for c in (_code() for _ in range(50)) if c not in used), None)
         if code is None:
             return err("Couldn't find a free room code. Try again.", 503)
-        room = NetRoom(published_id=pub.id, class_id=course.id, code=code, created_by=user.id, active_at=time.time())
+        # class_id stays in the table (0: no class) from when rooms were per class.
+        room = NetRoom(published_id=pub.id, class_id=0, code=code, created_by=user.id, active_at=time.time())
         db.add(room)
         try:
             db.flush()
@@ -191,11 +170,9 @@ def join(slug):
         code = _clean_code((request.get_json(silent=True) or {}).get("code"))
         _tidy(db, pub.id)
         room = db.query(NetRoom).filter_by(published_id=pub.id, code=code).first() if code else None
-        # The same answer for a room that's another class's as for no room:
-        # a code isn't a way to find out what other classes are playing.
-        if room is None or not any(c.id == room.class_id for c in classes_of(db, user)):
+        if room is None:
             db.commit()
-            return err(f"There's no room {code or ''} for your class in this game. Check the code?".replace("  ", " "), 404)
+            return err(f"There's no room {code or ''} in this game. Check the code, and that it's this game's room?".replace("  ", " "), 404)
         return _enter(db, room, user)
     finally:
         db.close()

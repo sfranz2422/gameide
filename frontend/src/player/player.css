@@ -223,8 +223,6 @@ body.phone-play {
 .net-join label { flex: 1; display: flex; flex-direction: column; gap: 4px; text-align: left; font-size: 13px; color: var(--muted); }
 .net-join input { font: 600 24px/1 ui-monospace, monospace; letter-spacing: 0.3em; text-transform: uppercase; padding: 8px 10px; background: var(--type-bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; width: 100%; box-sizing: border-box; }
 .net-or { color: var(--muted); font-size: 13px; }
-.net-make { display: flex; gap: 8px; justify-content: center; }
-.net-make select { flex: 1; background: var(--type-bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 4px 6px; }
 .net-alone { align-self: center; margin-top: 4px; }
 .net-error { color: var(--warn); margin: 0; }
 .net-bar { display: flex; gap: 18px; align-items: center; padding: 4px 10px; background: var(--panel-2); border-radius: 6px; font-size: 14px; }

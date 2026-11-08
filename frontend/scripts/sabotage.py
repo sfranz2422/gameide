@@ -1531,8 +1531,6 @@ CASES = [
  ("hillclimb: a cliff builds", HCB, "                if math.sin(slope) > most:", "                if False:", "won't build a stage", HC),
  ("hillclimb: a stage longer than the room builds", HCB, '        if len(hs) * GAME["STEP"] > ROOM_W - VIEW_W:', '        if False:', "won't build a stage", HC),
  # Multiplayer rooms (backend/multiplayer.py, runtime.py's net_, player/net.ts)
- ('rooms: any class joins', MP, '        if room is None or not any(c.id == room.class_id for c in classes_of(db, user)):', '        if room is None:', "rooms: another class can't join", PY),
- ('rooms: another class told it exists', MP, '        if room is None or not any(c.id == room.class_id for c in classes_of(db, user)):', '        if room is not None and not any(c.id == room.class_id for c in classes_of(db, user)):\n            return err("That room is for another class.", 404)\n        if room is None:', "…and is told just what a wrong code is told", PY),
  ('rooms: emails go out', MP, '    me.name, me.seen_at, me.away = _board_name(user), t, 0', '    me.name, me.seen_at, me.away = user.email, t, 0', "rooms: no email, last name or token goes out", PY),
  ('rooms: a token is enough', MP, '        if me is None or me.user_id != uid:\n            return err("You\'re not in this room', '        if me is None:\n            return err("You\'re not in this room', "rooms: someone else's token does nothing", PY),
  ('rooms: no cap', MP, '        if len(present) >= MAX_PLAYERS:', '        if len(present) >= MAX_PLAYERS + 5:', "rooms: twenty at most", PY),
@@ -1543,7 +1541,7 @@ CASES = [
  ('rooms: shouts echo', MP, '                               for m in new if m.sender != me.number]', '                               for m in new]', "rooms: …and not its sender", PY),
  ('rooms: leaving does nothing', MP, '            me.seen_at, me.token = 0, secrets.token_urlsafe(24)', '            me.token = secrets.token_urlsafe(24)', "rooms: leaving is at once", PY),
  ('rooms: a late sync rejoins', MP, '            me.seen_at, me.token = 0, secrets.token_urlsafe(24)', '            me.seen_at = 0', "late sync doesn't bring them back", PY),
- ('rooms: an old tab keeps going', MP, '    me.token = secrets.token_urlsafe(24)    # a new page', '    pass    # a new page', "the old page's token stops", PY),
+ ('rooms: an old tab keeps going', MP, '    me.token = secrets.token_urlsafe(24)    # a new page', '    pass    # a new page', "a second tab takes over from the first", PY),
  ('rooms: a number never comes back', MP, '    taken = {p.number for p in present if me is None or p.id != me.id}', '    taken = {p.number for p in db.query(NetPlayer).filter_by(room_id=room.id) if me is None or p.id != me.id}', "their number is given out again", PY),
  ('rooms: in two at once', MP, '    for p in others:\n        p.seen_at = 0', '    for p in others:\n        pass', "rooms: one room per game", PY),
  ('rooms: idle rooms kept', MP, 'NetRoom.active_at < t - ROOM_IDLE_SECONDS).all()', 'NetRoom.active_at < t - ROOM_IDLE_SECONDS * 1000).all()', "rooms: a room idle half an hour", PY),
@@ -1640,6 +1638,10 @@ CASES = [
  ('guests: out, and a reload lets them in', PC, '    left = lock_left(GuestState() if user is None else db.query(CheckState).get(user.id))', '    left = 0 if user is None else lock_left(db.query(CheckState).get(user.id))', "…and reloading doesn't get round it", PY),
  ('guests: nothing remembered', PC, '    if isinstance(st, GuestState):\n        st.save()', '    if isinstance(st, GuestState):\n        pass', "…and asked again, it's the same one", PY),
  ('guests: anyone\'s questions', PC, '        return (q.filter(CheckBank.teacher_id == pub.owner_id).first() if pub else None) or q.first()', '        return q.order_by(CheckBank.id.asc()).first()', "…from the bank of the teacher who published", PY),
+
+ # Rooms are anyone's, not a class's (the teacher's decision, 2026-11-08)
+ ('rooms: makers need a class again', MP, '        user, pub = _playable(db, slug)\n        _tidy(db, pub.id)\n        used', '        user, pub = _playable(db, slug)\n        if not publishing.classes_of(db, user):\n            return err("A room is for a class.", 403)\n        _tidy(db, pub.id)\n        used', "anyone signed in makes a room", PY),
+ ('rooms: joiners need the class again', MP, '        if room is None:\n            db.commit()', '        if room is None or not any(c.id == room.class_id for c in publishing.classes_of(db, user)):\n            db.commit()', "anyone signed in joins by the code", PY),
 
 ]
 only = sys.argv[1:]

@@ -1,8 +1,8 @@
 /**
  * Multiplayer rooms against the real server (backend/multiplayer.py), with
- * real browsers: one student makes a room, a classmate joins it by its code,
- * each sees the other's game state and hears their shouts — and a student in
- * another class can't get in. A player held for a Python check is away:
+ * real browsers: one student makes a room, another joins it by its code, each
+ * sees the other's game state and hears their shouts, and a wrong code is
+ * refused. (Rooms aren't tied to classes: anyone signed in may make or join one.) A player held for a Python check is away:
  * hidden from the others, and deaf to them until let go.
  */
 import { expect, test, type Browser, type Page } from "@playwright/test";
@@ -34,7 +34,7 @@ const project = {
     instances: [{ id: "i1", object: "o1", layer: "L", x: 0, y: 0, scaleX: 1, scaleY: 1, angle: 0, code: "" }] }],
 };
 
-test("a room: made by one student, joined by a classmate's code, closed to other classes", async ({ browser }) => {
+test("a room: made by one student, joined by another's code, a wrong code refused", async ({ browser }) => {
   test.setTimeout(180_000);
   const teacher = await signedIn(browser, "teach5@example.com");
   const make = async (name: string, emails: string) => {
@@ -68,12 +68,13 @@ test("a room: made by one student, joined by a classmate's code, closed to other
   await mia.page.waitForFunction(() => (window as any).__gameide.host.state === "running", null, { timeout: 30_000 });
   expect(await py(mia.page, "[net_room(), net_me().number]")).toEqual([CODE, 1]);
 
-  // Ola, in another class, is told there's no such room.
+  // A wrong code is told so. (Rooms aren't tied to classes: anyone signed in may join one.)
   const ola = await signedIn(browser, "otis@example.com");
   await ola.page.goto(url);
-  await ola.page.getByTestId("net-code").fill(CODE.toLowerCase());
+  const wrong = CODE === "ZZZZ" ? "BBBB" : "ZZZZ";
+  await ola.page.getByTestId("net-code").fill(wrong.toLowerCase());
   await ola.page.getByTestId("net-join").click({ timeout: 60_000 });
-  await expect(ola.page.getByTestId("net-error")).toContainText(`no room ${CODE} for your class`);
+  await expect(ola.page.getByTestId("net-error")).toContainText(`no room ${wrong}`);
 
   // Noe joins by the code, and each sees the other.
   const noe = await signedIn(browser, "noel@example.com");

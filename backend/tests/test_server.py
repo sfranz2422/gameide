@@ -1863,30 +1863,29 @@ def _others(c, tok, **kw):
     return {p["number"]: p for p in (_sync(c, tok, **kw).get_json() or {}).get("players", [])}
 
 
-check("rooms: signing in comes first", client().post(f"/api/play/{NG}/net/create", json={}).status_code == 401)
-check("rooms: a student is offered their own GameIDE classes", [c["name"] for c in _nia.get(f"/api/play/{NG}/net").get_json()["classes"]] == ["Net K1"])
-check("rooms: …never another editor's", _pyo.get(f"/api/play/{NG}/net").get_json()["classes"] == [])
-check("rooms: no class, no room", _quinn.post(f"/api/play/{NG}/net/create", json={}).status_code == 403
-      and _pyo.post(f"/api/play/{NG}/net/create", json={}).status_code == 403)
-check("rooms: a teacher of two classes says which", _nteach.post(f"/api/play/{NG}/net/create", json={}).status_code == 400)
-check("rooms: …and only one of theirs", _nteach.post(f"/api/play/{NG}/net/create", json={"classId": KPY}).status_code == 403
-      and _nia.post(f"/api/play/{NG}/net/create", json={"classId": K2}).status_code == 403)
+check("rooms: signing in comes first", client().post(f"/api/play/{NG}/net/create", json={}).status_code == 401
+      and client().post(f"/api/play/{NG}/net/join", json={"code": "BCDF"}).status_code == 401)
+# Not tied to classes (the teacher's decision, 2026-11-08): they use GameIDE across all
+# their classes, so anyone signed in, any email, makes and joins rooms.
+_qr = _quinn.post(f"/api/play/{NG}/net/create", json={})
+check("rooms: anyone signed in makes a room, in a class or not", _qr.status_code == 200 and _qr.get_json()["number"] == 1, _qr.get_json())
+_quinn.post("/api/net/leave", json={"token": _qr.get_json()["token"]})
 _r = _nia.post(f"/api/play/{NG}/net/create", json={}).get_json()
 CODE, NT = _r["code"], _r["token"]
 check("rooms: a room has a four-letter code with no vowels", re.fullmatch(r"[B-DF-HJ-NP-TV-XZ]{4}", CODE) is not None, CODE)
 check("rooms: its maker is player 1, by first name", _r["number"] == 1 and _r["name"] == "Nia" and _r["state"] == {}, _r)
+_anyone = [c.post(f"/api/play/{NG}/net/join", json={"code": CODE}).get_json() for c in (_pam, _pyo, _quinn)]
+check("rooms: anyone signed in joins by the code: another class, a PyIDE class, no class", all(a.get("token") for a in _anyone), _anyone)
+for _c, _a in zip((_pam, _pyo, _quinn), _anyone):
+    _c.post("/api/net/leave", json={"token": _a.get("token")})
 _r = _oli.post(f"/api/play/{NG}/net/join", json={"code": " " + CODE.lower()[:2] + " " + CODE.lower()[2:]}).get_json()
 OT = _r["token"]
-check("rooms: a classmate joins by the code, typed any old way", _r["number"] == 2 and _r["code"] == CODE, _r)
-_no_class = _pam.post(f"/api/play/{NG}/net/join", json={"code": CODE})
+check("rooms: someone joins by the code, typed any old way", _r["number"] == 2 and _r["code"] == CODE, _r)
 _no_room = _pam.post(f"/api/play/{NG}/net/join", json={"code": "ZZZZ" if CODE != "ZZZZ" else "BBBB"})
-check("rooms: another class can't join", _no_class.status_code == 404)
-check("rooms: …and is told just what a wrong code is told", _no_class.get_json()["error"].replace(CODE, "X") == _no_room.get_json()["error"].replace("ZZZZ", "X").replace("BBBB", "X"),
-      (_no_class.get_json(), _no_room.get_json()))
-check("rooms: no one in the PyIDE class either", _pyo.post(f"/api/play/{NG}/net/join", json={"code": CODE}).status_code == 404)
+check("rooms: a wrong code is told so", _no_room.status_code == 404 and "no room" in _no_room.get_json()["error"], _no_room.get_json())
 check("rooms: a code is for its own game", _oli.post(f"/api/play/{NG2}/net/join", json={"code": CODE}).status_code == 404)
 _tj = _nteach.post(f"/api/play/{NG}/net/join", json={"code": CODE}).get_json()
-check("rooms: the class's teacher joins, by last name", _tj.get("number") == 3 and _tj.get("name") != "", _tj)
+check("rooms: a teacher joins, by last name", _tj.get("number") == 3 and _tj.get("name") != "", _tj)
 _nteach.post("/api/net/leave", json={"token": _tj["token"]})
 
 _sync(_nia, NT, state={"x": 10, "y": -400, "pic": 2})
