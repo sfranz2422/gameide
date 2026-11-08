@@ -1,5 +1,10 @@
 # Progress
 
+## Multiplayer, step 1: smoother other players, and a ping readout (2026-11-08, waiting for review)
+- **Others moved in jerks, a step behind.** Each game now also sends its speed and a step count; between words, a Ghost carries on as its player was going (their speed, gravity in the air) for up to a fifth of a second, then waits, and glides onto each new word. Most online games do this; it hides much of the delay without anything new on the server.
+- **The room bar shows the ping**: how long a word to the room takes, there and back, smoothed. On Render, with a class, it will say how slow the room really is.
+- Snowcap Scramble needs importing and publishing again. The server's load per player is unchanged: step 2 (a room server of its own, over WebSockets) is what takes that off the database, and is waiting on the teacher.
+
 ## Snowcap Scramble: snowballs really knock the other player now (2026-11-08, waiting for review)
 - **The teacher saw snowballs hit, but the other player never moved.** The thrower's game showed the hit; the other player's game, which decides hits on them, heard of the throw a moment late (a quarter of a second, say) and jumped the snowball forward to where it would be by now, without looking at what it passed. Anyone 50 to 150 pixels away, which is most of the time, was skipped. It now flies the late part a step at a time through the same code as any snowball (`fly` in the room script), so a ball that would have hit them does.
 - **X threw over people's heads**: it arced up, so it missed anyone between about 50 and 200 pixels away. It's nearly level now and hits from close up to about 220 pixels. The target is the whole climber, boots to hat.

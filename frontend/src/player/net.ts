@@ -52,13 +52,15 @@ export class NetSession {
   private held = false;
   private gameAway = false;
   private wasAway = false;
+  /** How long a sync takes there and back, smoothed: the room bar shows it. */
+  private ping = 0;
   /** What net_me() should start with if the game starts again: the newest state sent. */
   latest: Record<string, unknown>;
 
   constructor(
     readonly joined: Joined,
     private readonly host: GameHost,
-    private readonly report: (here: number) => void,
+    private readonly report: (here: number, ping: number) => void,
     private readonly gone: (message: string) => void,
   ) {
     this.after = joined.after;
@@ -132,12 +134,15 @@ export class NetSession {
     if (msgs.length) body.msgs = msgs;
     let next = this.every;
     try {
+      const sentAt = performance.now();
       const r = await api<SyncReply>("/api/net/sync", { json: body });
+      const took = performance.now() - sentAt;
+      this.ping = this.ping ? this.ping * 0.8 + took * 0.2 : took;
       if (body.state === this.state) this.state = null; // sent; a newer one may have come meanwhile
       this.after = r.after;
       this.every = r.every;
       this.wasAway = away;
-      this.report(r.here);
+      this.report(r.here, Math.round(this.ping));
       // Held, the game takes no steps, so nothing would read it; away for any reason, it mustn't get messages.
       if (!this.held) this.host.netArrive(r.players, this.away ? [] : r.msgs);
     } catch (e) {

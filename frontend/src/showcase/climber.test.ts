@@ -579,6 +579,9 @@ for a in p.ledges:
     py(g, "global_vars.player.x += 50");
     step(g);
     expect(g.sent.filter((o) => o.state).at(-1)!.state!.x).toBe(py(g, "round(global_vars.player.x)"));
+    py(g, "global_vars.player.vx = 2.5");
+    step(g);
+    expect(g.sent.filter((o) => o.state).at(-1)!.state!.vx).not.toBe(0);
     // The tag is drawn: a box in #3's colour over the head.
     const color = py(g, "number_color(3)") as string;
     expect(JSON.stringify(g.engine.drawList)).toContain('"3"');
@@ -613,6 +616,27 @@ for a in p.ledges:
     g.netArrive([other(7, x - 300, y - 200)], []);
     step(g);
     expect(py(g, "[gh.number for gh in instances('Ghost')]")).toEqual([7]);
+  });
+
+  it("between their words, a ghost carries on as its player was going, then waits", async () => {
+    const g = await climbing({}, ROOM);
+    const [x, y] = me(g);
+    const ghostX = () => py(g, "instances('Ghost')[0].x") as number;
+    // Running right at full speed, on the ground.
+    g.netArrive([other(1, x + 100, y, { vx: 2.8, vy: 0, pose: 1, s: 500 })], []);
+    step(g, 8);
+    expect(ghostX(), "still going, though nothing new has come").toBeGreaterThan(x + 100 + 10);
+    step(g, 60);
+    const most = (py(g, "PREDICT_STEPS") as number) * 2.8;
+    expect(ghostX(), "but not for ever").toBeCloseTo(x + 100 + most, 0);
+    // A new word starts it afresh from there.
+    g.netArrive([other(1, x + 200, y, { vx: 0, vy: 0, pose: 0, s: 530 })], []);
+    step(g, 30);
+    expect(ghostX()).toBeCloseTo(x + 200, 0);
+    // In the air it rises and falls as a jump does.
+    g.netArrive([other(1, x + 200, y - 50, { vx: 0, vy: -6, pose: 3, s: 560 })], []);
+    step(g, 6);
+    expect(py(g, "instances('Ghost')[0].y") as number).toBeLessThan(y - 50);
   });
 
   it("your snowballs are shouted to the room, and burst on a ghost without hurting you", async () => {

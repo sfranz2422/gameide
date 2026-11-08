@@ -1601,7 +1601,7 @@ CASES = [
 
  ('climber: no number', _cl("Player"), 'self.number = me.number if me else None', 'self.number = None', "your number over your head", CLIMB),
  ('climber: not sent', _cl("Crowd"), 'net_send({"x": round(me.x)', 'net_send({"x": 0 * round(me.x)', "where you are sent to the room", CLIMB),
- ('climber: ghosts jump', _cl("Ghost"), '    self.x += (self.goal_x - self.x) * 0.3', '    self.x = self.goal_x', "gliding to where they are", CLIMB),
+ ('climber: ghosts jump', _cl("Ghost"), '    self.x += (guess_x - self.x) * 0.4', '    self.x = guess_x', "gliding to where they are", CLIMB),
  ('climber: ghosts stay', _cl("Crowd"), '        if instance_exists(g):\n            g.destroy()', '        if instance_exists(g):\n            pass', "gliding to where they are", CLIMB),
  ('climber: ghosts solid', _cl("Ghost"), 'self.image_alpha = 0.55', 'self.image_alpha = 1', "see-through ghosts", CLIMB),
  ('climber: throws kept quiet', _cl("Player"), '    net_shout({"ball"', '    0 and net_shout({"ball"', "your snowballs are shouted", CLIMB),
@@ -1653,6 +1653,11 @@ CASES = [
  ('climber: throws sail over heads', _cl("Player"), 'ball.vx, ball.vy = self.facing * 7.5 + self.vx * 0.5, -1.2', 'ball.vx, ball.vy = self.facing * 6.5 + self.vx * 0.5, -3.2', "X hits someone standing anywhere", CLIMB),
  ('climber: no stars on a hit ghost', _cl("_3room"), '                hit = True\n                g.dizzy = DIZZY', '                hit = True', "X hits someone standing anywhere", CLIMB),
  ('climber: stars kept to yourself', _cl("Crowd"), '"dz": me.dizzy})', '"dz": 0})', "has stars in everyone's game", CLIMB),
+
+ ('climber: ghosts stop between words', _cl("Ghost"), 'guess_x = clamp(self.base_x + self.vx * t,', 'guess_x = clamp(self.base_x + 0 * self.vx * t,', "a ghost carries on as its player was going", CLIMB),
+ ('climber: ghosts guess for ever', _cl("Ghost"), 't = min(self.since, PREDICT_STEPS)', 't = self.since', "a ghost carries on as its player was going", CLIMB),
+ ('climber: speed not sent', _cl("Crowd"), '"vx": round(me.vx, 2)', '"vx": 0 * round(me.vx, 2)', "where you are sent to the room", CLIMB),
+ ('net: no ping shown', "src/player/NetLobby.tsx", '          {ping > 0 && (', '          {ping < 0 && (', "a room: made by one student", E2E),
 
 ]
 only = sys.argv[1:]

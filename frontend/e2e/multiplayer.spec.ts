@@ -83,6 +83,8 @@ test("a room: made by one student, joined by another's code, a wrong code refuse
   await noe.page.getByTestId("net-join").click({ timeout: 60_000 });
   await noe.page.waitForFunction(() => (window as any).__gameide.host.state === "running", null, { timeout: 30_000 });
   await expect(noe.page.getByTestId("net-here")).toHaveText("2 players", { timeout: 10_000 });
+  // How long a word to the room takes, there and back: shown, so a slow room can be seen.
+  await expect(noe.page.getByTestId("net-ping")).toHaveText(/^\d+ ms$/, { timeout: 10_000 });
   await py(mia.page, "global_vars.x = 42");
   await expect.poll(() => py(noe.page, "[(p.number, p.name, p.x) for p in net_players()]"), { timeout: 10_000 }).toEqual([[1, "Mira", 42]]);
   await expect.poll(() => py(mia.page, "[(p.number, p.name) for p in net_players()]"), { timeout: 10_000 }).toEqual([[2, "Noel"]]);

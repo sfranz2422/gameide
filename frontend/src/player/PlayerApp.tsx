@@ -84,6 +84,7 @@ export function PlayerApp() {
   const [joined, setJoined] = useState<Joined | null>(null);
   const [alone, setAlone] = useState(false);
   const [here, setHere] = useState(1);
+  const [ping, setPing] = useState(0);
   const [netGone, setNetGone] = useState<string | null>(null);
   useEffect(() => () => net.current?.stop(), []);
 
@@ -163,7 +164,7 @@ export function PlayerApp() {
   const onJoined = (j: Joined) => {
     if (!host.current) return;
     net.current?.stop();
-    net.current = new NetSession(j, host.current, setHere, setNetGone);
+    net.current = new NetSession(j, host.current, (n, ms) => (setHere(n), setPing(ms)), setNetGone);
     setJoined(j);
     setNetGone(null);
     start();
@@ -172,7 +173,7 @@ export function PlayerApp() {
   return (
     <div className={`player-page${info ? " published" : ""}${hasBoards ? " has-boards" : ""}${phone ? " phone" : ""}`} data-testid="player-page">
       {info && <PublishedHeader info={info} setInfo={setInfo} host={host.current} />}
-      {joined && <NetBar joined={joined} here={here} gone={netGone} />}
+      {joined && <NetBar joined={joined} here={here} ping={ping} gone={netGone} />}
       <div className={`player-middle${hasBoards ? " with-boards" : ""}`}>
       {hasBoards && <Scoreboard side="left" board={scores.board} />}
       <div className="player-stage" ref={stage} data-testid="player-stage">

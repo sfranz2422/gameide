@@ -79,7 +79,7 @@ export function NetLobby({ slug, title, signedIn, ready, onJoined, onAlone }: {
 }
 
 /** Above the game while in a room: its code (to tell the class), how many are in it, and who you are. */
-export function NetBar({ joined, here, gone }: { joined: Joined; here: number; gone: string | null }) {
+export function NetBar({ joined, here, ping, gone }: { joined: Joined; here: number; ping: number; gone: string | null }) {
   return (
     <div className={`net-bar${gone ? " gone" : ""}`} data-testid="net-bar">
       {gone ? (
@@ -93,6 +93,12 @@ export function NetBar({ joined, here, gone }: { joined: Joined; here: number; g
           <span>
             You are <b>#{joined.number}</b>
           </span>
+          {/* How long a word to the room takes there and back: what the others' delay comes from. */}
+          {ping > 0 && (
+            <span className="muted" title="How long a message to the room takes there and back" data-testid="net-ping">
+              {ping} ms
+            </span>
+          )}
         </>
       )}
     </div>
