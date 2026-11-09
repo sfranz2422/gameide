@@ -1992,6 +1992,69 @@ check("rooms: …all of them", _rdb.query(gamestore.NetRoom).filter_by(published
 _rdb.close()
 _ndb.close()
 
+# ---- The same rooms, LIVE: one process, rooms in memory (GAMEIDE_ONE_PROCESS=1 on Render).
+# Pages use WebSockets then (the browser tests); a page that can't polls, served from
+# memory: these checks poll. The rules are the same; the database is touched only
+# every few seconds.
+multiplayer.LIVE = True
+multiplayer.Live.reset()
+put(_nia, "net3", project("net3", "Live"), 0)
+NG3 = _nia.post("/api/projects/net3/publish", json={"title": "Live", "visibility": "unlisted"}).get_json()["published"]["id"]
+_lr = _nia.post(f"/api/play/{NG3}/net/create", json={}).get_json()
+LCODE, LNT = _lr["code"], _lr["token"]
+_lo = _oli.post(f"/api/play/{NG3}/net/join", json={"code": LCODE}).get_json()
+LOT = _lo["token"]
+check("live rooms: made and joined as before", _lr["number"] == 1 and _lo["number"] == 2 and multiplayer.Live.player(LNT, _lr and server.SessionLocal().query(accounts.User).filter_by(email=f"nia@{S}").first().id) is not None)
+_rdb = server.SessionLocal()
+_msgs_before = _rdb.query(gamestore.NetMessage).count()
+_rdb.close()
+_sync(_nia, LNT, state={"x": 7, "y": 8})
+check("live rooms: a state reaches the others", _others(_oli, LOT).get(1) == {"number": 1, "name": "Nia", "state": {"x": 7, "y": 8}})
+check("live rooms: …not themselves", 1 not in _others(_nia, LNT))
+_raw = _sync(_oli, LOT).get_data(as_text=True)
+check("live rooms: no email, last name or token goes out", "@" not in _raw and "Quartermain" not in _raw and LNT not in _raw, _raw)
+check("live rooms: someone else's token does nothing", _sync(_pam, LNT).status_code == 410 and _sync(client(), LNT).status_code == 401)
+check("live rooms: a state is a small dict", _sync(_nia, LNT, state=[1]).status_code == 400 and _sync(_nia, LNT, state={"a": "x" * 3000}).status_code == 400)
+_a = _sync(_oli, LOT).get_json()["after"]
+_sync(_nia, LNT, msgs=[{"snowball": [1, 2]}])
+_got = _sync(_oli, LOT, after=_a).get_json()
+check("live rooms: a message reaches the others", [m["data"] for m in _got["msgs"]] == [{"snowball": [1, 2]}] and _got["msgs"][0]["from"] == 1, _got)
+check("live rooms: …once", _sync(_oli, LOT, after=_got["after"]).get_json()["msgs"] == [])
+check("live rooms: …and not its sender", _sync(_nia, LNT, after=_a).get_json()["msgs"] == [])
+_rdb = server.SessionLocal()
+check("live rooms: messages never touch the database", _rdb.query(gamestore.NetMessage).count() == _msgs_before)
+_rdb.close()
+_a = _sync(_oli, LOT).get_json()["after"]
+_h = _sync(_oli, LOT, away=True, after=_a).get_json()
+check("live rooms: an away player is hidden", 2 not in _others(_nia, LNT))
+_sync(_nia, LNT, msgs=[{"snowball": [3, 4]}])
+_h2 = _sync(_oli, LOT, away=True, after=_h["after"]).get_json()
+check("live rooms: …gets no messages, and none of them when back", _h2["msgs"] == [] and _sync(_oli, LOT, away=False, after=_h2["after"]).get_json()["msgs"] == [])
+_sync(_oli, LOT, away=True, msgs=[{"lost": 1}])
+check("live rooms: …and what they send meanwhile goes nowhere", _sync(_nia, LNT, after=_h2["after"]).get_json()["msgs"] == [])
+_sync(_oli, LOT, away=False, state={"best": 77})
+# Its state reaches the database now and then, for joins and reloads to read.
+multiplayer.Live.write_back(multiplayer.Live.player(LOT, server.SessionLocal().query(accounts.User).filter_by(email=f"oli@{S}").first().id), force=True)
+_oli.post("/api/net/leave", json={"token": LOT})
+check("live rooms: leaving is at once", 2 not in _others(_nia, LNT) and _sync(_nia, LNT).get_json()["here"] == 1)
+check("live rooms: …and a closing page's late sync doesn't bring them back", _sync(_oli, LOT, away=True).status_code == 410)
+_lo = _oli.post(f"/api/play/{NG3}/net/join", json={"code": LCODE}).get_json()
+check("live rooms: coming back keeps your number and state", _lo["number"] == 2 and _lo["state"] == {"best": 77}, _lo)
+LOT = _lo["token"]
+check("live rooms: …and they're back in the others' game", 2 in _others(_nia, LNT))
+# A restart empties memory: the database still knows who's in which room.
+multiplayer.Live.reset()
+check("live rooms: after a restart, a page carries on", _sync(_oli, LOT).status_code == 200 and 2 in _others(_nia, LNT))
+_lk = [client(f"k{i}@{S}") for i in range(19)]
+_lkt = [k.post(f"/api/play/{NG3}/net/join", json={"code": LCODE}).get_json() for k in _lk]
+check("live rooms: twenty at most", [bool(t.get("token")) for t in _lkt].count(True) == 18 and _sync(_nia, LNT).get_json()["here"] == 20, [t.get("number") for t in _lkt])
+for k, t in zip(_lk, _lkt):
+    if t.get("token"):
+        k.post("/api/net/leave", json={"token": t["token"]})
+check("live rooms: unpublishing takes its rooms, memory and all", _nia.delete("/api/projects/net3/publish").status_code == 200 and multiplayer.Live.rooms == {})
+multiplayer.LIVE = False
+multiplayer.Live.reset()
+
 print()
 if failures:
     print(f"FAILED: {len(failures)} — " + "; ".join(failures))

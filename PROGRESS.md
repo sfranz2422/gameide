@@ -1,5 +1,12 @@
 # Progress
 
+## Multiplayer, step 2: live rooms over WebSockets, inside GameIDE's own server (2026-11-08, waiting for review)
+- **Others still looked a little choppy, and the teacher was worried about 20 kids.** Instead of a second Render service (the teacher's choice), GameIDE's own server now runs as one process with many threads, keeps rooms in memory, and each page holds a WebSocket: an update goes up at most every 50 ms, and the others' come the moment they change. No database work per update; the database gets each player's state every 3 s, for joining and reloads.
+- **Measured locally with the real Start Command** (`tools/rooms_load.py`, 20 pretend players each sending 20 updates a second): about 30 ms for one player's move to reach the others (56 ms at worst), about 18 updates a second each, and 3–5% of one core; two rooms of 20 at once, the same, peaking at 15% while everyone joins. Making each player's part of the message once per change, and capping sends at 20 a second, cut the first try's 12% to that.
+- **Polling stays** as the fallback, for a network that blocks WebSockets (or `?nows`): a polling player and a WebSocket player share one room. Until the Start Command is changed, everything works exactly as before (rooms in the database, pages polling).
+- **The teacher's one step:** in Render, GameIDE's service, Settings → Start Command: `cd backend && GAMEIDE_ONE_PROCESS=1 gunicorn app:app --workers 1 --threads 64 --timeout 120` (also in render.yaml).
+- Tests: 20 "live rooms" server checks (everything rooms do, from memory, after a restart too), the browser tests now run the server as one process with WebSockets, and a new one has a WebSocket player and a polling player in one room. 7 sabotage cases, and all 13 earlier page cases still caught over WebSockets.
+
 ## Multiplayer, step 1: smoother other players, and a ping readout (2026-11-08, waiting for review)
 - **Others moved in jerks, a step behind.** Each game now also sends its speed and a step count; between words, a Ghost carries on as its player was going (their speed, gravity in the air) for up to a fifth of a second, then waits, and glides onto each new word. Most online games do this; it hides much of the delay without anything new on the server.
 - **The room bar shows the ping**: how long a word to the room takes, there and back, smoothed. On Render, with a class, it will say how slow the room really is.

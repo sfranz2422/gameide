@@ -10,7 +10,16 @@ was for one GameIDE class). Signing in is still needed: the room shows names,
 and they come from accounts. The names are `publishing._board_name` (students
 by first name, teachers by last), never an email. Twenty at most.
 
-How it talks: no websockets. Each player's page POSTs /api/net/sync a few
+How it talks, two ways. LIVE (one server process, GAMEIDE_ONE_PROCESS=1, the
+Start Command on Render): each page holds a WebSocket (/api/net/ws), and rooms
+are kept in this process's memory (`Live`): a player's update reaches the others
+within a tick, with no database work per update; the database gets each
+player's state and "last seen" every few seconds, which is what joining, the
+twenty-player cap and coming back after a reload read. A page whose network
+won't open a WebSocket polls /api/net/sync instead, served from the same
+memory. Otherwise (several processes share no memory) the old way, below:
+
+Each player's page POSTs /api/net/sync a few
 times a second — "here is my state (and any messages), give me everyone
 else's" — and the server keeps the latest of each in Postgres. Two gunicorn
 workers share no memory, so the database is the only place a room can live.
@@ -27,7 +36,9 @@ sends can be made up with the browser's tools. Nothing here touches a grade.
 """
 import itertools
 import json
+import os
 import random
+import threading
 import secrets
 import time
 
@@ -54,6 +65,16 @@ MAX_MESSAGES_PER_SYNC = 10
 #: How often a page syncs, in ms. The server says, so it can be slowed down
 #: for everyone without a new build if Render's CPU can't keep up.
 SYNC_MS = 200
+#: One process (GAMEIDE_ONE_PROCESS=1): rooms live in memory, and pages use
+#: WebSockets. With several processes they couldn't: each would have its own.
+LIVE = os.environ.get("GAMEIDE_ONE_PROCESS") == "1"
+#: How often a WebSocket hears of changes, at most (s), and how often a live
+#: player's state and "last seen" go to the database (s).
+LIVE_TICK = 0.05
+WRITE_EVERY = 3.0
+#: Messages kept in a live room, for pages polling with `after`.
+LIVE_MESSAGES = 200
+
 #: Codes have no vowels, so no code spells a word. 20^4 = 160,000 of them.
 CODE_LETTERS = "BCDFGHJKLMNPQRSTVWXZ"
 CODE_LENGTH = 4
@@ -67,6 +88,200 @@ def _clean_code(text):
     return "".join(ch for ch in str(text or "").upper() if ch.isalpha())[:8]
 
 
+# ---------------------------------------------------------------- live rooms (one process)
+
+class LivePlayer:
+    def __init__(self, row):
+        self.id, self.room_id, self.user_id = row.id, row.room_id, row.user_id
+        self.number, self.name, self.token = row.number, row.name, row.token
+        self.state = json.loads(row.state or "{}")
+        self.state_text = row.state or "{}"
+        self.entry = self._entry()
+        self.away = bool(row.away)
+        self.seen = time.time()
+        self.written = 0.0
+        self.sockets = 0          # WebSockets open: while there's one, they're here
+
+    def _entry(self):
+        """How the others are sent this player, made once per change rather than once per page per tick."""
+        return '{"number":%d,"name":%s,"state":%s}' % (self.number, json.dumps(self.name), self.state_text)
+
+
+class LiveRoom:
+    def __init__(self, room_id):
+        self.id = room_id
+        self.players = {}         # number -> LivePlayer
+        self.msgs = []            # (id, sender, data, sent_at), oldest first
+        self.next_id = 1
+        self.version = 0          # goes up on any change: a WebSocket sends when it has
+        self.active = time.time()
+
+
+class Live:
+    """The rooms in memory. One lock: every change is a few dict operations."""
+    lock = threading.Lock()
+    rooms = {}                    # room id -> LiveRoom
+    tokens = {}                   # token -> LivePlayer
+
+    @classmethod
+    def reset(cls):
+        with cls.lock:
+            cls.rooms.clear()
+            cls.tokens.clear()
+
+    @classmethod
+    def room(cls, room_id):
+        r = cls.rooms.get(room_id)
+        if r is None:
+            r = cls.rooms[room_id] = LiveRoom(room_id)
+        return r
+
+    @classmethod
+    def enter(cls, row):
+        """A player joined (or came back): their row, with its new token."""
+        with cls.lock:
+            room = cls.room(row.room_id)
+            old = next((p for p in room.players.values() if p.user_id == row.user_id), None)
+            if old is not None:
+                cls.tokens.pop(old.token, None)
+                room.players.pop(old.number, None)
+            # Someone gone may still hold the number this player was given.
+            gone = room.players.get(row.number)
+            if gone is not None:
+                cls.tokens.pop(gone.token, None)
+            p = LivePlayer(row)
+            room.players[p.number] = p
+            cls.tokens[p.token] = p
+            room.version += 1
+            room.active = time.time()
+            return room.next_id - 1
+
+    @classmethod
+    def player(cls, token, uid):
+        """The live player with this token and signed-in user, or None."""
+        with cls.lock:
+            p = cls.tokens.get(token)
+            return p if p is not None and p.user_id == uid else None
+
+    @classmethod
+    def present(cls, room, t):
+        return [p for p in room.players.values() if p.sockets > 0 or p.seen >= t - PRESENT_SECONDS]
+
+    @classmethod
+    def update(cls, p, body):
+        """A page's state, away and messages: as /api/net/sync checks them. An error message, or None."""
+        state_text = None
+        if "state" in body:
+            if not isinstance(body["state"], dict):
+                return "A player's state is a dict."
+            state_text, why = _json_text(body["state"], MAX_STATE, "A player's state")
+            if why:
+                return why
+        msgs = body.get("msgs") or []
+        if not isinstance(msgs, list) or len(msgs) > MAX_MESSAGES_PER_SYNC:
+            return f"At most {MAX_MESSAGES_PER_SYNC} messages at a time."
+        texts = []
+        for m in msgs:
+            text, why = _json_text(m, MAX_MESSAGE, "A message")
+            if why:
+                return why
+            texts.append(json.loads(text))
+        t = time.time()
+        with cls.lock:
+            room = cls.rooms.get(p.room_id)
+            if room is None:
+                return None
+            if state_text is not None and state_text != p.state_text:
+                p.state, p.state_text = json.loads(state_text), state_text
+                p.entry = p._entry()
+                room.version += 1
+            if "away" in body:
+                away = bool(body.get("away"))
+                if away != p.away:
+                    p.away = away
+                    room.version += 1
+            p.seen = t
+            room.active = t
+            # An away player's game is held: anything it sends is from before.
+            if not p.away:
+                for data in texts:
+                    room.msgs.append((room.next_id, p.number, data, t))
+                    room.next_id += 1
+                    room.version += 1
+                del room.msgs[:-LIVE_MESSAGES]
+        return None
+
+    @classmethod
+    def frame(cls, p, after):
+        """What a page is sent: everyone else here and not away, messages since `after`, how many here."""
+        t = time.time()
+        with cls.lock:
+            room = cls.rooms.get(p.room_id)
+            if room is None:
+                return {"players": [], "msgs": [], "after": after, "here": 0, "every": SYNC_MS}
+            here = cls.present(room, t)
+            players = [{"number": o.number, "name": o.name, "state": o.state} for o in here if o is not p and not o.away]
+            new = [m for m in room.msgs if m[0] > after]
+            last = room.msgs[-1][0] if room.msgs else after
+            last = max(last, after)
+            msgs = [] if p.away else [{"from": s, "data": d, "age": round(max(0.0, t - at), 3)} for i, s, d, at in new if s != p.number]
+            return {"players": players, "msgs": msgs, "after": last, "here": len(here), "every": SYNC_MS, "v": room.version}
+
+    @classmethod
+    def frame_text(cls, p, after):
+        """frame(), as the JSON a WebSocket sends: the players' entries are already made. (text, version, after)"""
+        t = time.time()
+        with cls.lock:
+            room = cls.rooms.get(p.room_id)
+            if room is None:
+                return None, None, after
+            here = cls.present(room, t)
+            players = ",".join(o.entry for o in here if o is not p and not o.away)
+            last = max(room.msgs[-1][0] if room.msgs else after, after)
+            msgs = [] if p.away else [{"from": s, "data": d, "age": round(max(0.0, t - at), 3)}
+                                      for i, s, d, at in room.msgs if i > after and s != p.number]
+            text = '{"players":[%s],"msgs":%s,"after":%d,"here":%d,"every":%d}' % (
+                players, json.dumps(msgs, separators=(",", ":")), last, len(here), SYNC_MS)
+            return text, room.version, last
+
+    @classmethod
+    def leave(cls, p):
+        with cls.lock:
+            room = cls.rooms.get(p.room_id)
+            cls.tokens.pop(p.token, None)
+            if room is not None and room.players.get(p.number) is p:
+                room.players.pop(p.number)
+                room.version += 1
+
+    @classmethod
+    def forget(cls, room_ids):
+        with cls.lock:
+            for i in room_ids:
+                room = cls.rooms.pop(i, None)
+                if room is not None:
+                    for p in room.players.values():
+                        cls.tokens.pop(p.token, None)
+
+    @classmethod
+    def write_back(cls, p, force=False):
+        """Now and then, a live player's state and "last seen" to the database, for joins and reloads to read."""
+        t = time.time()
+        if not force and t - p.written < WRITE_EVERY:
+            return
+        p.written = t
+        db = publishing._db()
+        try:
+            row = db.get(NetPlayer, p.id)
+            if row is not None and row.token == p.token:
+                row.state, row.away = p.state_text, int(p.away)
+                # An open WebSocket is being here, whether or not it said anything lately.
+                row.seen_at = t if p.sockets else p.seen
+                db.query(NetRoom).filter(NetRoom.id == p.room_id).update({"active_at": t}, synchronize_session=False)
+                db.commit()
+        finally:
+            db.close()
+
+
 def _tidy(db, published_id):
     """Deletes this game's idle rooms, and old messages everywhere. Run on join and create, not every sync."""
     t = time.time()
@@ -78,6 +293,7 @@ def _tidy(db, published_id):
         db.query(NetMessage).filter(NetMessage.room_id.in_(ids)).delete(synchronize_session=False)
         db.query(NetPlayer).filter(NetPlayer.room_id.in_(ids)).delete(synchronize_session=False)
         db.query(NetRoom).filter(NetRoom.id.in_(ids)).delete(synchronize_session=False)
+        Live.forget(ids)
 
 
 def delete_rooms(db, published_id):
@@ -87,6 +303,7 @@ def delete_rooms(db, published_id):
         db.query(NetMessage).filter(NetMessage.room_id.in_(ids)).delete(synchronize_session=False)
         db.query(NetPlayer).filter(NetPlayer.room_id.in_(ids)).delete(synchronize_session=False)
         db.query(NetRoom).filter(NetRoom.id.in_(ids)).delete(synchronize_session=False)
+        Live.forget(ids)
 
 
 def _playable(db, slug):
@@ -135,6 +352,8 @@ def _enter(db, room, user):
     db.flush()
     after = _last_message(db, room.id)
     db.commit()
+    if LIVE:
+        after = Live.enter(me)
     return jsonify(code=room.code, token=me.token, number=me.number, name=me.name,
                    state=json.loads(me.state or "{}"), after=after, every=SYNC_MS)
 
@@ -199,6 +418,21 @@ def sync():
     uid = session.get("uid")
     if not uid:
         return err("Sign in first.", 401)
+    if LIVE:
+        p = _live_player(str(body.get("token") or ""), uid)
+        if p is None:
+            return err("You're not in this room any more. Join it again.", 410)
+        why = Live.update(p, {**body, "away": bool(body.get("away"))})
+        if why:
+            return err(why, 400)
+        try:
+            after = int(body.get("after") or 0)
+        except (TypeError, ValueError):
+            after = 0
+        frame = Live.frame(p, after)
+        frame.pop("v", None)
+        Live.write_back(p)
+        return jsonify(frame)
     db = publishing._db()
     try:
         me = db.query(NetPlayer).filter_by(token=str(body.get("token") or "")).first()
@@ -254,6 +488,10 @@ def leave():
     db = publishing._db()
     try:
         me = db.query(NetPlayer).filter_by(token=str(body.get("token") or "")).first()
+        if LIVE and me is not None and me.user_id == uid:
+            p = Live.player(me.token, uid)
+            if p is not None:
+                Live.leave(p)
         if me is not None and me.user_id == uid:
             # A new token too: a closing page's last sync can arrive after this,
             # and with the old token it would put them back in the room.
@@ -262,3 +500,82 @@ def leave():
         return jsonify(ok=True)
     finally:
         db.close()
+
+
+def _live_player(token, uid):
+    """The live player for a token. After a restart memory is empty: the database still knows them."""
+    p = Live.player(token, uid)
+    if p is not None or not token:
+        return p
+    db = publishing._db()
+    try:
+        row = db.query(NetPlayer).filter_by(token=token).first()
+        if row is None or row.user_id != uid:
+            return None
+        Live.enter(row)
+        return Live.player(token, uid)
+    finally:
+        db.close()
+
+
+def socket(ws):
+    """
+    A page's WebSocket (LIVE only): it sends {"token"} first, then its updates
+    ({"state", "msgs", "away"}) and pings; it's sent everyone else, as
+    /api/net/sync answers, whenever anything in the room has changed, at most
+    every LIVE_TICK. Several processes couldn't share rooms in memory: then it
+    says {"fallback": true} and the page polls.
+    """
+    if not LIVE:
+        ws.send(json.dumps({"fallback": True}))
+        return
+    uid = session.get("uid")
+    try:
+        hello = json.loads(ws.receive(timeout=10) or "{}")
+    except (ValueError, TypeError):
+        hello = {}
+    p = _live_player(str(hello.get("token") or ""), uid) if uid else None
+    if p is None:
+        ws.send(json.dumps({"error": "You're not in this room any more. Join it again.", "status": 410}))
+        return
+    with Live.lock:
+        p.sockets += 1
+        p.seen = time.time()
+    after, sent, sent_at = int(hello.get("after") or 0), -1, 0.0
+    try:
+        while True:
+            data = ws.receive(timeout=LIVE_TICK)
+            if data:
+                try:
+                    body = json.loads(data)
+                except ValueError:
+                    body = {}
+                if "ping" in body:
+                    ws.send(json.dumps({"pong": body["ping"]}))
+                why = Live.update(p, body) if any(k in body for k in ("state", "msgs", "away")) else None
+                if why:
+                    ws.send(json.dumps({"error": why, "status": 400}))
+            if Live.player(p.token, uid) is not p:
+                ws.send(json.dumps({"error": "You're not in this room any more. Join it again.", "status": 410}))
+                return
+            room = Live.rooms.get(p.room_id)
+            # What's changed, but no more than once a LIVE_TICK: a page's own updates
+            # wake this loop early, and sending on each was half again as many frames.
+            if room is not None and room.version != sent and time.time() - sent_at >= LIVE_TICK:
+                text, version, after = Live.frame_text(p, after)
+                if text is not None:
+                    sent, sent_at = version, time.time()
+                    ws.send(text)
+            Live.write_back(p)
+    finally:
+        with Live.lock:
+            p.sockets -= 1
+            p.seen = time.time()
+        Live.write_back(p, force=True)
+
+
+def init(app):
+    """The WebSocket route (flask-sock), and the blueprint."""
+    from flask_sock import Sock
+    Sock(app).route("/api/net/ws")(socket)
+    app.register_blueprint(bp)

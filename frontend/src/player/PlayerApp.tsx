@@ -165,6 +165,7 @@ export function PlayerApp() {
     if (!host.current) return;
     net.current?.stop();
     net.current = new NetSession(j, host.current, (n, ms) => (setHere(n), setPing(ms)), setNetGone);
+    (window as unknown as { __gameide: Record<string, unknown> }).__gameide.net = net.current;
     setJoined(j);
     setNetGone(null);
     start();

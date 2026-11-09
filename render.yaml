@@ -12,7 +12,13 @@ services:
     # Node is part of Render's Python build image: the editor is built here,
     # then the server's packages installed.
     buildCommand: cd frontend && npm ci && npm run build && cd ../backend && pip install -r requirements.txt
-    startCommand: cd backend && gunicorn app:app --workers 2 --threads 4 --timeout 60
+    # ONE process, many threads: multiplayer rooms live in its memory and pages
+    # hold WebSockets to it (multiplayer.py). Two processes would split a room in
+    # two. GAMEIDE_ONE_PROCESS=1 is what turns that on; without it the rooms go
+    # through the database, as before. (Half a CPU on the starter plan: a second
+    # process never added speed.) Each open WebSocket holds a thread: 64 is room
+    # for a few classes playing at once and the rest of the site.
+    startCommand: cd backend && GAMEIDE_ONE_PROCESS=1 gunicorn app:app --workers 1 --threads 64 --timeout 120
     healthCheckPath: /healthz
     envVars:
       - key: PYTHON_VERSION

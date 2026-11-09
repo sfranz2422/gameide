@@ -108,7 +108,8 @@ export default defineConfig({
   server: {
     headers: ISOLATION,
     proxy: Object.fromEntries(
-      ["/api", "/login", "/logout", "/auth", "/dev", "/teacher"].map((p) => [p, { target: "http://127.0.0.1:5001", changeOrigin: false }]),
+      // ws: the multiplayer rooms' WebSocket (/api/net/ws) goes through too.
+      ["/api", "/login", "/logout", "/auth", "/dev", "/teacher"].map((p) => [p, { target: "http://127.0.0.1:5001", changeOrigin: false, ws: p === "/api" }]),
     ),
   },
   // Not the dev proxy (preview would inherit it): the editor tests run the

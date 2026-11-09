@@ -2,12 +2,17 @@
  * A published game's multiplayer room, on the page (the server's side is
  * backend/multiplayer.py; the game's is runtime.py's net_ functions).
  *
- * The page joins before the game starts (NetLobby.tsx), then syncs a few
- * times a second for as long as the game is open: this player's newest state
- * and any shouted messages go up, everyone else's state and new messages come
- * down and go to the game (GameHost.netArrive → worker → the next step). One
- * request at a time, never a pile of them: a slow answer just means the next
- * one waits.
+ * The page joins before the game starts (NetLobby.tsx), then, for as long as
+ * the game is open, this player's newest state and any shouted messages go up,
+ * and everyone else's state and new messages come down and go to the game
+ * (GameHost.netArrive → worker → the next step).
+ *
+ * Two ways. A WebSocket (/api/net/ws) when the server keeps rooms in memory: an
+ * update goes at most every SEND_EVERY ms, and the others' come the moment they
+ * change. If it can't open (a school network may block them), or the server
+ * says it can't (several processes), or it breaks, the page POLLS instead,
+ * /api/net/sync a few times a second, one request at a time. ?nows forces
+ * polling, for testing.
  *
  * Away is the server's word for "don't show me, don't send me anything":
  * held for a Python check (the teacher's rule: nothing can affect a player
@@ -40,6 +45,11 @@ export const usesNet = (project: unknown) => /\bnet_(room|me|players|send|shout|
 const MAX_QUEUED = 40;
 /** The server takes this many a sync. */
 const PER_SYNC = 10;
+/** On a WebSocket, an update goes at most this often (ms), and a ping every PING_EVERY. */
+const SEND_EVERY = 50;
+const PING_EVERY = 2000;
+/** A WebSocket not open by then, and the page polls. */
+const OPEN_WITHIN = 4000;
 
 export class NetSession {
   private state: Record<string, unknown> | null = null;
@@ -54,6 +64,11 @@ export class NetSession {
   private wasAway = false;
   /** How long a sync takes there and back, smoothed: the room bar shows it. */
   private ping = 0;
+  private ws: WebSocket | null = null;
+  /** "ws" while a WebSocket is open; "poll" when polling; "connecting" until one or the other. */
+  private mode: "connecting" | "ws" | "poll" = "connecting";
+  private sendTimer: number | undefined;
+  private pingTimer: number | undefined;
   /** What net_me() should start with if the game starts again: the newest state sent. */
   latest: Record<string, unknown>;
 
@@ -69,7 +84,101 @@ export class NetSession {
     document.addEventListener("visibilitychange", this.onVisibility);
     addEventListener("pagehide", this.onLeave);
     addEventListener("pageshow", this.onBack);
+    if (typeof WebSocket !== "undefined" && !location.search.includes("nows")) this.connect();
+    else this.poll();
+  }
+
+  /** How this page is talking to the room: for the tests, and the room bar. */
+  get via() {
+    return this.mode;
+  }
+
+  private connect() {
+    const url = new URL("api/net/ws", document.baseURI);
+    url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+    let ws: WebSocket;
+    try {
+      ws = new WebSocket(url);
+    } catch {
+      return this.poll();
+    }
+    this.ws = ws;
+    const giveUp = window.setTimeout(() => ws.readyState !== WebSocket.OPEN && ws.close(), OPEN_WITHIN);
+    ws.onopen = () => {
+      clearTimeout(giveUp);
+      ws.send(JSON.stringify({ token: this.joined.token, after: this.after }));
+      this.mode = "ws";
+      this.flushSoon(0);
+      const ping = () => ws.readyState === WebSocket.OPEN && ws.send(JSON.stringify({ ping: performance.now() }));
+      ping();
+      this.pingTimer = window.setInterval(ping, PING_EVERY);
+    };
+    ws.onmessage = (ev) => {
+      let m: Partial<SyncReply> & { fallback?: boolean; error?: string; status?: number; pong?: number };
+      try {
+        m = JSON.parse(String(ev.data));
+      } catch {
+        return;
+      }
+      if (m.fallback) return ws.close();
+      if (m.pong !== undefined) {
+        const took = performance.now() - m.pong;
+        this.ping = this.ping ? this.ping * 0.8 + took * 0.2 : took;
+        return;
+      }
+      if (m.error) {
+        if (m.status === 410 || m.status === 401) {
+          this.stop(false);
+          this.host.netArrive([], []);
+          this.gone(m.error);
+        }
+        return;
+      }
+      if (m.players) this.arrive(m as SyncReply);
+    };
+    ws.onclose = () => {
+      clearTimeout(giveUp);
+      clearInterval(this.pingTimer);
+      this.ws = null;
+      // Couldn't open, refused, or broke: carry on by polling.
+      if (!this.stopped) this.poll();
+    };
+  }
+
+  private poll() {
+    if (this.mode === "poll" || this.stopped) return;
+    this.mode = "poll";
     this.schedule(0);
+  }
+
+  /** On a WebSocket: what's changed goes soon, but no more than once every SEND_EVERY. */
+  private flushSoon(ms = SEND_EVERY) {
+    if (this.sendTimer !== undefined) return;
+    this.sendTimer = window.setTimeout(() => {
+      this.sendTimer = undefined;
+      const ws = this.ws;
+      if (!ws || ws.readyState !== WebSocket.OPEN || this.stopped) return;
+      const away = this.away;
+      if (away) this.queue = [];
+      const body: Record<string, unknown> = { away };
+      if (this.state) body.state = this.state;
+      const msgs = this.queue.splice(0, PER_SYNC);
+      if (msgs.length) body.msgs = msgs;
+      if (!body.state && !msgs.length && away === this.wasAway) return;
+      ws.send(JSON.stringify(body));
+      this.state = null;
+      this.wasAway = away;
+      if (this.queue.length) this.flushSoon();
+    }, ms);
+  }
+
+  /** What the room says, by either way: the others, and new messages, for the game. */
+  private arrive(r: SyncReply) {
+    this.after = r.after;
+    if (r.every) this.every = r.every;
+    this.report(r.here, Math.round(this.ping));
+    // Held, the game takes no steps, so nothing would read it; away for any reason, it mustn't get messages.
+    if (!this.held) this.host.netArrive(r.players, this.away ? [] : r.msgs);
   }
 
   /** The game for a new start: who this player is, with what they last sent. */
@@ -88,7 +197,8 @@ export class NetSession {
     if (o.away !== undefined) this.gameAway = o.away;
     if (o.msgs && !this.away) this.queue.push(...o.msgs);
     if (this.queue.length > MAX_QUEUED) this.queue.splice(0, this.queue.length - MAX_QUEUED);
-    if (this.away !== this.wasAway) this.schedule(0);
+    if (this.mode === "ws") this.flushSoon(this.away !== this.wasAway ? 0 : SEND_EVERY);
+    else if (this.away !== this.wasAway) this.schedule(0);
   }
 
   /** The game held for a question, or let go: away meanwhile, and the others told at once. */
@@ -105,6 +215,7 @@ export class NetSession {
     // Nothing more goes after this: the server takes the token back on leaving.
     this.stopped = true;
     clearTimeout(this.timer);
+    this.ws?.close();
     void fetch("/api/net/leave", { method: "POST", keepalive: true, credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: packed({ token: this.joined.token }) }).catch(() => undefined);
   };
 
@@ -116,8 +227,11 @@ export class NetSession {
     }
   };
 
+  /** Something changed (away, say): on a WebSocket it goes at once; polling, the next sync is now. */
   private schedule(ms: number) {
     if (this.stopped) return;
+    if (this.mode === "ws") return this.flushSoon(0);
+    if (this.mode !== "poll") return;
     clearTimeout(this.timer);
     this.timer = window.setTimeout(() => void this.sync(), ms);
   }
@@ -139,12 +253,8 @@ export class NetSession {
       const took = performance.now() - sentAt;
       this.ping = this.ping ? this.ping * 0.8 + took * 0.2 : took;
       if (body.state === this.state) this.state = null; // sent; a newer one may have come meanwhile
-      this.after = r.after;
-      this.every = r.every;
       this.wasAway = away;
-      this.report(r.here, Math.round(this.ping));
-      // Held, the game takes no steps, so nothing would read it; away for any reason, it mustn't get messages.
-      if (!this.held) this.host.netArrive(r.players, this.away ? [] : r.msgs);
+      this.arrive(r);
     } catch (e) {
       if (e instanceof ApiError && (e.status === 410 || e.status === 401)) {
         this.stop(false);
@@ -166,6 +276,9 @@ export class NetSession {
     if (this.stopped) return;
     this.stopped = true;
     clearTimeout(this.timer);
+    clearTimeout(this.sendTimer);
+    clearInterval(this.pingTimer);
+    this.ws?.close();
     document.removeEventListener("visibilitychange", this.onVisibility);
     removeEventListener("pagehide", this.onLeave);
     removeEventListener("pageshow", this.onBack);

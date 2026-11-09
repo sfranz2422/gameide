@@ -83,6 +83,9 @@ test("a room: made by one student, joined by another's code, a wrong code refuse
   await noe.page.getByTestId("net-join").click({ timeout: 60_000 });
   await noe.page.waitForFunction(() => (window as any).__gameide.host.state === "running", null, { timeout: 30_000 });
   await expect(noe.page.getByTestId("net-here")).toHaveText("2 players", { timeout: 10_000 });
+  // Both on WebSockets: the server keeps rooms in memory (one process, as on Render).
+  expect(await mia.page.evaluate(() => (window as any).__gameide.net.via)).toBe("ws");
+  expect(await noe.page.evaluate(() => (window as any).__gameide.net.via)).toBe("ws");
   // How long a word to the room takes, there and back: shown, so a slow room can be seen.
   await expect(noe.page.getByTestId("net-ping")).toHaveText(/^\d+ ms$/, { timeout: 10_000 });
   await py(mia.page, "global_vars.x = 42");
@@ -188,4 +191,43 @@ test("Snowcap Scramble in a room: each sees the other, a snowball knocks, a ques
   await sami.page.evaluate(() => (window as any).__gameide.host.holdForQuestion(false));
   await expect.poll(() => py(rosa.page, "instance_number('Ghost')"), { timeout: 15_000 }).toBe(1);
   await Promise.all([teacher.ctx, rosa.ctx, sami.ctx].map((c) => c.close()));
+});
+
+// A school network may block WebSockets: that page polls instead, in the same room.
+test("one player on a WebSocket and one polling still see each other, and hear each other's shouts", async ({ browser }) => {
+  test.setTimeout(180_000);
+  const teacher = await signedIn(browser, "teach5@example.com");
+  await teacher.page.goto("/#/games");
+  const zip = Buffer.from(zipSync({ "project.json": strToU8(JSON.stringify({ ...project, id: "mixzip", name: "Mixed" })), "assets/index.json": strToU8("{}") }));
+  await teacher.page.getByTestId("import-file").setInputFiles({ name: "m.zip", mimeType: "application/zip", buffer: zip });
+  await teacher.page.waitForURL(/#\/p\//, { timeout: 30_000 });
+  await expect(teacher.page.getByTestId("save-status")).toHaveText("Saved", { timeout: 30_000 });
+  await teacher.page.getByTestId("publish").click();
+  await teacher.page.getByTestId("publish-title").fill("Mixed");
+  await teacher.page.getByTestId("publish-unlisted").check();
+  await teacher.page.getByTestId("publish-go").click();
+  await expect(teacher.page.getByTestId("publish-link")).toHaveValue(/\/play\/[\w-]+$/);
+  const url = new URL(await teacher.page.getByTestId("publish-link").inputValue()).pathname;
+
+  const ws = await signedIn(browser, "wendy@example.com");
+  await ws.page.goto(url);
+  await ws.page.getByTestId("net-create").click({ timeout: 60_000 });
+  const code = (await ws.page.getByTestId("net-room-code").textContent({ timeout: 30_000 }))!;
+  await ws.page.waitForFunction(() => (window as any).__gameide.host.state === "running", null, { timeout: 30_000 });
+  const poller = await signedIn(browser, "paulo@example.com");
+  await poller.page.goto(url + "?nows");
+  await poller.page.getByTestId("net-code").fill(code);
+  await poller.page.getByTestId("net-join").click({ timeout: 60_000 });
+  await poller.page.waitForFunction(() => (window as any).__gameide.host.state === "running", null, { timeout: 30_000 });
+  await expect.poll(() => ws.page.evaluate(() => (window as any).__gameide.net.via)).toBe("ws");
+  expect(await poller.page.evaluate(() => (window as any).__gameide.net.via)).toBe("poll");
+  await py(ws.page, "global_vars.x = 11");
+  await py(poller.page, "global_vars.x = 22");
+  await expect.poll(() => py(poller.page, "[(p.number, p.x) for p in net_players()]"), { timeout: 10_000 }).toEqual([[1, 11]]);
+  await expect.poll(() => py(ws.page, "[(p.number, p.x) for p in net_players()]"), { timeout: 10_000 }).toEqual([[2, 22]]);
+  await py(ws.page, 'net_shout("from the socket")');
+  await py(poller.page, 'net_shout("from polling")');
+  await expect.poll(() => py(poller.page, "getattr(global_vars, 'heard', [])"), { timeout: 10_000 }).toEqual(["from the socket"]);
+  await expect.poll(() => py(ws.page, "getattr(global_vars, 'heard', [])"), { timeout: 10_000 }).toEqual(["from polling"]);
+  await Promise.all([teacher.ctx, ws.ctx, poller.ctx].map((c) => c.close()));
 });

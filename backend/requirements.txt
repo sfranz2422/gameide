@@ -8,3 +8,8 @@ Authlib==1.3.2
 requests==2.32.3
 # accounts.py's Classroom token encryption imports it; Authlib pulls it in too.
 cryptography==44.0.2
+# Multiplayer rooms over WebSockets (multiplayer.py), in this one process.
+flask-sock==0.7.0
+simple-websocket==1.1.0
+wsproto==1.3.2
+h11==0.16.0

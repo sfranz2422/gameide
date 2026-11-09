@@ -1659,6 +1659,15 @@ CASES = [
  ('climber: speed not sent', _cl("Crowd"), '"vx": round(me.vx, 2)', '"vx": 0 * round(me.vx, 2)', "where you are sent to the room", CLIMB),
  ('net: no ping shown', "src/player/NetLobby.tsx", '          {ping > 0 && (', '          {ping < 0 && (', "a room: made by one student", E2E),
 
+ # Live rooms: one process, rooms in memory, WebSockets (GAMEIDE_ONE_PROCESS=1)
+ ('live: shouts echo', MP, 'for i, s, d, at in new if s != p.number]', 'for i, s, d, at in new]', "live rooms: …and not its sender", PY),
+ ('live: away still shown', MP, '            players = [{"number": o.number, "name": o.name, "state": o.state} for o in here if o is not p and not o.away]', '            players = [{"number": o.number, "name": o.name, "state": o.state} for o in here if o is not p]', "live rooms: an away player is hidden", PY),
+ ('live: leaving does nothing', MP, '            if p is not None:\n                Live.leave(p)', '            if p is not None:\n                pass', "live rooms: leaving is at once", PY),
+ ('live: a restart loses everyone', MP, '        Live.enter(row)\n        return Live.player(token, uid)', '        return None', "live rooms: after a restart", PY),
+ ('live: sockets show the away', MP, '            players = ",".join(o.entry for o in here if o is not p and not o.away)', '            players = ",".join(o.entry for o in here if o is not p)', "a question hides", E2E),
+ ('live: sockets never used', MP, '    if not LIVE:\n        ws.send(json.dumps({"fallback": True}))', '    if True:\n        ws.send(json.dumps({"fallback": True}))', "a room: made by one student", E2E),
+ ('live: stale states on sockets', MP, '                p.entry = p._entry()\n', '', "a room: made by one student", E2E),
+
 ]
 only = sys.argv[1:]
 # A name that matches no case would otherwise run nothing and still say

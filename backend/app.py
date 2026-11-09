@@ -873,7 +873,7 @@ publishing.init(app, _db, current_user)
 # The Python check that stops a showcase game for a question (pycheck.py).
 app.register_blueprint(pycheck.bp)
 # Multiplayer rooms in published games (multiplayer.py).
-app.register_blueprint(multiplayer.bp)
+multiplayer.init(app)
 # Classes, assignments, turning in, comments and Google Classroom (classes.py).
 classes.init(app, _db, current_user, _scheme, _problem)
 # XP, levels, leaderboards, avatars, the token shop and random events (rewards.py).
