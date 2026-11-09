@@ -49,6 +49,8 @@ SM = "smash"      # …or Jelly Jailbreak's, rebuilt the same way
 RP = "rpg"        # …or The Lanterns of Hollowmere's, rebuilt the same way
 CLIMB = "climber"  # …or Snowcap Scramble's, rebuilt the same way (not CL: that's classes.py)
 def _cl(n): return f"../showcase/climber/game/{n}.py"
+UND = "undertow"   # …or Undertow's, rebuilt the same way
+def _ut(n): return f"../showcase/undertow/game/{n}.py"
 SMR, SML, SMB = "../showcase/smash/game/_2rules.py", "../showcase/smash/game/_1levels.py", "../showcase/smash/build.py"
 def _sm(n): return f"../showcase/smash/game/{n}.py"
 def _rp(n): return f"../showcase/rpg/game/{n}.py"
@@ -1681,6 +1683,22 @@ CASES = [
  ('host: an away host stays host', MP, '    numbers = [p.number for p in players if not p.away]', '    numbers = [p.number for p in players]', "the next one while they're away", PY),
  ('tell: private not said', RT, 'bool(m.get("private"))) for m in got.get("msgs", [])', 'False) for m in got.get("msgs", [])', "told messages arrive marked private"),
  ('host: the room not heard', RT, '    if "host" in got:\n        _net_host = got["host"]', '    if "host" in got:\n        pass', "net_host is the room's say"),
+ # Undertow (phase 2: the station alone)
+ ('undertow: a corridor cut off', _ut("_1station"), '    (49, 22, 3, 5),      # Med Bay down to Storage\n', '', "every floor tile can be walked to", UND, ('    (18, 30, 25, 3),     # the lower corridor: Sub Dock to Storage', '    (18, 30, 20, 3),     # the lower corridor: Sub Dock to Storage')),
+ ('undertow: walls let you through', "../showcase/undertow/build.py", '    ts = P.tileset("station", tiles_picture(), [WALL_FRONT, WALL_TOP])', '    ts = P.tileset("station", tiles_picture(), [])', "walls stop you", UND),
+ ('undertow: suit ignored', _ut("Player"), 'self.suit = save_get("suit", "coral")', 'self.suit = "coral"', "pick a suit with the arrows", UND),
+ ('undertow: no lamp', _ut("Player"), 'light(self.x, self.y - 16, 150, "#cfeaff", 1)', 'light(self.x, self.y - 16, 50, "#cfeaff", 1)', "your lamp", UND),
+ ('undertow: anyone\'s panel opens', _ut("Player"), '        if s.i in global_vars.jobs and s.i not in global_vars.done and point_distance', '        if s.i not in global_vars.done and point_distance', "only your own jobs open", UND),
+ ('undertow: any socket fits', _ut("WiresJob"), '        if self.colors[self.left[self.picked]] == self.colors[self.right[r]]:', '        if True:', "a wrong socket lets go", UND),
+ ('undertow: any tray will do', _ut("CrystalsJob"), '        if self.crystals[self.picked] == k:', '        if True:', "a wrong tray buzzes", UND),
+ ('undertow: the valve never blows', _ut("ValveJob"), 'if self.pressure > 96:', 'if self.pressure > 960:', "too far blows it off", UND),
+ ('undertow: the valve done at once', _ut("ValveJob"), 'if self.held >= 90:', 'if self.held >= 1:', "too far blows it off", UND),
+ ('undertow: scans while you fidget', _ut("ScanJob"), '    self.scanned = 0\nelse:', '    pass\nelse:', "moving starts it again", UND),
+ ('undertow: walk while working', _ut("Player"), 'if global_vars.job is None:\n    dx', 'if True:\n    dx', "a job holds you still", UND),
+ ('undertow: questions mid-job', _ut("Player"), 'question_ok(global_vars.job is None)', 'question_ok(True)', "a job holds you still", UND),
+ ('undertow: Esc finishes it', _ut("_2crew"), '    """Walked away from (Esc): nothing kept, it starts afresh next time."""\n    global_vars.job = None', '    """Walked away from (Esc): nothing kept, it starts afresh next time."""\n    global_vars.done.add(job.station)\n    global_vars.job = None', "Esc walks away with nothing kept", UND),
+ ('undertow: never all done', _ut("_2crew"), '        global_vars.all_done = 240', '        global_vars.all_done = 0', "all five done", UND),
+
  ('tell: the page drops them', NETS, '    if (o.tells && !this.away) this.tells.push(...o.tells);\n', '', "one player on a WebSocket and one polling", E2E),
 
 ]
@@ -1717,7 +1735,7 @@ for name, f, old, new, test, *extra in CASES:
             failed = any(l.startswith("FAIL") and test in l for l in out.splitlines())
             ran = "ok   " in out or "FAIL " in out
         else:
-            if runner in ([GM], [MM], [FB], [GF], [BB], [HC], [KT], [TD], [SM], [RP], [CLIMB]):
+            if runner in ([GM], [MM], [FB], [GF], [BB], [HC], [KT], [TD], [SM], [RP], [CLIMB], [UND]):
                 subprocess.run(["python3", str(ROOT.parent / f"showcase/{runner[0]}/build.py")], capture_output=True)
             cmd = ["npx", "playwright", "test", "-g", test] if runner == [E2E] else ["npx", "vitest", "run", "-t", test]
             r = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True)
@@ -1728,6 +1746,6 @@ for name, f, old, new, test, *extra in CASES:
         if not failed: bad.append(name)
     finally:
         p.write_text(src)
-        if runner in ([GM], [MM], [FB], [GF], [BB], [HC], [KT], [TD], [SM], [RP], [CLIMB]):
+        if runner in ([GM], [MM], [FB], [GF], [BB], [HC], [KT], [TD], [SM], [RP], [CLIMB], [UND]):
             subprocess.run(["python3", str(ROOT.parent / f"showcase/{runner[0]}/build.py")], capture_output=True)
 print("ALL SABOTAGES CAUGHT" if not bad else f"NOT CAUGHT: {bad}")

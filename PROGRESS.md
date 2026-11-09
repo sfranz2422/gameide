@@ -1,5 +1,14 @@
 # Progress
 
+## Undertow, phase 2: the station, alone (2026-11-09, waiting for review)
+- **The station** (`showcase/undertow/game/_1station.py`, built by `showcase/undertow/build.py`): eight rooms (Meeting Hub, Control, Reef Lab, Pump Room, Observation, Med Bay, Sub Dock, Storage) joined by corridors, 60 × 40 tiles of 32 pixels. One file says where everything is; the build paints it and the tests walk it.
+- **Dark, with your lamp:** the station is nearly black but for a dim light in each room and the lamp you carry, so you see only what's near you (the point of an impostor game). Walls stop your feet, so your helmet can pass in front of a wall above you.
+- **Pick a suit** on the title (8, kept for next time), then dive. **Five jobs a game**, listed with their rooms; your panels glow until done, then go green.
+- **Four mini-games**, each a few seconds, by mouse, touch or keys: Fix the wires (join each to its colour), Sort the crystals (into trays by colour), Set the pressure (hold the valve in the green; too far blows it off), Take a body scan (hold still). A wrong pick buzzes. Esc walks away and keeps nothing. While a job's open you stand still and Python questions wait (`question_ok`).
+- **Stand-in pictures** drawn by the build; the Gemini ones (PROMPTS.md) replace them in phase 4.
+- Tests: 12 in `undertow.test.ts` (the map's reachability, walls, the lamp, the suit, each job solved with the keys as a player would, wrong picks, Esc, all five done). 14 sabotage cases (runner `UND`), all caught.
+- **Next (phase 3):** the room game: the host deals roles privately (`net_tell`), Mimics freeze crew, a frozen player reports or the beacon calls a meeting, votes with preset phrases, ghosts, and who wins.
+
 ## Undertow, phase 1: private messages and a host, for an impostor game (2026-11-09, waiting for review)
 - **The next multiplayer showcase** (the teacher's idea, an original hidden-impostor game): **Undertow**, a research station on the sea floor; the impostors are Mimics, who freeze crew (never anything violent); meetings use preset phrases; jobs are quick mini-games. The teacher's decisions and my plan are in memory; Gemini prompts in `showcase/undertow/PROMPTS.md` (12 pictures, the teacher's to make).
 - **Two engine pieces any multiplayer game can use:** `net_tell(number, message)`, a message only that player receives (the server keeps who it's for and hands it to them alone, so a secret role can't be read from anyone else's traffic, browser tools or not); and `net_host()`, the number of the game in charge (the lowest number in the room and not away: the maker, while they're there; if they leave or are answering a question, the next), so every game agrees who deals roles and counts votes. Both in the docs, blocks and sheets. Received messages have `.private`.
