@@ -44,18 +44,7 @@ TILE, COLS, ROWS = MAP["TILE"], MAP["COLS"], MAP["ROWS"]
 VIEW_W, VIEW_H = MAP["VIEW_W"], MAP["VIEW_H"]
 FLOORS = MAP["FLOORS"]
 SUITS = CREW["SUITS"]
-# The tileset: the floors in FLOORS' order, then a wall's front (floor below it) and a wall's top.
-WALL_FRONT, WALL_TOP = len(FLOORS), len(FLOORS) + 1
-FLOOR_COLORS = {"metal": (74, 92, 110), "grating": (52, 66, 78), "glass": (30, 90, 120), "lab": (150, 170, 180),
-                "concrete": (96, 100, 102), "rug": (120, 60, 70), "plates": (110, 84, 64)}
-
-
-def rgb(hex_):
-    return tuple(int(hex_[i:i + 2], 16) for i in (1, 3, 5))
-
-
-def shade(c, k):
-    return tuple(max(0, min(255, round(v * k))) for v in c)
+ART = HERE / "art"
 
 
 class Under(_climb.Climb):
@@ -65,145 +54,71 @@ class Under(_climb.Climb):
         return t
 
 
-# ---------------------------------------------------------------- stand-in pictures
-
-def crew_frames(color):
-    """A diver: round glass helmet, suit in their colour, a lamp on the shoulder. 32 × 44, feet at the bottom."""
-    c = rgb(color)
-    dark = shade(c, 0.55)
-    frames = []
-    for pose in range(6):
-        im = Image.new("RGBA", (32, 44))
-        d = ImageDraw.Draw(im)
-        if pose == 4:                                   # frozen: in a block of ice
-            d.rounded_rectangle((2, 4, 29, 43), 4, fill=(170, 220, 255, 200), outline=(230, 250, 255, 255))
-        step = {1: -3, 2: 3}.get(pose, 0)
-        alpha = 120 if pose == 5 else 255
-        legs = (dark[0], dark[1], dark[2], alpha)
-        body = (c[0], c[1], c[2], alpha)
-        if pose != 5:
-            d.rectangle((10 + step, 34, 14 + step, 43), fill=legs)
-            d.rectangle((18 - step, 34, 22 - step, 43), fill=legs)
-        else:                                           # a ghost: a tail, no legs
-            d.polygon([(9, 34), (23, 34), (16, 43)], fill=body)
-        d.rounded_rectangle((8, 18, 24, 36), 4, fill=body, outline=(10, 20, 30, alpha))
-        d.ellipse((7, 2, 25, 20), fill=(40, 70, 95, alpha), outline=(10, 20, 30, alpha))
-        if pose != 3:                                   # the face through the glass (from behind at a panel: none)
-            d.ellipse((11, 6, 21, 16), fill=(240, 200, 170, alpha))
-            d.rectangle((13, 9, 14, 11), fill=(20, 20, 30, alpha))
-            d.rectangle((18, 9, 19, 11), fill=(20, 20, 30, alpha))
-        d.ellipse((10, 4, 15, 8), fill=(200, 240, 255, min(alpha, 160)))
-        d.ellipse((21, 19, 26, 24), fill=(255, 230, 120, alpha))
-        frames.append(im)
-    return frames
+# The tileset: the floors in FLOORS' order, then the walls: fronts (a wall with floor
+# below it, seen from the room) in several kinds, and a wall's top.
+WALLS = ["wall", "wall_porthole", "wall_lamp", "wall_pipes", "wall_glass"]
+WALL_FRONT = {name: len(FLOORS) + k for k, name in enumerate(WALLS)}
+WALL_TOP = len(FLOORS) + len(WALLS)
+SOLID = list(WALL_FRONT.values()) + [WALL_TOP]
+# Each kind of job at a machine from the props sheet, and how big it stands (pixels).
+MACHINES = {"wires": "desk", "crystals": "reef_tank", "valve": "pump", "scan": "lab_table"}
+MACHINE_W = 44
+# Things in the rooms (not in the way) and how wide they're drawn.
+DECOR_SIZES = {"lockers": 56, "crate": 30, "sub": 96, "hose": 30, "fan": 30, "plant": 26, "bench": 52}
+# What swims past outside, and how big.
+SEA_LIFE = {"fish": 30, "school": 40, "jelly": 22, "turtle": 40, "ray": 44, "octopus": 32, "angler": 32, "seahorse": 16}
 
 
-def face(color):
-    im = Image.new("RGBA", (64, 64))
-    d = ImageDraw.Draw(im)
-    c = rgb(color)
-    d.rounded_rectangle((8, 44, 56, 64), 8, fill=c)
-    d.ellipse((10, 4, 54, 50), fill=(40, 70, 95), outline=(10, 20, 30), width=2)
-    d.ellipse((20, 14, 44, 40), fill=(240, 200, 170))
-    d.rectangle((26, 22, 28, 26), fill=(20, 20, 30))
-    d.rectangle((36, 22, 38, 26), fill=(20, 20, 30))
-    d.arc((27, 28, 37, 34), 20, 160, fill=(120, 60, 50), width=2)
-    d.ellipse((16, 8, 26, 16), fill=(200, 240, 255))
-    return im
+def art(name, k=0.5):
+    """A picture from art/ (cut by cut_sheets.py at twice the game's size), scaled by k."""
+    im = Image.open(ART / f"{name}.png").convert("RGBA")
+    return im if k == 1 else im.resize((max(1, round(im.width * k)), max(1, round(im.height * k))), Image.LANCZOS)
+
+
+def trimmed(im):
+    box = im.getbbox()
+    return im.crop(box) if box else im
+
+
+def fitted(name, width):
+    """A drawing, trimmed to what's drawn, `width` pixels across."""
+    im = trimmed(art(name, 1))
+    return im.resize((width, max(1, round(im.height * width / im.width))), Image.LANCZOS)
+
+
+def covered(im, w, h):
+    """The picture filling w × h, cut to fit (the middle kept)."""
+    k = max(w / im.width, h / im.height)
+    big = im.resize((round(im.width * k), round(im.height * k)), Image.LANCZOS)
+    x, y = (big.width - w) // 2, (big.height - h) // 2
+    return big.crop((x, y, x + w, y + h))
+
+
+def wall_tile(name):
+    """A square from the middle of a wall piece: its full height, as wide as it is tall."""
+    im = trimmed(art(name, 1))
+    side = im.height
+    x = (im.width - side) // 2
+    return im.crop((x, 0, x + side, side)).resize((TILE, TILE), Image.LANCZOS)
 
 
 def tiles_picture():
-    im = Image.new("RGBA", ((len(FLOORS) + 2) * TILE, TILE))
-    d = ImageDraw.Draw(im)
-    rng = random.Random(5)
+    im = Image.new("RGBA", ((len(FLOORS) + len(WALLS) + 1) * TILE, TILE))
     for k, f in enumerate(FLOORS):
-        x0 = k * TILE
-        c = FLOOR_COLORS[f]
-        d.rectangle((x0, 0, x0 + TILE - 1, TILE - 1), fill=c)
-        d.rectangle((x0, 0, x0 + TILE - 1, TILE - 1), outline=shade(c, 0.75))
-        if f in ("metal", "plates"):
-            for dx, dy in ((3, 3), (28, 3), (3, 28), (28, 28)):
-                d.point((x0 + dx, dy), fill=shade(c, 1.4))
-        elif f == "grating":
-            for i in range(4, TILE, 6):
-                d.line((x0 + i, 1, x0 + i, TILE - 2), fill=shade(c, 0.5))
-        elif f == "glass":
-            for _ in range(6):
-                x, y = rng.randrange(TILE), rng.randrange(TILE)
-                d.point((x0 + x, y), fill=(120, 200, 230))
-        elif f == "rug":
-            d.arc((x0 + 4, 8, x0 + 28, 24), 200, 340, fill=shade(c, 1.4), width=2)
-        elif f == "lab":
-            d.line((x0 + 16, 0, x0 + 16, TILE), fill=shade(c, 0.85))
-            d.line((x0, 16, x0 + TILE, 16), fill=shade(c, 0.85))
-    x0 = WALL_FRONT * TILE
-    d.rectangle((x0, 0, x0 + TILE - 1, TILE - 1), fill=(46, 62, 78))
-    d.rectangle((x0, 0, x0 + TILE - 1, 5), fill=(98, 122, 140))
-    d.line((x0, 18, x0 + TILE, 18), fill=(36, 48, 60), width=2)
-    x0 = WALL_TOP * TILE
-    d.rectangle((x0, 0, x0 + TILE - 1, TILE - 1), fill=(24, 34, 46))
-    d.rectangle((x0, 0, x0 + TILE - 1, TILE - 1), outline=(70, 92, 110))
-    return im
-
-
-def station_picture(kind):
-    im = Image.new("RGBA", (32, 32))
-    d = ImageDraw.Draw(im)
-    d.rounded_rectangle((2, 4, 29, 30), 3, fill=(60, 78, 96), outline=(12, 20, 30))
-    d.rectangle((6, 8, 25, 20), fill=(10, 30, 40))
-    if kind == "wires":
-        for k, c in enumerate(("#ff5a4f", "#ffd23f", "#4fa3ff", "#3ecf8e")):
-            d.line((8, 10 + k * 3, 23, 18 - k * 3), fill=rgb(c), width=1)
-    elif kind == "crystals":
-        for k, c in enumerate(("#4fe3ff", "#ff6bd6", "#ffb84f")):
-            d.polygon([(10 + k * 6, 10), (7 + k * 6, 18), (13 + k * 6, 18)], fill=rgb(c))
-    elif kind == "valve":
-        d.ellipse((9, 9, 22, 22), outline=(200, 60, 50), width=3)
-    else:
-        d.rectangle((8, 14, 23, 15), fill=(62, 207, 142))
-    d.rectangle((6, 23, 25, 26), fill=(30, 44, 56))
-    return im
-
-
-def beacon_picture():
-    im = Image.new("RGBA", (28, 32))
-    d = ImageDraw.Draw(im)
-    d.rectangle((8, 14, 19, 31), fill=(60, 78, 96), outline=(12, 20, 30))
-    d.ellipse((2, 2, 25, 18), fill=(200, 50, 45), outline=(12, 20, 30))
-    d.ellipse((7, 5, 14, 9), fill=(255, 150, 140))
-    return im
-
-
-def ocean_picture():
-    im = Image.new("RGBA", (256, VIEW_H))
-    d = ImageDraw.Draw(im)
-    for y in range(VIEW_H):
-        k = y / VIEW_H
-        d.line((0, y, 256, y), fill=(round(8 + 10 * (1 - k)), round(30 + 40 * (1 - k)), round(55 + 50 * (1 - k))))
-    rng = random.Random(9)
-    for _ in range(5):                                  # kelp in silhouette
-        x = rng.randrange(256)
-        for y in range(VIEW_H - rng.randrange(80, 200), VIEW_H, 2):
-            d.point((x + round(3 * __import__("math").sin(y / 9)), y), fill=(6, 30, 34))
-    for _ in range(30):
-        d.point((rng.randrange(256), rng.randrange(VIEW_H)), fill=(70, 140, 170))
-    return im
-
-
-def title_picture():
-    im = ocean_picture().resize((VIEW_W, VIEW_H))
-    d = ImageDraw.Draw(im)
-    for cx, r in ((200, 70), (330, 100), (470, 60)):      # domes of the station on the sea floor
-        d.ellipse((cx - r, 300 - r, cx + r, 300 + r), fill=(40, 70, 90), outline=(120, 180, 210), width=2)
-        d.ellipse((cx - r // 3, 300 - r // 2, cx - r // 3 + 10, 300 - r // 2 + 10), fill=(255, 200, 110))
-    d.rectangle((0, 300, VIEW_W, VIEW_H), fill=(18, 30, 36))
+        im.alpha_composite(art(f"floor_{f}").resize((TILE, TILE), Image.LANCZOS), (k * TILE, 0))
+    for name, k in WALL_FRONT.items():
+        im.alpha_composite(wall_tile(name), (k * TILE, 0))
+    # A wall's top: the dark of the wall pieces' top edge, with a rim.
+    top = Image.new("RGBA", (TILE, TILE), (14, 24, 34, 255))
+    ImageDraw.Draw(top).rectangle((0, 0, TILE - 1, TILE - 1), outline=(44, 70, 88, 255))
+    im.alpha_composite(top, (WALL_TOP * TILE, 0))
     return im
 
 
 def icon_picture():
     tile = Image.new("RGBA", (128, 128))
     ImageDraw.Draw(tile).rounded_rectangle((0, 0, 127, 127), radius=22, fill=(16, 52, 78, 255))
-    tile.alpha_composite(face(SUITS[0][2]).resize((96, 96), Image.NEAREST), (16, 20))
+    tile.alpha_composite(art("face_coral", 1).resize((104, 104), Image.LANCZOS), (12, 12))
     return tile
 
 
@@ -225,6 +140,14 @@ def make_sounds(P):
 
 # ---------------------------------------------------------------- the map
 
+def wall_kind(c, r, below):
+    """Which wall a front is: glass where Observation looks out, else plain with now and then a porthole, a lamp or pipes."""
+    if below == "glass":
+        return "wall_glass"
+    k = (c * 7 + r * 3) % 13
+    return "wall_porthole" if k == 0 else "wall_lamp" if k == 5 else "wall_pipes" if k == 9 else "wall"
+
+
 def station_tiles():
     """The station's tile layer: "column,row" → tile, from station_grid()."""
     grid = MAP["station_grid"]()
@@ -236,7 +159,10 @@ def station_tiles():
                 continue
             if g == "wall":
                 below = grid[r + 1][c] if r + 1 < ROWS else None
-                out[f"{c},{r}"] = WALL_FRONT if below not in (None, "wall") else WALL_TOP
+                if below in (None, "wall"):
+                    out[f"{c},{r}"] = WALL_TOP
+                else:
+                    out[f"{c},{r}"] = WALL_FRONT[wall_kind(c, r, below)]
             else:
                 out[f"{c},{r}"] = FLOORS.index(g)
     return out
@@ -260,16 +186,33 @@ def build(out):
 
     # The crew: a sprite a suit, its frames the poses. The box is the feet only, so in
     # three-quarter view a diver's helmet can pass in front of the wall above them.
-    for name, _, color in SUITS:
-        sprite(f"crew_{name}", crew_frames(color), (16, 43), mask=(8, 32, 24, 44))
-        sprite(f"face_{name}", [face(color)], (0, 0))
-    for kind in CREW["JOB_OBJECT"]:
-        sprite(f"station_{kind}", [station_picture(kind)], (16, 16))
-    sprite("beacon", [beacon_picture()], (14, 28))
+    poses = ["stand", "walk1", "walk2", "work", "frozen", "ghost"]
+    for name, _, _ in SUITS:
+        sprite(f"crew_{name}", [art(f"crew_{name}_{pose}") for pose in poses], (20, 47), mask=(12, 38, 28, 48))
+        sprite(f"face_{name}", [art(f"face_{name}")], (0, 0))
+    for kind, machine in MACHINES.items():
+        im = fitted(machine, MACHINE_W)
+        sprite(f"station_{kind}", [im], (im.width // 2, im.height - 8))
+        # The job's screen: its panel picture, cut to the panel's shape.
+        x0, y0, x1, y1 = CREW["PANEL"]
+        picture(f"panel_{kind}", covered(art(f"panel_{kind}", 1), x1 - x0, y1 - y0))
+    im = fitted("beacon", 30)
+    sprite("beacon", [im], (im.width // 2, im.height - 4))
+    for name, width in DECOR_SIZES.items():
+        im = fitted(name, width)
+        sprite(name, [im], (im.width // 2, im.height))
+    for name in ("mimic_suit", "mimic_open", "mimic_shown"):
+        sprite(name, [art(name)], (32, 64))
+    sprite("ice_burst", [fitted("ice_burst", 56)], (28, 28))
+    for name, width in SEA_LIFE.items():
+        im = fitted(name, width)
+        sprite(name, [im], (im.width // 2, im.height // 2))
     sprite("icon", [icon_picture()], (64, 64))
-    picture("ocean", ocean_picture())
-    picture("title", title_picture())
-    ts = P.tileset("station", tiles_picture(), [WALL_FRONT, WALL_TOP])
+    sea = art("ocean", 1)
+    picture("ocean", sea.resize((round(VIEW_H * sea.width / sea.height), VIEW_H), Image.LANCZOS))
+    picture("title", covered(art("title", 1), VIEW_W, VIEW_H))
+    picture("meeting_room", covered(art("meeting_room", 1), VIEW_W, VIEW_H))
+    ts = P.tileset("station", tiles_picture(), SOLID)
     P.font("Ubuntu", HERE / "fonts" / "ubuntu-latin-700-normal.woff2")
     make_sounds(P)
 
@@ -318,6 +261,9 @@ def build(out):
     px, py = MAP["tile_middle"](*MAP["START"])
     bx, by = MAP["tile_middle"](*MAP["BEACON"])
     placed = [inst("Director", 0, 0, lid), inst("Lamps", 0, 0, lid), inst("Hud", 0, 0, lid), inst("Beacon", bx, by, lid), inst("Player", px, py, lid)]
+    placed.append(inst("Sea", 0, 0, lid))
+    for name, c, r in MAP["DECOR"]:
+        placed.append(inst("Decor", c * TILE + TILE // 2, (r + 1) * TILE, lid, f'self.sprite = "{name}"'))
     for i, (kind, c, r) in enumerate(MAP["STATIONS"]):
         x, y = MAP["tile_middle"](c, r)
         placed.append(inst("Station", x, y, lid, f'self.i = {i}\nself.kind = "{kind}"\nself.sprite = "station_{kind}"'))

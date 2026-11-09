@@ -55,8 +55,11 @@ if 222 <= mx <= 342 and 318 <= my <= 346:
 
 # === draw_gui
 g = global_vars.g
+draw_sprite("meeting_room", 0, 0, 0)
+draw_set_alpha(0.82)
 draw_set_color("#04121e")
 draw_rect(0, 0, VIEW_W, VIEW_H)
+draw_set_alpha(1)
 if g["found"]:
     title = f"#{g['call']} found #{g['found']} frozen!"
 else:
@@ -97,6 +100,11 @@ if g["ph"] == "result":
     draw_rect(0, 232, VIEW_W, VIEW_H)
     draw_set_alpha(1)
     if g["ej"]:
+        # What they really were.
+        if g["em"]:
+            draw_sprite("mimic_shown", 0, 70, 352)
+        else:
+            draw_sprite_ext("crew_" + who(g["ej"])[1], 5, 70, 350, 1.2, 1.2)
         words(VIEW_W / 2, 250, f"#{g['ej']} ({who(g['ej'])[0]}) was sent up to the surface.", 18, "white", "center")
         words(VIEW_W / 2, 280, "They were a Mimic!" if g["em"] else "They were not a Mimic.", 18,
               "#ff5a4f" if g["em"] else "#9fd0ff", "center")

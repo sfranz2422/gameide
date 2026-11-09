@@ -16,3 +16,7 @@ light(self.x, self.y - 20, 40, "#9fe3ff", 0.5 + 0.2 * math.sin(self.t / 20))
 
 # === draw
 draw_self()
+# The cold touch: a burst of ice as it happens.
+if self.t < 40:
+    k = 0.6 + self.t / 40
+    draw_sprite_ext("ice_burst", 0, self.x, self.y - 22, k, k, 0, "white", 1 - self.t / 40)

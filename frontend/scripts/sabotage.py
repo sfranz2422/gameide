@@ -1685,17 +1685,17 @@ CASES = [
  ('host: the room not heard', RT, '    if "host" in got:\n        _net_host = got["host"]', '    if "host" in got:\n        pass', "net_host is the room's say"),
  # Undertow (phase 2: the station alone)
  ('undertow: a corridor cut off', _ut("_1station"), '    (49, 22, 3, 5),      # Med Bay down to Storage\n', '', "every floor tile can be walked to", UND, ('    (18, 30, 25, 3),     # the lower corridor: Sub Dock to Storage', '    (18, 30, 20, 3),     # the lower corridor: Sub Dock to Storage')),
- ('undertow: walls let you through', "../showcase/undertow/build.py", '    ts = P.tileset("station", tiles_picture(), [WALL_FRONT, WALL_TOP])', '    ts = P.tileset("station", tiles_picture(), [])', "walls stop you", UND),
+ ('undertow: walls let you through', "../showcase/undertow/build.py", '    ts = P.tileset("station", tiles_picture(), SOLID)', '    ts = P.tileset("station", tiles_picture(), [])', "walls stop you", UND),
  ('undertow: suit ignored', _ut("Player"), 'self.suit = save_get("suit", "coral")', 'self.suit = "coral"', "pick a suit with the arrows", UND),
- ('undertow: no lamp', _ut("Player"), 'light(self.x, self.y - 16, 150, "#cfeaff", 1)', 'light(self.x, self.y - 16, 50, "#cfeaff", 1)', "your lamp", UND),
+ ('undertow: no lamp', _ut("_3room"), 'LIGHT = {"crew": 150,', 'LIGHT = {"crew": 50,', "your lamp", UND),
  ('undertow: anyone\'s panel opens', _ut("Player"), '        if s.i in global_vars.jobs and s.i not in global_vars.done and point_distance', '        if s.i not in global_vars.done and point_distance', "only your own jobs open", UND),
  ('undertow: any socket fits', _ut("WiresJob"), '        if self.colors[self.left[self.picked]] == self.colors[self.right[r]]:', '        if True:', "a wrong socket lets go", UND),
  ('undertow: any tray will do', _ut("CrystalsJob"), '        if self.crystals[self.picked] == k:', '        if True:', "a wrong tray buzzes", UND),
  ('undertow: the valve never blows', _ut("ValveJob"), 'if self.pressure > 96:', 'if self.pressure > 960:', "too far blows it off", UND),
  ('undertow: the valve done at once', _ut("ValveJob"), 'if self.held >= 90:', 'if self.held >= 1:', "too far blows it off", UND),
  ('undertow: scans while you fidget', _ut("ScanJob"), '    self.scanned = 0\nelse:', '    pass\nelse:', "moving starts it again", UND),
- ('undertow: walk while working', _ut("Player"), 'if global_vars.job is None:\n    dx', 'if True:\n    dx', "a job holds you still", UND),
- ('undertow: questions mid-job', _ut("Player"), 'question_ok(global_vars.job is None)', 'question_ok(True)', "a job holds you still", UND),
+ ('undertow: walk while working', _ut("Player"), 'held = global_vars.job is not None or g["ph"] in ("meeting", "result")', 'held = g["ph"] in ("meeting", "result")', "a job holds you still", UND),
+ ('undertow: questions mid-job', _ut("Player"), 'question_ok(global_vars.job is None and g["ph"] not in ("meeting", "result"))', 'question_ok(g["ph"] not in ("meeting", "result"))', "a job holds you still", UND),
  ('undertow: Esc finishes it', _ut("_2crew"), '    """Walked away from (Esc): nothing kept, it starts afresh next time."""\n    global_vars.job = None', '    """Walked away from (Esc): nothing kept, it starts afresh next time."""\n    global_vars.done.add(job.station)\n    global_vars.job = None', "Esc walks away with nothing kept", UND),
  ('undertow: never all done', _ut("_2crew"), '        global_vars.all_done = 240', '        global_vars.all_done = 0', "all five done", UND),
 
@@ -1734,6 +1734,9 @@ CASES = [
  ('undertow: asks for 20', "../showcase/undertow/build.py", '    P.p["settings"]["netPlayers"] = MAP["MAX_PLAYERS"]\n', '', "rooms of up to 25", UND),
  ('undertow: 25 faces overflow', _ut("_4play"), '    rows = max(4, (count + 4) // 5)', '    rows = 4', "rooms of up to 25", UND),
  ('undertow: 25 crowd the table', _ut("_3room"), '    grow = max(0, count - 16)', '    grow = 0', "seats round the table", UND),
+
+ ('undertow: glass walls walked through', "../showcase/undertow/build.py", 'SOLID = list(WALL_FRONT.values()) + [WALL_TOP]', 'SOLID = [WALL_FRONT["wall"], WALL_TOP]', "every wall is solid", UND),
+ ('undertow: a pose missing', "../showcase/undertow/build.py", 'poses = ["stand", "walk1", "walk2", "work", "frozen", "ghost"]', 'poses = ["stand", "walk1", "walk2", "work", "frozen"]', "every suit has its six poses", UND),
 
  ('tell: the page drops them', NETS, '    if (o.tells && !this.away) this.tells.push(...o.tells);\n', '', "one player on a WebSocket and one polling", E2E),
 

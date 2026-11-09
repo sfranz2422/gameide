@@ -3,6 +3,9 @@
 # Your lamp (Player) is the bright one.
 
 # === create
+# The slow deep tune, once (it carries on from the title into the station).
+if not sound_playing("music"):
+    sound_play("music", loop=True, volume=0.45)
 lighting(0.9, "#01060d")
 self.ghostly = False
 

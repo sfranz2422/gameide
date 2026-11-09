@@ -1,5 +1,11 @@
 # Progress
 
+## Undertow, phase 4: the teacher's pictures (2026-11-09, waiting for review)
+- **All 12 Gemini pictures are in the game**, cut by `showcase/undertow/cut_sheets.py` into `art/` (107 pictures; `raw/` and `art/` both committed). The crew in all 8 suits and 6 poses (standing, two steps, working, frozen in ice, ghost), their faces on the title and in meetings, the station's floors (glowing guide lights in the corridors) and walls (portholes, lamps and pipes along them, glass where Observation looks out), each job at a real machine (the control desk, the reef tank, the pump, the lab table) with its panel picture behind the job, props in every room (the little sub in the dock, lockers and crates in Storage, plants, benches), sea creatures swimming past outside (the jellyfish and the anglerfish glow), the ocean, the title, and the meeting room behind every meeting. The Mimic shows in the result when one is sent up and at the end; a freeze bursts into ice. The slow, deep music plays from the title on.
+- Gemini's crew and Mimic sheets have a line under each row; the cutter takes out thin lines only (drawings side by side can fill a row too). The ocean and title had a beige and a grey band; taken off.
+- Tests: the built game has every suit's six poses and face, every machine and prop, and every wall tile solid; the old phase-2 sabotage cases were pointed at the code phase 3 rewrote. All 47 of Undertow's sabotage cases caught.
+- **Next:** play it with the class. Publish it from My Games with the Python check box ticked (a showcase game); rooms hold 25.
+
 ## Undertow: rooms of 25 (2026-11-09, waiting for review)
 - **Undertow's rooms hold 25; every other game's still hold 20** (the teacher's choice). A game asks in its settings (`netPlayers`); the server reads it from the published game, never from the page, and allows 2 to 25. Undertow's seats round the table widen past 16, and its meeting screen fits a fifth row of faces.
 - CPU players: not wanted (the teacher's decision).

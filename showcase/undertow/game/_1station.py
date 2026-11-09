@@ -34,7 +34,7 @@ CORRIDORS = [
     (8, 22, 3, 5),       # Observation down to Sub Dock
     (49, 22, 3, 5),      # Med Bay down to Storage
 ]
-FLOORS = ["metal", "grating", "glass", "lab", "concrete", "rug", "plates"]
+FLOORS = ["metal", "grating", "glass", "lab", "concrete", "rug", "plates", "guide"]
 
 # The jobs: their kind, the words for them, and where (column, row) their panel is.
 JOB_KINDS = {
@@ -48,6 +48,17 @@ STATIONS = [
     ("crystals", 6, 4), ("crystals", 45, 35),
     ("valve", 53, 10), ("valve", 6, 35),
     ("scan", 50, 18),
+]
+# Things standing in the rooms, just to look at (you walk past them): (picture, column, row).
+DECOR = [
+    ("plant", 25, 15), ("plant", 34, 15),
+    ("plant", 34, 3), ("lockers", 32, 3),
+    ("plant", 15, 4), ("crate", 14, 10), ("plant", 5, 10),
+    ("fan", 50, 6), ("hose", 47, 10),
+    ("bench", 8, 17), ("plant", 12, 20),
+    ("bench", 53, 16), ("plant", 47, 20),
+    ("sub", 10, 31), ("hose", 6, 33), ("crate", 15, 34),
+    ("lockers", 45, 28), ("lockers", 48, 28), ("crate", 52, 30), ("crate", 53, 31), ("crate", 50, 33),
 ]
 JOBS_EACH = 5          # how many jobs a player is given
 REACH = 44             # how close (pixels) to a panel to use it
@@ -70,7 +81,7 @@ def station_grid():
         for y in range(r, r + h):
             for x in range(c, c + w):
                 if grid[y][x] is None:
-                    grid[y][x] = "metal"
+                    grid[y][x] = "guide"     # corridors: floor lights to follow
     walls = []
     for y in range(ROWS):
         for x in range(COLS):

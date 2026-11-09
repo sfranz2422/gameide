@@ -80,6 +80,7 @@ if room and g["ph"] == "over":
     draw_rect(0, 90, VIEW_W, 250)
     draw_set_alpha(1)
     crew_won = g["win"] == "crew"
+    draw_sprite("mimic_shown" if crew_won else "mimic_open", 0, 90, 236)
     words(VIEW_W / 2, 104, "The crew win!" if crew_won else "The Mimics win!", 32, "#3ecf8e" if crew_won else "#ff5a4f", "center")
     words(VIEW_W / 2, 152, g["why"], 16, "white", "center")
     mm = ", ".join(f"#{n} {who(n)[0]}" for n in g["mm"])

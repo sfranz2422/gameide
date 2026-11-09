@@ -125,6 +125,24 @@ floor = [(c, r) for r in range(ROWS) for c in range(COLS) if grid[r][c] not in (
     expect(offFloor).toEqual([]);
   });
 
+  it("the art: every suit has its six poses and a face, every machine and prop is there, and every wall is solid", () => {
+    const project = JSON.parse(readFileSync(BUILT, "utf8")) as Project;
+    const sprite = (n: string) => project.sprites.find((x) => x.name === n);
+    for (const suit of ["coral", "sea", "sun", "violet", "orange", "white", "black", "pink"]) {
+      expect(sprite(`crew_${suit}`)?.frames.length).toBe(6);
+      expect(sprite(`face_${suit}`)).toBeTruthy();
+    }
+    for (const n of ["station_wires", "station_crystals", "station_valve", "station_scan", "beacon", "sub", "lockers", "mimic_shown", "ice_burst", "jelly", "title", "meeting_room", "ocean", "icon"])
+      expect(sprite(n), n).toBeTruthy();
+    const station = project.rooms.find((r) => r.name === "Station")!;
+    const layer = station.layers.find((l) => l.kind === "tiles") as { tiles: Record<string, number> };
+    const set = project.tilesets[0]!;
+    const floors = 8;
+    const walls = new Set(Object.values(layer.tiles).filter((t) => t >= floors));
+    expect(walls.size).toBeGreaterThanOrEqual(5);
+    expect([...walls].filter((t) => !set.solid.includes(t))).toEqual([]);
+  });
+
   it("the title: pick a suit with the arrows, Space dives, and the suit is kept", async () => {
     const g = await start();
     expect(py(g, "room_name()")).toBe("Title");

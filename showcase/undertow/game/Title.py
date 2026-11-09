@@ -2,6 +2,9 @@
 # The front: pick a suit (arrows, or click one), then dive.
 
 # === create
+# The slow deep tune, once (it carries on from the title into the station).
+if not sound_playing("music"):
+    sound_play("music", loop=True, volume=0.45)
 names = [s[0] for s in SUITS]
 self.pick = names.index(save_get("suit", "coral")) if save_get("suit", "coral") in names else 0
 self.t = 0
