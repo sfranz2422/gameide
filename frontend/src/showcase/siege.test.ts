@@ -71,12 +71,12 @@ describe.skipIf(!have)("Tabletop Siege: a match against the computer", () => {
 
   it("playing a card: it costs energy, waits a moment, arrives, and the next card comes into the hand", async () => {
     const g = await desk(false);
-    py(g, "global_vars.energy[0] = 5");
+    // Whatever the shuffle dealt (the golem costs 6): enough energy for any card.
+    py(g, "global_vars.energy[0] = 10");
     const [first, next] = py(g, "(hand(0)[1], up_next(0))") as unknown as [string, string];
     const cost = py(g, `CARDS['${first}']['cost']`) as unknown as number;
-    const x = first === "glue" ? 200 : 200;
-    expect(py(g, `play_card(0, 1, ${x}, 150)`)).toBe(true);
-    expect(py(g, "round(global_vars.energy[0], 1)")).toBeCloseTo(5 - cost, 0);
+    expect(py(g, "play_card(0, 1, 200, 150)")).toBe(true);
+    expect(py(g, "round(global_vars.energy[0], 1)")).toBeCloseTo(10 - cost, 0);
     expect(py(g, "hand(0)[1]")).toBe(next);
     expect(py(g, "global_vars.decks[0][-1]")).toBe(first);
     expect(count(g, "Deploy")).toBe(1);
@@ -228,7 +228,8 @@ describe.skipIf(!have)("Tabletop Siege: a match against the computer", () => {
     const g = await desk();
     play(g, 0, "knight", 280, 96);
     // Enough to answer, not enough to push or to spend because it's full.
-    py(g, "global_vars.energy[1] = 6\nc = instances('Cpu')[0]\nc.save_for = 9");
+    // (A hand it can defend with: one of golem, plane, marble and glue alone is 1 deal in 70.)
+    py(g, "global_vars.energy[1] = 6\nc = instances('Cpu')[0]\nc.save_for = 9\nglobal_vars.decks[1] = ['knight', 'soldiers', 'wall', 'archer', 'golem', 'plane', 'marble', 'glue']");
     step(g, 60 * 6);
     // Something of its own, dropped in the knight's lane on its side of the desk.
     expect((py(g, "[(round(o.x), round(o.y)) for o in instances('Unit') + instances('Deploy') + instances('Building') if o.side == 1 and not is_a(o, 'Tower') and abs(o.y - 96) < 60 and o.x > 330]") as unknown as unknown[]).length).toBeGreaterThan(0);
