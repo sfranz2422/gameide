@@ -75,6 +75,30 @@ def art(name, k=0.5):
     return im if k == 1 else im.resize((max(1, round(im.width * k)), max(1, round(im.height * k))), Image.LANCZOS)
 
 
+def passing(pic, legs_from=0.8, squeeze=0.55, lift=3):
+    """
+    The step between strides: the lower legs (below `legs_from` of the height) drawn
+    together under the body, and the body a little higher. Gemini's two walking
+    frames came back both mid-stride with the same foot forward, so walking looked
+    like sliding (as Snowcap's climbers did); now the walk goes stride, together, stride.
+    """
+    w, h = pic.size
+    top = round(h * legs_from)
+    legs = pic.crop((0, top, w, h))
+    box = legs.getbbox()
+    out = pic.copy()
+    if box is None:
+        return out
+    part = legs.crop(box)
+    narrow = part.resize((max(1, round(part.width * squeeze)), part.height), Image.NEAREST)
+    out.paste((0, 0, 0, 0), (box[0], top + box[1], box[2], top + box[3]))
+    mid = (box[0] + box[2]) // 2
+    out.alpha_composite(narrow, (mid - narrow.width // 2, top + box[1]))
+    lifted = Image.new("RGBA", (w, h))
+    lifted.alpha_composite(out.crop((0, lift, w, h)), (0, 0))
+    return lifted
+
+
 def trimmed(im):
     box = im.getbbox()
     return im.crop(box) if box else im
@@ -188,7 +212,10 @@ def build(out):
     # three-quarter view a diver's helmet can pass in front of the wall above them.
     poses = ["stand", "walk1", "walk2", "work", "frozen", "ghost"]
     for name, _, _ in SUITS:
-        sprite(f"crew_{name}", [art(f"crew_{name}_{pose}") for pose in poses], (20, 47), mask=(12, 38, 28, 48))
+        frames = [art(f"crew_{name}_{pose}", 1) for pose in poses]
+        frames[2] = passing(frames[1])
+        frames = [f.resize((f.width // 2, f.height // 2), Image.LANCZOS) for f in frames]
+        sprite(f"crew_{name}", frames, (20, 47), mask=(12, 38, 28, 48))
         sprite(f"face_{name}", [art(f"face_{name}")], (0, 0))
     for kind, machine in MACHINES.items():
         im = fitted(machine, MACHINE_W)

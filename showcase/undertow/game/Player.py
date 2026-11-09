@@ -46,7 +46,7 @@ if not held:
     if dx:
         self.facing = 1 if dx > 0 else -1
     if dx or dy:
-        self.walk_t += 0.12
+        self.walk_t += 0.15
         self.image_index = 1 + int(self.walk_t) % 2
     else:
         self.image_index = 0
