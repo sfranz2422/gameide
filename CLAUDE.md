@@ -296,7 +296,7 @@ code (the harness turns bytecode caching off for that reason), or a
 mistyped case name ran nothing and still reported success (the harness now
 refuses unknown names).
 
-**The showcase games' runners** (`GM`, `MM`, `FB`, `GF`, `BB`, `HC`, `KT`, `TD`, `SM`, `RP`, `CLIMB`, `UND` — not `CL`, which is classes.py) rebuild
+**The showcase games' runners** (`GM`, `MM`, `FB`, `GF`, `BB`, `HC`, `KT`, `TD`, `SM`, `RP`, `CLIMB`, `UND`, `SIEGE` — not `CL`, which is classes.py) rebuild
 that game from the sabotaged source before its playtest and again after. A
 build that **refuses** (Greenside's course checks, Ridgeline Rally's stage
 checks) leaves the old `out/project.json`, and the test passes on it: a
@@ -638,6 +638,22 @@ version in History before accepting (`save_project`).
 - Sync-state changes go through `updateMeta` (one at a time per project),
   or a picture added mid-save can drop off the upload list. **No test
   covers that race** — it needs a fake IndexedDB the repo doesn't have.
+
+## Showcase games: names the engine already uses
+
+An instance variable named like one of the engine's own properties is the
+engine's (the list is `_props` in runtime.py: speed, direction, gravity, friction,
+glow, spin, outline, bounce, weight…). `self.speed` on a troop made the engine
+walk it every step, even while it stood fighting, right past the tower; `glow`
+on a fish wanted a colour. Call a game's own numbers something else (`pace`, `lit`).
+
+## Tabletop Siege
+
+`showcase/siege/`: a 1v1 lane battle on a desk (the teacher's pick, an original game
+in the genre). Every number is in `game/_1rules.py`; the troops are objects (Unit
+and its kinds; Building, Tower, Keep, Wall), `_2battle.py` is what they share. The
+computer (`Cpu`) plays side 1 alone. Phase 2 puts two players in a room the
+Undertow way (the host's game runs the battle).
 
 ## Style
 

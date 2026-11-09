@@ -1,5 +1,17 @@
 # Progress
 
+## Tabletop Siege, phase 1: a match against the computer (2026-11-09, waiting for review)
+- **The next multiplayer showcase** (the teacher's pick, an original lane battle): two desks pushed together, a ruler across the gap in each lane, two pencil-cup towers and a lunchbox keep a side. Drag a card onto your half (or click it, or press 1 to 4, then click); after a moment's wind-up the troops are there and march on their own.
+- **The same 8 cards for everyone** (the teacher's choice): Toy Soldiers (3 at once), Wind-up Knight (tough; slows as it unwinds), Paper Plane (flies; towers only), Band Archer (shoots, even planes), Eraser Golem (huge, slow, buildings only), Block Wall (draws attackers, crumbles), Marble (rolls down the desk, bowling each troop over once), Glue Puddle (slows the other side's troops). Energy fills to 10; a hand of 4 and the next card shown.
+- **Winning:** three minutes; a fallen tower is a crown, the keep is all three and the match. Level at the end: a minute of overtime at double energy, then the stronger towers. The keep sleeps until it's hit or a tower falls.
+- **The computer** (`Cpu`) defends what crosses the gap (archers for planes, a marble down a crowd, a knight or soldiers in front) and saves up to push down a lane, with a little hesitation.
+- Python questions wait for the end of a match.
+- **Built from objects**: Unit and its five kinds, Building/Tower/Keep/Wall, Shot, Marble, Glue, Deploy, Arena, Hand, Hud, Cpu, Title; every number in `game/_1rules.py`.
+- Stand-in pictures drawn by the game; the Gemini prompts are in `showcase/siege/PROMPTS.md` (8 pictures).
+- Found on the way: a troop's `self.speed` is the engine's own movement, so troops kept walking while they fought (now `pace`; CLAUDE.md warns of the engine's names).
+- Tests: 16 in `siege.test.ts` (cards and energy, where cards may go, the ruler crossing, towers, planes, golems, marbles, glue, walls, the keep, overtime, questions, the computer defending, and the computer against itself for a whole match). 17 sabotage cases (runner `SIEGE`), all caught.
+- **Next (phase 2):** two players: a room code or "Find me a match", the host's game runs the battle, the other's cards go to it privately; the computer for the odd one out; rematches.
+
 ## Undertow, phase 4: the teacher's pictures (2026-11-09, waiting for review)
 - **All 12 Gemini pictures are in the game**, cut by `showcase/undertow/cut_sheets.py` into `art/` (107 pictures; `raw/` and `art/` both committed). The crew in all 8 suits and 6 poses (standing, two steps, working, frozen in ice, ghost), their faces on the title and in meetings, the station's floors (glowing guide lights in the corridors) and walls (portholes, lamps and pipes along them, glass where Observation looks out), each job at a real machine (the control desk, the reef tank, the pump, the lab table) with its panel picture behind the job, props in every room (the little sub in the dock, lockers and crates in Storage, plants, benches), sea creatures swimming past outside (the jellyfish and the anglerfish glow), the ocean, the title, and the meeting room behind every meeting. The Mimic shows in the result when one is sent up and at the end; a freeze bursts into ice. The slow, deep music plays from the title on.
 - Gemini's crew and Mimic sheets have a line under each row; the cutter takes out thin lines only (drawings side by side can fill a row too). The ocean and title had a beige and a grey band; taken off.

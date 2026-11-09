@@ -50,6 +50,8 @@ RP = "rpg"        # …or The Lanterns of Hollowmere's, rebuilt the same way
 CLIMB = "climber"  # …or Snowcap Scramble's, rebuilt the same way (not CL: that's classes.py)
 def _cl(n): return f"../showcase/climber/game/{n}.py"
 UND = "undertow"   # …or Undertow's, rebuilt the same way
+SIEGE = "siege"    # …or Tabletop Siege's, rebuilt the same way
+def _sg(n): return f"../showcase/siege/game/{n}.py"
 def _ut(n): return f"../showcase/undertow/game/{n}.py"
 SMR, SML, SMB = "../showcase/smash/game/_2rules.py", "../showcase/smash/game/_1levels.py", "../showcase/smash/build.py"
 def _sm(n): return f"../showcase/smash/game/{n}.py"
@@ -1738,6 +1740,25 @@ CASES = [
  ('undertow: glass walls walked through', "../showcase/undertow/build.py", 'SOLID = list(WALL_FRONT.values()) + [WALL_TOP]', 'SOLID = [WALL_FRONT["wall"], WALL_TOP]', "every wall is solid", UND),
  ('undertow: a pose missing', "../showcase/undertow/build.py", 'poses = ["stand", "walk1", "walk2", "work", "frozen", "ghost"]', 'poses = ["stand", "walk1", "walk2", "work", "frozen"]', "every suit has its six poses", UND),
 
+ # Tabletop Siege (phase 1: a match against the computer)
+ ('siege: troops wade the gap', _sg("_1rules"), '    if (x < MID) == (tx < MID):\n        return tx, ty', '    if True:\n        return tx, ty', "cross only by a ruler", SIEGE),
+ ('siege: free cards', _sg("_2battle"), '    if m.energy[side] < CARDS[card]["cost"] or not can_drop(side, card, x, y):', '    if not can_drop(side, card, x, y):', "not enough energy", SIEGE),
+ ('siege: drop anywhere', _sg("_1rules"), '    return own_half(side, x)\n', '    return True\n', "not enough energy", SIEGE),
+ ('siege: the hand never turns over', _sg("_2battle"), '    deck.insert(slot, deck.pop(HAND - 1))\n    deck.append(card)', '    deck.insert(slot, card)', "the next card comes into the hand", SIEGE),
+ ('siege: soldiers swat planes', _sg("_2battle"), '        return u.targets == "all"', '        return True', "soldiers can't hit it", SIEGE),
+ ('siege: golems pick fights', _sg("_2battle"), '    if u.targets == "buildings":\n        return is_a(o, "Building")', '    if False:\n        return is_a(o, "Building")', "golem walks past troops", SIEGE),
+ ('siege: marbles hit again and again', _sg("Marble"), 'and id(u) not in self.hit and', 'and', "a marble bowls over each troop once", SIEGE),
+ ('siege: glue slows friends', _sg("Unit"), 'any(g.side != self.side and point_distance', 'any(point_distance', "glue slows", SIEGE),
+ ('siege: walls last for ever', _sg("Wall"), '    self.hp -= WALL_HP / WALL_LIFE\n', '', "crumbles by itself", SIEGE),
+ ('siege: the keep wins nothing', _sg("_2battle"), '            global_vars.crowns[other] = 3\n            end_match(other)', '            global_vars.crowns[other] = 3', "the keep falling wins", SIEGE),
+ ('siege: no overtime', _sg("_2battle"), '    elif not m.overtime:', '    elif False:', "overtime with double energy", SIEGE),
+ ('siege: overtime, same energy', _sg("_2battle"), '    rate = 2 if m.overtime else 1', '    rate = 1', "overtime with double energy", SIEGE),
+ ('siege: the keep never sleeps', _sg("Keep"), 'self.awake = False', 'self.awake = True', "the keep sleeps", SIEGE),
+ ('siege: towers blind', _sg("Tower"), 'point_distance(self.x, self.y, u.x, u.y) <= self.range]', 'point_distance(self.x, self.y, u.x, u.y) <= 0]', "towers shoot troops", SIEGE),
+ ('siege: questions mid-battle', _sg("Arena"), 'question_ok(global_vars.over)', 'question_ok(True)', "questions wait for the end", SIEGE),
+ ('siege: the computer sits still', _sg("Cpu"), 'if threats:\n    t = threats[0]', 'if False and threats:\n    t = threats[0]', "the computer defends", SIEGE),
+ ('siege: walking with the engine\'s speed', _sg("Unit"), 'self.age += 1\n', 'self.age += 1\nself.speed = self.pace\n', "a lone knight hurts a tower", SIEGE),
+
  ('tell: the page drops them', NETS, '    if (o.tells && !this.away) this.tells.push(...o.tells);\n', '', "one player on a WebSocket and one polling", E2E),
 
 ]
@@ -1774,7 +1795,7 @@ for name, f, old, new, test, *extra in CASES:
             failed = any(l.startswith("FAIL") and test in l for l in out.splitlines())
             ran = "ok   " in out or "FAIL " in out
         else:
-            if runner in ([GM], [MM], [FB], [GF], [BB], [HC], [KT], [TD], [SM], [RP], [CLIMB], [UND]):
+            if runner in ([GM], [MM], [FB], [GF], [BB], [HC], [KT], [TD], [SM], [RP], [CLIMB], [UND], [SIEGE]):
                 subprocess.run(["python3", str(ROOT.parent / f"showcase/{runner[0]}/build.py")], capture_output=True)
             cmd = ["npx", "playwright", "test", "-g", test] if runner == [E2E] else ["npx", "vitest", "run", "-t", test]
             r = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True)
@@ -1785,6 +1806,6 @@ for name, f, old, new, test, *extra in CASES:
         if not failed: bad.append(name)
     finally:
         p.write_text(src)
-        if runner in ([GM], [MM], [FB], [GF], [BB], [HC], [KT], [TD], [SM], [RP], [CLIMB], [UND]):
+        if runner in ([GM], [MM], [FB], [GF], [BB], [HC], [KT], [TD], [SM], [RP], [CLIMB], [UND], [SIEGE]):
             subprocess.run(["python3", str(ROOT.parent / f"showcase/{runner[0]}/build.py")], capture_output=True)
 print("ALL SABOTAGES CAUGHT" if not bad else f"NOT CAUGHT: {bad}")
