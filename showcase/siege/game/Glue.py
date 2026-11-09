@@ -5,10 +5,12 @@
 
 # === create
 self.side = 0
+self.uid = next_uid()       # how the other player's game knows it again (Link)
+self.puppet = False         # True in the other player's game: a copy, moved by Link
 self.life = GLUE_LIFE
 
 # === step
-if not global_vars.over:
+if not (self.puppet or stopped()):
     self.life -= 1
     if self.life <= 0:
         self.destroy()

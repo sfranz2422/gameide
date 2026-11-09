@@ -7,12 +7,22 @@
 m = global_vars
 if m.over and (keyboard_check_pressed("space") or keyboard_check_pressed("enter")
                or mouse_check_pressed("left") and 250 <= mouse_x <= 390 and 210 <= mouse_y <= 244):
-    new_match()
+    if not in_room():
+        new_match()
+    elif opponent() is None:
+        room_goto("Title")              # they've gone: wait for someone new
+    elif runs_battle():
+        m.again[0] = True               # both press it, then the next match starts (Link)
+    else:
+        m.again[0] = True
+        net_tell(net_host(), {"again": 1, "n": m.match_no})
 
 # === draw_gui
 m = global_vars
 secs = max(0, m.clock) // 60
 words(VIEW_W / 2, 2, f"{secs // 60}:{secs % 60:02d}", 16, "#ff9f43" if m.overtime else "white", "center")
+if m.halt and not m.over:
+    words(VIEW_W / 2, 150, "Your opponent is away (a question?). The match is held.", 14, "white", "center")
 if m.overtime:
     words(VIEW_W / 2, 20, "Overtime: double energy!", 10, "#ff9f43", "center")
 # Crowns won, three to win outright: drawn (the font has no crown in it).
@@ -30,4 +40,8 @@ if m.over:
     words(VIEW_W / 2, 168, f"Crowns {m.crowns[0]} to {m.crowns[1]}", 16, "white", "center")
     draw_set_color("#3ecf8e")
     draw_rect(250, 210, 390, 244)
-    words(VIEW_W / 2, 217, "Play again", 16, "white", "center")
+    gone = in_room() and opponent() is None
+    waiting = in_room() and m.again[0] and not m.again[1]
+    words(VIEW_W / 2, 217, "Find someone new" if gone else "Waiting for them..." if waiting else "Play again", 16, "white", "center")
+    if in_room() and m.again[1] and not m.again[0] and not gone:
+        words(VIEW_W / 2, 190, "They want a rematch!", 14, "#ffd23f", "center")

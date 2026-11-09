@@ -395,6 +395,43 @@ def create(slug):
         db.close()
 
 
+@bp.post("/api/play/<slug>/net/match")
+def match(slug):
+    """
+    "Find me a match": into a room where one other player is waiting for a match, or
+    a new one of your own to wait in. Rooms made this way have codes like any other
+    (the next player is put in it); a two-player game (settings.netPlayers 2) is
+    what it's for, but any game may use it.
+    """
+    db = publishing._db()
+    try:
+        user, pub = _playable(db, slug)
+        _tidy(db, pub.id)
+        t = time.time()
+        for room in db.query(NetRoom).filter_by(published_id=pub.id, matching=1).order_by(NetRoom.id).all():
+            here = db.query(NetPlayer).filter(NetPlayer.room_id == room.id, NetPlayer.seen_at >= t - PRESENT_SECONDS).all()
+            if any(p.user_id == user.id for p in here):
+                return _enter(db, room, user)          # your own, still waiting (a reload)
+            if len(here) == 1:
+                if len(here) + 1 >= room_size(db, room):
+                    room.matching = 0                   # full now: nobody else is matched into it
+                return _enter(db, room, user)
+        used = {r.code for r in db.query(NetRoom.code).filter_by(published_id=pub.id).all()}
+        code = next((c for c in (_code() for _ in range(50)) if c not in used), None)
+        if code is None:
+            return err("Couldn't find a free room code. Try again.", 503)
+        room = NetRoom(published_id=pub.id, class_id=0, code=code, created_by=user.id, active_at=t, matching=1)
+        db.add(room)
+        try:
+            db.flush()
+        except IntegrityError:
+            db.rollback()
+            return err("Couldn't find a free room code. Try again.", 503)
+        return _enter(db, room, user)
+    finally:
+        db.close()
+
+
 @bp.post("/api/play/<slug>/net/join")
 def join(slug):
     db = publishing._db()

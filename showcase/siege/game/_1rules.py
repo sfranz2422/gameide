@@ -2,6 +2,7 @@
 # Tabletop Siege's rules: the desk, the towers, the eight cards, and the clock.
 # Every number the game plays by is here, so balancing it is changing numbers
 # in this one file.
+import json
 import math
 import random
 

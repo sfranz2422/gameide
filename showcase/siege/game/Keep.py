@@ -9,6 +9,8 @@ super().on_create()
 self.awake = False
 
 # === step
+if self.puppet:
+    return
 if not self.awake:
     self.awake = self.hp < self.max_hp or len([t for t in instances("Tower") if t.side == self.side]) < 3
     super(Tower, self).on_step()

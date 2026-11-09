@@ -29,9 +29,22 @@ def bar(x, y, w, frac, color):
     draw_rect(x - w / 2, y, x - w / 2 + w * max(0.0, min(1.0, frac)), y + 3)
 
 
+def stopped():
+    """The match isn't running: over, or held while the other player is away."""
+    return global_vars.over or global_vars.halt
+
+
+def next_uid():
+    global_vars.uid = getattr(global_vars, "uid", 0) + 1
+    return global_vars.uid
+
+
 def new_match():
     """Everything a match keeps, fresh: energy, hands, crowns, the clock."""
     m = global_vars
+    m.halt = False
+    m.again = [False, False]           # Play again, pressed: both, in a room
+    m.match_no = getattr(m, "match_no", 0) + 1
     m.energy = [float(ENERGY_START), float(ENERGY_START)]
     m.decks = []
     for side in (0, 1):
@@ -121,7 +134,7 @@ def enemies_of(side):
 def tick_clock():
     """A step of the match: energy comes in, the clock runs down, overtime, the end."""
     m = global_vars
-    if m.over:
+    if stopped():
         return
     rate = 2 if m.overtime else 1
     for side in (0, 1):

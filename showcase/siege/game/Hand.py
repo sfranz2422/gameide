@@ -19,7 +19,7 @@ if mouse_check_pressed("left"):
         m.pick, m.drag = slot, True
         sound_play("tick", volume=0.3)
     elif m.pick is not None and my <= BOTTOM:
-        if play_card(0, m.pick, mx, my):
+        if play(m.pick, mx, my):
             m.pick = None
         else:
             sound_play("nope", volume=0.4)
@@ -27,7 +27,7 @@ if mouse_check_released("left") and m.drag:
     m.drag = False
     # Let go over the desk: played. Let go back on the cards: still picked, to click the desk after.
     if m.pick is not None and my <= BOTTOM:
-        if play_card(0, m.pick, mx, my):
+        if play(m.pick, mx, my):
             m.pick = None
         else:
             sound_play("nope", volume=0.4)

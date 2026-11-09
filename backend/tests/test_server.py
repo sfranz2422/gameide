@@ -1713,6 +1713,12 @@ with old3.begin() as conn:
     conn.execute(_text("CREATE TABLE gameide_net_messages (id INTEGER PRIMARY KEY, room_id INTEGER, sender INTEGER, data TEXT, sent_at FLOAT)"))
 server.gamestore.create_all(old3)
 check("an old database gains private messages", "to_number" in {c["name"] for c in _inspect(old3).get_columns("gameide_net_messages")})
+old_db4 = Path(tempfile.mkdtemp()) / "old4.db"
+old4 = create_engine(f"sqlite:///{old_db4}")
+with old4.begin() as conn:
+    conn.execute(_text("CREATE TABLE gameide_net_rooms (id INTEGER PRIMARY KEY, published_id INTEGER, class_id INTEGER, code VARCHAR(8), created_by INTEGER, active_at FLOAT)"))
+server.gamestore.create_all(old4)
+check("an old database gains rooms waiting for a match", "matching" in {c["name"] for c in _inspect(old4).get_columns("gameide_net_rooms")})
 
 # Guests (not signed in) get the questions too, kept in their session.
 _g1 = client()
@@ -2046,6 +2052,31 @@ _pub.data = _was
 _cdb.commit()
 check("rooms: a game can't ask for more than 25, or for nonsense", _sizes == [25, 2, 20, 20, 20], _sizes)
 _cdb.close()
+
+# ---- "Find me a match" (Tabletop Siege, the teacher's ask 2026-11-09): pairs whoever is waiting.
+put(_nia, "duel", project("duel", "Duel", settings={"stepsPerSecond": 60, "netPlayers": 2}), 0)
+DUEL = _nia.post("/api/projects/duel/publish", json={"title": "Duel", "visibility": "unlisted"}).get_json()["published"]["id"]
+_m = {n: client(f"match{n}@{S}") for n in "abcdef"}
+_ma = _m["a"].post(f"/api/play/{DUEL}/net/match", json={}).get_json()
+_ma2 = _m["a"].post(f"/api/play/{DUEL}/net/match", json={}).get_json()
+check("matching: the first waits in a new room of their own, and a reload finds it again",
+      _ma.get("number") == 1 and _ma2.get("code") == _ma["code"] and _ma2.get("number") == 1, (_ma, _ma2))
+_mb = _m["b"].post(f"/api/play/{DUEL}/net/match", json={}).get_json()
+check("matching: the next is put in with them", _mb.get("code") == _ma["code"] and _mb.get("number") == 2, _mb)
+_mc = _m["c"].post(f"/api/play/{DUEL}/net/match", json={}).get_json()
+check("matching: a full room isn't handed out: the third waits in a new one",
+      _mc.get("code") not in (None, _ma["code"]) and _mc.get("number") == 1, _mc)
+_m["c"].post("/api/net/leave", json={"token": _mc["token"]})
+_md = _m["d"].post(f"/api/play/{DUEL}/net/match", json={}).get_json()
+check("matching: a room whose waiter has gone isn't handed out", _md.get("code") not in (None, _mc["code"], _ma["code"]) and _md.get("number") == 1, _md)
+check("matching: signing in comes first", client().post(f"/api/play/{DUEL}/net/match", json={}).status_code == 401)
+# A game whose rooms hold more (20, saying nothing): matching still pairs, two to a room.
+put(_nia, "trio", project("trio", "Trio"), 0)
+TRIO = _nia.post("/api/projects/trio/publish", json={"title": "Trio", "visibility": "unlisted"}).get_json()["published"]["id"]
+_t1, _t2, _t3 = (_m[n].post(f"/api/play/{TRIO}/net/match", json={}).get_json() for n in "abc")
+check("matching: pairs, even in a game whose rooms hold more", _t2.get("code") == _t1.get("code") and _t3.get("code") not in (None, _t1.get("code")), (_t1, _t2, _t3))
+_me = _m["e"].post(f"/api/play/{DUEL}/net/join", json={"code": _ma["code"]})
+check("matching: a matched room is full at two, by its code too", _me.status_code == 409, _me.get_json())
 
 # ---- The same rooms, LIVE: one process, rooms in memory (GAMEIDE_ONE_PROCESS=1 on Render).
 # Pages use WebSockets then (the browser tests); a page that can't polls, served from

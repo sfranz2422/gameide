@@ -326,4 +326,7 @@ export class NetSession {
 /** A new room in this game: anyone signed in may make one (rooms aren't tied to classes). */
 export const createRoom = (slug: string) => api<Joined>(`/api/play/${encodeURIComponent(slug)}/net/create`, { json: {} });
 
+/** "Find me a match": in with someone already waiting, or a new room to wait in (multiplayer.match). */
+export const findMatch = (slug: string) => api<Joined>(`/api/play/${encodeURIComponent(slug)}/net/match`, { json: {} });
+
 export const joinRoom = (slug: string, code: string) => api<Joined>(`/api/play/${encodeURIComponent(slug)}/net/join`, { json: { code } });

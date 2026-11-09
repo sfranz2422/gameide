@@ -1,15 +1,18 @@
 /**
  * Before a multiplayer game starts: join a room by its code, or make one and
- * tell everyone the code. Or play alone. Anyone signed in may make or join a
+ * tell everyone the code; in a one-against-one game, or be paired with whoever
+ * is waiting ("Find me a match"). Or play alone. Anyone signed in may make or join a
  * room (backend/multiplayer.py): they aren't tied to classes.
  */
 import { useState } from "react";
-import { createRoom, joinRoom, type Joined } from "./net";
+import { createRoom, findMatch, joinRoom, type Joined } from "./net";
 
-export function NetLobby({ slug, title, signedIn, ready, onJoined, onAlone }: {
+export function NetLobby({ slug, title, signedIn, matchable = false, ready, onJoined, onAlone }: {
   slug: string;
   title: string;
   signedIn: boolean;
+  /** A one-against-one game: offer "Find me a match" (pairs whoever is waiting). */
+  matchable?: boolean;
   /** Python is loaded, so the game can start the moment a room is joined. */
   ready: boolean;
   onJoined: (j: Joined) => void;
@@ -31,6 +34,7 @@ export function NetLobby({ slug, title, signedIn, ready, onJoined, onAlone }: {
   };
   const join = () => void go(() => joinRoom(slug, code));
   const make = () => void go(() => createRoom(slug));
+  const match = () => void go(() => findMatch(slug));
 
   if (!signedIn) {
     return (
@@ -69,7 +73,12 @@ export function NetLobby({ slug, title, signedIn, ready, onJoined, onAlone }: {
         </button>
       </form>
       <div className="net-or">or</div>
-      <button className="btn go" onClick={make} disabled={busy || !ready} data-testid="net-create">
+      {matchable && (
+        <button className="btn go" onClick={match} disabled={busy || !ready} data-testid="net-match">
+          Find me a match
+        </button>
+      )}
+      <button className={matchable ? "btn" : "btn go"} onClick={make} disabled={busy || !ready} data-testid="net-create">
         Make a room
       </button>
       <button className="btn small net-alone" onClick={onAlone} disabled={busy || !ready} data-testid="net-alone">Play alone</button>

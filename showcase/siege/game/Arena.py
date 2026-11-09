@@ -1,16 +1,25 @@
 # object: Arena
 # depth: 1000
 # The desk: two school desks pushed together, the gap between them, and a ruler
-# across it in each lane. It runs the match's clock, and starts a new match.
+# across it in each lane. It runs the match's clock, and starts a new match (in
+# the game that runs the battle: alone, or the room's host).
 
 # === create
-new_match()
 global_vars.pick = None          # the card in hand being played (Hand)
 global_vars.drag = False
 touch_controls(False)
+if runs_battle():
+    new_match()
+else:
+    # The other player's game: no battle of its own; Link fills these in from the host's.
+    m = global_vars
+    m.energy, m.decks, m.crowns = [0.0, 0.0], [DECK[:], DECK[:]], [0, 0]
+    m.clock, m.overtime, m.over, m.halt, m.winner = MATCH_STEPS, False, False, False, None
+    m.again, m.match_no = [False, False], 0
 
 # === step
-tick_clock()
+if runs_battle():
+    tick_clock()
 # Python questions wait for the end of a match: never in the middle of a battle.
 question_ok(global_vars.over)
 

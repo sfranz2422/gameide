@@ -13,7 +13,7 @@ self.target = None
 
 # === step
 super().on_step()
-if global_vars.over:
+if self.puppet or stopped():
     return
 self.cool = max(0, self.cool - 1)
 t = self.target

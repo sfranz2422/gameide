@@ -6,12 +6,13 @@ player against another (or the computer).
 
     python3 showcase/siege/build.py      # → showcase/siege/out/Siege.zip
 
-Phase 1: a match against the computer, everything drawn by the game itself until
-the teacher's Gemini pictures come.
+Against the computer, or another player in a room (a code, or "Find me a match"),
+everything drawn by the game itself until the teacher's Gemini pictures come.
 
 THE GAME IS OBJECTS: Unit and its kinds (Soldier, Knight, Plane, Archer, Golem),
 Building and its kinds (Tower, Keep, Wall), Shot, Marble, Glue, Deploy (a card on
-its way), Arena (the desk and the clock), Hand (your cards), Hud, Cpu, Title. Every
+its way), Arena (the desk and the clock), Hand (your cards), Hud, Cpu, Link (the
+room: the host runs the battle, the other game shows it), Title. Every
 number is in game/_1rules.py.
 """
 import importlib.util
@@ -71,6 +72,8 @@ def build(out):
     P = _climb.Climb("Tabletop Siege")
     P.p["settings"]["pixelScaling"] = False
     P.p["settings"]["scoreboard"] = {"unit": "wins"}
+    # One against one: rooms hold two, and the lobby offers "Find me a match".
+    P.p["settings"]["netPlayers"] = 2
     P.sprite("icon", [icon_picture()], (64, 64))
     P.font("Ubuntu", HERE / "fonts" / "ubuntu-latin-700-normal.woff2")
     make_sounds(P)
@@ -109,7 +112,7 @@ def build(out):
         })
 
     room("Title", ["Title"])
-    room("Desk", ["Arena", "Hand", "Hud", "Cpu"])
+    room("Desk", ["Arena", "Hand", "Hud", "Cpu", "Link"])
     out.parent.mkdir(parents=True, exist_ok=True)
     P.write(out)
     (out.parent / "project.json").write_text(json.dumps(P.p, indent=1))

@@ -333,3 +333,52 @@ test("Undertow in a room: roles dealt privately, a meeting at the beacon, a vote
   if (process.env.UNDERTOW_SHOTS) await uma.page.locator("canvas[data-testid=game-canvas]").screenshot({ path: `${process.env.UNDERTOW_SHOTS}/result.png` });
   await Promise.all([teacher.ctx, uma.ctx, ...others.map((o) => o.ctx)].map((c) => c.close()));
 });
+
+// Tabletop Siege, built (python3 showcase/siege/build.py), published and played one
+// against one: both press "Find me a match", the server pairs them, each plays a
+// card, and each sees the other's troops on the far side. Skipped if unbuilt.
+const SIEGE = new URL("../../showcase/siege/out/Siege.zip", import.meta.url).pathname;
+
+test("Tabletop Siege: Find me a match pairs two players, and each sees the other's cards", async ({ browser }) => {
+  test.skip(!existsSync(SIEGE), "Tabletop Siege isn't built here");
+  test.setTimeout(400_000);
+  const teacher = await signedIn(browser, "teach5@example.com");
+  await teacher.page.goto("/#/games");
+  await teacher.page.getByTestId("import-file").setInputFiles(SIEGE);
+  await teacher.page.waitForURL(/#\/p\//, { timeout: 60_000 });
+  await expect(teacher.page.getByTestId("save-status")).toHaveText("Saved", { timeout: 60_000 });
+  await teacher.page.getByTestId("publish").click();
+  await teacher.page.getByTestId("publish-title").fill("Tabletop Siege");
+  await teacher.page.getByTestId("publish-unlisted").check();
+  await teacher.page.getByTestId("publish-go").click();
+  await expect(teacher.page.getByTestId("publish-link")).toHaveValue(/\/play\/[\w-]+$/, { timeout: 60_000 });
+  const url = new URL(await teacher.page.getByTestId("publish-link").inputValue()).pathname;
+
+  const players: { ctx: import("@playwright/test").BrowserContext; page: Page }[] = [];
+  for (const email of ["siena@example.com", "tomas@example.com"]) {
+    const p = await signedIn(browser, email);
+    await p.page.goto(url);
+    await p.page.getByTestId("net-match").click({ timeout: 120_000 });
+    await p.page.waitForFunction(() => (window as any).__gameide.host.state === "running", null, { timeout: 120_000 });
+    players.push(p);
+  }
+  const [one, two] = players.map((p) => p.page) as [Page, Page];
+  // Paired into the same room.
+  await expect(two.getByTestId("net-room-code")).toHaveText((await one.getByTestId("net-room-code").textContent())!);
+  for (const p of [one, two]) await expect.poll(() => py(p, "room_name()"), { timeout: 30_000 }).toBe("Desk");
+  expect(await py(one, "runs_battle()")).toBe(true);
+  expect(await py(two, "runs_battle()")).toBe(false);
+  // Each plays a card on their own left: each then sees one of their own (blue, left) and one of theirs (red, right).
+  await py(one, "global_vars.energy = [10, 10]");
+  await expect.poll(() => py(two, "round(global_vars.energy[0])"), { timeout: 15_000 }).toBe(10);
+  await py(one, "play(0, 200, 96)");
+  await py(two, "play(0, 200, 200)");
+  const deploys = (p: Page) => py(p, "sorted((d.side, round(d.x) < 320) for d in instances('Deploy'))");
+  for (const p of [one, two]) await expect.poll(() => deploys(p), { timeout: 15_000 }).toEqual([[0, true], [1, false]]);
+  if (process.env.SIEGE_SHOTS) {
+    await one.waitForTimeout(3000);
+    await one.locator("canvas[data-testid=game-canvas]").screenshot({ path: `${process.env.SIEGE_SHOTS}/duel-1.png` });
+    await two.locator("canvas[data-testid=game-canvas]").screenshot({ path: `${process.env.SIEGE_SHOTS}/duel-2.png` });
+  }
+  await Promise.all([teacher.ctx, ...players.map((p) => p.ctx)].map((c) => c.close()));
+});

@@ -11,6 +11,8 @@
 
 # === create
 self.side = 0
+self.uid = next_uid()       # how the other player's game knows it again (Link)
+self.puppet = False         # True in the other player's game: a copy, moved by Link
 self.target = None
 self.cool = 0
 self.age = 0
@@ -19,7 +21,7 @@ self.glued = False
 setup_unit(self, "Soldier")
 
 # === step
-if global_vars.over:
+if self.puppet or stopped():
     return
 self.age += 1
 self.flash = max(0, self.flash - 1)

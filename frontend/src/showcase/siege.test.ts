@@ -11,21 +11,24 @@ import { buildGame } from "../python/codegen";
 import { PythonGame } from "../python/bridge";
 import { KEY_CODE } from "../engine/input";
 import type { Project } from "../store/project";
+import type { NetJoined, NetMessageIn, NetOut, NetPlayerState } from "../engine/game";
 
 const BUILT = resolve(__dirname, "../../../showcase/siege/out/project.json");
 const have = existsSync(BUILT);
 
-async function start() {
+async function start(net?: NetJoined) {
   const project = JSON.parse(readFileSync(BUILT, "utf8")) as Project;
   const { def } = buildGame(project, new Map());
   const oks: boolean[] = [];
-  const { game, error } = await PythonGame.load(def, {
+  const sent: NetOut[] = [];
+  const { game, error } = await PythonGame.load({ ...def, ...(net ? { net } : {}) } as typeof def, {
     stdout: () => undefined, stderr: () => undefined, warning: () => undefined,
     questionOk: (ok) => oks.push(ok),
+    net: (o) => sent.push(o),
   });
   if (error) throw new Error(`${error.object} ${error.event} line ${error.line}: ${error.message}`);
   step(game, 2);
-  return Object.assign(game, { oks });
+  return Object.assign(game, { oks, sent });
 }
 function step(game: PythonGame, n = 1) {
   for (let i = 0; i < n; i++) {
@@ -246,5 +249,169 @@ describe.skipIf(!have)("Tabletop Siege: a match against the computer", () => {
     expect(py(g, "global_vars.over")).toBe(true);
     // Both sides played: towers were hit somewhere.
     expect(py(g, "global_vars.crowns[0] + global_vars.crowns[1] > 0 or min(t.hp / t.max_hp for t in instances('Tower')) < 1")).toBe(true);
+  });
+});
+
+interface Seat { g: Game; number: number; name: string; here: boolean; state: Record<string, unknown>; inbox: NetMessageIn[]; read: number }
+
+/** A room as the server keeps one: each step, every game gets the others' newest states, its messages, and the host. */
+class Room {
+  seats: Seat[] = [];
+  async join(number: number, name: string) {
+    const g = await start({ code: "KXTD", number, name, state: {} });
+    // From the very start: a game sends an unchanged state only once, and this one sent it on its first steps.
+    const seat: Seat = { g, number, name, here: true, state: {}, inbox: [], read: 0 };
+    this.seats.push(seat);
+    return seat;
+  }
+  seat(n: number) {
+    return this.seats.find((s) => s.number === n)!;
+  }
+  step(n = 1) {
+    for (let i = 0; i < n; i++) {
+      const live = this.seats.filter((s) => s.here);
+      const host = Math.min(...live.map((s) => s.number));
+      for (const s of live) {
+        const others: NetPlayerState[] = live.filter((o) => o !== s && Object.keys(o.state).length)
+          .map((o) => ({ number: o.number, name: o.name, state: o.state }));
+        s.g.netArrive(others, s.inbox, host);
+        s.inbox = [];
+        step(s.g);
+      }
+      for (const s of live) {
+        for (const out of s.g.sent.slice(s.read)) {
+          if (out.state) s.state = out.state;
+          for (const m of out.msgs ?? []) for (const o of live) if (o !== s) o.inbox.push({ from: s.number, data: m, age: 0 });
+          for (const [to, m] of out.tells ?? []) {
+            const o = live.find((x) => x.number === to);
+            if (o) o.inbox.push({ from: s.number, data: m, age: 0, private: true } as NetMessageIn);
+          }
+        }
+        s.read = s.g.sent.length;
+      }
+    }
+  }
+}
+
+/** Two players in a room, both on the desk: #1 (the host) and #2. */
+async function duel() {
+  const room = new Room();
+  const a = await room.join(1, "Ana");
+  const b = await room.join(2, "Ben");
+  room.step(100);
+  expect(py(a.g, "room_name()")).toBe("Desk");
+  expect(py(b.g, "room_name()")).toBe("Desk");
+  room.step(3);
+  return { room, a, b };
+}
+const towers = (g: Game) => py(g, "sorted((round(t.x), round(t.y), t.side) for t in instances('Tower'))") as unknown as [number, number, number][];
+
+describe.skipIf(!have)("Tabletop Siege: two players", () => {
+  it("in a room, each waits for the other, then both go to the desk; the computer stays out of it", async () => {
+    const room = new Room();
+    const a = await room.join(1, "Ana");
+    room.step(150);
+    expect(py(a.g, "room_name()")).toBe("Title");
+    await room.join(2, "Ben");
+    room.step(100);
+    expect(room.seats.map((s) => py(s.g, "room_name()"))).toEqual(["Desk", "Desk"]);
+    expect(room.seats.map((s) => count(s.g, "Cpu"))).toEqual([0, 0]);
+  });
+
+  it("the host runs the battle; the other sees it mirrored, themselves blue on the left", async () => {
+    const { a, b } = await duel();
+    expect(py(a.g, "runs_battle()")).toBe(true);
+    expect(py(b.g, "runs_battle()")).toBe(false);
+    expect(py(b.g, "all(t.puppet for t in instances('Tower'))")).toBe(true);
+    // The same six towers, each side's on its own left.
+    const host = towers(a.g);
+    const other = towers(b.g).map(([x, y, side]): [number, number, number] => [640 - x, y, 1 - side]).sort((p, q) => p[0] - q[0] || p[1] - q[1]);
+    expect(other).toEqual(host);
+    expect(py(b.g, "len(global_vars.decks[0]) >= 5 and global_vars.match_no")).toBe(1);
+  });
+
+  it("the other player's card goes to the host, is played there as the red side, and both see it", async () => {
+    const { room, a, b } = await duel();
+    py(a.g, "global_vars.energy[1] = 10");
+    room.step(3);
+    const card = py(b.g, "hand(0)[0]") as unknown as string;
+    const x = card === "glue" ? 200 : 200;
+    expect(py(b.g, `play(0, ${x}, 200)`)).toBe(true);
+    room.step(3);
+    expect(py(a.g, "[(round(d.x), round(d.y), d.side, d.card) for d in instances('Deploy')]")).toEqual([[440, 200, 1, card]]);
+    expect(py(a.g, "round(global_vars.energy[1])")).toBeLessThan(10);
+    room.step(3);
+    // In the other game, its own drop: on its left, blue.
+    expect(py(b.g, "[(round(d.x), d.side) for d in instances('Deploy')]")).toEqual([[200, 0]]);
+    room.step(70);
+    expect(py(b.g, "round(global_vars.energy[0])")).toBe(py(a.g, "round(global_vars.energy[1])"));
+  });
+
+  it("a play the host may not allow is refused: the wrong half, or too little energy", async () => {
+    const { room, a, b } = await duel();
+    py(a.g, "global_vars.energy[1] = 10\nd = global_vars.decks[1]\nd.remove('knight')\nd.insert(0, 'knight')");
+    room.step(3);
+    // A changed game asking for a drop on the host's half (host x 200).
+    py(b.g, "net_tell(1, {'play': [0, 200, 150], 'n': global_vars.match_no})");
+    room.step(3);
+    expect(count(a.g, "Deploy")).toBe(0);
+    py(a.g, "global_vars.energy[1] = 1");
+    py(b.g, "net_tell(1, {'play': [0, 500, 150], 'n': global_vars.match_no})");
+    room.step(3);
+    expect(count(a.g, "Deploy")).toBe(0);
+  });
+
+  it("troops fight and the crowns and winner read the right way round in both games", async () => {
+    const { room, a, b } = await duel();
+    py(a.g, "k = [t for t in instances('Keep') if t.side == 0][0]\nhurt(k, 99999)");
+    room.step(4);
+    expect(py(a.g, "(global_vars.winner, global_vars.crowns)")).toEqual([1, [0, 3]]);
+    expect(py(b.g, "(global_vars.over, global_vars.winner, global_vars.crowns)")).toEqual([true, 0, [3, 0]]);
+  });
+
+  it("a rematch when both press Play again", async () => {
+    const { room, a, b } = await duel();
+    py(a.g, "end_match(0)");
+    room.step(3);
+    tap(b.g, "space");
+    room.step(3);
+    expect(py(a.g, "global_vars.again")).toEqual([false, true]);
+    expect(py(a.g, "global_vars.over")).toBe(true);
+    tap(a.g, "space");
+    room.step(4);
+    expect(py(a.g, "(global_vars.over, global_vars.match_no)")).toEqual([false, 2]);
+    expect(py(b.g, "(global_vars.over, global_vars.match_no)")).toEqual([false, 2]);
+  });
+
+  it("an opponent away, answering a question, holds the match; gone for good, the one still here wins", async () => {
+    const { room, a, b } = await duel();
+    room.step(30);
+    b.here = false;
+    room.step(5);
+    const clock = py(a.g, "global_vars.clock") as unknown as number;
+    room.step(60);
+    expect(py(a.g, "(global_vars.halt, global_vars.clock)")).toEqual([true, clock]);
+    b.here = true;
+    room.step(10);
+    expect(py(a.g, "global_vars.halt")).toBe(false);
+    b.here = false;
+    room.step(150 * 60 + 10);
+    expect(py(a.g, "(global_vars.over, global_vars.winner)")).toEqual([true, 0]);
+  });
+
+  it("the host away: the other game holds too", async () => {
+    const { room, a, b } = await duel();
+    room.step(10);
+    a.here = false;
+    room.step(5);
+    expect(py(b.g, "global_vars.halt")).toBe(true);
+  });
+
+  it("a big battle still fits in what a game may send", async () => {
+    const { room, a } = await duel();
+    py(a.g, "for k in range(120):\n    u = instance_create(60 + k * 4, 40 + (k % 11) * 20, 'Soldier')\n    u.side = k % 2");
+    room.step(30);
+    const sizes = a.g.sent.filter((o) => o.state).slice(-10).map((o) => JSON.stringify(o.state).length);
+    expect(Math.max(...sizes)).toBeLessThanOrEqual(2000);
   });
 });

@@ -6,10 +6,12 @@
 # === create
 self.card = "soldiers"
 self.side = 0
+self.uid = next_uid()       # how the other player's game knows it again (Link)
+self.puppet = False         # True in the other player's game: a copy, moved by Link
 self.t = 0
 
 # === step
-if global_vars.over:
+if self.puppet or stopped():
     return
 self.t += 1
 if self.t < WIND_UP:

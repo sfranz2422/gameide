@@ -1,5 +1,13 @@
 # Progress
 
+## Tabletop Siege, phase 2: two players (2026-11-09, waiting for review)
+- **Find me a match** (the teacher's ask, beside room codes): a new button in the lobby of a one-against-one game. The server puts you in with someone already waiting, or makes a room for you to wait in; a room whose waiter left isn't handed out. Rooms of a two-player game hold two (`netPlayers` 2, as Undertow's hold 25).
+- **In a room:** each waits on the title for the other (named when they arrive), then both go to the desk. The room's host runs the battle; the other player's game shows it mirrored, so each sees themselves blue on the left. The other player's cards go privately to the host, which plays them only if they may be played (energy, the right half), as it does its own. The computer stays out of rooms; it's Play the computer, or Play alone in the lobby, for the odd one out.
+- **Rematch** when both press Play again ("They want a rematch!"); if the other has left, "Find someone new".
+- **Away for a Python question:** the match holds still for both ("Your opponent is away… The match is held."), and carries on when they're back; gone two and a half minutes, the one still here wins.
+- Tests: 9 more in `siege.test.ts`, two real games in a room side by side (waiting and going to the desk together, the mirrored desk, the other player's cards, refused plays, crowns and winner both ways round, rematch, held while away and the forfeit, a big battle still fitting what a game may send); 7 server checks for matching (and an old database gaining the column); a browser test with two signed-in players pressing Find me a match and playing a card each. 14 sabotage cases, all caught.
+- **Next (phase 3):** the teacher's Gemini pictures (prompts in `showcase/siege/PROMPTS.md`), sound and polish, wins on the school board, publishing.
+
 ## Tabletop Siege, phase 1: a match against the computer (2026-11-09, waiting for review)
 - **The next multiplayer showcase** (the teacher's pick, an original lane battle): two desks pushed together, a ruler across the gap in each lane, two pencil-cup towers and a lunchbox keep a side. Drag a card onto your half (or click it, or press 1 to 4, then click); after a moment's wind-up the troops are there and march on their own.
 - **The same 8 cards for everyone** (the teacher's choice): Toy Soldiers (3 at once), Wind-up Knight (tough; slows as it unwinds), Paper Plane (flies; towers only), Band Archer (shoots, even planes), Eraser Golem (huge, slow, buildings only), Block Wall (draws attackers, crumbles), Marble (rolls down the desk, bowling each troop over once), Glue Puddle (slows the other side's troops). Energy fills to 10; a hand of 4 and the next card shown.

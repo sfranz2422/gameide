@@ -5,6 +5,8 @@
 
 # === create
 self.side = 0
+self.uid = next_uid()       # how the other player's game knows it again (Link)
+self.puppet = False         # True in the other player's game: a copy, moved by Link
 self.hp = self.max_hp = 100
 self.radius = 16
 self.flash = 0

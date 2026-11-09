@@ -10,7 +10,7 @@ self.radius = 14
 
 # === step
 super().on_step()
-if not global_vars.over:
+if not (self.puppet or stopped()):
     self.hp -= WALL_HP / WALL_LIFE
     if self.hp <= 0:
         self.destroy()

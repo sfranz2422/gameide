@@ -80,6 +80,8 @@ export function PlayerApp() {
   sendScore.current = scores.send;
   // A game whose code uses net_ functions asks for a room before it starts (published games only, for now).
   const multi = !!id && !!pkg && usesNet(pkg.project);
+  // A one-against-one game (its rooms hold two) gets "Find me a match" in its lobby.
+  const matchable = multi && pkg?.project.settings.netPlayers === 2;
   const net = useRef<NetSession | null>(null);
   const [joined, setJoined] = useState<Joined | null>(null);
   const [alone, setAlone] = useState(false);
@@ -202,6 +204,7 @@ export function PlayerApp() {
                 slug={id!}
                 title={title}
                 signedIn={!!info?.signedIn}
+                matchable={matchable}
                 ready={pythonReady}
                 onJoined={onJoined}
                 onAlone={() => {

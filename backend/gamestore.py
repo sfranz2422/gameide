@@ -325,6 +325,8 @@ class NetRoom(Base):
     code = Column(String(8), nullable=False)
     created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
     active_at = Column(Float, nullable=False, default=0)
+    # Made by "Find me a match" and still waiting for its second player (multiplayer.match).
+    matching = Column(Integer, nullable=False, default=0)
 
 
 class NetPlayer(Base):
@@ -531,3 +533,6 @@ def create_all(engine):
     if "to_number" not in {c["name"] for c in inspect(engine).get_columns("gameide_net_messages")}:
         with engine.begin() as conn:
             conn.execute(text("ALTER TABLE gameide_net_messages ADD COLUMN to_number INTEGER"))
+    if "matching" not in {c["name"] for c in inspect(engine).get_columns("gameide_net_rooms")}:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE gameide_net_rooms ADD COLUMN matching INTEGER NOT NULL DEFAULT 0"))

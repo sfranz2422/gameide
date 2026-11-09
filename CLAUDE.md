@@ -591,6 +591,7 @@ games are untouched.
 - **Smoothing is the engine's**: each `net_players()` player has `draw_x`/`draw_y` (`_net_smooth_step`, once a step in `_frame`): carried on at the `vx`/`vy`/`ay` they send for up to `NET_PREDICT_STEPS`, gliding onto each new word. Games draw others there (Snowcap's Ghost does), so every multiplayer game is fluid without its own code.
 - **`net_tell(number, msg)` is private**: the server keeps who it's for (`to` in a live message, `to_number` in `gameide_net_messages`) and hands it to that player only (`_for`), so a secret role can't be read from anyone else's traffic. `net_host()` is the game in charge (`_host`: the lowest number here and not away), sent with every frame, so every game agrees who deals and counts.
 - **A room holds 20, unless the game asks** (`settings.netPlayers`, read by `multiplayer.room_size` from the published snapshot, never the page; 2 to `BIGGEST_ROOM`, 25). Only Undertow asks (25, the teacher's choice 2026-11-09): every other game stays at 20.
+- **"Find me a match"** (`multiplayer.match`, the lobby's `net-match`, shown when a game's rooms hold two): into the oldest room still marked `matching` with exactly one player present, else a new marked room. A room loses the mark when full; matching pairs even in games whose rooms hold more.
 - **Undertow is the pattern for a game with secrets** (`showcase/undertow/game/_3room.py`, `_4play.py`, Director): the host's game is the referee. Public state goes out as `g` in the host's `net_send`; roles go by `net_tell`; every action (freeze, report, vote, jobs done) is a private word to the host, which checks it against where players really are, because a changed game in a browser can send anything. A new host carries on from its copy of `g` (the newest `v`) and learns roles from the players. `undertow.test.ts`'s `Room` steps several real games side by side as the server would: test a room game there, not one game at a time.
 - **A dropped WebSocket comes back by itself** (`NetSession`): the page polls at once, then tries a new socket after 5 s, doubling to 30 s (60 s if the server said it can't). A Render restart doesn't leave a room choppy until a reload.
 
@@ -652,8 +653,13 @@ on a fish wanted a colour. Call a game's own numbers something else (`pace`, `li
 `showcase/siege/`: a 1v1 lane battle on a desk (the teacher's pick, an original game
 in the genre). Every number is in `game/_1rules.py`; the troops are objects (Unit
 and its kinds; Building, Tower, Keep, Wall), `_2battle.py` is what they share. The
-computer (`Cpu`) plays side 1 alone. Phase 2 puts two players in a room the
-Undertow way (the host's game runs the battle).
+computer (`Cpu`) plays side 1 alone. In a room (`netPlayers` 2), the host's game
+runs the battle and sends `snapshot()` each step; the other game runs no battle
+and shows **puppets** of the same objects (`self.puppet`: every step that
+simulates returns at once), mirrored so each player is blue on the left
+(`_3duel.py`, `Link`). The other player's cards go to the host privately and go
+through `play_card`, like the host's own. An opponent away (a question) holds the
+match (`halt`, `stopped()`); gone `GONE_STEPS`, the one still here wins.
 
 ## Style
 

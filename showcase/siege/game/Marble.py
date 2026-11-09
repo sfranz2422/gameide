@@ -5,11 +5,13 @@
 
 # === create
 self.side = 0
+self.uid = next_uid()       # how the other player's game knows it again (Link)
+self.puppet = False         # True in the other player's game: a copy, moved by Link
 self.hit = set()
 self.roll = 0
 
 # === step
-if global_vars.over:
+if self.puppet or stopped():
     return
 self.x += MARBLE_SPEED * forward(self.side)
 self.roll += 0.3

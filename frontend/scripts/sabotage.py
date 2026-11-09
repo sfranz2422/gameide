@@ -1759,6 +1759,22 @@ CASES = [
  ('siege: the computer sits still', _sg("Cpu"), 'if threats:\n    t = threats[0]', 'if False and threats:\n    t = threats[0]', "the computer defends", SIEGE),
  ('siege: walking with the engine\'s speed', _sg("Unit"), 'self.age += 1\n', 'self.age += 1\nself.speed = self.pace\n', "a lone knight hurts a tower", SIEGE),
 
+ # Tabletop Siege phase 2: two players, "Find me a match"
+ ('matching: full rooms handed out', MP, '            if len(here) == 1:\n                if len(here) + 1', '            if len(here) >= 1:\n                if len(here) + 1', "pairs, even in a game whose rooms hold more", PY),
+ ('matching: gone waiters matched', MP, '            here = db.query(NetPlayer).filter(NetPlayer.room_id == room.id, NetPlayer.seen_at >= t - PRESENT_SECONDS).all()', '            here = db.query(NetPlayer).filter(NetPlayer.room_id == room.id).all()', "a room whose waiter has gone", PY),
+ ('matching: old databases stuck', GS, '    if "matching" not in {c["name"]', '    if False and "matching" not in {c["name"]', "an old database gains rooms waiting for a match", PY),
+ ('matching: no button', "src/player/NetLobby.tsx", '      {matchable && (', '      {false && (', "Find me a match pairs two players", E2E),
+ ('siege: plays sent unmirrored', _sg("_3duel"), '{"play": [slot, round(VIEW_W - x), round(y)]', '{"play": [slot, round(x), round(y)]', "the other player's card goes to the host", SIEGE),
+ ('siege: the host trusts any play', _sg("Link"), '                play_card(1, slot, x, y)', '                dd = instance_create(x, y, "Deploy")\n                dd.card, dd.side = hand(1)[slot], 1', "a play the host may not allow is refused", SIEGE),
+ ('siege: no hold while away', _sg("Link"), '    m.halt = them is None and not m.over', '    m.halt = False', "an opponent away, answering a question", SIEGE),
+ ('siege: never a forfeit', _sg("Link"), '    if m.halt and self.away_for > GONE_STEPS:', '    if False:', "an opponent away, answering a question", SIEGE),
+ ('siege: a rematch by one', _sg("Link"), '    if m.over and all(m.again):', '    if m.over and any(m.again):', "a rematch when both press", SIEGE),
+ ('siege: winner the wrong way round', _sg("_3duel"), '    m.winner = mirror_side(g["w"]) if g["w"] is not None else None', '    m.winner = g["w"]', "the crowns and winner read the right way round", SIEGE),
+ ('siege: crowns the wrong way round', _sg("_3duel"), '    m.crowns = [g["c"][1], g["c"][0]]', '    m.crowns = list(g["c"])', "the crowns and winner read the right way round", SIEGE),
+ ('siege: the computer joins rooms', _sg("Cpu"), 'if in_room():\n    self.destroy()\n    return\n', '', "the computer stays out of it", SIEGE),
+ ('siege: big battles overflow', _sg("_3duel"), '    if len(json.dumps(g)) > 1900:\n        g["s"] = []\n    while len(json.dumps(g)) > 1900 and g["u"]:', '    if False:\n        g["s"] = []\n    while False:', "a big battle still fits", SIEGE),
+ ('siege: the other side not mirrored', _sg("_3duel"), '            o.side = 1 - side', '            o.side = side', "themselves blue on the left", SIEGE),
+
  ('tell: the page drops them', NETS, '    if (o.tells && !this.away) this.tells.push(...o.tells);\n', '', "one player on a WebSocket and one polling", E2E),
 
 ]

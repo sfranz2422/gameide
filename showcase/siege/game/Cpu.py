@@ -4,6 +4,10 @@
 # second, with a little hesitation so it isn't superhuman.
 
 # === create
+# Against a person there's no computer (the Desk room places one; it takes itself away).
+if in_room():
+    self.destroy()
+    return
 self.t = 0
 self.wait = 0
 self.side = 1
