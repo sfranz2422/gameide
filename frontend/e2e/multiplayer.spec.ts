@@ -255,3 +255,78 @@ test("one player on a WebSocket and one polling still see each other, and hear e
   await expect.poll(() => py(ws.page, "[(p.number, p.x) for p in net_players()]"), { timeout: 10_000 }).toEqual([[2, 33]]);
   await Promise.all([teacher.ctx, ws.ctx, poller.ctx].map((c) => c.close()));
 });
+
+// Undertow, built (python3 showcase/undertow/build.py), published and played by
+// three at once through the real server: the host deals, each learns their role
+// alone, the beacon calls a meeting, and the vote is counted. Skipped if unbuilt.
+const UNDERTOW = new URL("../../showcase/undertow/out/Undertow.zip", import.meta.url).pathname;
+
+test("Undertow in a room: roles dealt privately, a meeting at the beacon, a vote", async ({ browser }) => {
+  test.skip(!existsSync(UNDERTOW), "Undertow isn't built here");
+  test.setTimeout(400_000);
+  const teacher = await signedIn(browser, "teach6@example.com");
+  await teacher.page.goto("/#/games");
+  await teacher.page.getByTestId("import-file").setInputFiles(UNDERTOW);
+  await teacher.page.waitForURL(/#\/p\//, { timeout: 60_000 });
+  await expect(teacher.page.getByTestId("save-status")).toHaveText("Saved", { timeout: 60_000 });
+  await teacher.page.getByTestId("publish").click();
+  await teacher.page.getByTestId("publish-title").fill("Undertow");
+  await teacher.page.getByTestId("publish-unlisted").check();
+  await teacher.page.getByTestId("publish-go").click();
+  await expect(teacher.page.getByTestId("publish-link")).toHaveValue(/\/play\/[\w-]+$/, { timeout: 60_000 });
+  const url = new URL(await teacher.page.getByTestId("publish-link").inputValue()).pathname;
+
+  const dive = async (page: Page) => {
+    await page.waitForFunction(() => (window as any).__gameide.host.state === "running", null, { timeout: 120_000 });
+    await page.locator("canvas[data-testid=game-canvas]").click({ position: { x: 5, y: 5 } });
+    await page.keyboard.press("Space");
+    await expect.poll(() => py(page, "room_name()"), { timeout: 30_000 }).toBe("Station");
+  };
+  const uma = await signedIn(browser, "uma@example.com");
+  await uma.page.goto(url);
+  await uma.page.getByTestId("net-create").click({ timeout: 60_000 });
+  const code = (await uma.page.getByTestId("net-room-code").textContent({ timeout: 30_000 }))!;
+  await dive(uma.page);
+  const others: { ctx: import("@playwright/test").BrowserContext; page: Page }[] = [];
+  for (const email of ["ivo@example.com", "kit@example.com"]) {
+    const p = await signedIn(browser, email);
+    await p.page.goto(url);
+    await p.page.getByTestId("net-code").fill(code);
+    await p.page.getByTestId("net-join").click({ timeout: 60_000 });
+    await dive(p.page);
+    others.push(p);
+  }
+  const pages = [uma.page, ...others.map((o) => o.page)];
+  await expect.poll(() => py(uma.page, "len(net_players())"), { timeout: 30_000 }).toBe(2);
+
+  // Uma's game is the host: Enter deals.
+  await uma.page.keyboard.press("Enter");
+  for (const p of pages) await expect.poll(() => py(p, "global_vars.role"), { timeout: 30_000 }).toMatch(/^(crew|mimic)$/);
+  const roles = await Promise.all(pages.map((p) => py(p, "global_vars.role")));
+  expect(roles.filter((r) => r === "mimic")).toHaveLength(1);
+  if (process.env.UNDERTOW_SHOTS) {
+    for (const [k, p] of pages.entries()) {
+      await py(p, `global_vars.player.x += ${k * 30 - 30}`);
+    }
+    await uma.page.waitForTimeout(800);
+    for (const [k, p] of pages.entries()) await p.locator("canvas[data-testid=game-canvas]").screenshot({ path: `${process.env.UNDERTOW_SHOTS}/play-${roles[k]}-${k + 1}.png` });
+  }
+  // Each knows only their own: the others' games hold no role for anyone else.
+  expect(await py(others[0]!.page, "global_vars.mates")).toEqual([]);
+
+  // Ivo goes to the beacon and calls a meeting; everyone's game shows it.
+  await py(others[0]!.page, "global_vars.player.x, global_vars.player.y = tile_middle(*BEACON)");
+  await expect.poll(() => py(others[0]!.page, "global_vars.near[0] if global_vars.near else None"), { timeout: 30_000 }).toBe("beacon");
+  await others[0]!.page.keyboard.press("e");
+  for (const p of pages) await expect.poll(() => py(p, "global_vars.g['ph']"), { timeout: 30_000 }).toBe("meeting");
+  if (process.env.UNDERTOW_SHOTS) await uma.page.locator("canvas[data-testid=game-canvas]").screenshot({ path: `${process.env.UNDERTOW_SHOTS}/meeting.png` });
+  // A phrase from Kit reaches Uma.
+  await py(others[1]!.page, "say('who')");
+  await expect.poll(() => py(uma.page, "global_vars.chat"), { timeout: 30_000 }).toEqual([[3, "Who did it?"]]);
+  // All skip: nobody sent up.
+  for (const p of pages) await py(p, "vote(0)");
+  for (const p of pages) await expect.poll(() => py(p, "global_vars.g['ph']"), { timeout: 30_000 }).toBe("result");
+  expect(await py(uma.page, "global_vars.g['ej']")).toBe(undefined);
+  if (process.env.UNDERTOW_SHOTS) await uma.page.locator("canvas[data-testid=game-canvas]").screenshot({ path: `${process.env.UNDERTOW_SHOTS}/result.png` });
+  await Promise.all([teacher.ctx, uma.ctx, ...others.map((o) => o.ctx)].map((c) => c.close()));
+});

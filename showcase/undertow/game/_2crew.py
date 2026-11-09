@@ -40,7 +40,7 @@ def job_finished(job):
     global_vars.job = None
     job.destroy()
     sound_play("done", volume=0.6)
-    if all(i in global_vars.done for i in global_vars.jobs):
+    if global_vars.jobs and all(i in global_vars.done for i in global_vars.jobs):
         global_vars.all_done = 240
 
 

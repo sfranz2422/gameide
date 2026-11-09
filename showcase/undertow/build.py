@@ -6,11 +6,13 @@ they seem.
 
     python3 showcase/undertow/build.py      # → showcase/undertow/out/Undertow.zip
 
-Phase 2: the station with one player. The pictures are stand-ins drawn here
+The station, its jobs, and the round in a room (who's a Mimic, freezing,
+meetings and votes, who wins). The pictures are stand-ins drawn here
 (the teacher's Gemini pictures, PROMPTS.md, replace them in phase 4), so the
 game builds and plays without any art on disk.
 
-THE GAME IS OBJECTS: Crew and Player, Station (a job's panel), Job and its kinds
+THE GAME IS OBJECTS: Crew, Player and Other (another player), Director (the
+room's side: runs the round in the host's game), Meeting, Body, Station (a job's panel), Job and its kinds
 (WiresJob, CrystalsJob, ValveJob, ScanJob), Lamps, Beacon, Hud, Title. The map
 is game/_1station.py: this file paints it.
 """
@@ -211,6 +213,8 @@ def make_sounds(P):
     P.sound("buzz", tone(0.18, 110, 100, "square", 0.25))
     P.sound("open", lowpass(tone(0.2, 0, 0, "noise", 0.4, seed=4), 0.6, 0.1))
     P.sound("beep", tone(0.06, 1200, 1200, "sine", 0.25))
+    P.sound("alarm", join(*[tone(0.18, f, f * 0.8, "square", 0.22) for f in (880, 660, 880, 660)]))
+    P.sound("freeze", mix(tone(0.4, 2400, 600, "sine", 0.25), lowpass(tone(0.4, 0, 0, "noise", 0.3, seed=13), 0.9, 0.2)))
     P.sound("done", join(*[tone(0.08, f, f, "tri", 0.3) for f in (523, 659, 784)], tone(0.25, 1047, 1047, "tri", 0.3)))
     # A slow, deep loop: D minor, sonar pings on top.
     melody = [62, 0, 0, 0, 65, 0, 69, 0, 0, 0, 67, 0, 65, 0, 0, 0, 62, 0, 0, 0, 65, 0, 70, 0, 69, 0, 0, 0, 0, 0, 0, 0]
@@ -310,7 +314,7 @@ def build(out):
     lid = _tw.new_id()
     px, py = MAP["tile_middle"](*MAP["START"])
     bx, by = MAP["tile_middle"](*MAP["BEACON"])
-    placed = [inst("Lamps", 0, 0, lid), inst("Hud", 0, 0, lid), inst("Beacon", bx, by, lid), inst("Player", px, py, lid)]
+    placed = [inst("Director", 0, 0, lid), inst("Lamps", 0, 0, lid), inst("Hud", 0, 0, lid), inst("Beacon", bx, by, lid), inst("Player", px, py, lid)]
     for i, (kind, c, r) in enumerate(MAP["STATIONS"]):
         x, y = MAP["tile_middle"](c, r)
         placed.append(inst("Station", x, y, lid, f'self.i = {i}\nself.kind = "{kind}"\nself.sprite = "station_{kind}"'))

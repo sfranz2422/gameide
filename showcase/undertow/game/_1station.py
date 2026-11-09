@@ -51,8 +51,8 @@ STATIONS = [
 ]
 JOBS_EACH = 5          # how many jobs a player is given
 REACH = 44             # how close (pixels) to a panel to use it
-START = (30, 19)       # where everyone starts: the middle of the Meeting Hub (tile)
-BEACON = (30, 16)      # the sonar beacon that calls a meeting (tile)
+START = (30, 21)       # where you start alone: the Meeting Hub, below the table (tile)
+BEACON = (30, 18)      # the sonar beacon that calls a meeting, the middle of the hub's table (tile)
 SPEED = 2.4            # pixels a step
 
 

@@ -1,5 +1,16 @@
 # Progress
 
+## Undertow, phase 3: the round in a room (2026-11-09, waiting for review)
+- **A round, from 3 players:** everyone walks the station while the class joins; the room's host (its maker) presses Enter. Each player is told **privately** whether they're crew or a **Mimic** (1 Mimic, 2 from 7 players, 3 from 13) and given five jobs; Mimics are told who the others are (red numbers). Everyone starts round the hub's table.
+- **Mimics freeze crew** with F when close (every 25 s, not in the first 12). The frozen crew member becomes a **ghost**: drifts through walls, sees other ghosts (the living don't), can still do jobs, can't speak, vote, report or call. An ice block stays where they were.
+- **Meetings:** E beside an ice block reports it; the beacon in the middle of the hub's table calls one (once a round each). Everyone goes to the table; the meeting screen shows everyone's face and number, **preset phrases** ("I saw #4 in Reef Lab", "#2 is suspicious"…: click a player and a room, then a phrase) and the vote. A minute to talk and vote; not voting is skipping; a tie or more skips sends nobody up. Whoever has the most votes is "sent up to the surface", and everyone learns whether they were a Mimic.
+- **Who wins:** the crew, when every Mimic is sent up or every crew job is done (ghosts' jobs count, a Mimic's pretend jobs don't); the Mimics, when there are as many of them as crew. Then the Mimics are revealed and the room goes back to waiting.
+- **Nobody can cheat from the traffic:** freezes, reports, calls, votes and job counts go privately to the host's game, which checks each against where everyone really is (distance, cooldown, role, once each). The public state never names a role until the end. A student could still read the host's own game with browser tools, so the teacher can host.
+- **The host can leave** (or be answering a question): the next player's game carries on from its copy of the round, and every player re-tells it their role. A player who reloads is told their role again; one gone 90 s has left the round.
+- Questions wait during jobs, meetings and results (`question_ok`).
+- Tests: 25 in `undertow.test.ts`, 13 of them a room of real games side by side, passed each other's messages as the server does; and one browser test with three players through the real server. 25 more sabotage cases, all caught.
+- **The teacher's Gemini pictures are in** `showcase/undertow/raw/` (01–12, one per prompt, all matching); they go in in phase 4.
+
 ## Undertow, phase 2: the station, alone (2026-11-09, waiting for review)
 - **The station** (`showcase/undertow/game/_1station.py`, built by `showcase/undertow/build.py`): eight rooms (Meeting Hub, Control, Reef Lab, Pump Room, Observation, Med Bay, Sub Dock, Storage) joined by corridors, 60 × 40 tiles of 32 pixels. One file says where everything is; the build paints it and the tests walk it.
 - **Dark, with your lamp:** the station is nearly black but for a dim light in each room and the lamp you carry, so you see only what's near you (the point of an impostor game). Walls stop your feet, so your helmet can pass in front of a wall above you.
