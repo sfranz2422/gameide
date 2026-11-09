@@ -2398,6 +2398,10 @@ _net_messages = []          # what arrived this step: kept one step only
 _net_state = None           # JSON text of the last net_send, to send only a change
 _net_out = {}
 _net_away = False
+#: How long a player is carried on as they were going between words, at most
+#: (steps): guessing longer could put them through a wall.
+NET_PREDICT_STEPS = 12
+_net_smooth = {}            # their number -> where they're being drawn, and the guess
 
 
 class NetPlayer:
@@ -2406,10 +2410,17 @@ class NetPlayer:
     last sent with net_send, by name — p.x for net_send({"x": ...}). A name
     they never sent is an error naming what they did send; p.get("x", 0)
     gives a default instead.
+
+    .draw_x and .draw_y are where to DRAW them: their x and y, smoothed. Word of
+    where they are comes a few times a second and a little late, so between
+    words they carry on as they were going (vx, vy, and ay if they send it: a
+    jump's gravity) for up to NET_PREDICT_STEPS, and glide onto each new word
+    rather than jumping. None if they don't send an x and a y.
     """
 
     def __init__(self, number, name, state):
         self.number, self.name, self._state = number, name, state
+        self.draw_x = self.draw_y = None
 
     def __getattr__(self, key):
         state = self.__dict__.get("_state", {})
@@ -2499,6 +2510,38 @@ def net_away(away=True):
         _net_out["away"] = away
         if away:
             _net_out.pop("msgs", None)
+
+
+def _net_smooth_step():
+    """Once a step, in a room: each player's draw_x and draw_y (NetPlayer)."""
+    here = set()
+    for p in _net_players:
+        st = p._state
+        x, y = st.get("x"), st.get("y")
+        if isinstance(x, bool) or isinstance(y, bool) or not isinstance(x, (int, float)) or not isinstance(y, (int, float)):
+            continue
+        num = lambda k: st.get(k) if isinstance(st.get(k), (int, float)) and not isinstance(st.get(k), bool) else 0
+        here.add(p.number)
+        s = _net_smooth.get(p.number)
+        if s is None:
+            s = _net_smooth[p.number] = {"word": None, "x": x, "y": y, "since": 0}
+        word = (x, y, st.get("vx"), st.get("vy"), st.get("ay"), st.get("s"))
+        if word != s["word"]:
+            s.update(word=word, bx=x, by=y, vx=num("vx"), vy=num("vy"), ay=num("ay"), since=0)
+        else:
+            s["since"] += 1
+        t = min(s["since"], NET_PREDICT_STEPS)
+        gx = s["bx"] + s["vx"] * t
+        gy = s["by"] + s["vy"] * t + s["ay"] * t * t / 2
+        if (gx - s["x"]) ** 2 + (gy - s["y"]) ** 2 > 400 ** 2:
+            s["x"], s["y"] = gx, gy          # a long way off (a reload, a long fall): no gliding there
+        else:
+            s["x"] += (gx - s["x"]) * 0.4
+            s["y"] += (gy - s["y"]) * 0.4
+        p.draw_x, p.draw_y = s["x"], s["y"]
+    for n in list(_net_smooth):
+        if n not in here:
+            del _net_smooth[n]
 
 
 def _net_arrive(text):
@@ -3034,6 +3077,8 @@ def _frame(net=None):
         _net_messages.clear()
         if net is not None:
             _net_arrive(net)
+        if _net is not None:
+            _net_smooth_step()
         _publish_globals()
         # Paused (game_pause): only instances that ignore the pause run their
         # events; the engine holds everyone else still. Tweens wait too.
@@ -3222,6 +3267,7 @@ def _setup(layout_json, game_json):
     _question_waiting = False
     _net_messages.clear()
     _net_out.clear()
+    _net_smooth.clear()
     _PAD_BUTTONS.clear()
     _PAD_BUTTONS.update({b: i for i, b in enumerate(_L.PAD_BUTTONS)})
     for name in ("on_begin_step", "on_step", "on_end_step", "on_draw", "on_draw_gui", "keyboard", "global_mouse"):

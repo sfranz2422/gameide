@@ -627,7 +627,7 @@ for a in p.ledges:
     step(g, 8);
     expect(ghostX(), "still going, though nothing new has come").toBeGreaterThan(x + 100 + 10);
     step(g, 60);
-    const most = (py(g, "PREDICT_STEPS") as number) * 2.8;
+    const most = (py(g, "import gameide\ngameide.NET_PREDICT_STEPS") as number) * 2.8;
     expect(ghostX(), "but not for ever").toBeCloseTo(x + 100 + most, 0);
     // A new word starts it afresh from there.
     g.netArrive([other(1, x + 200, y, { vx: 0, vy: 0, pose: 0, s: 530 })], []);

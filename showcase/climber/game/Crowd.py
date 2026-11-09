@@ -12,7 +12,8 @@ if net_room() is None:
 me = global_vars.player
 net_send({"x": round(me.x), "y": round(me.y), "pic": me.pic, "pose": me.image_index, "face": me.facing,
           "best": global_vars.room_best, "h": global_vars.height, "dz": me.dizzy,
-          "vx": round(me.vx, 2), "vy": round(me.vy, 2), "s": global_vars.ticks})
+          # Speed, and gravity in the air: the others' games keep drawing you moving between words.
+          "vx": round(me.vx, 2), "vy": round(me.vy, 2), "ay": GRAVITY if me.on is None else 0, "s": global_vars.ticks})
 here = set()
 for p in net_players():
     here.add(p.number)
@@ -21,15 +22,9 @@ for p in net_players():
         g = instance_create(p.get("x", 0), p.get("y", 0), "Ghost")
         g.number = p.number
         self.ghosts[p.number] = g
-    # A new word from them (their step count, or where they are, changed): the Ghost
-    # starts guessing afresh from there.
-    word = (p.get("s"), p.get("x"), p.get("y"))
-    if word != g.heard:
-        g.heard = word
-        g.base_x, g.base_y = p.get("x", g.x), p.get("y", g.y)
-        g.vx, g.vy = p.get("vx", 0), p.get("vy", 0)
-        g.air = p.get("pose", 0) in (3, 4)
-        g.since = 0
+    # Where the engine says to draw them: smoothed between words (NetPlayer.draw_x).
+    if p.draw_x is not None:
+        g.x, g.y = p.draw_x, p.draw_y
     g.pic = p.get("pic", "red")
     g.sprite = "climber_" + g.pic
     g.image_index = p.get("pose", 0)

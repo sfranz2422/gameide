@@ -15,7 +15,6 @@ NUMBER_COLORS = ["#e74c3c", "#3498db", "#2ecc71", "#f39c12", "#9b59b6", "#1abc9c
 KNOCK = 4.5        # how hard a snowball shoves you across (running is 2.8)
 KNOCK_HOP = -4.2   # and the little hop it gives you off your feet
 DIZZY = 45         # steps the stars go round your head
-PREDICT_STEPS = 12 # a Ghost carries on as they were going for at most this long between words
 
 
 def number_color(n):

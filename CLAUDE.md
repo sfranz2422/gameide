@@ -588,6 +588,8 @@ games are untouched.
 - Names are `_board_name` (students by first name), never an email. A new route handing out players needs a leak check.
 - Syncing isn't activity (`_counts_as_activity`), or playing would pay XP's working time.
 - Outside a room (the editor, exports) every `net_` function quietly does nothing.
+- **Smoothing is the engine's**: each `net_players()` player has `draw_x`/`draw_y` (`_net_smooth_step`, once a step in `_frame`): carried on at the `vx`/`vy`/`ay` they send for up to `NET_PREDICT_STEPS`, gliding onto each new word. Games draw others there (Snowcap's Ghost does), so every multiplayer game is fluid without its own code.
+- **A dropped WebSocket comes back by itself** (`NetSession`): the page polls at once, then tries a new socket after 5 s, doubling to 30 s (60 s if the server said it can't). A Render restart doesn't leave a room choppy until a reload.
 
 ## XP
 

@@ -108,4 +108,35 @@ r`));
     expect(err('net_send({"x": "a" * 3000})')).toMatch(/2000 characters/);
     expect(err('net_shout("a" * 600)')).toMatch(/500 characters/);
   });
+
+  it("draw_x and draw_y: a player keeps moving between words, for a while, and glides onto each new one", async () => {
+    const { game: g } = await game();
+    const at = () => py(g, "p = net_players()[0]\n(p.draw_x, p.draw_y)") as unknown as [number, number];
+    g.netArrive([{ number: 1, name: "Oli", state: { x: 100, y: 50, vx: 3, vy: 0, s: 1 } }], []);
+    run(g, 1);
+    expect(at()).toEqual([100, 50]);
+    run(g, 6);
+    expect(at()[0], "still going, though nothing new has come").toBeGreaterThan(110);
+    run(g, 60);
+    expect(at()[0], "but not for ever").toBeCloseTo(100 + 3 * (py(g, "import gameide\ngameide.NET_PREDICT_STEPS") as number), 0);
+    g.netArrive([{ number: 1, name: "Oli", state: { x: 200, y: 50, vx: 0, vy: 0, s: 2 } }], []);
+    run(g, 1);
+    const glided = at()[0];
+    expect(glided, "glides, doesn't jump").toBeGreaterThan(140);
+    expect(glided).toBeLessThan(200);
+    run(g, 30);
+    expect(at()[0]).toBeCloseTo(200, 0);
+    // ay: a jump's gravity, up and then down.
+    g.netArrive([{ number: 1, name: "Oli", state: { x: 200, y: 50, vx: 0, vy: -6, ay: 0.5, s: 3 } }], []);
+    run(g, 8);
+    expect(at()[1]).toBeLessThan(50);
+  });
+
+  it("draw_x is None for a player who sends no x and y, and nothing outside a room", async () => {
+    const { game: g } = await game();
+    g.netArrive([{ number: 1, name: "Oli", state: { score: 3 } }], []);
+    run(g, 2);
+    expect(py(g, "net_players()[0].draw_x is None")).toBe(true);
+  });
 });
+

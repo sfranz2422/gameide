@@ -275,7 +275,7 @@ export const API: ApiEntry[] = [
   fn("Multiplayer", "net_me", [], "you as a player, or None",
     "You, as the others see you: net_me().number (the number over your head), net_me().name, and what you last sent. The room keeps what you sent, so after a reload net_me().best is your best again."),
   fn("Multiplayer", "net_players", [], "a list of players",
-    'Everyone else in the room now — not you, and not anyone away. Each has .number, .name, and what their game sent with net_send: for p in net_players(): draw_sprite("ghost", 0, p.x, p.y)'),
+    'Everyone else in the room now — not you, and not anyone away. Each has .number, .name, and what their game sent with net_send. Draw them at .draw_x and .draw_y: their x and y, smoothed between updates (send vx and vy too, and ay for gravity, and they keep moving between them): for p in net_players(): draw_sprite("ghost", 0, p.draw_x, p.draw_y)'),
   fn("Multiplayer", "net_send", [p("state", "any")], "nothing",
     'What the others see of you, as a dict of names and values: net_send({"x": self.x, "y": self.y}). Send it every step; the newest is what counts. Up to 2000 characters.'),
   fn("Multiplayer", "net_shout", [p("message", "any")], "nothing",

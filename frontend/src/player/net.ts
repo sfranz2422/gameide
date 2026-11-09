@@ -50,6 +50,14 @@ const SEND_EVERY = 50;
 const PING_EVERY = 2000;
 /** A WebSocket not open by then, and the page polls. */
 const OPEN_WITHIN = 4000;
+/**
+ * Polling after a WebSocket went (a server restart, a network blip), the page
+ * tries a new one after this long, twice as long after each try that fails, up
+ * to RETRY_MOST; a server that said it can't (several processes) every RETRY_SLOW.
+ */
+const RETRY_FIRST = 5000;
+const RETRY_MOST = 30_000;
+const RETRY_SLOW = 60_000;
 
 export class NetSession {
   private state: Record<string, unknown> | null = null;
@@ -69,6 +77,10 @@ export class NetSession {
   private mode: "connecting" | "ws" | "poll" = "connecting";
   private sendTimer: number | undefined;
   private pingTimer: number | undefined;
+  private retryTimer: number | undefined;
+  /** How long until the next try at a WebSocket, polling (a test sets it short). */
+  retryMs = RETRY_FIRST;
+  private cantSocket = false;
   /** What net_me() should start with if the game starts again: the newest state sent. */
   latest: Record<string, unknown>;
 
@@ -107,7 +119,10 @@ export class NetSession {
     ws.onopen = () => {
       clearTimeout(giveUp);
       ws.send(JSON.stringify({ token: this.joined.token, after: this.after }));
+      // Back on a WebSocket: polling stops (sync() sees the mode), and the next drop starts the waits afresh.
       this.mode = "ws";
+      clearTimeout(this.timer);
+      this.retryMs = Math.min(this.retryMs, RETRY_FIRST);
       this.flushSoon(0);
       const ping = () => ws.readyState === WebSocket.OPEN && ws.send(JSON.stringify({ ping: performance.now() }));
       ping();
@@ -120,7 +135,10 @@ export class NetSession {
       } catch {
         return;
       }
-      if (m.fallback) return ws.close();
+      if (m.fallback) {
+        this.cantSocket = true;
+        return ws.close();
+      }
       if (m.pong !== undefined) {
         const took = performance.now() - m.pong;
         this.ping = this.ping ? this.ping * 0.8 + took * 0.2 : took;
@@ -139,9 +157,15 @@ export class NetSession {
     ws.onclose = () => {
       clearTimeout(giveUp);
       clearInterval(this.pingTimer);
-      this.ws = null;
-      // Couldn't open, refused, or broke: carry on by polling.
-      if (!this.stopped) this.poll();
+      if (this.ws === ws) this.ws = null;
+      if (this.stopped) return;
+      // Couldn't open, refused, or broke (a server restart): carry on by polling,
+      // and try again in a while, so a restart doesn't leave the room choppy until a reload.
+      this.poll();
+      const wait = this.cantSocket ? RETRY_SLOW : this.retryMs;
+      this.retryMs = Math.min(this.retryMs * 2, RETRY_MOST);
+      clearTimeout(this.retryTimer);
+      this.retryTimer = window.setTimeout(() => !this.stopped && this.mode === "poll" && this.connect(), wait);
     };
   }
 
@@ -237,7 +261,8 @@ export class NetSession {
   }
 
   private async sync() {
-    if (this.stopped) return;
+    // Back on a WebSocket since this was scheduled: no more polling.
+    if (this.stopped || this.mode !== "poll") return;
     if (this.busy) return; // the one in flight schedules the next
     this.busy = true;
     const away = this.away;
@@ -277,6 +302,7 @@ export class NetSession {
     this.stopped = true;
     clearTimeout(this.timer);
     clearTimeout(this.sendTimer);
+    clearTimeout(this.retryTimer);
     clearInterval(this.pingTimer);
     this.ws?.close();
     document.removeEventListener("visibilitychange", this.onVisibility);

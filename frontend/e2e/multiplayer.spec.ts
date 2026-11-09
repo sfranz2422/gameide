@@ -229,5 +229,22 @@ test("one player on a WebSocket and one polling still see each other, and hear e
   await py(poller.page, 'net_shout("from polling")');
   await expect.poll(() => py(poller.page, "getattr(global_vars, 'heard', [])"), { timeout: 10_000 }).toEqual(["from the socket"]);
   await expect.poll(() => py(ws.page, "getattr(global_vars, 'heard', [])"), { timeout: 10_000 }).toEqual(["from polling"]);
+
+  // The WebSocket drops (a server restart, a network blip): the page polls at once, then gets a
+  // new WebSocket by itself, still in the room, without a reload.
+  await ws.page.evaluate(() => {
+    const net = (window as any).__gameide.net;
+    net.retryMs = 300;
+    net.ws.close();
+  });
+  await expect.poll(() => ws.page.evaluate(() => (window as any).__gameide.net.via), { timeout: 5000 }).toBe("poll");
+  await expect.poll(() => ws.page.evaluate(() => (window as any).__gameide.net.via), { timeout: 10_000 }).toBe("ws");
+  // …and stops polling: back on the WebSocket, no more syncs go.
+  let syncs = 0;
+  ws.page.on("request", (r) => r.url().includes("/api/net/sync") && syncs++);
+  await ws.page.waitForTimeout(1500);
+  expect(syncs).toBe(0);
+  await py(poller.page, "global_vars.x = 33");
+  await expect.poll(() => py(ws.page, "[(p.number, p.x) for p in net_players()]"), { timeout: 10_000 }).toEqual([[2, 33]]);
   await Promise.all([teacher.ctx, ws.ctx, poller.ctx].map((c) => c.close()));
 });

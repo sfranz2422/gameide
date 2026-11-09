@@ -1601,7 +1601,6 @@ CASES = [
 
  ('climber: no number', _cl("Player"), 'self.number = me.number if me else None', 'self.number = None', "your number over your head", CLIMB),
  ('climber: not sent', _cl("Crowd"), 'net_send({"x": round(me.x)', 'net_send({"x": 0 * round(me.x)', "where you are sent to the room", CLIMB),
- ('climber: ghosts jump', _cl("Ghost"), '    self.x += (guess_x - self.x) * 0.4', '    self.x = guess_x', "gliding to where they are", CLIMB),
  ('climber: ghosts stay', _cl("Crowd"), '        if instance_exists(g):\n            g.destroy()', '        if instance_exists(g):\n            pass', "gliding to where they are", CLIMB),
  ('climber: ghosts solid', _cl("Ghost"), 'self.image_alpha = 0.55', 'self.image_alpha = 1', "see-through ghosts", CLIMB),
  ('climber: throws kept quiet', _cl("Player"), '    net_shout({"ball"', '    0 and net_shout({"ball"', "your snowballs are shouted", CLIMB),
@@ -1654,8 +1653,6 @@ CASES = [
  ('climber: no stars on a hit ghost', _cl("_3room"), '                hit = True\n                g.dizzy = DIZZY', '                hit = True', "X hits someone standing anywhere", CLIMB),
  ('climber: stars kept to yourself', _cl("Crowd"), '"dz": me.dizzy})', '"dz": 0})', "has stars in everyone's game", CLIMB),
 
- ('climber: ghosts stop between words', _cl("Ghost"), 'guess_x = clamp(self.base_x + self.vx * t,', 'guess_x = clamp(self.base_x + 0 * self.vx * t,', "a ghost carries on as its player was going", CLIMB),
- ('climber: ghosts guess for ever', _cl("Ghost"), 't = min(self.since, PREDICT_STEPS)', 't = self.since', "a ghost carries on as its player was going", CLIMB),
  ('climber: speed not sent', _cl("Crowd"), '"vx": round(me.vx, 2)', '"vx": 0 * round(me.vx, 2)', "where you are sent to the room", CLIMB),
  ('net: no ping shown', "src/player/NetLobby.tsx", '          {ping > 0 && (', '          {ping < 0 && (', "a room: made by one student", E2E),
 
@@ -1667,6 +1664,15 @@ CASES = [
  ('live: sockets show the away', MP, '            players = ",".join(o.entry for o in here if o is not p and not o.away)', '            players = ",".join(o.entry for o in here if o is not p)', "a question hides", E2E),
  ('live: sockets never used', MP, '    if not LIVE:\n        ws.send(json.dumps({"fallback": True}))', '    if True:\n        ws.send(json.dumps({"fallback": True}))', "a room: made by one student", E2E),
  ('live: stale states on sockets', MP, '                p.entry = p._entry()\n', '', "a room: made by one student", E2E),
+
+ # Smoothing in the engine: NetPlayer.draw_x / draw_y (runtime.py _net_smooth_step)
+ ('net: smoothing stops between words', RT, '        gx = s["bx"] + s["vx"] * t', '        gx = s["bx"] + 0 * s["vx"] * t', "a player keeps moving between words"),
+ ('net: smoothing guesses for ever', RT, '        t = min(s["since"], NET_PREDICT_STEPS)', '        t = s["since"]', "a player keeps moving between words"),
+ ('net: smoothing jumps', RT, '            s["x"] += (gx - s["x"]) * 0.4', '            s["x"] = gx', "a player keeps moving between words"),
+ ('net: no draw_x without x', RT, '            continue\n        num = lambda k:', '            st = dict(st, x=0, y=0)\n            x = y = 0\n        num = lambda k:', "draw_x is None for a player who sends no x"),
+ ('climber: ghosts ignore the smoothing', _cl("Crowd"), '        g.x, g.y = p.draw_x, p.draw_y', '        g.x, g.y = p.x, p.y', "a ghost carries on as its player was going", CLIMB),
+
+ ('net: dropped for good', NETS, '      this.retryTimer = window.setTimeout(() => !this.stopped && this.mode === "poll" && this.connect(), wait);', '      void wait;', "one player on a WebSocket and one polling", E2E),
 
 ]
 only = sys.argv[1:]
