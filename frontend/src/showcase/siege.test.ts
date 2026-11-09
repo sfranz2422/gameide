@@ -231,7 +231,7 @@ describe.skipIf(!have)("Tabletop Siege: a match against the computer", () => {
     py(g, "global_vars.energy[1] = 6\nc = instances('Cpu')[0]\nc.save_for = 9");
     step(g, 60 * 6);
     // Something of its own, dropped in the knight's lane on its side of the desk.
-    expect(py(g, "[(round(o.x), round(o.y)) for o in instances('Unit') + instances('Deploy') + instances('Building') if o.side == 1 and not is_a(o, 'Tower') and abs(o.y - 96) < 60 and o.x > 330]").length).toBeGreaterThan(0);
+    expect((py(g, "[(round(o.x), round(o.y)) for o in instances('Unit') + instances('Deploy') + instances('Building') if o.side == 1 and not is_a(o, 'Tower') and abs(o.y - 96) < 60 and o.x > 330]") as unknown as unknown[]).length).toBeGreaterThan(0);
   });
 
   it("the computer against itself: a whole match, to the end, without an error", async () => {
