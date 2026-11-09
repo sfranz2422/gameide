@@ -1,5 +1,12 @@
 # Progress
 
+## Undertow, phase 1: private messages and a host, for an impostor game (2026-11-09, waiting for review)
+- **The next multiplayer showcase** (the teacher's idea, an original hidden-impostor game): **Undertow**, a research station on the sea floor; the impostors are Mimics, who freeze crew (never anything violent); meetings use preset phrases; jobs are quick mini-games. The teacher's decisions and my plan are in memory; Gemini prompts in `showcase/undertow/PROMPTS.md` (12 pictures, the teacher's to make).
+- **Two engine pieces any multiplayer game can use:** `net_tell(number, message)`, a message only that player receives (the server keeps who it's for and hands it to them alone, so a secret role can't be read from anyone else's traffic, browser tools or not); and `net_host()`, the number of the game in charge (the lowest number in the room and not away: the maker, while they're there; if they leave or are answering a question, the next), so every game agrees who deals roles and counts votes. Both in the docs, blocks and sheets. Received messages have `.private`.
+- **Honest limit:** the host's own game knows the roles, so a student hosting could peek with browser tools; the teacher can host.
+- Tests: 16 server checks (private delivery, nobody else, not back to the sender, its shape, the host and how it passes on, both ways of syncing), 3 in `net.test.ts`, and the browser test sends private messages both ways between a WebSocket player and a polling one. 7 sabotage cases.
+- **Next (phase 2):** the station itself, one player: the map, moving about in the dark with a light, and the mini-game jobs, with stand-in pictures until the Gemini ones come.
+
 ## Multiplayer for every game: smoothing in the engine, and WebSockets that come back (2026-11-09, waiting for review)
 - **Smoothing is now the engine's**, not Snowcap Scramble's: every player from `net_players()` has `draw_x` and `draw_y`, where to draw them, carried on at the speed they send (`vx`, `vy`, and `ay` for gravity) between words for up to a fifth of a second and gliding onto each new one. A new multiplayer game, a student's included, is fluid by drawing others there. Snowcap's Ghost now uses it (its own copy is gone), and sends its gravity in the air.
 - **A dropped WebSocket comes back by itself**: a Render restart or a network blip used to leave a room polling (choppier) until a reload. The page polls at once, then tries a new WebSocket after 5 s, then 10, 20, up to 30 s between tries, and stops polling when one opens.

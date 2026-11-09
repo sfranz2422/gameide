@@ -180,12 +180,9 @@ class Live:
         msgs = body.get("msgs") or []
         if not isinstance(msgs, list) or len(msgs) > MAX_MESSAGES_PER_SYNC:
             return f"At most {MAX_MESSAGES_PER_SYNC} messages at a time."
-        texts = []
-        for m in msgs:
-            text, why = _json_text(m, MAX_MESSAGE, "A message")
-            if why:
-                return why
-            texts.append(json.loads(text))
+        texts, why = _messages(body)
+        if why:
+            return why
         t = time.time()
         with cls.lock:
             room = cls.rooms.get(p.room_id)
@@ -204,8 +201,8 @@ class Live:
             room.active = t
             # An away player's game is held: anything it sends is from before.
             if not p.away:
-                for data in texts:
-                    room.msgs.append((room.next_id, p.number, data, t))
+                for to, data in texts:
+                    room.msgs.append((room.next_id, p.number, data, t, to))
                     room.next_id += 1
                     room.version += 1
                 del room.msgs[:-LIVE_MESSAGES]
@@ -224,8 +221,8 @@ class Live:
             new = [m for m in room.msgs if m[0] > after]
             last = room.msgs[-1][0] if room.msgs else after
             last = max(last, after)
-            msgs = [] if p.away else [{"from": s, "data": d, "age": round(max(0.0, t - at), 3)} for i, s, d, at in new if s != p.number]
-            return {"players": players, "msgs": msgs, "after": last, "here": len(here), "every": SYNC_MS, "v": room.version}
+            msgs = [] if p.away else [_delivered(s, d, t - at, to) for i, s, d, at, to in new if _for(p.number, s, to)]
+            return {"players": players, "msgs": msgs, "after": last, "here": len(here), "every": SYNC_MS, "host": _host(here), "v": room.version}
 
     @classmethod
     def frame_text(cls, p, after):
@@ -238,10 +235,9 @@ class Live:
             here = cls.present(room, t)
             players = ",".join(o.entry for o in here if o is not p and not o.away)
             last = max(room.msgs[-1][0] if room.msgs else after, after)
-            msgs = [] if p.away else [{"from": s, "data": d, "age": round(max(0.0, t - at), 3)}
-                                      for i, s, d, at in room.msgs if i > after and s != p.number]
-            text = '{"players":[%s],"msgs":%s,"after":%d,"here":%d,"every":%d}' % (
-                players, json.dumps(msgs, separators=(",", ":")), last, len(here), SYNC_MS)
+            msgs = [] if p.away else [_delivered(s, d, t - at, to) for i, s, d, at, to in room.msgs if i > after and _for(p.number, s, to)]
+            text = '{"players":[%s],"msgs":%s,"after":%d,"here":%d,"every":%d,"host":%s}' % (
+                players, json.dumps(msgs, separators=(",", ":")), last, len(here), SYNC_MS, json.dumps(_host(here)))
             return text, room.version, last
 
     @classmethod
@@ -397,6 +393,48 @@ def join(slug):
         db.close()
 
 
+def _messages(body):
+    """
+    A page's messages, checked: "msgs" for everyone else (net_shout) and "tells",
+    [number, message] for one player only (net_tell: a secret role, say). As
+    [(to, data)], to None for everyone; or an error.
+    """
+    msgs, tells = body.get("msgs") or [], body.get("tells") or []
+    if not isinstance(msgs, list) or not isinstance(tells, list) or len(msgs) + len(tells) > MAX_MESSAGES_PER_SYNC:
+        return None, f"At most {MAX_MESSAGES_PER_SYNC} messages at a time."
+    out = []
+    for to, m in [(None, m) for m in msgs] + [(t[0], t[1]) if isinstance(t, list) and len(t) == 2 else (False, None) for t in tells]:
+        if to is False or (to is not None and (isinstance(to, bool) or not isinstance(to, int))):
+            return None, "A message to one player is [their number, the message]."
+        text, why = _json_text(m, MAX_MESSAGE, "A message")
+        if why:
+            return None, why
+        out.append((to, json.loads(text)))
+    return out, None
+
+
+def _for(number, sender, to):
+    """Does this message go to player `number`? Not their own, and only them if it was told to one."""
+    return sender != number and (to is None or to == number)
+
+
+def _delivered(sender, data, age, to):
+    m = {"from": sender, "data": data, "age": round(max(0.0, age), 3)}
+    if to is not None:
+        m["private"] = True
+    return m
+
+
+def _host(players):
+    """
+    The game in charge (net_host): the lowest number here and not away, so the
+    room's maker while they're in it; if they leave, or are answering a question,
+    the next. None with nobody.
+    """
+    numbers = [p.number for p in players if not p.away]
+    return min(numbers) if numbers else None
+
+
 def _json_text(value, limit, what):
     try:
         text = json.dumps(value, separators=(",", ":"))
@@ -448,16 +486,13 @@ def sync():
             me.state = text
         away = bool(body.get("away"))
         me.away, me.seen_at = int(away), t
-        msgs = body.get("msgs") or []
-        if not isinstance(msgs, list) or len(msgs) > MAX_MESSAGES_PER_SYNC:
-            return err(f"At most {MAX_MESSAGES_PER_SYNC} messages at a time.", 400)
-        for m in msgs:
-            text, why = _json_text(m, MAX_MESSAGE, "A message")
-            if why:
-                return err(why, 400)
+        texts, why = _messages(body)
+        if why:
+            return err(why, 400)
+        for to, data in texts:
             # An away player's game is held: anything it sends is from before.
             if not away:
-                db.add(NetMessage(room_id=me.room_id, sender=me.number, data=text, sent_at=t))
+                db.add(NetMessage(room_id=me.room_id, sender=me.number, to_number=to, data=json.dumps(data, separators=(",", ":")), sent_at=t))
         # The room is active while anyone's in it; once a second is enough to say so.
         db.query(NetRoom).filter(NetRoom.id == me.room_id, NetRoom.active_at < t - 1).update({"active_at": t}, synchronize_session=False)
         db.flush()
@@ -469,13 +504,13 @@ def sync():
             after = int(body.get("after") or 0)
         except (TypeError, ValueError):
             after = 0
-        new = (db.query(NetMessage.id, NetMessage.sender, NetMessage.data, NetMessage.sent_at)
+        new = (db.query(NetMessage.id, NetMessage.sender, NetMessage.data, NetMessage.sent_at, NetMessage.to_number)
                .filter(NetMessage.room_id == me.room_id, NetMessage.id > after).order_by(NetMessage.id).all())
         last = new[-1].id if new else after
-        out = [] if away else [{"from": m.sender, "data": json.loads(m.data), "age": round(max(0.0, t - m.sent_at), 3)}
-                               for m in new if m.sender != me.number]
+        out = [] if away else [_delivered(m.sender, json.loads(m.data), t - m.sent_at, m.to_number)
+                               for m in new if _for(me.number, m.sender, m.to_number)]
         db.commit()
-        return jsonify(players=players, msgs=out, after=last, here=len(rows), every=SYNC_MS)
+        return jsonify(players=players, msgs=out, after=last, here=len(rows), every=SYNC_MS, host=_host(rows))
     finally:
         db.close()
 

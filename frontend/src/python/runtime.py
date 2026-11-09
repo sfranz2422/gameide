@@ -127,7 +127,7 @@ __all__ = [
     # saving
     "save_set", "save_get", "save_delete", "save_clear", "high_score",
     # multiplayer
-    "net_room", "net_me", "net_players", "net_send", "net_shout", "net_messages", "net_away",
+    "net_room", "net_me", "net_players", "net_send", "net_shout", "net_messages", "net_away", "net_tell", "net_host",
     # game feel
     "particles", "effect", "weather", "particles_clear", "hit_pause", "lighting", "light", "screen_effect",
     "screen_flash", "screen_fade", "tween", "tween_stop", "ease", "say", "ask", "answer", "dialogue_open", "dialogue_clear",
@@ -2402,6 +2402,7 @@ _net_away = False
 #: (steps): guessing longer could put them through a wall.
 NET_PREDICT_STEPS = 12
 _net_smooth = {}            # their number -> where they're being drawn, and the guess
+_net_host = None            # the number of the game in charge, as the room last said
 
 
 class NetPlayer:
@@ -2437,10 +2438,13 @@ class NetPlayer:
 
 
 class NetMessage:
-    """A message another player sent with net_shout: .sender (their number), .data, and .age in seconds."""
+    """
+    A message another player sent: .sender (their number), .data, .age in seconds,
+    and .private, True if it was sent to you alone (net_tell), False if to everyone (net_shout).
+    """
 
-    def __init__(self, sender, data, age):
-        self.sender, self.data, self.age = sender, data, age
+    def __init__(self, sender, data, age, private=False):
+        self.sender, self.data, self.age, self.private = sender, data, age, private
 
     def __repr__(self):
         return f"<message from {self.sender}: {self.data!r}>"
@@ -2496,6 +2500,31 @@ def net_shout(message):
         _net_out.setdefault("msgs", []).append(json.loads(text))
 
 
+def net_tell(number, message):
+    """
+    Sends a message to ONE other player, by their number: net_tell(3, {"role": "mimic"}).
+    Nobody else gets it, not even in their browser's tools, which is what makes
+    a secret (a role, a hand of cards) secret. They read it with net_messages(), .private True.
+    """
+    if isinstance(number, bool) or not isinstance(number, int):
+        raise TypeError(f"net_tell needs a player's number first, like net_tell(3, {{\"role\": \"mimic\"}}), not {number!r}.")
+    text = _net_json(message, NET_MESSAGE_LIMIT, "net_tell", 'net_tell(3, {"role": "mimic"})')
+    if _net is not None and not _net_away:
+        _net_out.setdefault("tells", []).append([number, json.loads(text)])
+
+
+def net_host():
+    """
+    The number of the player whose game is in charge: the one that deals the roles
+    and counts the votes, so every game agrees. The lowest number in the room and
+    not away (the room's maker, while they're in it); if they leave, the next.
+    `if net_host() == net_me().number:` this game decides. None outside a room.
+    """
+    if _net is None:
+        return None
+    return _net_host if _net_host is not None else _net["number"]
+
+
 def net_messages():
     """The messages that arrived this step from other players (net_shout), oldest first. Each has .sender, .data and .age."""
     return list(_net_messages)
@@ -2510,6 +2539,7 @@ def net_away(away=True):
         _net_out["away"] = away
         if away:
             _net_out.pop("msgs", None)
+            _net_out.pop("tells", None)
 
 
 def _net_smooth_step():
@@ -2552,8 +2582,11 @@ def _net_arrive(text):
         _question_waiting = bool(got["question"])
     if "players" in got:
         _net_players = [NetPlayer(p["number"], p["name"], p.get("state") or {}) for p in got["players"]]
+    global _net_host
+    if "host" in got:
+        _net_host = got["host"]
     if not _net_away:
-        _net_messages.extend(NetMessage(m["from"], m["data"], m.get("age", 0)) for m in got.get("msgs", []))
+        _net_messages.extend(NetMessage(m["from"], m["data"], m.get("age", 0), bool(m.get("private"))) for m in got.get("msgs", []))
 
 
 def save_set(key, value):
@@ -3268,6 +3301,8 @@ def _setup(layout_json, game_json):
     _net_messages.clear()
     _net_out.clear()
     _net_smooth.clear()
+    global _net_host
+    _net_host = None
     _PAD_BUTTONS.clear()
     _PAD_BUTTONS.update({b: i for i, b in enumerate(_L.PAD_BUTTONS)})
     for name in ("on_begin_step", "on_step", "on_end_step", "on_draw", "on_draw_gui", "keyboard", "global_mouse"):

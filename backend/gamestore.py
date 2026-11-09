@@ -345,12 +345,13 @@ class NetPlayer(Base):
 
 
 class NetMessage(Base):
-    """A one-off message to everyone else in a room (net_shout): kept a few seconds."""
+    """A one-off message to everyone else in a room (net_shout), or to one player (net_tell): kept a few seconds."""
     __tablename__ = "gameide_net_messages"
 
     id = Column(Integer, primary_key=True)
     room_id = Column(Integer, ForeignKey("gameide_net_rooms.id"), index=True, nullable=False)
     sender = Column(Integer, nullable=False)   # the player's number
+    to_number = Column(Integer, nullable=True)  # net_tell: only this player gets it; None is everyone
     data = Column(Text, nullable=False)
     sent_at = Column(Float, nullable=False, default=0)
 
@@ -527,3 +528,6 @@ def create_all(engine):
             conn.execute(text("ALTER TABLE gameide_check_state ADD COLUMN play_left FLOAT"))
         if "ticked_at" not in have:
             conn.execute(text("ALTER TABLE gameide_check_state ADD COLUMN ticked_at TIMESTAMP"))
+    if "to_number" not in {c["name"] for c in inspect(engine).get_columns("gameide_net_messages")}:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE gameide_net_messages ADD COLUMN to_number INTEGER"))

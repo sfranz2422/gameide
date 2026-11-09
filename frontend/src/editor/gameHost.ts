@@ -561,8 +561,8 @@ export class GameHost {
   }
 
   /** What the game's multiplayer room sent back, for the game's next step. */
-  netArrive(players: NetPlayerState[] | null, msgs: NetMessageIn[]) {
-    this.send({ type: "net", players, msgs });
+  netArrive(players: NetPlayerState[] | null, msgs: NetMessageIn[], host?: number | null) {
+    this.send({ type: "net", players, msgs, ...(host === undefined ? {} : { host }) });
   }
 
   /** One step of a frozen game. */

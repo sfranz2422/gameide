@@ -245,7 +245,7 @@ self.onmessage = async (ev: MessageEvent<ToWorker>) => {
         stepsWanted++;
         break;
       case "net":
-        game?.netArrive(msg.players, msg.msgs);
+        game?.netArrive(msg.players, msg.msgs, msg.host);
         break;
       case "questionWaiting":
         game?.setQuestionWaiting(msg.on);

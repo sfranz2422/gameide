@@ -1707,6 +1707,12 @@ with old2.begin() as conn:
     conn.execute(_text("CREATE TABLE gameide_check_state (user_id INTEGER PRIMARY KEY, due_at TIMESTAMP, pending VARCHAR(12), strikes INTEGER, locked_until TIMESTAMP, recent TEXT)"))
 server.gamestore.create_all(old2)
 check("an old database gains the playing-time clock", {"play_left", "ticked_at"} <= {c["name"] for c in _inspect(old2).get_columns("gameide_check_state")})
+old_db3 = Path(tempfile.mkdtemp()) / "old3.db"
+old3 = create_engine(f"sqlite:///{old_db3}")
+with old3.begin() as conn:
+    conn.execute(_text("CREATE TABLE gameide_net_messages (id INTEGER PRIMARY KEY, room_id INTEGER, sender INTEGER, data TEXT, sent_at FLOAT)"))
+server.gamestore.create_all(old3)
+check("an old database gains private messages", "to_number" in {c["name"] for c in _inspect(old3).get_columns("gameide_net_messages")})
 
 # Guests (not signed in) get the questions too, kept in their session.
 _g1 = client()
@@ -1963,6 +1969,23 @@ check("rooms: twenty at most", [bool(t.get("token")) for t in _kt].count(True) =
       [t.get("number") for t in _kt])
 check("rooms: numbers 1 to 20, each once", sorted([1, 2] + [t["number"] for t in _kt if t.get("token")]) == list(range(1, 21)))
 check("rooms: everyone sees the other nineteen", len(_others(_nia, NT)) == 19 and _sync(_nia, NT).get_json()["here"] == 20)
+
+# net_tell: a message for one player only (a secret role, say); net_host: the game in charge.
+_ka, _kb = [(_kids[i], _kt[i]['token'], _kt[i]['number']) for i in (1, 2)][0], [(_kids[i], _kt[i]['token'], _kt[i]['number']) for i in (1, 2)][1]
+_a0 = _sync(_ka[0], _ka[1]).get_json()["after"]
+_b0 = _sync(_kb[0], _kb[1]).get_json()["after"]
+_n0 = _sync(_nia, NT).get_json()["after"]
+_sync(_nia, NT, tells=[[_ka[2], {"role": "mimic"}]])
+_ga = _sync(_ka[0], _ka[1], after=_a0).get_json()["msgs"]
+check("rooms: a private message reaches its player, marked private", _ga == [{"from": 1, "data": {"role": "mimic"}, "age": _ga[0]["age"], "private": True}] if _ga else False, _ga)
+check("rooms: …and nobody else", _sync(_kb[0], _kb[1], after=_b0).get_json()["msgs"] == [])
+check("rooms: …nor back to its sender", _sync(_nia, NT, after=_n0).get_json()["msgs"] == [])
+check("rooms: a message to one player is shaped [number, message]", _sync(_nia, NT, tells=[["two", 1]]).status_code == 400 and _sync(_nia, NT, tells=[[2]]).status_code == 400)
+check("rooms: the host is the room's maker", _sync(_ka[0], _ka[1]).get_json()["host"] == 1)
+_sync(_nia, NT, away=True)
+check("rooms: …and the next one while they're away", _sync(_ka[0], _ka[1]).get_json()["host"] == 2)
+_sync(_nia, NT, away=False)
+check("rooms: …and theirs again when they're back", _sync(_ka[0], _ka[1]).get_json()["host"] == 1)
 _kids[0].post("/api/net/leave", json={"token": _kt[0]["token"]})
 _r = _kids[19].post(f"/api/play/{NG}/net/join", json={"code": CODE}).get_json()
 check("rooms: someone leaving makes room, and their number is given out again", _r.get("number") == _kt[0]["number"], _r)
@@ -2048,6 +2071,23 @@ check("live rooms: after a restart, a page carries on", _sync(_oli, LOT).status_
 _lk = [client(f"k{i}@{S}") for i in range(19)]
 _lkt = [k.post(f"/api/play/{NG3}/net/join", json={"code": LCODE}).get_json() for k in _lk]
 check("live rooms: twenty at most", [bool(t.get("token")) for t in _lkt].count(True) == 18 and _sync(_nia, LNT).get_json()["here"] == 20, [t.get("number") for t in _lkt])
+
+# net_tell: a message for one player only (a secret role, say); net_host: the game in charge.
+_ka, _kb = [(_lk[i], _lkt[i]['token'], _lkt[i]['number']) for i in (1, 2)][0], [(_lk[i], _lkt[i]['token'], _lkt[i]['number']) for i in (1, 2)][1]
+_a0 = _sync(_ka[0], _ka[1]).get_json()["after"]
+_b0 = _sync(_kb[0], _kb[1]).get_json()["after"]
+_n0 = _sync(_nia, LNT).get_json()["after"]
+_sync(_nia, LNT, tells=[[_ka[2], {"role": "mimic"}]])
+_ga = _sync(_ka[0], _ka[1], after=_a0).get_json()["msgs"]
+check("live rooms: a private message reaches its player, marked private", _ga == [{"from": 1, "data": {"role": "mimic"}, "age": _ga[0]["age"], "private": True}] if _ga else False, _ga)
+check("live rooms: …and nobody else", _sync(_kb[0], _kb[1], after=_b0).get_json()["msgs"] == [])
+check("live rooms: …nor back to its sender", _sync(_nia, LNT, after=_n0).get_json()["msgs"] == [])
+check("live rooms: a message to one player is shaped [number, message]", _sync(_nia, LNT, tells=[["two", 1]]).status_code == 400 and _sync(_nia, LNT, tells=[[2]]).status_code == 400)
+check("live rooms: the host is the room's maker", _sync(_ka[0], _ka[1]).get_json()["host"] == 1)
+_sync(_nia, LNT, away=True)
+check("live rooms: …and the next one while they're away", _sync(_ka[0], _ka[1]).get_json()["host"] == 2)
+_sync(_nia, LNT, away=False)
+check("live rooms: …and theirs again when they're back", _sync(_ka[0], _ka[1]).get_json()["host"] == 1)
 for k, t in zip(_lk, _lkt):
     if t.get("token"):
         k.post("/api/net/leave", json={"token": t["token"]})

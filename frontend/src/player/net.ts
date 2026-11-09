@@ -36,6 +36,8 @@ interface SyncReply {
   after: number;
   here: number;
   every: number;
+  /** net_host(): the number of the game in charge. */
+  host?: number | null;
 }
 
 /** Does this game use a room at all? Reads the whole project, so blocks and sheets count. */
@@ -62,6 +64,8 @@ const RETRY_SLOW = 60_000;
 export class NetSession {
   private state: Record<string, unknown> | null = null;
   private queue: unknown[] = [];
+  /** net_tell: [their number, message], waiting to go. */
+  private tells: [number, unknown][] = [];
   private after: number;
   private every: number;
   private timer: number | undefined;
@@ -183,16 +187,18 @@ export class NetSession {
       const ws = this.ws;
       if (!ws || ws.readyState !== WebSocket.OPEN || this.stopped) return;
       const away = this.away;
-      if (away) this.queue = [];
+      if (away) (this.queue = []), (this.tells = []);
       const body: Record<string, unknown> = { away };
       if (this.state) body.state = this.state;
       const msgs = this.queue.splice(0, PER_SYNC);
       if (msgs.length) body.msgs = msgs;
-      if (!body.state && !msgs.length && away === this.wasAway) return;
+      const tells = this.tells.splice(0, PER_SYNC - msgs.length);
+      if (tells.length) body.tells = tells;
+      if (!body.state && !msgs.length && !tells.length && away === this.wasAway) return;
       ws.send(JSON.stringify(body));
       this.state = null;
       this.wasAway = away;
-      if (this.queue.length) this.flushSoon();
+      if (this.queue.length || this.tells.length) this.flushSoon();
     }, ms);
   }
 
@@ -202,7 +208,7 @@ export class NetSession {
     if (r.every) this.every = r.every;
     this.report(r.here, Math.round(this.ping));
     // Held, the game takes no steps, so nothing would read it; away for any reason, it mustn't get messages.
-    if (!this.held) this.host.netArrive(r.players, this.away ? [] : r.msgs);
+    if (!this.held) this.host.netArrive(r.players, this.away ? [] : r.msgs, r.host);
   }
 
   /** The game for a new start: who this player is, with what they last sent. */
@@ -220,6 +226,8 @@ export class NetSession {
     if (o.state) this.state = this.latest = o.state;
     if (o.away !== undefined) this.gameAway = o.away;
     if (o.msgs && !this.away) this.queue.push(...o.msgs);
+    if (o.tells && !this.away) this.tells.push(...o.tells);
+    if (this.tells.length > MAX_QUEUED) this.tells.splice(0, this.tells.length - MAX_QUEUED);
     if (this.queue.length > MAX_QUEUED) this.queue.splice(0, this.queue.length - MAX_QUEUED);
     if (this.mode === "ws") this.flushSoon(this.away !== this.wasAway ? 0 : SEND_EVERY);
     else if (this.away !== this.wasAway) this.schedule(0);
@@ -266,11 +274,13 @@ export class NetSession {
     if (this.busy) return; // the one in flight schedules the next
     this.busy = true;
     const away = this.away;
-    if (away) this.queue = [];
+    if (away) (this.queue = []), (this.tells = []);
     const body: Record<string, unknown> = { token: this.joined.token, after: this.after, away };
     if (this.state) body.state = this.state;
     const msgs = this.queue.splice(0, PER_SYNC);
     if (msgs.length) body.msgs = msgs;
+    const tells = this.tells.splice(0, PER_SYNC - msgs.length);
+    if (tells.length) body.tells = tells;
     let next = this.every;
     try {
       const sentAt = performance.now();
@@ -289,6 +299,7 @@ export class NetSession {
       }
       // Offline for a moment, or the server busy: what didn't go goes next time.
       this.queue.unshift(...msgs);
+      this.tells.unshift(...tells);
       next = Math.max(1000, this.every);
     } finally {
       this.busy = false;

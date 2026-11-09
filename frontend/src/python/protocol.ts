@@ -35,7 +35,7 @@ export type ToWorker =
   | { type: "freeze"; on: boolean }
   | { type: "step" }
   /** What a multiplayer room sent back (player/net.ts): the others' state, and new messages. */
-  | { type: "net"; players: NetPlayerState[] | null; msgs: NetMessageIn[] }
+  | { type: "net"; players: NetPlayerState[] | null; msgs: NetMessageIn[]; host?: number | null }
   /** A Python check question is waiting for a good moment (question_waiting()). */
   | { type: "questionWaiting"; on: boolean }
   | { type: "inspect"; id: number; at: { x: number; y: number } | { slot: number } };

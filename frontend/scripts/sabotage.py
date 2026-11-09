@@ -1674,6 +1674,15 @@ CASES = [
 
  ('net: dropped for good', NETS, '      this.retryTimer = window.setTimeout(() => !this.stopped && this.mode === "poll" && this.connect(), wait);', '      void wait;', "one player on a WebSocket and one polling", E2E),
 
+ # net_tell (private messages) and net_host (the game in charge)
+ ('tell: told to everyone', MP, '    return sender != number and (to is None or to == number)', '    return sender != number', "rooms: …and nobody else", PY),
+ ('tell: any shape taken', MP, '        if to is False or (to is not None and (isinstance(to, bool) or not isinstance(to, int))):', '        if False:', "a message to one player is shaped", PY),
+ ('tell: old databases stuck', GS, '    if "to_number" not in {c["name"] for c in inspect(engine).get_columns("gameide_net_messages")}:', '    if False:', "an old database gains private messages", PY),
+ ('host: an away host stays host', MP, '    numbers = [p.number for p in players if not p.away]', '    numbers = [p.number for p in players]', "the next one while they're away", PY),
+ ('tell: private not said', RT, 'bool(m.get("private"))) for m in got.get("msgs", [])', 'False) for m in got.get("msgs", [])', "told messages arrive marked private"),
+ ('host: the room not heard', RT, '    if "host" in got:\n        _net_host = got["host"]', '    if "host" in got:\n        pass', "net_host is the room's say"),
+ ('tell: the page drops them', NETS, '    if (o.tells && !this.away) this.tells.push(...o.tells);\n', '', "one player on a WebSocket and one polling", E2E),
+
 ]
 only = sys.argv[1:]
 # A name that matches no case would otherwise run nothing and still say

@@ -280,8 +280,12 @@ export const API: ApiEntry[] = [
     'What the others see of you, as a dict of names and values: net_send({"x": self.x, "y": self.y}). Send it every step; the newest is what counts. Up to 2000 characters.'),
   fn("Multiplayer", "net_shout", [p("message", "any")], "nothing",
     'Sends a message once to everyone else in the room, for something that happens once: net_shout({"snowball": [self.x, self.y]}). They read it with net_messages().'),
+  fn("Multiplayer", "net_tell", [p("number", "number"), p("message", "any")], "nothing",
+    'Sends a message to ONE other player, by their number: net_tell(3, {"role": "mimic"}). Nobody else gets it, which is what keeps a secret (a role, a hand of cards) secret. They read it with net_messages(); its .private is True.'),
+  fn("Multiplayer", "net_host", [], "a player's number, or None",
+    "The number of the player whose game is in charge: it deals the roles, counts the votes, decides, so every game agrees. The room's maker while they're in it (and not away); if they leave, the next. if net_host() == net_me().number: this game decides."),
   fn("Multiplayer", "net_messages", [], "a list of messages",
-    "The messages other players shouted that arrived this step. Each has .sender (their number), .data (what they sent) and .age (how many seconds ago). Read them every step: they are only there for one."),
+    "The messages other players shouted (or told you alone: .private is True) that arrived this step. Each has .sender (their number), .data (what they sent) and .age (how many seconds ago). Read them every step: they are only there for one."),
   fn("Multiplayer", "net_away", [p("away", "boolean", "True")], "nothing",
     "Hides you from the others, for a pause menu: they don't see you, and their messages don't reach you. net_away(False) brings you back. A Python check question does this by itself."),
 

@@ -229,6 +229,13 @@ test("one player on a WebSocket and one polling still see each other, and hear e
   await py(poller.page, 'net_shout("from polling")');
   await expect.poll(() => py(poller.page, "getattr(global_vars, 'heard', [])"), { timeout: 10_000 }).toEqual(["from the socket"]);
   await expect.poll(() => py(ws.page, "getattr(global_vars, 'heard', [])"), { timeout: 10_000 }).toEqual(["from polling"]);
+  // net_tell and net_host, both ways: the host is the room's maker, and a told message is private.
+  await py(ws.page, 'net_tell(2, "for poller only")');
+  await py(poller.page, 'net_tell(1, "for socket only")');
+  await expect.poll(async () => JSON.stringify(await py(poller.page, "getattr(global_vars, 'heard', [])")), { timeout: 10_000 }).toContain("for poller only");
+  await expect.poll(async () => JSON.stringify(await py(ws.page, "getattr(global_vars, 'heard', [])")), { timeout: 10_000 }).toContain("for socket only");
+  expect(await py(ws.page, "net_host()")).toBe(1);
+  await expect.poll(() => py(poller.page, "net_host()"), { timeout: 10_000 }).toBe(1);
 
   // The WebSocket drops (a server restart, a network blip): the page polls at once, then gets a
   // new WebSocket by itself, still in the room, without a reload.

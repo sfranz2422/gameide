@@ -271,22 +271,26 @@ export class PythonGame {
    * the next step takes it: the players are replaced, the messages pile up,
    * so a step never misses one that came between two steps.
    */
-  netArrive(players: NetPlayerState[] | null, messages: NetMessageIn[]) {
+  netArrive(players: NetPlayerState[] | null, messages: NetMessageIn[], host?: number | null) {
     if (players) this.netPlayers = players;
     this.netMessages.push(...messages);
+    if (host !== undefined) this.netHost = host;
   }
+  private netHost: number | null | undefined = undefined;
 
   /** The room's news for this step, as JSON for _frame — or undefined, with none. */
   private takeNet(): string | undefined {
-    if (!this.netPlayers && !this.netMessages.length && this.questionWaiting === null) return undefined;
+    if (!this.netPlayers && !this.netMessages.length && this.questionWaiting === null && this.netHost === undefined) return undefined;
     const out = JSON.stringify({
       ...(this.netPlayers ? { players: this.netPlayers } : {}),
+      ...(this.netHost === undefined ? {} : { host: this.netHost }),
       msgs: this.netMessages,
       ...(this.questionWaiting === null ? {} : { question: this.questionWaiting }),
     });
     this.netPlayers = null;
     this.netMessages = [];
     this.questionWaiting = null;
+    this.netHost = undefined;
     return out;
   }
 

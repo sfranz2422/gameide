@@ -138,5 +138,35 @@ r`));
     run(g, 2);
     expect(py(g, "net_players()[0].draw_x is None")).toBe(true);
   });
+
+  it("net_tell goes to one player; told messages arrive marked private", async () => {
+    const { game: g, nets } = await game();
+    py(g, 'net_tell(4, {"role": "mimic"})');
+    run(g, 1);
+    expect(nets.at(-1)!.tells).toEqual([[4, { role: "mimic" }]]);
+    expect(String(py(g, 'r = ""\ntry:\n    net_tell("four", 1)\nexcept TypeError as e:\n    r = str(e)\nr'))).toMatch(/needs a player's number/);
+    g.netArrive(null, [{ from: 1, data: { role: "crew" }, age: 0, private: true }, { from: 2, data: "hi", age: 0 }]);
+    run(g, 1);
+    expect(py(g, "[(m.sender, m.private) for m in net_messages()]")).toEqual([[1, true], [2, false]]);
+  });
+
+  it("net_host is the room's say, or you before it has said; None outside a room", async () => {
+    const { game: g } = await game();
+    expect(py(g, "net_host()")).toBe(3);
+    g.netArrive([], [], 1);
+    run(g, 1);
+    expect(py(g, "net_host()")).toBe(1);
+    const { game: alone } = await game(null);
+    expect(py(alone, "net_host() is None")).toBe(true);
+    py(alone, "net_tell(2, 1)");
+  });
+
+  it("away, nothing is told either", async () => {
+    const { game: g, nets } = await game();
+    run(g, 1);
+    py(g, 'net_away(True); net_tell(2, "lost")');
+    run(g, 1);
+    expect(nets.flatMap((n) => n.tells ?? [])).toEqual([]);
+  });
 });
 

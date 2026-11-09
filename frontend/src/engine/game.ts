@@ -226,17 +226,20 @@ export interface NetPlayerState {
   state: Record<string, unknown>;
 }
 
-/** A net_shout from another player. `age` is how long ago it was sent, in seconds. */
+/** A net_shout (or net_tell, `private`) from another player. `age` is how long ago it was sent, in seconds. */
 export interface NetMessageIn {
   from: number;
   data: unknown;
   age: number;
+  private?: boolean;
 }
 
-/** What a frame's net_send / net_shout / net_away asked for. */
+/** What a frame's net_send / net_shout / net_tell / net_away asked for. */
 export interface NetOut {
   state?: Record<string, unknown>;
   msgs?: unknown[];
+  /** net_tell: [their number, the message], for one player only. */
+  tells?: [number, unknown][];
   away?: boolean;
 }
 
