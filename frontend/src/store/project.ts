@@ -84,6 +84,8 @@ export interface ProjectSettings {
   pixelScaling?: boolean;
   /** How high_score ranks on the play page. Absent = highest wins, plain numbers. unit "time" reads scores as seconds. */
   scoreboard?: { lowest?: boolean; unit?: string };
+  /** How many players a multiplayer room of this game holds. Absent = 20; the server allows 2 to 25 (multiplayer.room_size). */
+  netPlayers?: number;
 }
 
 export interface SpriteResource {

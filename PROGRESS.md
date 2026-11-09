@@ -1,5 +1,10 @@
 # Progress
 
+## Undertow: rooms of 25 (2026-11-09, waiting for review)
+- **Undertow's rooms hold 25; every other game's still hold 20** (the teacher's choice). A game asks in its settings (`netPlayers`); the server reads it from the published game, never from the page, and allows 2 to 25. Undertow's seats round the table widen past 16, and its meeting screen fits a fifth row of faces.
+- CPU players: not wanted (the teacher's decision).
+- Tests: 3 server checks (20 by default and the 21st refused, 25 for a game that asks and the 26th refused, never more than 25 or nonsense), the browser test sees 25 reach the server, and Undertow's tests fit 25 at the table and on the meeting screen. 6 sabotage cases.
+
 ## Undertow, phase 3: the round in a room (2026-11-09, waiting for review)
 - **A round, from 3 players:** everyone walks the station while the class joins; the room's host (its maker) presses Enter. Each player is told **privately** whether they're crew or a **Mimic** (1 Mimic, 2 from 7 players, 3 from 13) and given five jobs; Mimics are told who the others are (red numbers). Everyone starts round the hub's table.
 - **Mimics freeze crew** with F when close (every 25 s, not in the first 12). The frozen crew member becomes a **ghost**: drifts through walls, sees other ghosts (the living don't), can still do jobs, can't speak, vote, report or call. An ice block stays where they were.

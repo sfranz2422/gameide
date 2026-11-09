@@ -396,13 +396,13 @@ describe.skipIf(!have)("Undertow: a round in a room", () => {
     expect(room.all("room_at(global_vars.player.x, global_vars.player.y) == 'Meeting Hub'")).toBe(true);
   });
 
-  it("seats round the table: on the hub's floor, apart, and out of the beacon's reach, for 3 to 20 players", async () => {
+  it("seats round the table: on the hub's floor, apart, and out of the beacon's reach, for 3 to 25 players", async () => {
     const g = await start();
     const bad = py(g, `
 grid = station_grid()
 bx, by = tile_middle(*BEACON)
 bad = []
-for count in range(3, 21):
+for count in range(3, 26):
     spots = [seat(k, count) for k in range(count)]
     for x, y in spots:
         if room_at(x, y) != 'Meeting Hub' or grid[int(y // TILE)][int(x // TILE)] in (None, 'wall') or point_distance(x, y, bx, by) <= REACH:
@@ -411,6 +411,23 @@ for count in range(3, 21):
         bad.append((count, 'crowded'))
 bad`) as unknown as unknown[];
     expect(bad).toEqual([]);
+  });
+
+  it("rooms of up to 25: the game asks the server for 25, and 25 faces fit the meeting screen", async () => {
+    const project = JSON.parse(readFileSync(BUILT, "utf8")) as Project;
+    expect(project.settings.netPlayers).toBe(25);
+    const g = await start();
+    // Every face clear of the next and above the room buttons (y 234), for 3 to 25.
+    const bad = py(g, `
+bad = []
+for count in range(3, 26):
+    for k in range(count):
+        x, y, h = tile_xy(k, count)
+        if y + h > 230 or h < 30:
+            bad.append((count, k, y, h))
+bad`) as unknown as unknown[];
+    expect(bad).toEqual([]);
+    expect(py(g, "tile_xy(19, 20)[2]")).toBe(44);
   });
 
   it("waiting: two can't start a round; others see who will start it", async () => {

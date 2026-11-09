@@ -257,9 +257,14 @@ def end_if_won(d):
 
 # ---- for drawing
 
-def tile_xy(k):
-    """Where the k-th player's picture goes on the meeting screen: five across, four down."""
-    return 12 + (k % 5) * 78, 34 + (k // 5) * 48
+def tile_xy(k, count):
+    """
+    Where the k-th of `count` players' pictures goes on the meeting screen, and how
+    tall it is: five across, four rows of 48 pixels, squeezed to fit a fifth (21 to 25).
+    """
+    rows = max(4, (count + 4) // 5)
+    h = 192 // rows
+    return 12 + (k % 5) * 78, 34 + (k // 5) * h, h - 4
 
 
 def who(n):

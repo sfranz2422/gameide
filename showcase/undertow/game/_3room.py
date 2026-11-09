@@ -13,6 +13,7 @@
 # over from its copy of "g", and everyone tells it their role again.
 
 MIN_PLAYERS = 3          # to start a round (4 or more is better)
+MAX_PLAYERS = 25         # a room holds this many (build.py asks the server for it: settings.netPlayers)
 FREEZE_REACH = 48        # pixels between a Mimic and who they freeze
 FREEZE_WAIT = 25 * 60    # steps between a Mimic's freezes
 FIRST_WAIT = 12 * 60     # ...and before their first, after a round or meeting starts
@@ -64,7 +65,9 @@ def seat(k, count):
     """Where the k-th of `count` players stands in the Meeting Hub: round the table, the beacon in its middle (out of reach)."""
     cx, cy = tile_middle(*BEACON)
     a = 2 * math.pi * k / max(1, count) - math.pi / 2
-    return cx + math.cos(a) * 112, cy + math.sin(a) * 84
+    # Past 16 the ring widens (up to 25 players: the hub's walls are just beyond it).
+    grow = max(0, count - 16)
+    return cx + math.cos(a) * (112 + 5 * grow), cy + math.sin(a) * (84 + 4 * grow)
 
 
 def new_game():

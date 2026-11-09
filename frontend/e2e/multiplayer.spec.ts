@@ -275,6 +275,9 @@ test("Undertow in a room: roles dealt privately, a meeting at the beacon, a vote
   await teacher.page.getByTestId("publish-go").click();
   await expect(teacher.page.getByTestId("publish-link")).toHaveValue(/\/play\/[\w-]+$/, { timeout: 60_000 });
   const url = new URL(await teacher.page.getByTestId("publish-link").inputValue()).pathname;
+  // Its rooms hold 25 (only Undertow asks): the setting came through import, saving and publishing.
+  const published = await teacher.page.request.get(`/api${url}`);
+  expect(JSON.stringify(await published.json())).toContain('"netPlayers":25');
 
   const dive = async (page: Page) => {
     await page.waitForFunction(() => (window as any).__gameide.host.state === "running", null, { timeout: 120_000 });

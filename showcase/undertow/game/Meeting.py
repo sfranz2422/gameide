@@ -30,8 +30,8 @@ if keyboard_check_pressed("enter") and self.pick is not None:
 if not click:
     return
 for k, n in enumerate(people):
-    x, y = tile_xy(k)
-    if x <= mx <= x + 74 and y <= my <= y + 44:
+    x, y, h = tile_xy(k, len(people))
+    if x <= mx <= x + 74 and y <= my <= y + h:
         self.pick = n
         sound_play("click", volume=0.3)
 for k, (name, _, _) in enumerate(ROOMS):
@@ -68,22 +68,22 @@ people = sorted(g["in"])
 out = ghosts(g)
 counts = dict((k, c) for k, c in g["tally"])
 for k, n in enumerate(people):
-    x, y = tile_xy(k)
+    x, y, h = tile_xy(k, len(people))
     name, suit = who(n)
     draw_set_color("#ffd23f" if n == self.pick else "#1b2a38")
-    draw_rect(x - 2, y - 2, x + 76, y + 46)
+    draw_rect(x - 2, y - 2, x + 76, y + h + 2)
     draw_set_color("#0d2233")
-    draw_rect(x, y, x + 74, y + 44)
-    draw_sprite_ext("face_" + suit, 0, x + 2, y + 2, 40 / SIZES["face_" + suit][0], 40 / SIZES["face_" + suit][1],
+    draw_rect(x, y, x + 74, y + h)
+    draw_sprite_ext("face_" + suit, 0, x + 2, y + 2, (h - 4) / SIZES["face_" + suit][0], (h - 4) / SIZES["face_" + suit][1],
                     0, "white", 0.35 if n in out else 1)
     words(x + 46, y + 2, f"#{n}", 13, "#ff5a4f" if n in global_vars.mates else "white")
-    words(x + 46, y + 20, name[:6], 9, "#9fb9cf")
+    words(x + 46, y + h // 2 - 2, name[:6], 9, "#9fb9cf")
     if n in out:
-        words(x + 22, y + 14, "out", 11, "#7f9fb9", "center")
+        words(x + 22, y + h // 2 - 8, "out", 11, "#7f9fb9", "center")
     elif n in g["voted"] and g["ph"] == "meeting":
-        words(x + 70, y + 30, "✓", 11, "#3ecf8e", "right")
+        words(x + 70, y + h - 14, "✓", 11, "#3ecf8e", "right")
     if g["ph"] == "result" and counts.get(n):
-        words(x + 70, y + 30, f"{counts[n]} votes" if counts[n] > 1 else "1 vote", 9, "#ffd23f", "right")
+        words(x + 70, y + h - 14, f"{counts[n]} votes" if counts[n] > 1 else "1 vote", 9, "#ffd23f", "right")
 # What's been said, newest at the bottom.
 draw_set_color("#0b1620")
 draw_rect(404, 34, 628, 226)

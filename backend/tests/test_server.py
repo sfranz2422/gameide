@@ -2015,6 +2015,38 @@ check("rooms: …all of them", _rdb.query(gamestore.NetRoom).filter_by(published
 _rdb.close()
 _ndb.close()
 
+# ---- How many a room holds: 20, unless the published game's settings.netPlayers says
+# otherwise, up to 25 (Undertow asks for 25: the teacher's choice, 2026-11-09).
+def _fill(game, settings, people):
+    put(_nia, game, project(game, game, settings={"stepsPerSecond": 60, **settings}), 0)
+    pid = _nia.post(f"/api/projects/{game}/publish", json={"title": game, "visibility": "unlisted"}).get_json()["published"]["id"]
+    made = client(f"{game}0@{S}").post(f"/api/play/{pid}/net/create", json={}).get_json()
+    joined = [made] + [client(f"{game}{i}@{S}").post(f"/api/play/{pid}/net/join", json={"code": made["code"]}) for i in range(1, people)]
+    return [made] + [r.get_json() for r in joined[1:]], [r.status_code for r in joined[1:]]
+
+
+_got, _codes = _fill("cap20", {}, 21)
+check("rooms: 20 players at most, as a game says nothing", _codes[:19] == [200] * 19 and _codes[19] == 409
+      and "20 players" in _got[-1].get("error", ""), (_codes, _got[-1]))
+_got, _codes = _fill("cap25", {"netPlayers": 25}, 26)
+check("rooms: a game asking for 25 (Undertow) holds 25, and no more", _codes[:24] == [200] * 24 and _codes[24] == 409
+      and "25 players" in _got[-1].get("error", "") and _got[24].get("number") == 25, (_codes, _got[-1]))
+_cdb = server.SessionLocal()
+_room = _cdb.query(gamestore.NetRoom).order_by(gamestore.NetRoom.id.desc()).first()
+_pub = _cdb.get(gamestore.Published, _room.published_id)
+_was = _pub.data
+_sizes = []
+for _ask in (99, 1, "lots", True, None):
+    _d = json.loads(_was)
+    _d["settings"]["netPlayers"] = _ask
+    _pub.data = json.dumps(_d)
+    _cdb.commit()
+    _sizes.append(multiplayer.room_size(_cdb, _room))
+_pub.data = _was
+_cdb.commit()
+check("rooms: a game can't ask for more than 25, or for nonsense", _sizes == [25, 2, 20, 20, 20], _sizes)
+_cdb.close()
+
 # ---- The same rooms, LIVE: one process, rooms in memory (GAMEIDE_ONE_PROCESS=1 on Render).
 # Pages use WebSockets then (the browser tests); a page that can't polls, served from
 # memory: these checks poll. The rules are the same; the database is touched only

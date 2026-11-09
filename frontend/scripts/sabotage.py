@@ -1727,6 +1727,14 @@ CASES = [
  ('undertow: anyone runs the round', _ut("Director"), 'if host == me:\n    self.host_for += 1', 'if True:\n    self.host_for += 1', "two can't start", UND),
  ('undertow: seats on the beacon', _ut("_3room"), '    cx, cy = tile_middle(*BEACON)', '    cx, cy = tile_middle(*START)', "seats round the table", UND),
 
+ # Rooms of 25 for Undertow only (the teacher's choice, 2026-11-09)
+ ('rooms: size from the game ignored', MP, '        most = room_size(db, room)', '        most = MAX_PLAYERS', "a game asking for 25 (Undertow) holds 25", PY),
+ ('rooms: no ceiling', MP, '    return max(2, min(BIGGEST_ROOM, asked))', '    return max(2, asked)', "can't ask for more than 25", PY),
+ ('rooms: every game 25', MP, '        return MAX_PLAYERS\n    return max(2', '        return BIGGEST_ROOM\n    return max(2', "20 players at most, as a game says nothing", PY),
+ ('undertow: asks for 20', "../showcase/undertow/build.py", '    P.p["settings"]["netPlayers"] = MAP["MAX_PLAYERS"]\n', '', "rooms of up to 25", UND),
+ ('undertow: 25 faces overflow', _ut("_4play"), '    rows = max(4, (count + 4) // 5)', '    rows = 4', "rooms of up to 25", UND),
+ ('undertow: 25 crowd the table', _ut("_3room"), '    grow = max(0, count - 16)', '    grow = 0', "seats round the table", UND),
+
  ('tell: the page drops them', NETS, '    if (o.tells && !this.away) this.tells.push(...o.tells);\n', '', "one player on a WebSocket and one polling", E2E),
 
 ]

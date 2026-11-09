@@ -47,12 +47,29 @@ from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 
 import publishing
-from gamestore import NetMessage, NetPlayer, NetRoom
+from gamestore import NetMessage, NetPlayer, NetRoom, Published
 from publishing import _board_name, _need_user, _pub_or_404, _viewable, err
 
 bp = Blueprint("multiplayer", __name__)
 
 MAX_PLAYERS = 20
+#: The most a game may ask for with settings.netPlayers (Undertow asks for 25:
+#: the teacher's choice, 2026-11-09, for that game only). Measured: 20 players
+#: at 20 updates a second is 3-5% of a core, so 25 is well within it.
+BIGGEST_ROOM = 25
+
+
+def room_size(db, room):
+    """How many players a room of this game holds: the published game's settings.netPlayers
+    (read from the snapshot, never the page), 2 to BIGGEST_ROOM; MAX_PLAYERS if it doesn't say."""
+    pub = db.get(Published, room.published_id)
+    try:
+        asked = (json.loads(pub.data).get("settings") or {}).get("netPlayers") if pub else None
+    except ValueError:
+        asked = None
+    if isinstance(asked, bool) or not isinstance(asked, int):
+        return MAX_PLAYERS
+    return max(2, min(BIGGEST_ROOM, asked))
 #: A player not heard from for this long isn't in the room any more.
 PRESENT_SECONDS = 10
 #: A room nobody has synced with for this long is deleted.
@@ -331,8 +348,9 @@ def _enter(db, room, user):
     present = db.query(NetPlayer).filter(NetPlayer.room_id == room.id, NetPlayer.seen_at >= t - PRESENT_SECONDS).all()
     me = db.query(NetPlayer).filter_by(room_id=room.id, user_id=user.id).first()
     if me is None or me.seen_at < t - PRESENT_SECONDS:
-        if len(present) >= MAX_PLAYERS:
-            return err(f"That room is full: {MAX_PLAYERS} players is the most.", 409)
+        most = room_size(db, room)
+        if len(present) >= most:
+            return err(f"That room is full: {most} players is the most.", 409)
     taken = {p.number for p in present if me is None or p.id != me.id}
     if me is None:
         # The lowest number nobody here has: the number over a player's head.

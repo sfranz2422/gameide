@@ -37,6 +37,7 @@ _tw = _load("thornwood_build", HERE.parent / "build.py")
 _climb = _load("climber_build", HERE.parent / "climber" / "build.py")
 MAP = {}
 exec((HERE / "game" / "_1station.py").read_text(), MAP)
+exec((HERE / "game" / "_3room.py").read_text(), MAP)
 CREW = {"global_vars": None}
 exec((HERE / "game" / "_2crew.py").read_text(), CREW)
 TILE, COLS, ROWS = MAP["TILE"], MAP["COLS"], MAP["ROWS"]
@@ -244,6 +245,8 @@ def station_tiles():
 def build(out):
     P = Under("Undertow")
     P.p["settings"]["pixelScaling"] = True
+    # Rooms of up to 25 (the server allows a game up to 25; others stay at 20).
+    P.p["settings"]["netPlayers"] = MAP["MAX_PLAYERS"]
     sizes = {}
 
     def sprite(name, frames, origin, mask=None, fps=None):
