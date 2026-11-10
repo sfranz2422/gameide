@@ -659,7 +659,10 @@ and shows **puppets** of the same objects (`self.puppet`: every step that
 simulates returns at once), mirrored so each player is blue on the left
 (`_3duel.py`, `Link`). The other player's cards go to the host privately and go
 through `play_card`, like the host's own. An opponent away (a question) holds the
-match (`halt`, `stopped()`); gone `GONE_STEPS`, the one still here wins.
+match (`halt`, `stopped()`); gone `GONE_STEPS`, the one still here wins. Pictures
+are the teacher's (`cut_sheets.py` → `art/`); `draw_troop` chooses a frame from
+where a troop is (moving or not, `swing` after a blow), so puppets animate too.
+Its board is wins against players only (`Hud`).
 
 ## Style
 

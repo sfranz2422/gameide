@@ -57,9 +57,10 @@ def snapshot():
         elif is_a(o, "Marble"):
             extra = [0, 0]
         else:
-            extra = [round(100 * max(0, o.hp) / o.max_hp), (1 if o.flash else 0) + (2 if getattr(o, "awake", False) else 0)]
+            extra = [round(100 * max(0, o.hp) / o.max_hp), (1 if o.flash else 0) + (2 if getattr(o, "awake", False) else 0)
+                     + (4 if getattr(o, "swing", 0) > 0 else 0)]
         things.append([o.uid, k, o.side, round(o.x), round(o.y)] + extra)
-    shots = [[round(s.x), round(s.y), s.side] for s in instances("Shot")]
+    shots = [[round(s.x), round(s.y), s.side, 1 if s.kind == "shaving" else 0] for s in instances("Shot")]
     g = {"n": m.match_no, "t": m.clock, "c": m.crowns, "e": round(m.energy[1], 2), "h": m.decks[1][:HAND + 1],
          "o": m.overtime, "x": m.over, "w": m.winner, "a": m.again, "u": things, "s": shots, "z": m.halt}
     # A room's word is at most NET_STATE_LIMIT characters: in a very big battle, the shots go first.
@@ -87,7 +88,7 @@ def show(g, puppets):
     m.energy[0] = g["e"]
     m.decks[0] = list(g["h"]) + [c for c in DECK if c not in g["h"]]
     m.again = [g["a"][1], g["a"][0]]
-    m.shots = [(VIEW_W - x, y, 1 - side) for x, y, side in g["s"]]
+    m.shots = [(VIEW_W - x, y, 1 - side, "shaving" if kind else "band") for x, y, side, kind in g["s"]]
     seen = set()
     for uid, k, side, x, y, a, b in g["u"]:
         seen.add(uid)
@@ -111,8 +112,14 @@ def show(g, puppets):
             o.flash = 6 if b & 1 else 0
             if KINDS[k] == "Keep":
                 o.awake = bool(b & 2)
+            if b & 4:
+                o.swing = max(getattr(o, "swing", 0), 6)
     for uid in list(puppets):
         if uid not in seen:
-            if instance_exists(puppets[uid]):
-                puppets[uid].destroy()
+            o = puppets[uid]
+            if instance_exists(o):
+                # A troop knocked out, or a card's troops arriving: the same puff as in the host's game.
+                if is_a(o, "Unit") or is_a(o, "Deploy"):
+                    puff(o.x, o.y)
+                o.destroy()
             del puppets[uid]

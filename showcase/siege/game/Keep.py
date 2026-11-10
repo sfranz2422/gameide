@@ -18,16 +18,7 @@ if not self.awake:
 super().on_step()
 
 # === draw
-c = SIDE_COLOR[self.side]
-draw_set_color("#000000")
-draw_set_alpha(0.25)
-draw_rect(self.x - 22, self.y - 16, self.x + 26, self.y + 22)
-draw_set_alpha(1)
-draw_set_color("#ffffff" if self.flash else c)
-draw_rect(self.x - 24, self.y - 20, self.x + 24, self.y + 18)
-draw_set_color("#1b1208")
-draw_rect(self.x - 24, self.y - 20, self.x + 24, self.y + 18, True)
-draw_rect(self.x - 10, self.y - 26, self.x + 10, self.y - 20, True)
-bar(self.x, self.y - 36, 48, self.hp / self.max_hp, c)
+draw_sprite_ext("box_" + TEAM[self.side], 0, self.x, self.y, 1, 1, 0, "#ffd0d0" if self.flash else "white")
+bar(self.x, self.y - 36, 48, self.hp / self.max_hp, SIDE_COLOR[self.side])
 if not self.awake:
-    words(self.x + 20, self.y - 30, "z", 12, "#3b2a1a")
+    words(self.x + 22, self.y - 32, "z", 12, "#3b2a1a")

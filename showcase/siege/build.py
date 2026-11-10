@@ -6,8 +6,9 @@ player against another (or the computer).
 
     python3 showcase/siege/build.py      # → showcase/siege/out/Siege.zip
 
-Against the computer, or another player in a room (a code, or "Find me a match"),
-everything drawn by the game itself until the teacher's Gemini pictures come.
+Against the computer, or another player in a room (a code, or "Find me a match").
+The pictures are the teacher's, made with Gemini (PROMPTS.md), cut by
+cut_sheets.py into art/ at twice the game's size.
 
 THE GAME IS OBJECTS: Unit and its kinds (Soldier, Knight, Plane, Archer, Golem),
 Building and its kinds (Tower, Keep, Wall), Shot, Marble, Glue, Deploy (a card on
@@ -38,14 +39,31 @@ exec((HERE / "game" / "_1rules.py").read_text(), RULES)
 VIEW_W, VIEW_H = RULES["VIEW_W"], RULES["VIEW_H"]
 
 
+ART = HERE / "art"
+TROOPS = ["soldier", "knight", "plane", "archer", "golem"]
+# How wide each picture is drawn in the game (pixels): build.py fits the teacher's drawings to these.
+WIDE = {"wood": 256, "ruler": 72, "blocks": 30, "glue_puddle": 2 * RULES["GLUE_R"], "marble_blue": 2 * RULES["MARBLE_R"] + 2,
+        "marble_red": 2 * RULES["MARBLE_R"] + 2, "puff": 30, "spark": 18, "band": 12, "shaving": 10, "key": 16, "sparkle": 40,
+        "scissors": 34, "note": 26, "clip": 14, "coins": 22, "crayon": 34, "sharpener": 16}
+
+
+def art(name, k=0.5):
+    im = Image.open(ART / f"{name}.png").convert("RGBA")
+    return im if k == 1 else im.resize((max(1, round(im.width * k)), max(1, round(im.height * k))), Image.LANCZOS)
+
+
+def fitted(name, width):
+    """A drawing trimmed to what's drawn, `width` pixels across."""
+    im = Image.open(ART / f"{name}.png").convert("RGBA")
+    im = im.crop(im.getbbox())
+    return im.resize((width, max(1, round(im.height * width / im.width))), Image.LANCZOS)
+
+
 def icon_picture():
-    """For now: a blue pencil cup on a wooden tile."""
+    """The wind-up knight's card on a wooden tile."""
     tile = Image.new("RGBA", (128, 128))
-    d = ImageDraw.Draw(tile)
-    d.rounded_rectangle((0, 0, 127, 127), radius=22, fill=(200, 149, 90, 255))
-    d.ellipse((34, 44, 94, 104), fill=(61, 123, 255, 255), outline=(27, 18, 8, 255), width=4)
-    for k, c in enumerate(((255, 210, 63), (62, 207, 142), (255, 122, 198))):
-        d.line((52 + k * 12, 70, 48 + k * 14, 22), fill=c, width=7)
+    ImageDraw.Draw(tile).rounded_rectangle((0, 0, 127, 127), radius=22, fill=(200, 149, 90, 255))
+    tile.alpha_composite(art("card_knight", 1).resize((108, 108), Image.LANCZOS), (10, 10))
     return tile
 
 
@@ -75,6 +93,32 @@ def build(out):
     # One against one: rooms hold two, and the lobby offers "Find me a match".
     P.p["settings"]["netPlayers"] = 2
     P.sprite("icon", [icon_picture()], (64, 64))
+    # The troops: a sprite for each kind and team, frames walking, walking, attacking (a plane:
+    # flying, tilting, diving). Drawn facing right; the red side's are turned round. The origin
+    # is a little below the middle: where the troop stands, for fights and the gap.
+    for troop in TROOPS:
+        for team in ("blue", "red"):
+            frames = [art(f"{troop}_{team}_{k}") for k in range(3)]
+            w, h = frames[0].size
+            P.sprite(f"{troop}_{team}", frames, (w // 2, round(h * 0.62)))
+    for team in ("blue", "red"):
+        frames = [art(f"cup_{team}_{k}") for k in range(3)]
+        w, h = frames[0].size
+        P.sprite(f"cup_{team}", frames, (w // 2, round(h * 0.68)))
+    for name in ("box_blue", "box_red", "box_broken"):
+        im = art(name)
+        P.sprite(name, [im], (im.width // 2, round(im.height * 0.62)))
+    for name, width in WIDE.items():
+        im = fitted(name, width) if name != "wood" else art(name).resize((width, width), Image.LANCZOS)
+        P.sprite(name, [im], (0, 0) if name == "wood" else (im.width // 2, im.height // 2))
+    for card in RULES["DECK"]:
+        im = art(f"card_{card}")
+        P.sprite(f"card_{card}", [im], (im.width // 2, im.height // 2))
+    title = art("title", 1)
+    k = max(VIEW_W / title.width, VIEW_H / title.height)
+    title = title.resize((round(title.width * k), round(title.height * k)), Image.LANCZOS)
+    x, y = (title.width - VIEW_W) // 2, (title.height - VIEW_H) // 2
+    P.picture("title", title.crop((x, y, x + VIEW_W, y + VIEW_H)))
     P.font("Ubuntu", HERE / "fonts" / "ubuntu-latin-700-normal.woff2")
     make_sounds(P)
     for f in sorted((HERE / "game").glob("_*.py")):

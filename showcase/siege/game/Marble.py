@@ -14,7 +14,7 @@ self.roll = 0
 if self.puppet or stopped():
     return
 self.x += MARBLE_SPEED * forward(self.side)
-self.roll += 0.3
+self.roll += MARBLE_SPEED / MARBLE_R
 for u in instances("Unit"):
     if u.side != self.side and not u.flies and id(u) not in self.hit and point_distance(self.x, self.y, u.x, u.y) < MARBLE_R + u.radius:
         self.hit.add(id(u))
@@ -30,11 +30,4 @@ if self.x < -20 or self.x > VIEW_W + 20:
     self.destroy()
 
 # === draw
-draw_set_color("#000000")
-draw_set_alpha(0.25)
-draw_circle(self.x + 3, self.y + 3, MARBLE_R)
-draw_set_alpha(1)
-draw_set_color("#4fc3ff" if self.side == 0 else "#ff8f6b")
-draw_circle(self.x, self.y, MARBLE_R)
-draw_set_color("#ffffff")
-draw_circle(self.x - 4 + math.cos(self.roll) * 2, self.y - 4, 3)
+draw_sprite_ext("marble_" + TEAM[self.side], 0, self.x, self.y, 1, 1, math.degrees(-self.roll) * forward(self.side))

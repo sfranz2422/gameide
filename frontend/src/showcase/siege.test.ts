@@ -62,6 +62,18 @@ function play(g: Game, side: number, card: string, x: number, y: number) {
 }
 
 describe.skipIf(!have)("Tabletop Siege: a match against the computer", () => {
+  it("the art: every troop of both teams in its three poses, the cups and lunchboxes, the eight cards", () => {
+    const project = JSON.parse(readFileSync(BUILT, "utf8")) as Project;
+    const frames = (n: string) => project.sprites.find((x) => x.name === n)?.frames.length;
+    for (const troop of ["soldier", "knight", "plane", "archer", "golem"]) for (const team of ["blue", "red"]) expect(frames(`${troop}_${team}`), troop).toBe(3);
+    for (const team of ["blue", "red"]) {
+      expect(frames(`cup_${team}`)).toBe(3);
+      expect(frames(`box_${team}`)).toBe(1);
+    }
+    for (const card of ["soldiers", "knight", "plane", "archer", "golem", "wall", "marble", "glue"]) expect(frames(`card_${card}`), card).toBe(1);
+    for (const n of ["wood", "ruler", "title", "box_broken", "puff", "spark", "band", "shaving", "key", "icon"]) expect(frames(n), n).toBe(1);
+  });
+
   it("a match starts with three towers a side, 5 energy, a hand of four, and three minutes", async () => {
     const g = await desk();
     expect(count(g, "Tower", 0)).toBe(3);

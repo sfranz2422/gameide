@@ -113,6 +113,8 @@ def hurt(target, amount):
             global_vars.crowns[other] += 1
         sound_play("crash", volume=0.7)
         camera_shake(4, 12)
+    elif is_a(target, "Unit"):
+        puff(target.x, target.y)
     target.destroy()
 
 
@@ -190,9 +192,10 @@ def pick_target(u):
     return min(towers, key=lambda t: point_distance(u.x, u.y, t.x, t.y)) if towers else None
 
 
-def shoot(x, y, target, damage, side):
+def shoot(x, y, target, damage, side, kind="band"):
+    """A shot on its way: a rubber band (an archer's) or a pencil shaving (a tower's)."""
     s = instance_create(x, y, "Shot")
-    s.target, s.damage, s.side = target, damage, side
+    s.target, s.damage, s.side, s.kind = target, damage, side, kind
     return s
 
 
@@ -211,47 +214,9 @@ def card_at(x, y):
     return None
 
 
-def card_picture(card, x, y):
-    """A little picture of the card's troop, centred on (x, y)."""
-    c = SIDE_COLOR[0]
-    if card == "soldiers":
-        for dx in (-8, 0, 8):
-            draw_set_color(c)
-            draw_circle(x + dx, y + (4 if dx else -2), 5)
-    elif card == "knight":
-        draw_set_color(c)
-        draw_rect(x - 8, y - 8, x + 8, y + 8)
-        draw_set_color("#c0c8d0")
-        draw_rect(x - 5, y - 11, x + 5, y - 4)
-    elif card == "plane":
-        draw_set_color("#ffffff")
-        draw_triangle(x + 12, y, x - 10, y - 8, x - 10, y + 8)
-    elif card == "archer":
-        draw_set_color(c)
-        draw_circle(x, y, 7)
-        draw_set_color("#c9874a")
-        draw_line(x + 4, y - 9, x + 9, y + 7, 2)
-    elif card == "golem":
-        draw_set_color("#ff9fb0")
-        draw_rect(x - 12, y - 10, x + 12, y + 10)
-        draw_set_color(c)
-        draw_rect(x - 12, y + 2, x + 12, y + 10)
-    elif card == "wall":
-        for k, col in enumerate(("#ff6b5a", "#ffd23f", "#3ecf8e", "#4fa3ff")):
-            bx, by = x - 10 + (k % 2) * 10, y - 8 + (k // 2) * 8
-            draw_set_color(col)
-            draw_rect(bx, by, bx + 9, by + 7)
-    elif card == "marble":
-        draw_set_color("#4fc3ff")
-        draw_circle(x, y, 10)
-        draw_set_color("#ffffff")
-        draw_circle(x - 3, y - 3, 3)
-    elif card == "glue":
-        draw_set_color("#f2f0e6")
-        draw_circle(x, y + 2, 11)
-        draw_set_color("#e0dccb")
-        draw_rect(x - 3, y - 14, x + 3, y - 4)
-
+def card_picture(card, x, y, size=1.0):
+    """The card's picture (the teacher's portraits), centred on (x, y)."""
+    draw_sprite_ext("card_" + card, 0, x, y, size, size)
 
 def crown(x, y, won, color):
     """A little crown centred on (x, y): filled in the side's colour if won, an outline if not."""
@@ -265,3 +230,35 @@ def crown(x, y, won, color):
     draw_set_color("#1b1208")
     for a, b in zip(pts, pts[1:] + pts[:1]):
         draw_line(a[0], a[1], b[0], b[1], 2)
+
+
+# ---- drawing, from the teacher's pictures
+
+TEAM = ["blue", "red"]
+# Gemini drew every troop facing right but the golem, which faces left.
+FACES_LEFT = {"golem"}
+
+
+def draw_troop(u, troop):
+    """
+    A troop's picture: walking (two frames, one per few pixels moved) while it moves,
+    attacking just after a blow, standing otherwise. Turned to face the way it marches.
+    Works the same on a puppet: what it draws comes from where it is, not from steps.
+    """
+    moved = u.px is not None and abs(u.x - u.px) + abs(u.y - u.py) > 0.05
+    u.px, u.py = u.x, u.y
+    if u.swing > 0:
+        u.swing -= 1
+        frame = 2
+    elif troop == "plane":
+        frame = 1 if int(u.x / 20) % 2 else 0
+    else:
+        frame = int((u.x + u.y) / 7) % 2 if moved else 0
+    facing = forward(u.side) * (-1 if troop in FACES_LEFT else 1)
+    draw_sprite_ext(f"{troop}_{TEAM[u.side]}", frame, u.x, u.y, facing, 1, 0, "#ffd0d0" if u.flash else "white")
+    if u.flash > 3:
+        draw_sprite("spark", 0, u.x, u.y - u.radius)
+
+
+def puff(x, y):
+    instance_create(x, y, "Puff")

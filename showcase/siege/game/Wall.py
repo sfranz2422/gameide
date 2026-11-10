@@ -16,13 +16,7 @@ if not (self.puppet or stopped()):
         self.destroy()
 
 # === draw
-for k, col in enumerate(("#ff6b5a", "#ffd23f", "#3ecf8e", "#4fa3ff")):
-    x = self.x - 14 + (k % 2) * 14
-    y = self.y - 12 + (k // 2) * 12
-    draw_set_color("#ffffff" if self.flash else col)
-    draw_rect(x, y, x + 13, y + 11)
-    draw_set_color("#1b1208")
-    draw_rect(x, y, x + 13, y + 11, True)
+draw_sprite_ext("blocks", 0, self.x, self.y, 1, 1, 0, "#ffd0d0" if self.flash else "white", 0.5 + 0.5 * self.hp / self.max_hp)
 draw_set_color(SIDE_COLOR[self.side])
-draw_rect(self.x - 14, self.y + 12, self.x + 14, self.y + 14)
+draw_rect(self.x - 14, self.y + 9, self.x + 14, self.y + 11)
 super().on_draw()

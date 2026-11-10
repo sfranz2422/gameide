@@ -16,9 +16,6 @@ if not (self.puppet or stopped()):
         self.destroy()
 
 # === draw
-draw_set_alpha(0.55 * min(1, self.life / 60))
-draw_set_color("#f2f0e6")
-draw_circle(self.x, self.y, GLUE_R)
-draw_set_alpha(1)
+draw_sprite_ext("glue_puddle", 0, self.x, self.y, 1, 1, 0, "white", 0.85 * min(1, self.life / 60))
 draw_set_color(SIDE_COLOR[self.side])
 draw_circle(self.x, self.y, GLUE_R, True)

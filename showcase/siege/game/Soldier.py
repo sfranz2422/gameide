@@ -7,8 +7,5 @@ super().on_create()
 setup_unit(self, "Soldier")
 
 # === draw
-draw_set_color("#ffffff" if self.flash else SIDE_COLOR[self.side])
-draw_circle(self.x, self.y, self.radius)
-draw_set_color("#2f4f2f")
-draw_circle(self.x, self.y - 3, 3)
+draw_troop(self, "soldier")
 super().on_draw()

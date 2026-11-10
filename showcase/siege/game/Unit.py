@@ -18,6 +18,8 @@ self.cool = 0
 self.age = 0
 self.flash = 0
 self.glued = False
+self.swing = 0                   # steps of the attacking picture still to show
+self.px = self.py = None         # where it was last drawn (draw_troop: walking or standing)
 setup_unit(self, "Soldier")
 
 # === step
@@ -39,12 +41,13 @@ reach = self.range + self.radius + t.radius
 if point_distance(self.x, self.y, t.x, t.y) <= reach:
     if self.cool == 0:
         if self.range > 40:
-            shoot(self.x, self.y - 6, t, self.damage, self.side)
+            shoot(self.x, self.y - 6, t, self.damage, self.side, "band")
             sound_play("twang", volume=0.25)
         else:
             hurt(t, self.damage)
             sound_play("hit", volume=0.25)
         self.cool = self.rate
+        self.swing = 14
 else:
     pace = self.pace
     if self.glued:

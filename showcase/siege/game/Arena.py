@@ -24,24 +24,34 @@ if runs_battle():
 question_ok(global_vars.over)
 
 # === draw
-# Two desks of wood, a little different, and the gap between them.
-for side, col, line in ((0, "#c8955a", "#b9844b"), (1, "#c18c52", "#b07c45")):
-    x0, x1 = (0, MID - GAP) if side == 0 else (MID + GAP, VIEW_W)
-    draw_set_color(col)
-    draw_rect(x0, 0, x1, VIEW_H)
-    draw_set_color(line)
-    for y in range(12, VIEW_H, 26):
-        draw_line(x0, y, x1, y + 3, 1)
-draw_set_color("#3b2a1a")
+# Two desks of wood (the teacher's picture, repeated), and the gap between them.
+for x in range(0, VIEW_W, 256):
+    for y in range(0, VIEW_H, 256):
+        draw_sprite("wood", 0, x, y)
+draw_set_alpha(0.08)
+draw_set_color("#000000")
+draw_rect(MID + GAP, 0, VIEW_W, VIEW_H)          # the right-hand desk a shade darker, so they read as two
+draw_set_alpha(1)
+draw_set_color("#2a1d12")
 draw_rect(MID - GAP, 0, MID + GAP, VIEW_H)
-# A ruler across the gap in each lane.
+draw_set_color("#140d07")
+draw_rect(MID - 3, 0, MID + 3, VIEW_H)
+# Things on the desks, out of the way of the fighting.
+for name, x, y, turn in DESK_THINGS:
+    draw_sprite_ext(name, 0, x, y, 1, 1, turn)
+# Across the gap in each lane: rulers laid side by side.
 for ly in LANES:
-    draw_set_color("#f2e3a0")
-    draw_rect(MID - GAP - 14, ly - BRIDGE, MID + GAP + 14, ly + BRIDGE)
-    draw_set_color("#7a6a3a")
-    draw_rect(MID - GAP - 14, ly - BRIDGE, MID + GAP + 14, ly + BRIDGE, True)
-    for k in range(-GAP - 10, GAP + 14, 6):
-        draw_line(MID + k, ly - BRIDGE, MID + k, ly - BRIDGE + (8 if k % 12 == 0 else 4), 1)
+    for k in (-1, 0, 1):
+        draw_sprite("ruler", 0, MID, ly + k * (BRIDGE * 2 / 3))
+# Where a tower stood and fell: its heap.
+for side in (0, 1):
+    for kind, x, y in TOWERS:
+        x = mirror_x(x, side)
+        if not any(abs(t.x - x) < 4 and abs(t.y - y) < 4 for t in instances("Tower")) and global_vars.match_no:
+            if kind == "keep":
+                draw_sprite("box_broken", 0, x, y)
+            else:
+                draw_sprite_ext("cup_" + TEAM[side], 2, x, y, 1, 1)
 # Where a card in hand may go, while one is being played.
 card = None if global_vars.pick is None else hand(0)[global_vars.pick]
 if card is not None and not global_vars.over:

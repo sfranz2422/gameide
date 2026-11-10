@@ -1775,6 +1775,12 @@ CASES = [
  ('siege: big battles overflow', _sg("_3duel"), '    if len(json.dumps(g)) > 1900:\n        g["s"] = []\n    while len(json.dumps(g)) > 1900 and g["u"]:', '    if False:\n        g["s"] = []\n    while False:', "a big battle still fits", SIEGE),
  ('siege: the other side not mirrored', _sg("_3duel"), '            o.side = 1 - side', '            o.side = side', "themselves blue on the left", SIEGE),
 
+ # Tabletop Siege phase 3: the teacher's pictures, and wins on the school's board
+ ('siege: a pose missing', "../showcase/siege/build.py", '            frames = [art(f"{troop}_{team}_{k}") for k in range(3)]', '            frames = [art(f"{troop}_{team}_{k}") for k in range(2)]', "every troop of both teams in its three poses", SIEGE),
+ ('siege: wins against the computer count', _sg("Hud"), 'if m.over and in_room() and m.winner == 0 and self.counted != m.match_no:', 'if m.over and m.winner == 0 and self.counted != m.match_no:', "never wins against the computer", SIEGE),
+ ('siege: losses count as wins', _sg("Hud"), 'if m.over and in_room() and m.winner == 0 and self.counted', 'if m.over and in_room() and self.counted', "never wins against the computer", SIEGE),
+ ('siege: wins forgotten', _sg("Hud"), '    wins = save_get("wins", 0) + 1', '    wins = 1', "never wins against the computer", SIEGE),
+
  ('tell: the page drops them', NETS, '    if (o.tells && !this.away) this.tells.push(...o.tells);\n', '', "one player on a WebSocket and one polling", E2E),
 
 ]

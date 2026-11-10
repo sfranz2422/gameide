@@ -1,5 +1,13 @@
 # Progress
 
+## Tabletop Siege, phase 3: the teacher's pictures and the school's board (2026-11-10, waiting for review)
+- **All 8 Gemini pictures are in**, cut by `showcase/siege/cut_sheets.py` into `art/` (67 pictures; `raw/` and `art/` committed): both teams' five troops walking and attacking (a plane flying and diving), pencil-cup towers that crack at half and fall over into a heap, lunchbox keeps (broken when they fall), the desk's wood, rulers laid side by side across the gap, desk things in the corners, glue, marbles, a wall of toy blocks, wind-up keys turning as troops arrive, puffs of dust, hit sparks, rubber bands and pencil shavings in flight, the eight card portraits, the title picture, and sparkles when you win. The other player's game draws all of it the same (the pictures come from where things are, not from steps).
+- Gemini drew the golem facing left and every other troop facing right; the red side's are turned round, so the golem is turned the other way. Its blue marble caught a sliver of the red one; the cutter keeps only a drawing's largest piece there.
+- **The school's board: wins against other players**, all told (kept with `save_set`). Wins against the computer don't count, since anyone could pile them up.
+- Found on the way: shots were also called `speed`, so the engine pushed every shot to the right as well.
+- Tests: the art (every troop of both teams in its three poses, cups, lunchboxes, cards); the board (`scores.test.ts`: in a room only, wins only, added up). 4 sabotage cases, all caught.
+- **Next:** play it! Publish with the Python check box ticked; Find me a match pairs students.
+
 ## Tabletop Siege, phase 2: two players (2026-11-09, waiting for review)
 - **Find me a match** (the teacher's ask, beside room codes): a new button in the lobby of a one-against-one game. The server puts you in with someone already waiting, or makes a room for you to wait in; a room whose waiter left isn't handed out. Rooms of a two-player game hold two (`netPlayers` 2, as Undertow's hold 25).
 - **In a room:** each waits on the title for the other (named when they arrive), then both go to the desk. The room's host runs the battle; the other player's game shows it mirrored, so each sees themselves blue on the left. The other player's cards go privately to the host, which plays them only if they may be played (energy, the right half), as it does its own. The computer stays out of rooms; it's Play the computer, or Play alone in the lobby, for the odd one out.

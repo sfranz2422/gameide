@@ -16,6 +16,10 @@ LANES = [96, 200]              # the two lanes' heights
 BRIDGE = 18                    # half a ruler's width
 SIDE_COLOR = ["#3d7bff", "#ff4f4f"]   # blue (you, on the left), red (them)
 
+# Things lying on the desks (picture, x, y, turned by degrees): out of the lanes.
+DESK_THINGS = [("note", 34, 248, -8), ("crayon", 250, 34, 20), ("coins", 262, 254, 0), ("clip", 386, 36, 30),
+               ("sharpener", 404, 256, 0), ("scissors", 600, 250, -15)]
+
 # ---- towers: a pencil cup at the head of each lane, a lunchbox keep behind them
 TOWERS = [  # (kind, x, y) for the left side; the right side's are mirrored
     ("tower", 116, LANES[0]), ("tower", 116, LANES[1]), ("keep", 54, (LANES[0] + LANES[1]) / 2),

@@ -19,11 +19,11 @@ function builtAt(folder: string, patched?: string) {
   return p && existsSync(p) ? p : resolve(dir, "project.json");
 }
 
-async function start(file: string, save: Record<string, unknown> = {}) {
+async function start(file: string, save: Record<string, unknown> = {}, net?: { code: string; number: number; name: string; state: Record<string, unknown> }) {
   const project = JSON.parse(readFileSync(file, "utf8")) as Project;
   const { def } = buildGame(project, new Map());
   const scores: number[] = [];
-  const { game, error } = await PythonGame.load({ ...def, save } as typeof def, {
+  const { game, error } = await PythonGame.load({ ...def, save, ...(net ? { net } : {}) } as typeof def, {
     stdout: () => undefined, stderr: () => undefined, warning: () => undefined, score: (n) => scores.push(n),
   });
   if (error) throw new Error(`${error.object} ${error.event} line ${error.line}: ${error.message}`);
@@ -264,5 +264,27 @@ on("climber")("Snowcap Scramble's board", () => {
     expect(g.scores.length).toBe(1);
     expect(g.scores[0]).toBeGreaterThanOrEqual(44);
     expect(g.scores[0]).toBe(g.py("global_vars.best"));
+  });
+});
+
+on("siege")("Tabletop Siege's board", () => {
+  it("is wins against other players, all told: never wins against the computer", async () => {
+    const alone = await start(builtAt("siege"));
+    expect(alone.project.settings.scoreboard).toEqual({ unit: "wins" });
+    alone.py('room_goto("Desk")');
+    alone.step(3);
+    alone.py("end_match(0)");
+    alone.step(3);
+    expect(alone.scores).toEqual([]);
+    // In a room (as the host, alone for the moment: the match is the game's own), wins count.
+    const g = await start(builtAt("siege"), { wins: 4 }, { code: "KXTD", number: 1, name: "Ana", state: {} });
+    g.py('room_goto("Desk")');
+    g.step(3);
+    g.py("end_match(0)");
+    g.step(3);
+    expect(g.scores).toEqual([5]);
+    g.py("new_match()\nend_match(1)");
+    g.step(3);
+    expect(g.scores).toEqual([5]);
   });
 });

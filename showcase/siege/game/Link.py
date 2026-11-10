@@ -49,6 +49,5 @@ else:
 
 # === draw
 # The host's shots, in the other player's game (it has no Shot objects of its own).
-for x, y, side in global_vars.shots:
-    draw_set_color("#c9874a" if side == 0 else "#7a3b3b")
-    draw_circle(x, y, 2.5)
+for x, y, side, kind in global_vars.shots:
+    draw_sprite_ext(kind, 0, x, y, 1, 1, x * 9)

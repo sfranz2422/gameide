@@ -56,7 +56,7 @@ for k, card in enumerate(hand(0)):
     draw_rect(x - 2, y - 2 + lift, x + 74, y + 60 + lift)
     draw_set_color("#f4ecd8" if affordable else "#9a9184")
     draw_rect(x, y + lift, x + 72, y + 58 + lift)
-    card_picture(card, x + 36, y + 24 + lift)
+    card_picture(card, x + 36, y + 21 + lift, 0.75)
     words(x + 36, y + 40 + lift, c["name"], 9, "white", "center")
     draw_set_color("#7a4fd0")
     draw_circle(x + 8, y + 8 + lift, 9)
@@ -64,4 +64,4 @@ for k, card in enumerate(hand(0)):
     words(x + 70, y + 1 + lift, str(k + 1), 9, "#5a4a3a", "right")
 nx = 60
 words(nx, BOTTOM + 22, "Next", 10, "#cfb98a", "center")
-card_picture(up_next(0), nx, BOTTOM + 52)
+card_picture(up_next(0), nx, BOTTOM + 52, 0.6)

@@ -23,16 +23,19 @@ if keyboard_check_pressed("space") or keyboard_check_pressed("enter") or \
     room_goto("Desk")
 
 # === draw
-draw_set_color("#c8955a")
-draw_rect(0, 0, VIEW_W, VIEW_H)
+draw_sprite("title", 0, 0, 0)
+draw_set_alpha(0.35)
+draw_set_color("#2a1d12")
+draw_rect(0, 0, VIEW_W, 175)
+draw_set_alpha(1)
 words(VIEW_W / 2, 60, "Tabletop Siege", 44, "white", "center")
-words(VIEW_W / 2, 118, "Toy soldiers, wind-up knights and paper planes, battling across a desk.", 14, "#3b2a1a", "center")
-words(VIEW_W / 2, 150, "Drag cards onto your side. Knock down their towers.", 14, "#3b2a1a", "center")
+words(VIEW_W / 2, 118, "Toy soldiers, wind-up knights and paper planes, battling across a desk.", 14, "#fff2d8", "center")
+words(VIEW_W / 2, 150, "Drag cards onto your side. Knock down their towers.", 14, "#fff2d8", "center")
 if in_room():
     them = opponent()
     if them is None:
         words(VIEW_W / 2, 236, f"Room {net_room()}: waiting for an opponent" + "." * (self.t // 30 % 4), 18, "white", "center")
-        words(VIEW_W / 2, 264, "Tell a friend the code, or wait for a match.", 13, "#3b2a1a", "center")
+        words(VIEW_W / 2, 264, "Tell a friend the code, or wait for a match.", 13, "#fff2d8", "center")
     else:
         words(VIEW_W / 2, 236, f"{them.name} is here!", 22, "#ffd23f", "center")
 else:

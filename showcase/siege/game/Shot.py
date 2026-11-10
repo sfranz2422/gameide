@@ -23,5 +23,4 @@ self.x += (t.x - self.x) / d * self.pace
 self.y += (t.y - self.y) / d * self.pace
 
 # === draw
-draw_set_color("#c9874a" if self.side == 0 else "#7a3b3b")
-draw_circle(self.x, self.y, 2.5)
+draw_sprite_ext(self.kind, 0, self.x, self.y, 1, 1, self.x * 9)

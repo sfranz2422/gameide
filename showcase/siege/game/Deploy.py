@@ -25,16 +25,16 @@ for k in range(n):
     o = instance_create(self.x + math.cos(a) * r, self.y + math.sin(a) * r, c["object"])
     o.side = self.side
 sound_play("pop", volume=0.5)
+puff(self.x, self.y)
 self.destroy()
 
 # === draw
 k = self.t / WIND_UP
-draw_set_alpha(0.5)
+draw_set_alpha(0.35)
 draw_set_color(SIDE_COLOR[self.side])
 draw_circle(self.x, self.y, 16)
 draw_set_alpha(1)
-draw_set_color("#ffd23f")
-a = self.t * 0.25
-draw_line(self.x - 8 * math.cos(a), self.y - 8 * math.sin(a), self.x + 8 * math.cos(a), self.y + 8 * math.sin(a), 3)
 draw_set_color("#ffffff")
 draw_circle(self.x, self.y, 16 * (1 - k) + 2, True)
+# A wind-up key, turning as it winds.
+draw_sprite_ext("key", 0, self.x, self.y, 1, 1, self.t * 12)
