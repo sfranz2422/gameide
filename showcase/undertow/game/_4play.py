@@ -44,6 +44,7 @@ def take_role(d):
     global_vars.jobs = [i for i in d.get("jobs", []) if isinstance(i, int) and 0 <= i < len(STATIONS)]
     global_vars.done = set()
     global_vars.all_done = 0
+    global_vars.role_flash = ROLE_FLASH      # shown big for a moment, then off the screen
 
 
 def sit_down(g):
@@ -54,6 +55,20 @@ def sit_down(g):
     pl = global_vars.player
     pl.x, pl.y = seat(sorted(g["in"]).index(me.number), len(g["in"]))
     pl.vx = pl.vy = 0
+
+
+def in_sight(x, y):
+    """
+    Whether you can see a player (or someone frozen) at (x, y): only inside your own
+    light (the teacher's ask: nobody shows outside your light circle, though the
+    station itself stays dimly lit). Ghosts, and everyone between rounds, see all.
+    """
+    g = global_vars.g
+    if am_ghost() or g["ph"] in ("lobby", "over"):
+        return True
+    pl = global_vars.player
+    reach = LIGHT[global_vars.role or "crew"] * SIGHT
+    return point_distance(pl.x, pl.y - 16, x, y) <= reach
 
 
 def where(n):

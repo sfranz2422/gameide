@@ -25,22 +25,27 @@ if room and g["ph"] == "lobby":
 if room and net_me().number not in g["in"] and g["ph"] != "over":
     words(VIEW_W / 2, VIEW_H - 40, "A round is on: you'll be in the next one.", 14, "#9fb9cf", "center")
 
-# Who you are.
+# Who you are: big, for a moment at the start of a round, then off your screen, so
+# nobody glancing at it can tell (the teacher's ask). Ghosts are no secret.
 role = global_vars.role
 if room and role is not None and g["ph"] == "play":
     if am_ghost():
         words(VIEW_W - 10, 10, "You're a ghost", 14, "#9fb9cf", "right")
         words(VIEW_W - 10, 28, "Your jobs still count" if role == "crew" else "Watch the crew", 11, "#9fb9cf", "right")
-    elif role == "mimic":
-        words(VIEW_W - 10, 10, "You are a Mimic", 14, "#ff5a4f", "right")
-        mates = ", ".join(f"#{n}" for n in global_vars.mates)
-        words(VIEW_W - 10, 28, ("With " + mates + ". " if mates else "") + "Your jobs are pretend.", 11, "#ff9a8f", "right")
-        cool = global_vars.cool
-        words(VIEW_W - 10, 46, f"F: freeze in {cool // 60 + 1}s" if cool > 0 else "F: freeze is ready", 12,
-              "#9fb9cf" if cool > 0 else "#9fe3ff", "right")
-    else:
-        words(VIEW_W - 10, 10, "You are crew", 14, "#3ecf8e", "right")
-        words(VIEW_W - 10, 28, "Do your jobs. Watch for Mimics.", 11, "#9fd0b9", "right")
+    elif global_vars.role_flash > 0:
+        global_vars.role_flash -= 1
+        draw_set_alpha(min(1, global_vars.role_flash / 30) * 0.8)
+        draw_set_color("#020a14")
+        draw_rect(120, 120, VIEW_W - 120, 240)
+        draw_set_alpha(1)
+        if role == "mimic":
+            words(VIEW_W / 2, 132, "You are a Mimic", 30, "#ff5a4f", "center")
+            mates = ", ".join(f"#{n}" for n in global_vars.mates)
+            words(VIEW_W / 2, 176, ("The other Mimics: " + mates + ". " if mates else "") + "Freeze the crew with F.", 14, "#ff9a8f", "center")
+            words(VIEW_W / 2, 200, "Your jobs are pretend: act like crew.", 12, "#ff9a8f", "center")
+        else:
+            words(VIEW_W / 2, 132, "You are crew", 30, "#3ecf8e", "center")
+            words(VIEW_W / 2, 176, "Do your jobs. Watch for Mimics.", 14, "#9fd0b9", "center")
 
 # Your jobs.
 if global_vars.jobs:

@@ -13,6 +13,7 @@ global_vars.chat = []            # [(number, words)], the meeting's, newest last
 global_vars.my_vote = None
 global_vars.cool = 0             # a Mimic's steps until they can freeze again
 global_vars.calls_left = CALLS_EACH
+global_vars.role_flash = 0
 self.t = 0
 self.inbox = []                  # what players told the host: [(number, dict)]
 self.host_for = 0                # steps this game has been the host
@@ -135,7 +136,7 @@ for p in players:
     o.image_index = p.get("p", 0)
     o.facing = -1 if p.get("f", 1) < 0 else 1
     o.ghost = p.number in ghosts(g) and g["ph"] not in ("lobby", "over")
-    o.visible = seeing_ghosts or not o.ghost
+    o.visible = (seeing_ghosts or not o.ghost) and in_sight(o.x, o.y)
 for n in list(self.others):
     if n not in numbers:
         if instance_exists(self.others[n]):
@@ -150,6 +151,9 @@ for b in g["b"]:
         body.number = b[0]
         body.sprite = "crew_" + (b[3] if b[3] in SUIT_NAMES else "coral")
         self.bodies[b[0]] = body
+for body in self.bodies.values():
+    if instance_exists(body):
+        body.visible = in_sight(body.x, body.y)
 for n in list(self.bodies):
     if n not in found:
         if instance_exists(self.bodies[n]):

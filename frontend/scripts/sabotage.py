@@ -1706,7 +1706,7 @@ CASES = [
  ('undertow: freeze from afar', _ut("_4play"), '                    and point_distance(a[0], a[1], b[0], b[1]) <= FREEZE_REACH + SLACK):', '                    ):', "never from afar", UND),
  ('undertow: freezes nonstop', _ut("_4play"), '                    and d.coolness.get(sender, 0) <= 0 and a and b', '                    and a and b', "must wait between", UND),
  ('undertow: crew can freeze', _ut("_4play"), '            if (d.roles.get(sender) == "mimic" and alive(sender)', '            if (alive(sender)', "must wait between", UND),
- ('undertow: ghosts seen by all', _ut("Director"), '    o.visible = seeing_ghosts or not o.ghost', '    o.visible = True', "ghosts: the frozen walk through walls", UND),
+ ('undertow: ghosts seen by all', _ut("Director"), '    o.visible = (seeing_ghosts or not o.ghost) and in_sight(o.x, o.y)', '    o.visible = in_sight(o.x, o.y)', "ghosts: the frozen walk through walls", UND),
  ('undertow: ghosts stopped by walls', _ut("Player"), '    if ghost:\n        # Ghosts drift', '    if False:\n        # Ghosts drift', "ghosts: the frozen walk through walls", UND),
  ('undertow: ghosts vote', _ut("_4play"), '    if not playing() or g["ph"] != "meeting" or global_vars.my_vote is not None:', '    if g["ph"] != "meeting" or global_vars.my_vote is not None:', "a report: everyone to the table", UND),
  ('undertow: ghosts speak', _ut("_4play"), '    if words is None or not playing() or', '    if words is None or', "a report: everyone to the table", UND),
@@ -1780,6 +1780,12 @@ CASES = [
  ('siege: wins against the computer count', _sg("Hud"), 'if m.over and in_room() and m.winner == 0 and self.counted != m.match_no:', 'if m.over and m.winner == 0 and self.counted != m.match_no:', "never wins against the computer", SIEGE),
  ('siege: losses count as wins', _sg("Hud"), 'if m.over and in_room() and m.winner == 0 and self.counted', 'if m.over and in_room() and self.counted', "never wins against the computer", SIEGE),
  ('siege: wins forgotten', _sg("Hud"), '    wins = save_get("wins", 0) + 1', '    wins = 1', "never wins against the computer", SIEGE),
+
+ # Undertow tweaks (the teacher's asks, 2026-11-10)
+ ('undertow: seen through the dark', _ut("Director"), '    o.visible = (seeing_ghosts or not o.ghost) and in_sight(o.x, o.y)', '    o.visible = seeing_ghosts or not o.ghost', "others show only inside your light", UND),
+ ('undertow: the Mimic sees no further', _ut("_4play"), '    reach = LIGHT[global_vars.role or "crew"] * SIGHT', '    reach = LIGHT["crew"] * SIGHT', "others show only inside your light", UND),
+ ('undertow: bodies seen from afar', _ut("Director"), '        body.visible = in_sight(body.x, body.y)', '        body.visible = True', "others show only inside your light", UND),
+ ('undertow: the role stays on screen', _ut("Hud"), '        global_vars.role_flash -= 1\n', '', "your role shows big for five seconds", UND),
 
  ('tell: the page drops them', NETS, '    if (o.tells && !this.away) this.tells.push(...o.tells);\n', '', "one player on a WebSocket and one polling", E2E),
 

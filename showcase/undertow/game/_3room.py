@@ -26,6 +26,9 @@ SAY_WAIT = 90            # steps between a player's phrases
 GONE_STEPS = 90 * 60     # a player not seen this long has left the round
 SLACK = 40               # pixels the host allows for the room's delay
 LIGHT = {"crew": 150, "mimic": 210, "ghost": 260}
+SIGHT = 0.7                  # others are seen only this far into your light: past it they're too dim to make
+                             # out, but their number (which the dark doesn't cover) still showed
+ROLE_FLASH = 5 * 60          # steps your role is shown at the start of a round, then hidden from your screen
 
 # What can be said in a meeting: a phrase, and what it needs filled in
 # ("n" a player's number, "room" a room).

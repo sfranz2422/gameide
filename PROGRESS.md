@@ -1,5 +1,10 @@
 # Progress
 
+## Undertow: in the dark, and the role kept secret (2026-11-10, waiting for review)
+- **Nobody shows outside your light** (the teacher's ask): the station stays dimly lit, but other players, their numbers, and anyone frozen appear only inside your own lamp's circle (70% of it, where it's bright enough to make them out). A Mimic's eyes see further, as before; ghosts see everyone. Frozen crew no longer glow: they're found by walking into them.
+- **Your role flashes for five seconds** at the start of a round (big, in the middle: "You are a Mimic", who the other Mimics are, "Freeze the crew with F"), then it's off the screen, so a classmate glancing over can't read it. The Mimic's freeze timer is gone too; "F: freeze #3" still shows when someone is in reach and it's ready.
+- Tests: 2 more in `undertow.test.ts`; 4 sabotage cases (and one older case pointed at the rewritten line), all caught.
+
 ## Tabletop Siege, phase 3: the teacher's pictures and the school's board (2026-11-10, waiting for review)
 - **All 8 Gemini pictures are in**, cut by `showcase/siege/cut_sheets.py` into `art/` (67 pictures; `raw/` and `art/` committed): both teams' five troops walking and attacking (a plane flying and diving), pencil-cup towers that crack at half and fall over into a heap, lunchbox keeps (broken when they fall), the desk's wood, rulers laid side by side across the gap, desk things in the corners, glue, marbles, a wall of toy blocks, wind-up keys turning as troops arrive, puffs of dust, hit sparks, rubber bands and pencil shavings in flight, the eight card portraits, the title picture, and sparkles when you win. The other player's game draws all of it the same (the pictures come from where things are, not from steps).
 - Gemini drew the golem facing left and every other troop facing right; the red side's are turned round, so the golem is turned the other way. Its blue marble caught a sliver of the red one; the cutter keeps only a drawing's largest piece there.

@@ -533,6 +533,44 @@ bad`) as unknown as unknown[];
     expect(py(room.seat(2).g, "try_call()")).toBe(false);
   });
 
+  it("in the dark: others show only inside your light (a Mimic's reaches further), frozen crew too", async () => {
+    const room = await round(5, 3);
+    const seen = (from: number, of: number) => py(room.seat(from).g, `[o.visible for o in instances('Other') if o.number == ${of}]`) as unknown as boolean[];
+    put(room, 2, ...hub(0, 0));
+    put(room, 4, ...hub(100, 0));
+    expect(seen(2, 4)).toEqual([true]);
+    put(room, 4, ...hub(140, 0));
+    expect(seen(2, 4)).toEqual([false]);
+    // The Mimic's eyes: further.
+    put(room, 3, ...hub(0, 0));
+    expect(seen(3, 4)).toEqual([true]);
+    put(room, 4, ...hub(240, 0));
+    expect(seen(3, 4)).toEqual([false]);
+    // Someone frozen is found by walking up to them, not seen glowing from across the station.
+    py(room.seat(3).g, "global_vars.cool = 0");
+    py(room.seat(1).g, "global_vars.director.coolness[3] = 0");
+    put(room, 4, ...hub(-200, 0));
+    put(room, 3, ...hub(-180, 0));
+    py(room.seat(3).g, "try_freeze(4)");
+    room.step(10);
+    put(room, 2, ...hub(200, 0));
+    expect(py(room.seat(2).g, "[b.visible for b in instances('Body')]")).toEqual([false]);
+    put(room, 2, ...hub(-150, 0));
+    expect(py(room.seat(2).g, "[b.visible for b in instances('Body')]")).toEqual([true]);
+    // A ghost sees everyone.
+    put(room, 5, ...hub(200, 0));
+    expect(seen(4, 5)).toEqual([true]);
+  });
+
+  it("your role shows big for five seconds at the start of a round, then it's off the screen", async () => {
+    const room = await round(4, 3);
+    expect(py(room.seat(3).g, "global_vars.role_flash")).toBeGreaterThan(4 * 60);
+    room.step(5 * 60);
+    expect(room.seats.map((s) => py(s.g, "global_vars.role_flash"))).toEqual([0, 0, 0, 0]);
+    // Still a Mimic, of course: just not written on the screen.
+    expect(roleOf(room.seat(3))).toBe("mimic");
+  });
+
   it("a report: everyone to the table, phrases said, a vote, and the Mimic sent up: the crew win", async () => {
     const room = await round(4, 3);
     py(room.seat(3).g, "global_vars.cool = 0");

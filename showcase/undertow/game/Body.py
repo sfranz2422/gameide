@@ -2,7 +2,7 @@
 # sprite: crew_coral
 # depth: 4
 # A crew member frozen in ice, where the Mimic caught them. Walk up and press E
-# to tell everyone. A meeting clears them away.
+# to tell everyone. A meeting clears them away. Seen only in your light (Director).
 
 # === create
 self.number = 0
@@ -12,7 +12,7 @@ self.t = 0
 
 # === step
 self.t += 1
-light(self.x, self.y - 20, 40, "#9fe3ff", 0.5 + 0.2 * math.sin(self.t / 20))
+# No glow of its own: a frozen crew member is found by walking into them with your lamp.
 
 # === draw
 draw_self()
