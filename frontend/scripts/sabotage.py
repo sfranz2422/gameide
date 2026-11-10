@@ -1798,6 +1798,24 @@ CASES = [
  ('siege: backs to the enemy', _sg("Unit"), '    if abs(t.x - self.x) > 2:\n        self.face = 1 if t.x > self.x else -1\n', '', "turn to face what they're fighting", SIEGE),
  ('siege: facing not sent', _sg("_3duel"), '                o.face = 1 if b & 8 else -1', '                o.face = -1 if b & 8 else 1', "faces the same way in both games", SIEGE),
 
+ # Tabletop Siege: eight more cards, and decks (the teacher's asks, 2026-11-10)
+ ('siege: sleds never charge', _sg("_2battle"), '        damage *= CHARGE_HIT\n', '        damage *= 1\n', "Sled Riders: the first hit", SIEGE),
+ ('siege: sleds always charged', _sg("_2battle"), '    u.run = 0\n    if is_a(u, "PolarBear"):', '    if is_a(u, "PolarBear"):', "Sled Riders: the first hit", SIEGE),
+ ('siege: the bear hits one', _sg("_2battle"), '    if is_a(u, "PolarBear"):\n', '    if False:\n', "a Polar Bear's swipe hits every troop", SIEGE),
+ ('siege: three foxes', _sg("_1rules"), '"object": "Fox", "count": 4,', '"object": "Fox", "count": 3,', "Arctic Foxes come four at a time", SIEGE),
+ ('siege: frost that doesn\'t chill', _sg("Shot"), '        t.chill = CHILL_STEPS', '        pass', "her shots slow what they hit", SIEGE),
+ ('siege: the cannon shoots flyers', _sg("SnowCannon"), 'if u.side != self.side and not u.flies', 'if u.side != self.side', "a Snow Cannon shoots troops on foot", SIEGE),
+ ('siege: the cannon never melts', _sg("SnowCannon"), 'self.hp -= self.max_hp / self.life\n', '', "a Snow Cannon shoots troops on foot", SIEGE),
+ ('siege: avalanches hit your own', _sg("Avalanche"), '    for o in enemies_of(self.side):', '    for o in enemies_of(self.side) + [u for u in instances("Unit") if u.side == self.side]:', "an Avalanche hurts everything of theirs", SIEGE),
+ ('siege: avalanches flatten towers', _sg("Avalanche"), 'hurt(o, AVALANCHE_TOWER if is_a(o, "Building") else AVALANCHE_DAMAGE)', 'hurt(o, AVALANCHE_DAMAGE)', "an Avalanche hurts everything of theirs", SIEGE),
+ ('siege: cocoa for everyone', _sg("Cocoa"), '        if u.side == self.side and point_distance', '        if point_distance', "Hot Cocoa heals your own troops", SIEGE),
+ ('siege: golems just go', _sg("_2battle"), '        if is_a(target, "IceGolem"):', '        if False:', "an Ice Golem knocked out breaks into two", SIEGE),
+ ('siege: the deck not kept', _sg("Decks"), '        save_set("deck", self.chosen)\n', '', "the deck screen: pick 8", SIEGE),
+ ('siege: done before eight', _sg("Decks"), 'my <= 346 and len(self.chosen) == DECK_SIZE:', 'my <= 346 and len(self.chosen) >= 1:', "the deck screen: pick 8", SIEGE),
+ ('siege: any deck goes', _sg("_2battle"), '    if not isinstance(cards, list) or len(cards) != DECK_SIZE or len(set(cards)) != DECK_SIZE:\n        return None\n    return list(cards) if all(isinstance(c, str) and c in CARDS for c in cards) else None', '    return list(cards) if isinstance(cards, list) and cards else None', "the deck screen: pick 8", SIEGE),
+ ('siege: the host deals its own deck to them', _sg("_2battle"), '        return real_deck(opponent().get("deck")) or DECK[:]', '        return DECK[:]', "the host deals the other player's own deck", SIEGE),
+ ('siege: the deck stays home', _sg("Title"), '    net_send({"here": 1, "deck": my_deck()})', '    net_send({"here": 1})', "the host deals the other player's own deck", SIEGE),
+
  ('tell: the page drops them', NETS, '    if (o.tells && !this.away) this.tells.push(...o.tells);\n', '', "one player on a WebSocket and one polling", E2E),
 
 ]

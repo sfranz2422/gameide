@@ -58,7 +58,8 @@ const count = (g: Game, obj: string, side?: number) =>
   py(g, `len([o for o in instances('${obj}')${side === undefined ? "" : ` if o.side == ${side}`}])`) as unknown as number;
 /** Puts `card` in hand slot 0 for `side` and plenty of energy, then plays it at (x, y). */
 function play(g: Game, side: number, card: string, x: number, y: number) {
-  return py(g, `d = global_vars.decks[${side}]\nd.remove('${card}')\nd.insert(0, '${card}')\nglobal_vars.energy[${side}] = 10\nplay_card(${side}, 0, ${x}, ${y})`) as unknown as boolean;
+  // (A card not in the deck, one of the new ones, is put in: the deck screen would.)
+  return py(g, `d = global_vars.decks[${side}]\nif '${card}' in d: d.remove('${card}')\nd.insert(0, '${card}')\nglobal_vars.energy[${side}] = 10\nplay_card(${side}, 0, ${x}, ${y})`) as unknown as boolean;
 }
 
 describe.skipIf(!have)("Tabletop Siege: a match against the computer", () => {
@@ -483,5 +484,140 @@ describe.skipIf(!have)("Tabletop Siege: two players", () => {
     room.step(30);
     const sizes = a.g.sent.filter((o) => o.state).slice(-10).map((o) => JSON.stringify(o.state).length);
     expect(Math.max(...sizes)).toBeLessThanOrEqual(2000);
+  });
+});
+
+describe.skipIf(!have)("Tabletop Siege: the eight new cards, and picking a deck", () => {
+  const red = (g: Game, obj: string, x: number, y: number, still = true) =>
+    py(g, `o = instance_create(${x}, ${y}, '${obj}')\no.side = 1\n${still ? "o.pace = 0\nif hasattr(o, 'base_pace'): o.base_pace = 0" : ""}\no.uid`);
+  const hpOf = (g: Game, obj: string) => py(g, `[round(o.max_hp - o.hp) for o in instances('${obj}') if o.side == 1]`) as unknown as number[];
+
+  it("Sled Riders: the first hit after a run-up does double, the next ones don't", async () => {
+    const g = await desk(false);
+    red(g, "Snowman", 280, 200);
+    py(g, "u = instance_create(180, 200, 'SledRider')\nu.side = 0");
+    let first = 0;
+    for (let t = 0; t < 400 && !first; t++) {
+      step(g);
+      first = (hpOf(g, "Snowman")[0] ?? 0);
+    }
+    expect(first).toBe(140);
+    step(g, 62);
+    expect(hpOf(g, "Snowman")[0]).toBe(210);
+  });
+
+  it("a Polar Bear's swipe hits every troop of theirs around what it hits", async () => {
+    const g = await desk(false);
+    red(g, "Snowman", 240, 200);
+    red(g, "Snowman", 245, 222);
+    py(g, "u = instance_create(205, 200, 'PolarBear')\nu.side = 0");
+    step(g, 30);
+    expect(hpOf(g, "Snowman").sort()).toEqual([66, 66]);
+  });
+
+  it("Arctic Foxes come four at a time", async () => {
+    const g = await desk(false);
+    play(g, 0, "foxes", 200, 200);
+    step(g, 62);
+    expect(count(g, "Fox", 0)).toBe(4);
+  });
+
+  it("a Frost Fairy flies, and her shots slow what they hit", async () => {
+    const g = await desk(false);
+    red(g, "Snowman", 260, 200);
+    py(g, "u = instance_create(200, 200, 'Fairy')\nu.side = 0");
+    step(g, 40);
+    expect(py(g, "[o.chill > 0 for o in instances('Snowman')]")).toEqual([true]);
+    expect(py(g, "instances('Fairy')[0].flies")).toBe(true);
+  });
+
+  it("a Snow Cannon shoots troops on foot (not flyers), and melts away", async () => {
+    const g = await desk(false);
+    play(g, 0, "cannon", 200, 200);
+    step(g, 62);
+    red(g, "Owl", 280, 200);
+    step(g, 60);
+    expect(py(g, "instances('SnowCannon')[0].target")).toBe(undefined);
+    red(g, "SnowKid", 290, 200);
+    step(g, 80);
+    expect(count(g, "SnowKid", 1)).toBe(0);
+    step(g, 30 * 60);
+    expect(count(g, "SnowCannon")).toBe(0);
+  });
+
+  it("an Avalanche hurts everything of theirs in its circle, towers a little; not your own", async () => {
+    const g = await desk(false);
+    // Out of the towers' reach, too far apart to fight each other.
+    red(g, "Snowman", 420, 200);
+    py(g, "a = instance_create(440, 245, 'Snowman')\na.side = 0\na.base_pace = 0");
+    play(g, 0, "avalanche", 430, 215);
+    step(g, 62 + 32);
+    expect(hpOf(g, "Snowman")).toEqual([260]);
+    expect(py(g, "[o.hp == o.max_hp for o in instances('Snowman') if o.side == 0]")).toEqual([true]);
+    // Dropped on a tower: it takes a little.
+    play(g, 0, "avalanche", 524, 200);
+    step(g, 62 + 32);
+    expect(py(g, "[t.max_hp - t.hp for t in instances('Tower') if t.side == 1 and abs(t.y - 200) < 5]")).toEqual([90]);
+  });
+
+  it("Hot Cocoa heals your own troops in its circle, not theirs", async () => {
+    const g = await desk(false);
+    py(g, "a = instance_create(205, 200, 'Snowman')\na.side = 0\na.base_pace = 0\na.hp = 300");
+    red(g, "Snowman", 205, 241);
+    py(g, "[o.__setattr__('hp', 300) for o in instances('Snowman') if o.side == 1]");
+    play(g, 0, "cocoa", 205, 215);
+    step(g, 63);
+    expect(py(g, "sorted((o.side, round(o.hp)) for o in instances('Snowman'))")).toEqual([[0, 540], [1, 300]]);
+  });
+
+  it("an Ice Golem knocked out breaks into two ice chunks that keep fighting", async () => {
+    const g = await desk(false);
+    py(g, "u = instance_create(200, 200, 'IceGolem')\nu.side = 0\nhurt(u, 99999)");
+    step(g);
+    expect(py(g, "[(c.side, c.hp == c.max_hp) for c in instances('IceChunk')]")).toEqual([[0, true], [0, true]]);
+  });
+
+  it("the deck screen: pick 8 of the 16 by clicking, Done only at 8, kept; a match deals from it", async () => {
+    const g = await start();
+    const click = (x: number, y: number) => {
+      g.engine.input.mouseMove(x, y);
+      g.engine.input.mouseDown(0);
+      step(g);
+      g.engine.input.mouseUp(0);
+      step(g);
+    };
+    const slot = (card: string) => py(g, `deck_slot(ALL_CARDS.index('${card}'))`) as unknown as [number, number];
+    click(320, 304);                                   // Your deck
+    expect(count(g, "Decks")).toBe(1);
+    // Out with the starting eight, in with the new eight, clicking each.
+    for (const c of ["kids", "snowman", "owl", "penguin", "yeti", "wall", "snowball", "ice"]) click(slot(c)[0] + 30, slot(c)[1] + 30);
+    for (const c of ["sled", "bear", "foxes", "fairy", "cannon", "avalanche", "cocoa"]) click(slot(c)[0] + 30, slot(c)[1] + 30);
+    click(320, 330);                                   // Done, at seven: not yet
+    expect(count(g, "Decks")).toBe(1);
+    click(slot("icegolem")[0] + 30, slot("icegolem")[1] + 30);
+    click(320, 330);
+    expect(count(g, "Decks")).toBe(0);
+    tap(g, "space");
+    step(g, 2);
+    expect(py(g, "sorted(global_vars.decks[0])")).toEqual(["avalanche", "bear", "cannon", "cocoa", "fairy", "foxes", "icegolem", "sled"]);
+    // A deck that isn't 8 different real cards is the starting deck instead.
+    py(g, "save_set('deck', ['sled', 'sled', 'dragon'])");
+    expect(py(g, "sorted(my_deck())")).toEqual(["ice", "kids", "owl", "penguin", "snowball", "snowman", "wall", "yeti"]);
+  });
+
+  it("in a room the host deals the other player's own deck, and both see the new cards", async () => {
+    const room = new Room();
+    const a = await room.join(1, "Ana");
+    const b = await room.join(2, "Ben");
+    py(b.g, "save_set('deck', ['sled', 'bear', 'foxes', 'fairy', 'cannon', 'avalanche', 'cocoa', 'icegolem'])");
+    room.step(100);
+    room.step(3);
+    expect(py(a.g, "room_name()")).toBe("Field");
+    expect(py(a.g, "sorted(global_vars.decks[1])")).toEqual(["avalanche", "bear", "cannon", "cocoa", "fairy", "foxes", "icegolem", "sled"]);
+    // The host plays an avalanche: the other game shows it.
+    py(a.g, "d = global_vars.decks[0]\nd.remove('yeti')\nd.insert(0, 'yeti')\nglobal_vars.energy[0] = 10");
+    py(a.g, "o = instance_create(400, 200, 'Avalanche')\no.side = 0");
+    room.step(3);
+    expect(count(b.g, "Avalanche")).toBe(1);
   });
 });

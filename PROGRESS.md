@@ -1,5 +1,11 @@
 # Progress
 
+## Tabletop Siege: eight more cards, and your own deck (2026-11-10, waiting for review)
+- **Eight new cards** (the teacher's picks): Sled Riders (fast; the first hit after a run-up does double), Polar Bear (each swipe hits everything around), Arctic Foxes (a pack of four), Frost Fairy (flies; her shots slow what they hit), Snow Cannon (a building: shoots far at troops on foot, melts), Avalanche (snow crashes down on a circle; towers a little), Hot Cocoa (heals your troops in a circle), Ice Golem (breaks into two ice chunks that keep fighting). Every number in `_1rules.py`.
+- **Pick your deck** (the teacher's choice): "Your deck" on the title (in a room too, while you wait) shows all 16; click to take one in or leave it out, Done at 8; kept for next time. A match deals from it. In a room your deck goes with you and the host's game deals from it, if it's 8 different real cards (else the starting deck). The computer uses the starting deck.
+- **Stand-in pictures** for the new ones (other troops' pictures, resized and tinted; a cannon drawn by the game; framed stand-in cards) until the teacher's Gemini pictures come: prompts 10-13 in `showcase/siege/PROMPTS.md`.
+- Tests: 10 more (each card's rule, the deck screen by clicking, the other player's deck in a room); 16 sabotage cases.
+
 ## Tabletop Siege: past the creek, and facing the enemy (2026-11-10, waiting for review)
 - **Knock a tower down and you may drop troops just past the creek** in that lane (the teacher's ask; 90 pixels over, near the lane), the drop zone showing it; the same for the other side, mirrored, and checked by the host's game.
 - **Troops turn to face what they're fighting** (even behind them), and face the way they walk; the other player's game shows them turned the same way, mirrored.

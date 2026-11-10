@@ -7,7 +7,8 @@
 # host privately, which checks them as it checks its own (play_card).
 
 # Everything the other player's game shows, by its number in snapshot().
-KINDS = ["SnowKid", "Snowman", "Owl", "Penguin", "Yeti", "SnowWall", "Tower", "Keep", "Snowball", "IcePatch", "Deploy"]
+KINDS = ["SnowKid", "Snowman", "Owl", "Penguin", "Yeti", "SnowWall", "Tower", "Keep", "Snowball", "IcePatch", "Deploy",
+         "SledRider", "PolarBear", "Fox", "Fairy", "IceGolem", "IceChunk", "SnowCannon", "Avalanche", "Cocoa"]
 GONE_STEPS = 150 * 60        # an opponent away this long (not just answering a question) has left
 SMOOTH = 0.35                # how far a puppet glides toward where the host says it is, each step
 
@@ -48,10 +49,12 @@ def snapshot():
     """The battle in a few hundred characters: what the other player's game draws."""
     m = global_vars
     things = []
-    for o in instances("Unit") + instances("Building") + instances("Snowball") + instances("IcePatch") + instances("Deploy"):
+    for o in [o for name in ("Unit", "Building", "Snowball", "IcePatch", "Deploy", "Avalanche", "Cocoa") for o in instances(name)]:
         k = KINDS.index(type(o).__name__)
         if is_a(o, "Deploy"):
-            extra = [o.t, DECK.index(o.card)]
+            extra = [o.t, ALL_CARDS.index(o.card)]
+        elif is_a(o, "Avalanche") or is_a(o, "Cocoa"):
+            extra = [o.t, 0]
         elif is_a(o, "IcePatch"):
             extra = [o.life, 0]
         elif is_a(o, "Snowball"):
@@ -61,7 +64,7 @@ def snapshot():
                      + (4 if getattr(o, "swing", 0) > 0 else 0)
                      + (8 if is_a(o, "Unit") and (o.face or forward(o.side)) < 0 else 0)]
         things.append([o.uid, k, o.side, round(o.x), round(o.y)] + extra)
-    shots = [[round(s.x), round(s.y), s.side, 1 if s.kind == "icicle" else 0] for s in instances("Shot")]
+    shots = [[round(s.x), round(s.y), s.side, ["snowshot", "icicle", "frost"].index(s.kind)] for s in instances("Shot")]
     g = {"n": m.match_no, "t": m.clock, "c": m.crowns, "e": round(m.energy[1], 2), "h": m.decks[1][:HAND + 1],
          "o": m.overtime, "x": m.over, "w": m.winner, "a": m.again, "u": things, "s": shots, "z": m.halt}
     # A room's word is at most NET_STATE_LIMIT characters: in a very big battle, the shots go first.
@@ -87,9 +90,9 @@ def show(g, puppets):
     m.crowns = [g["c"][1], g["c"][0]]
     m.winner = mirror_side(g["w"]) if g["w"] is not None else None
     m.energy[0] = g["e"]
-    m.decks[0] = list(g["h"]) + [c for c in DECK if c not in g["h"]]
+    m.decks[0] = list(g["h"]) + [c for c in ALL_CARDS if c not in g["h"]]
     m.again = [g["a"][1], g["a"][0]]
-    m.shots = [(VIEW_W - x, y, 1 - side, "icicle" if kind else "snowshot") for x, y, side, kind in g["s"]]
+    m.shots = [(VIEW_W - x, y, 1 - side, ["snowshot", "icicle", "frost"][kind]) for x, y, side, kind in g["s"]]
     seen = set()
     for uid, k, side, x, y, a, b in g["u"]:
         seen.add(uid)
@@ -105,7 +108,9 @@ def show(g, puppets):
         o.x += (tx - o.x) * SMOOTH
         o.y += (y - o.y) * SMOOTH
         if KINDS[k] == "Deploy":
-            o.t, o.card = a, DECK[b]
+            o.t, o.card = a, ALL_CARDS[b]
+        elif KINDS[k] in ("Avalanche", "Cocoa"):
+            o.t = a
         elif KINDS[k] == "IcePatch":
             o.life = a
         elif KINDS[k] != "Snowball":

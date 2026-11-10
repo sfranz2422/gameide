@@ -49,8 +49,27 @@ CARDS = {
                  "about": "Rolls down a lane, bowling things over"},
     "ice": {"cost": 2, "name": "Ice Patch", "kind": "ice", "object": "IcePatch", "count": 1,
             "about": "Slows the other side's troops"},
+    # Eight more (the teacher's ask, 2026-11-10): each player picks 8 of all 16 for their deck.
+    "sled": {"cost": 4, "name": "Sled Riders", "kind": "unit", "object": "SledRider", "count": 1,
+             "about": "Fast; the first hit after a run-up does double"},
+    "bear": {"cost": 5, "name": "Polar Bear", "kind": "unit", "object": "PolarBear", "count": 1,
+             "about": "Each swipe hits everything around it"},
+    "foxes": {"cost": 3, "name": "Arctic Foxes", "kind": "unit", "object": "Fox", "count": 4,
+              "about": "A pack of four, fast and weak"},
+    "fairy": {"cost": 4, "name": "Frost Fairy", "kind": "unit", "object": "Fairy", "count": 1,
+              "about": "Flies; her shots slow what they hit"},
+    "cannon": {"cost": 4, "name": "Snow Cannon", "kind": "building", "object": "SnowCannon", "count": 1,
+               "about": "Shoots far at troops on foot; melts"},
+    "avalanche": {"cost": 4, "name": "Avalanche", "kind": "spell", "object": "Avalanche", "count": 1,
+                  "about": "Snow crashes down on everything in a circle"},
+    "cocoa": {"cost": 2, "name": "Hot Cocoa", "kind": "spell", "object": "Cocoa", "count": 1,
+              "about": "Heals your troops in a circle"},
+    "icegolem": {"cost": 4, "name": "Ice Golem", "kind": "unit", "object": "IceGolem", "count": 1,
+                 "about": "Breaks into two ice chunks that keep fighting"},
 }
-DECK = ["kids", "snowman", "owl", "penguin", "yeti", "wall", "snowball", "ice"]
+DECK = ["kids", "snowman", "owl", "penguin", "yeti", "wall", "snowball", "ice"]   # the deck you start with
+ALL_CARDS = DECK + ["sled", "bear", "foxes", "fairy", "cannon", "avalanche", "cocoa", "icegolem"]
+DECK_SIZE = 8
 HAND = 4
 
 # What each troop is like. targets: "ground" (troops on foot and buildings),
@@ -62,7 +81,20 @@ UNITS = {
     "Owl": (200, 64, 18, 58, 1.35, 8, True, "buildings"),
     "Penguin": (170, 44, 60, 62, 0.7, 7, False, "all"),     # in a tower's reach when it shoots one
     "Yeti": (2000, 96, 20, 84, 0.34, 15, False, "buildings"),
+    "SledRider": (480, 70, 18, 60, 1.25, 9, False, "ground"),
+    "PolarBear": (1100, 66, 20, 72, 0.55, 13, False, "ground"),
+    "Fox": (75, 16, 14, 34, 1.3, 5, False, "ground"),
+    "Fairy": (220, 34, 70, 56, 1.0, 7, True, "all"),
+    "IceGolem": (900, 48, 18, 70, 0.45, 13, False, "buildings"),
+    "IceChunk": (220, 24, 16, 50, 0.7, 7, False, "ground"),      # what an Ice Golem breaks into: two
 }
+CHARGE_RUN, CHARGE_HIT = 60, 2.0       # Sled Riders: pixels of run-up for a charge, and what it multiplies
+BEAR_SPLASH = 34                       # a Polar Bear's swipe reaches this far round what it hits
+CHILL, CHILL_STEPS = 0.5, 90           # a Frost Fairy's shot: pace times this, for this many steps
+# Snow Cannon: hp, damage, range, steps between shots, radius, steps until it's melted
+CANNON = (600, 56, 120, 54, 16, 30 * 60)
+AVALANCHE_R, AVALANCHE_DAMAGE, AVALANCHE_TOWER, AVALANCHE_FALL = 50, 260, 90, 30
+COCOA_R, COCOA_HEAL = 50, 240
 SIGHT = 100                    # how near a troop notices something to fight
 LANE_SIGHT = 52                # ...and only in its own lane: no further up or down than this
 MELT = 1500                    # steps for a snowman to melt to half speed
@@ -104,11 +136,11 @@ def can_drop(side, card, x, y):
     """
     Where a card may be dropped: troops, walls and snowballs on your own side of the
     creek, or just past it in a lane whose tower you've knocked down (the teacher's
-    ask); ice anywhere.
+    ask); ice and spells (Avalanche, Hot Cocoa) anywhere.
     """
     if not (TOP + 6 <= y <= BOTTOM - 6 and 8 <= x <= VIEW_W - 8):
         return False
-    if CARDS[card]["kind"] == "ice":
+    if CARDS[card]["kind"] in ("ice", "spell"):
         return True
     return own_half(side, x) or past_the_creek(side, x, y)
 

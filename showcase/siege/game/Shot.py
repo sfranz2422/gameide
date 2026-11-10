@@ -17,6 +17,8 @@ if t is None or not instance_exists(t):
     return
 d = point_distance(self.x, self.y, t.x, t.y)
 if d <= self.pace:
+    if self.kind == "frost" and is_a(t, "Unit"):
+        t.chill = CHILL_STEPS
     hurt(t, self.damage)
     self.destroy()
     return
@@ -26,4 +28,7 @@ self.y += (t.y - self.y) / d * self.pace
 # === draw
 t = self.target
 a = point_direction(self.x, self.y, t.x, t.y) if t is not None and instance_exists(t) else 0
-draw_sprite_ext(self.kind, 0, self.x, self.y, 1, 1, a if self.kind == "icicle" else 0)
+if self.kind == "frost":
+    draw_sprite_ext("spark", 0, self.x, self.y, 0.6, 0.6, self.x * 6)
+else:
+    draw_sprite_ext(self.kind, 0, self.x, self.y, 1, 1, a if self.kind == "icicle" else 0)

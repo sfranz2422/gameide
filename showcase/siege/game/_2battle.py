@@ -46,23 +46,47 @@ def new_match():
     m.again = [False, False]           # Play again, pressed: both, in a room
     m.match_no = getattr(m, "match_no", 0) + 1
     m.energy = [float(ENERGY_START), float(ENERGY_START)]
+    # Each side's own deck (picked on the title, Decks), shuffled: the first HAND are in
+    # the hand, the next is up next. The other player's comes with them (Link); the
+    # computer's is the deck everyone starts with.
     m.decks = []
     for side in (0, 1):
-        order = DECK[:]
+        order = deck_of(side)[:]
         random.shuffle(order)
-        m.decks.append(order)          # the first HAND are in your hand, the next is up next
+        m.decks.append(order)
     m.crowns = [0, 0]
     m.clock = MATCH_STEPS
     m.overtime = False
     m.over = False
     m.winner = None                    # 0, 1, or -1 for a draw
-    for o in instances("Building") + instances("Unit") + instances("Deploy") + instances("Snowball") + instances("IcePatch") + instances("Shot"):
+    for o in [o for name in ("Building", "Unit", "Deploy", "Snowball", "IcePatch", "Shot", "Avalanche", "Cocoa") for o in instances(name)]:
         o.destroy()
     for side in (0, 1):
         for kind, x, y in TOWERS:
             t = instance_create(mirror_x(x, side), y, "Keep" if kind == "keep" else "Tower")
             t.side = side
             setup_tower(t, kind)
+
+
+def real_deck(cards):
+    """A deck as it may be played: 8 different real cards, or None."""
+    if not isinstance(cards, list) or len(cards) != DECK_SIZE or len(set(cards)) != DECK_SIZE:
+        return None
+    return list(cards) if all(isinstance(c, str) and c in CARDS for c in cards) else None
+
+
+def my_deck():
+    """Your deck, as you picked it on the title (kept for next time), or the deck everyone starts with."""
+    return real_deck(save_get("deck")) or DECK[:]
+
+
+def deck_of(side):
+    """Side 0 is you; side 1 the other player (their deck, sent with them) or the computer."""
+    if side == 0:
+        return my_deck()
+    if in_room() and opponent() is not None:
+        return real_deck(opponent().get("deck")) or DECK[:]
+    return DECK[:]
 
 
 def fallen_lanes(side):
@@ -121,6 +145,11 @@ def hurt(target, amount):
         camera_shake(4, 12)
     elif is_a(target, "Unit"):
         puff(target.x, target.y)
+        # An Ice Golem breaks into two ice chunks that keep fighting.
+        if is_a(target, "IceGolem"):
+            for dy in (-9, 9):
+                c = instance_create(target.x, target.y + dy, "IceChunk")
+                c.side = target.side
     target.destroy()
 
 
@@ -205,6 +234,23 @@ def pick_target(u):
     return (ahead or keep or theirs or [None])[0]
 
 
+def strike(u, t):
+    """
+    A blow up close. Sled Riders hit double after a run-up; a Polar Bear's swipe also
+    hits every other troop on foot of theirs around what it hits.
+    """
+    damage = u.damage
+    if is_a(u, "SledRider") and u.run >= CHARGE_RUN:
+        damage *= CHARGE_HIT
+        camera_shake(2, 6)
+    u.run = 0
+    if is_a(u, "PolarBear"):
+        for o in [o for o in instances("Unit") if o.side != u.side and not o.flies and o is not t
+                  and point_distance(o.x, o.y, t.x, t.y) <= BEAR_SPLASH]:
+            hurt(o, damage)
+    hurt(t, damage)
+
+
 def shoot(x, y, target, damage, side, kind="snowshot"):
     """A shot on its way: a snowball (a penguin's slingshot) or an icicle (a tower's)."""
     s = instance_create(x, y, "Shot")
@@ -250,7 +296,7 @@ def crown(x, y, won, color):
 TEAM = ["blue", "red"]
 
 
-def draw_troop(u, troop):
+def draw_troop(u, troop, size=1.0, tint=None):
     """
     A troop's picture: walking (two frames, one per few pixels moved) while it moves,
     attacking just after a blow, standing otherwise. Turned to face the way it marches.
@@ -271,10 +317,16 @@ def draw_troop(u, troop):
     else:
         frame = (u.anim // 10) % 2 if u.still < 8 else 0
     face = u.face or forward(u.side)
-    draw_sprite_ext(f"{troop}_{TEAM[u.side]}", frame, u.x, u.y, face, 1, 0, "#ffd0d0" if u.flash else "white")
+    draw_sprite_ext(f"{troop}_{TEAM[u.side]}", frame, u.x, u.y, face * size, size, 0,
+                    "#ffd0d0" if u.flash else tint or "white")
     if u.flash > 3:
         draw_sprite("spark", 0, u.x, u.y - u.radius)
 
 
 def puff(x, y):
     instance_create(x, y, "Puff")
+
+
+def deck_slot(k):
+    """Where card k of ALL_CARDS sits on the deck screen: two rows of eight."""
+    return 18 + (k % 8) * 77, 44 + (k // 8) * 116

@@ -20,6 +20,8 @@ self.flash = 0
 self.slowed = False
 self.swing = 0                   # steps of the attacking picture still to show
 self.face = None                 # which way it faces: 1 right, -1 left (None: the way its side marches)
+self.chill = 0                   # steps still slowed by a Frost Fairy's shot
+self.run = 0                     # pixels walked since its last blow (Sled Riders charge with it)
 self.px = self.py = None         # where it was last drawn (draw_troop: walking or standing)
 setup_unit(self, "SnowKid")
 
@@ -28,7 +30,10 @@ if self.puppet or stopped():
     return
 self.age += 1
 self.flash = max(0, self.flash - 1)
-self.cool = max(0, self.cool - 1)
+# Chilled by a Frost Fairy: getting ready for the next blow takes twice as long.
+self.chill = max(0, self.chill - 1)
+if not (self.chill and self.age % 2):
+    self.cool = max(0, self.cool - 1)
 t = self.target
 # Look again every so often (something nearer may have come), or when it's gone.
 if t is None or not instance_exists(t) or self.age % 20 == 0:
@@ -45,10 +50,10 @@ if point_distance(self.x, self.y, t.x, t.y) <= reach:
         self.face = 1 if t.x > self.x else -1
     if self.cool == 0:
         if self.range > 40:
-            shoot(self.x, self.y - 6, t, self.damage, self.side, "snowshot")
+            shoot(self.x, self.y - 6, t, self.damage, self.side, "frost" if is_a(self, "Fairy") else "snowshot")
             sound_play("twang", volume=0.25)
         else:
-            hurt(t, self.damage)
+            strike(self, t)
             sound_play("hit", volume=0.25)
         self.cool = self.rate
         self.swing = 14
@@ -56,6 +61,8 @@ else:
     pace = self.pace
     if self.slowed:
         pace *= ICE_SLOW
+    if self.chill:
+        pace *= CHILL
     tx, ty = (t.x, t.y) if self.flies else waypoint(self.x, self.y, t.x, t.y)
     d = point_distance(self.x, self.y, tx, ty)
     if d > 0:
@@ -64,6 +71,7 @@ else:
         step = min(pace, d)
         self.x += (tx - self.x) / d * step
         self.y += (ty - self.y) / d * step
+        self.run += step
 # Troops of one side don't stand in one another (flyers and those on foot don't mind each other).
 for o in instances("Unit"):
     if o is not self and o.side == self.side and o.flies == self.flies:

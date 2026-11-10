@@ -8,16 +8,23 @@ if not sound_playing("music"):
 
 # === step
 self.t += 1
+picking = len(instances("Decks")) > 0
+if not picking and mouse_check_pressed("left") and 250 <= mouse_x <= 390 and 290 <= mouse_y <= 318:
+    instance_create(0, 0, "Decks")
+    picking = True
 if in_room():
-    # In a room: say you're here, wait for the other player, then both go to the field.
-    net_send({"here": 1})
+    # In a room: say you're here (and your deck: the host's game deals from it), wait
+    # for the other player, then both go to the field (not while you're picking a deck).
+    net_send({"here": 1, "deck": my_deck()})
     if opponent() is None:
         self.found = 0
     else:
         self.found = getattr(self, "found", 0) + 1
-        if self.found > 90:
+        if self.found > 90 and not picking:
             room_goto("Field")
     return
+if picking:
+    return                      # the deck screen has the mouse
 if keyboard_check_pressed("space") or keyboard_check_pressed("enter") or \
         mouse_check_pressed("left") and 220 <= mouse_x <= 420 and 236 <= mouse_y <= 276:
     room_goto("Field")
@@ -38,7 +45,13 @@ if in_room():
         words(VIEW_W / 2, 264, "Tell a friend the code, or wait for a match.", 13, "#fff2d8", "center")
     else:
         words(VIEW_W / 2, 236, f"{them.name} is here!", 22, "#ffd23f", "center")
+    draw_set_color("#2f6f9f")
+    draw_rect(250, 290, 390, 318)
+    words(VIEW_W / 2, 295, "Your deck", 15, "white", "center")
 else:
     draw_set_color("#3ecf8e" if (self.t // 30) % 2 else "#2fb27a")
     draw_rect(220, 236, 420, 276)
     words(VIEW_W / 2, 245, "Play the computer", 18, "white", "center")
+    draw_set_color("#2f6f9f")
+    draw_rect(250, 290, 390, 318)
+    words(VIEW_W / 2, 295, "Your deck", 15, "white", "center")

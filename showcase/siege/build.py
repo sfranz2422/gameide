@@ -41,6 +41,9 @@ VIEW_W, VIEW_H = RULES["VIEW_W"], RULES["VIEW_H"]
 
 
 ART = HERE / "art"
+_cut = _load("siege_cut", HERE / "cut_sheets.py")
+STAND_IN_CARDS = {"sled": "sled", "bear": "yeti_blue_0", "foxes": "penguin_blue_0", "fairy": "owl_blue_0",
+                  "cannon": "snow_wall", "avalanche": "heap", "cocoa": "mug", "icegolem": "snowman_blue_0"}
 TROOPS = ["kid", "snowman", "owl", "penguin", "yeti"]
 # How wide each picture is drawn in the game (pixels): build.py fits the teacher's drawings to these.
 WIDE = {"snow": 256, "bridge": 64, "snow_wall": 48, "ice_patch": 2 * RULES["ICE_R"], "snowball_blue": 2 * RULES["SNOWBALL_R"] + 4,
@@ -144,8 +147,13 @@ def build(out):
             im = im.resize((width, 2 * RULES["BRIDGE"] + 6), Image.LANCZOS)   # logs from bank to bank, a lane wide
         origin = (0, 0) if name == "snow" else (im.width // 2, im.height - 2) if name.startswith("pine") else (im.width // 2, im.height // 2)
         P.sprite(name, [im], origin)
-    for card in RULES["DECK"]:
-        im = art(f"card_{card}")
+    # The cards' pictures. Until the teacher's come for the eight new ones, each is a stand-in:
+    # another picture of the game, framed like the rest (cut_sheets.framed).
+    for card in RULES["ALL_CARDS"]:
+        if (ART / f"card_{card}.png").exists():
+            im = art(f"card_{card}")
+        else:
+            im = _cut.framed(Image.open(ART / f"{STAND_IN_CARDS[card]}.png").convert("RGBA")).resize((44, 44), Image.LANCZOS)
         P.sprite(f"card_{card}", [im], (im.width // 2, im.height // 2))
     title = art("title", 1)
     k = max(VIEW_W / title.width, VIEW_H / title.height)

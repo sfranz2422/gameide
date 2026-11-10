@@ -50,4 +50,7 @@ else:
 # === draw
 # The host's shots, in the other player's game (it has no Shot objects of its own).
 for x, y, side, kind in global_vars.shots:
-    draw_sprite_ext(kind, 0, x, y, 1, 1, 0 if kind == "snowshot" else (0 if side == 0 else 180))
+    if kind == "frost":
+        draw_sprite_ext("spark", 0, x, y, 0.6, 0.6, x * 6)
+    else:
+        draw_sprite_ext(kind, 0, x, y, 1, 1, 0 if kind == "snowshot" else (0 if side == 0 else 180))
