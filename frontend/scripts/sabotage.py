@@ -52,6 +52,8 @@ def _cl(n): return f"../showcase/climber/game/{n}.py"
 UND = "undertow"   # …or Undertow's, rebuilt the same way
 SIEGE = "siege"    # …or Tabletop Siege's, rebuilt the same way
 def _sg(n): return f"../showcase/siege/game/{n}.py"
+SAND = "sand"      # …or Pour Decisions', rebuilt the same way
+def _sd(n): return f"../showcase/sand/game/{n}.py"
 def _ut(n): return f"../showcase/undertow/game/{n}.py"
 SMR, SML, SMB = "../showcase/smash/game/_2rules.py", "../showcase/smash/game/_1levels.py", "../showcase/smash/build.py"
 def _sm(n): return f"../showcase/smash/game/{n}.py"
@@ -1816,6 +1818,35 @@ CASES = [
  ('siege: the host deals its own deck to them', _sg("_2battle"), '        return real_deck(opponent().get("deck")) or DECK[:]', '        return DECK[:]', "the host deals the other player's own deck", SIEGE),
  ('siege: the deck stays home', _sg("Title"), '    net_send({"here": 1, "deck": my_deck()})', '    net_send({"here": 1})', "the host deals the other player's own deck", SIEGE),
 
+ # Pour Decisions, the sand-sorting puzzle (2026-11-10). The first four the build
+ # refuses (solve.py), so they're caught by the built game being out of date.
+ ('sand: a layer a pour', _sd("_2sand"), '    return min(n, CAP - len(dst))', '    return min(1, CAP - len(dst))', "is today's source", SAND),
+ ('sand: pours onto any colour', _sd("_2sand"), '    return not dst or dst[-1] == colour', '    return True', "is today's source", SAND),
+ ('sand: a par that\'s wrong', _sd("_1levels"), '"name": "First Pour", "par": 3,', '"name": "First Pour", "par": 2,', "is today's source", SAND),
+ ('sand: a level that can\'t be finished', _sd("_1levels"), '"tubes": ["RRRO", "OOOR", ""]', '"tubes": ["RRRO", "OOOR"]', "is today's source", SAND),
+ ('sand: a wrong pour pours', _sd("_4play"), '    elif can_pour(d.picked.sand, tube.sand):', '    elif d.picked.sand and len(tube.sand) < CAP:', "a wrong pour does nothing but shake", SAND),
+ ('sand: pours not counted', _sd("_4play"), '    d.pours += 1\n', '', "the bot finishes level 1 in", SAND),
+ ('sand: half a tube is done', _sd("_2sand"), '    return len(sand) == CAP and len(set(sand)) == 1', '    return len(set(sand)) == 1', "the bot finishes level 2 in", SAND),
+ ('sand: dealt upside down', _sd("Director"), '    t.sand = list(sand)\n', '    t.sand = list(sand)[::-1]\n', "dealt as written", SAND),
+ ('sand: covered for ever', _sd("_4play"), '    src.hidden = min(src.hidden, max(0, len(src.sand) - 1))', '    pass', "hidden layers show", SAND),
+ ('sand: undo covers them again', _sd("_4play"), '        t.hidden = min(t.hidden, hidden, max(0, len(sand) - 1))', '        t.hidden = min(hidden, max(0, len(sand) - 1))', "stay shown after an undo", SAND),
+ ('sand: undo goes right back to the start', _sd("_4play"), 'zip(d.tubes, d.history.pop())', 'zip(d.tubes, d.history[0])', "undo takes back a pour", SAND),
+ ('sand: tubes without end', _sd("_4play"), '    if d.extra or d.won:\n        return\n    d.extra = True', '    if d.won:\n        return\n    d.extra = True', "an extra tube once a level", SAND),
+ ('sand: the extra tube is free', _sd("_2sand"), '    return min(stars, 2) if extra_tube else stars', '    return stars', "an extra tube once a level", SAND),
+ ('sand: pointless pours are a way out', _sd("_2sand"), ' and not (not b.sand and n == len(a.sand))', '', "no pours left", SAND),
+ ('sand: the worst stars kept', _sd("_4play"), '    if d.stars > save_get(f"stars_{n}", 0):', '    if True:', "the best stars are kept", SAND),
+ ('sand: never unlocks', _sd("LevelCard"), 'self.off = self.i > 0 and not save_get(f"stars_{self.i - 1}", 0)', 'self.off = self.i > 0', "the next level unlocks", SAND),
+ ('sand: next is the same level', _sd("GoButton"), '    global_vars.level += 1\n', '', "the next level unlocks", SAND),
+ ('sand: shapes forgotten', _sd("ShapesButton"), 'save_set("shapes", global_vars.shapes)\n', '', "the shapes are kept", SAND),
+ ('sand: sand lost mid-pour', _sd("_2sand"), '        out.append([drain_colour, min(1.0, left)])', '        out.append([drain_colour, min(0.5, left)])', "no sand appears or vanishes", SAND),
+ ('sand: the stream misses the mouth', _sd("Pour"), 'top_y, bottom_y = self.src.y, surface_y(self.dst)', 'top_y, bottom_y = self.src.y + 30, surface_y(self.dst)', "the falling sand is drawn", SAND),
+ ('sand: the stream under the tubes', _sd("Pour"), '# depth: -20', '# depth: 20', "the falling sand is drawn", SAND),
+ ('sand: tipped across the tube', _sd("_2sand"), '-TILT if from_left else TILT', '-TILT', "leans back the way it came", SAND),
+ ('sand: one long row', _sd("_2sand"), 'ONE_ROW = 7 ', 'ONE_ROW = 13 ', "two rows", SAND),
+ ('sand: questions mid-pour', _sd("Director"), 'question_ok(not instance_exists("Pour"))', 'question_ok(True)', "never while sand is pouring", SAND),
+ ('sand: the board is the last level', _sd("_4play"), '    high_score(sum(save_get(f"points_{i}", 0) for i in range(len(LEVELS))))', '    high_score(points)', "Pour Decisions' board", SAND),
+ ('sand: the board ignores stars', _sd("_2sand"), '    return 10 * par * stars', '    return 10 * par', "Pour Decisions' board", SAND),
+
  ('tell: the page drops them', NETS, '    if (o.tells && !this.away) this.tells.push(...o.tells);\n', '', "one player on a WebSocket and one polling", E2E),
 
 ]
@@ -1852,7 +1883,7 @@ for name, f, old, new, test, *extra in CASES:
             failed = any(l.startswith("FAIL") and test in l for l in out.splitlines())
             ran = "ok   " in out or "FAIL " in out
         else:
-            if runner in ([GM], [MM], [FB], [GF], [BB], [HC], [KT], [TD], [SM], [RP], [CLIMB], [UND], [SIEGE]):
+            if runner in ([GM], [MM], [FB], [GF], [BB], [HC], [KT], [TD], [SM], [RP], [CLIMB], [UND], [SIEGE], [SAND]):
                 subprocess.run(["python3", str(ROOT.parent / f"showcase/{runner[0]}/build.py")], capture_output=True)
             cmd = ["npx", "playwright", "test", "-g", test] if runner == [E2E] else ["npx", "vitest", "run", "-t", test]
             r = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True)
@@ -1863,6 +1894,6 @@ for name, f, old, new, test, *extra in CASES:
         if not failed: bad.append(name)
     finally:
         p.write_text(src)
-        if runner in ([GM], [MM], [FB], [GF], [BB], [HC], [KT], [TD], [SM], [RP], [CLIMB], [UND], [SIEGE]):
+        if runner in ([GM], [MM], [FB], [GF], [BB], [HC], [KT], [TD], [SM], [RP], [CLIMB], [UND], [SIEGE], [SAND]):
             subprocess.run(["python3", str(ROOT.parent / f"showcase/{runner[0]}/build.py")], capture_output=True)
 print("ALL SABOTAGES CAUGHT" if not bad else f"NOT CAUGHT: {bad}")

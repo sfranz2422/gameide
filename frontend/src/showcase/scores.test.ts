@@ -222,6 +222,28 @@ on("smash")("Jelly Jailbreak's board", () => {
   }, 60_000);
 });
 
+on("sand")("Pour Decisions' board", () => {
+  it("is each level's best added up: bigger levels and fewer pours count for more", async () => {
+    const g = await start(builtAt("sand"));
+    expect(g.project.settings.scoreboard).toEqual({ unit: "points" });
+    const finish = (level: number, pours: number) => {
+      g.py(`global_vars.level = ${level}; room_goto("Play")`);
+      g.step(3);
+      g.py(`global_vars.director.pours = ${pours}; finish(global_vars.director)`);
+      g.step();
+    };
+    const par = (n: number): number => g.py(`LEVELS[${n}]["par"]`);
+    finish(0, 999); // one star
+    expect(g.scores).toEqual([10 * par(0)]);
+    finish(3, 0); // three stars
+    expect(g.scores.at(-1)).toBe(10 * par(0) + 30 * par(3));
+    finish(0, 0); // level 1 again, better
+    expect(g.scores.at(-1)).toBe(30 * par(0) + 30 * par(3));
+    finish(3, 999); // worse: the best stays
+    expect(g.scores.at(-1)).toBe(30 * par(0) + 30 * par(3));
+  }, 60_000);
+});
+
 on("greymire", "Greymire")("Greymire's board", () => {
   it("is how many endings you've found", async () => {
     const g = await start(builtAt("greymire", "Greymire"));

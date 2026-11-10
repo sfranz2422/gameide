@@ -296,7 +296,7 @@ code (the harness turns bytecode caching off for that reason), or a
 mistyped case name ran nothing and still reported success (the harness now
 refuses unknown names).
 
-**The showcase games' runners** (`GM`, `MM`, `FB`, `GF`, `BB`, `HC`, `KT`, `TD`, `SM`, `RP`, `CLIMB`, `UND`, `SIEGE` — not `CL`, which is classes.py) rebuild
+**The showcase games' runners** (`GM`, `MM`, `FB`, `GF`, `BB`, `HC`, `KT`, `TD`, `SM`, `RP`, `CLIMB`, `UND`, `SIEGE`, `SAND` — not `CL`, which is classes.py) rebuild
 that game from the sabotaged source before its playtest and again after. A
 build that **refuses** (Greenside's course checks, Ridgeline Rally's stage
 checks) leaves the old `out/project.json`, and the test passes on it: a
@@ -667,6 +667,18 @@ match (`halt`, `stopped()`); gone `GONE_STEPS`, the one still here wins. Picture
 are the teacher's (`cut_sheets.py` → `art/`); `draw_troop` chooses a frame from
 where a troop is (moving or not, `swing` after a blow), so puppets animate too.
 Its board is wins against players only (`Hud`).
+
+## Pour Decisions
+
+`showcase/sand/`: a sand-sorting puzzle (the teacher's ask, 2026-11-10), every
+picture drawn by its build. Levels are `game/_1levels.py`, one letter a layer,
+written by `make_levels.py`; **`solve.py` re-solves every level as it builds** and
+refuses one that can't be finished or whose `par` isn't the fewest pours, and
+refuses if the game's pouring rule (`_2sand.py`) and the checker's disagree.
+A refused build leaves the old `out/`, so `sand.test.ts`'s "is today's source"
+fails when it happens (that's how a sabotage of those is caught). A pour moves the
+sand at once (`pour_from`); the `Pour` object only shows it moving (`drain`,
+`pending`, `shown_layers`), so undo and the win never wait on an animation.
 
 ## Style
 

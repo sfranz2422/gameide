@@ -138,6 +138,20 @@ on("smash")("Jelly Jailbreak", () => {
   });
 });
 
+on("sand")("Pour Decisions", () => {
+  it("never while sand is pouring", async () => {
+    const g = await start("sand");
+    g.py('global_vars.level = 0; room_goto("Play")');
+    g.step(3);
+    expect(g.fair()).toBe(true);
+    g.py("d = global_vars.director; a, b = next((a, b) for a in d.tubes for b in d.tubes if a is not b and can_pour(a.sand, b.sand)); pour_from(d, a, b)");
+    g.step();
+    expect(g.fair()).toBe(false);
+    g.step(120);
+    expect(g.fair()).toBe(true);
+  });
+});
+
 on("towers")("Fort Bramble", () => {
   it("between waves, never while one's on its way", async () => {
     const g = await start("towers");
