@@ -16,12 +16,12 @@ import type { NetJoined, NetMessageIn, NetOut, NetPlayerState } from "../engine/
 const BUILT = resolve(__dirname, "../../../showcase/siege/out/project.json");
 const have = existsSync(BUILT);
 
-async function start(net?: NetJoined) {
+async function start(net?: NetJoined, save: Record<string, unknown> = {}) {
   const project = JSON.parse(readFileSync(BUILT, "utf8")) as Project;
   const { def } = buildGame(project, new Map());
   const oks: boolean[] = [];
   const sent: NetOut[] = [];
-  const { game, error } = await PythonGame.load({ ...def, ...(net ? { net } : {}) } as typeof def, {
+  const { game, error } = await PythonGame.load({ ...def, save, ...(net ? { net } : {}) } as typeof def, {
     stdout: () => undefined, stderr: () => undefined, warning: () => undefined,
     questionOk: (ok) => oks.push(ok),
     net: (o) => sent.push(o),
@@ -46,8 +46,8 @@ function tap(g: PythonGame, name: string) {
 }
 type Game = Awaited<ReturnType<typeof start>>;
 /** On the desk, a match begun. With `cpu` false, the computer is sent away, so the test plays both sides. */
-async function desk(cpu = true): Promise<Game> {
-  const g = await start();
+async function desk(cpu = true, save: Record<string, unknown> = {}): Promise<Game> {
+  const g = await start(undefined, save);
   tap(g, "space");
   step(g, 2);
   expect(py(g, "room_name()")).toBe("Field");
@@ -73,7 +73,8 @@ describe.skipIf(!have)("Tabletop Siege: a match against the computer", () => {
       expect(frames(`castle_${team}`)).toBe(1);
     }
     for (const card of ["kids", "snowman", "owl", "penguin", "yeti", "wall", "snowball", "ice",
-                        "sled", "bear", "foxes", "fairy", "cannon", "avalanche", "cocoa", "icegolem"]) expect(frames(`card_${card}`), card).toBe(1);
+                        "sled", "bear", "foxes", "fairy", "cannon", "avalanche", "cocoa", "icegolem",
+                        "kangaroo", "salamander", "moose", "hedgehog", "beaver", "campfire", "fireworks", "squirrels"]) expect(frames(`card_${card}`), card).toBe(1);
     for (const n of ["cannon_blue", "cannon_red", "cannon_fire", "avalanche", "cocoa", "heal", "ice_burst"]) expect(frames(n), n).toBe(1);
     for (const n of ["snow", "bridge", "title", "castle_broken", "puff", "spark", "snowshot", "icicle", "swirl", "snow_wall", "ice_patch", "icon"]) expect(frames(n), n).toBe(1);
   });
@@ -321,8 +322,8 @@ interface Seat { g: Game; number: number; name: string; here: boolean; state: Re
 /** A room as the server keeps one: each step, every game gets the others' newest states, its messages, and the host. */
 class Room {
   seats: Seat[] = [];
-  async join(number: number, name: string) {
-    const g = await start({ code: "KXTD", number, name, state: {} });
+  async join(number: number, name: string, save: Record<string, unknown> = {}) {
+    const g = await start({ code: "KXTD", number, name, state: {} }, save);
     // From the very start: a game sends an unchanged state only once, and this one sent it on its first steps.
     const seat: Seat = { g, number, name, here: true, state: {}, inbox: [], read: 0 };
     this.seats.push(seat);
@@ -622,5 +623,266 @@ describe.skipIf(!have)("Tabletop Siege: the eight new cards, and picking a deck"
     py(a.g, "o = instance_create(400, 200, 'Avalanche')\no.side = 0");
     room.step(3);
     expect(count(b.g, "Avalanche")).toBe(1);
+  });
+});
+
+describe.skipIf(!have)("Tabletop Siege: coins, upgrades, and cards to buy", () => {
+  const red = (g: Game, obj: string, x: number, y: number) =>
+    py(g, `o = instance_create(${x}, ${y}, '${obj}')\no.side = 1\no.pace = 0\nif hasattr(o, 'base_pace'): o.base_pace = 0\no.uid`);
+  const blue = (g: Game, obj: string, x: number, y: number) => py(g, `o = instance_create(${x}, ${y}, '${obj}')\no.side = 0\no.uid`);
+  const coins = (g: Game) => py(g, "my_coins()") as unknown as number;
+  const lost = (g: Game, obj: string, side = 1) => py(g, `[round(o.max_hp - o.hp) for o in instances('${obj}') if o.side == ${side}]`) as unknown as number[];
+
+  it("a match pays coins once: 10 for beating the computer, 3 for losing", async () => {
+    const g = await desk(true, { coins: 5 });
+    py(g, "end_match(0)");
+    step(g, 3);
+    expect(coins(g)).toBe(15);
+    step(g, 30);
+    expect(coins(g)).toBe(15);
+    py(g, "new_match()\nend_match(1)");
+    step(g, 3);
+    expect(coins(g)).toBe(18);
+    py(g, "new_match()\nend_match(-1)");      // a draw pays what a loss does
+    step(g, 3);
+    expect(coins(g)).toBe(21);
+  });
+
+  it("in a room, a win pays 30 and the loser still gets 3, in both games", async () => {
+    const { room, a, b } = await duel();
+    py(a.g, "end_match(0)");
+    room.step(4);
+    expect([coins(a.g), coins(b.g)]).toEqual([30, 3]);
+    room.step(20);
+    expect([coins(a.g), coins(b.g)]).toEqual([30, 3]);
+  });
+
+  it("upgrading costs coins, more each level, up to level 5; not without enough", async () => {
+    const g = await start(undefined, { coins: 330 });
+    for (const want of [2, 3, 4, 5]) {
+      expect(py(g, "upgrade_card('kids')")).toBe(true);
+      expect(py(g, "my_levels()['kids']")).toBe(want);
+    }
+    expect(coins(g)).toBe(330 - 20 - 40 - 80 - 160);
+    expect(py(g, "upgrade_card('kids')")).toBe(false);   // the top
+    expect(py(g, "upgrade_cost('kids') is None")).toBe(true);
+    expect(py(g, "upgrade_card('yeti')")).toBe(true);      // 30 coins left: one more level, at 20
+    expect(py(g, "upgrade_card('owl')")).toBe(false);      // 10 left
+    expect(coins(g)).toBe(10);
+    expect(py(g, "upgrade_card('kangaroo')")).toBe(false);   // not bought
+  });
+
+  it("an upgraded card's troops have 10% a level more health and damage", async () => {
+    const g = await desk(false, { levels: { kids: 3 } });
+    play(g, 0, "kids", 200, 200);
+    play(g, 1, "kids", 440, 200);
+    step(g, 62);
+    const kids = py(g, "sorted((k.side, round(k.max_hp), round(k.damage, 1), k.level) for k in instances('SnowKid'))") as unknown as number[][];
+    expect(kids.filter((k) => k[0] === 0)).toEqual([[0, 132, 26.4, 3], [0, 132, 26.4, 3], [0, 132, 26.4, 3]]);
+    // The computer's (side 1): your deck's average level, here 1.
+    expect(kids.filter((k) => k[0] === 1)[0]).toEqual([1, 110, 22, 1]);
+  });
+
+  it("spells, walls and ice grow with their level too", async () => {
+    const g = await desk(false, { levels: { avalanche: 5, wall: 2, ice: 3, snowball: 4 } });
+    red(g, "Snowman", 420, 200);
+    play(g, 0, "avalanche", 420, 200);
+    step(g, 62 + 31);
+    expect(lost(g, "Snowman")).toEqual([364]);      // 260, +40%
+    play(g, 0, "wall", 200, 96);
+    play(g, 0, "ice", 400, 96);
+    step(g, 62);
+    expect(py(g, "round(instances('SnowWall')[0].max_hp)")).toBe(880);
+    expect(py(g, "round(instances('IcePatch')[0].life / 300, 2) >= 1.19")).toBe(true);
+    py(g, "[s.destroy() for s in instances('Snowman')]");
+    red(g, "Snowman", 300, 150);
+    py(g, "o = instance_create(260, 150, 'Snowball')\no.side = 0\nupgrade(o, 4)");
+    step(g, 20);
+    expect(lost(g, "Snowman")).toEqual([195]);      // 150, +30%
+    // An Ice Golem's chunks are as strong as the golem was.
+    py(g, "o = instance_create(200, 240, 'IceGolem')\no.side = 0\nupgrade(o, 3)\nhurt(o, 99999)");
+    expect(py(g, "sorted(round(c.max_hp) for c in instances('IceChunk'))")).toEqual([264, 264]);
+  });
+
+  it("the computer plays at your deck's average level", async () => {
+    const g = await desk(true, { levels: { kids: 4, snowman: 4, owl: 4, penguin: 4, yeti: 5, wall: 3, snowball: 4, ice: 4 } });
+    expect(py(g, "global_vars.levels[1]['snowman'], global_vars.levels[1]['sled']")).toEqual([4, 4]);
+    expect(py(g, "global_vars.levels[0]['yeti'], global_vars.levels[0]['sled']")).toEqual([5, 1]);
+  });
+
+  it("in a room the host plays each player's cards at their own levels, and made-up levels are level 1", async () => {
+    const room = new Room();
+    const a = await room.join(1, "Ana", { levels: { kids: 2 } });
+    await room.join(2, "Ben", { levels: { kids: 5, yeti: 99, owl: "lots" } });
+    room.step(100);
+    room.step(3);
+    expect(py(a.g, "room_name()")).toBe("Field");
+    expect(py(a.g, "[global_vars.levels[0]['kids'], global_vars.levels[1]['kids'], global_vars.levels[1]['yeti'], global_vars.levels[1]['owl']]")).toEqual([2, 5, 1, 1]);
+    py(a.g, "d = global_vars.decks[1]\nd.remove('kids')\nd.insert(0, 'kids')\nglobal_vars.energy[1] = 10\nplay_card(1, 0, 440, 200)");
+    room.step(62);
+    expect(py(a.g, "sorted({round(k.max_hp) for k in instances('SnowKid') if k.side == 1})")).toEqual([154]);      // level 5: +40%
+  });
+
+  it("the shop: a card to buy can't go in a deck until it's bought, and buying costs its price", async () => {
+    const g = await start(undefined, { coins: 100 });
+    const click = (x: number, y: number) => {
+      g.engine.input.mouseMove(x, y);
+      g.engine.input.mouseDown(0);
+      step(g);
+      g.engine.input.mouseUp(0);
+      step(g);
+    };
+    const at = (card: string) => {
+      const [x, y] = py(g, `deck_slot(ALL_CARDS.index('${card}'))`) as unknown as [number, number];
+      click(x + 30, y + 30);
+    };
+    click(320, 304);                                   // Your deck
+    at("kids");                                        // out: seven
+    at("kangaroo");                                    // not bought: only chosen
+    expect(py(g, "'kangaroo' in instances('Decks')[0].chosen")).toBe(false);
+    click(320, 288);                                   // Buy it: 80 coins
+    expect(py(g, "owns('kangaroo')")).toBe(true);
+    expect(coins(g)).toBe(20);
+    at("kangaroo");
+    expect(py(g, "'kangaroo' in instances('Decks')[0].chosen")).toBe(true);
+    at("moose");
+    click(320, 288);                                   // 100 coins: not enough
+    expect(py(g, "owns('moose')")).toBe(false);
+    expect(coins(g)).toBe(20);
+    at("owl");                                         // out, and chosen: its button upgrades it
+    click(320, 288);
+    expect(py(g, "my_levels()['owl']")).toBe(2);
+    expect(coins(g)).toBe(0);
+    at("owl");
+    click(320, 330);                                   // Done
+    expect(py(g, "'kangaroo' in my_deck()")).toBe(true);
+    // A deck saved with a card that was never bought isn't played.
+    py(g, "save_set('deck', ['moose', 'snowman', 'owl', 'penguin', 'yeti', 'wall', 'snowball', 'ice'])");
+    expect(py(g, "'moose' in my_deck()")).toBe(false);
+  });
+
+  it("a Kangaroo hops straight over the creek, nowhere near a bridge", async () => {
+    const g = await desk(false);
+    blue(g, "Kangaroo", 250, 148);
+    let crossed: number | null = null;
+    for (let t = 0; t < 300 && crossed === null; t++) {
+      step(g);
+      const [x, y] = py(g, "k = instances('Kangaroo')[0]\n[k.x, k.y]") as unknown as [number, number];
+      if (Math.abs(x - 320) < 4) crossed = y;
+    }
+    expect(crossed).not.toBeNull();
+    expect(py(g, `on_the_gap(320, ${crossed})`)).toBe(true);
+  });
+
+  it("a Fire Salamander does triple damage to snow things, not to kids", async () => {
+    const g = await desk(false);
+    red(g, "Snowman", 240, 200);
+    py(g, "instances('Snowman')[0].damage = 0");
+    blue(g, "Salamander", 215, 200);
+    for (let t = 0; t < 100 && !(lost(g, "Snowman")[0] ?? 0); t++) step(g);
+    expect(lost(g, "Snowman")).toEqual([60]);
+    const h = await desk(false);
+    red(h, "SnowKid", 240, 200);
+    py(h, "instances('SnowKid')[0].damage = 0");
+    blue(h, "Salamander", 215, 200);
+    for (let t = 0; t < 100 && !(lost(h, "SnowKid")[0] ?? 0); t++) step(h);
+    expect(lost(h, "SnowKid")).toEqual([20]);
+  });
+
+  it("a Moose's hit knocks a troop back down the lane", async () => {
+    const g = await desk(false);
+    red(g, "Snowman", 250, 200);
+    py(g, "instances('Snowman')[0].damage = 0");
+    blue(g, "Moose", 215, 200);
+    for (let t = 0; t < 100 && !(lost(g, "Snowman")[0] ?? 0); t++) step(g);
+    expect(py(g, "round(instances('Snowman')[0].x)")).toBe(250 + 26);
+  });
+
+  it("a Hedgehog hurts what hits it up close", async () => {
+    const g = await desk(false);
+    red(g, "Snowman", 240, 200);
+    blue(g, "Hedgehog", 222, 200);
+    py(g, "h = instances('Hedgehog')[0]\nh.damage = 0\nh.pace = 0");
+    for (let t = 0; t < 100 && !(lost(g, "Hedgehog", 0)[0] ?? 0); t++) step(g);
+    expect(lost(g, "Hedgehog", 0)).toEqual([82]);
+    expect(lost(g, "Snowman")).toEqual([30]);
+  });
+
+  it("a Beaver Dam goes only on a bridge, and their troops go round by the other lane", async () => {
+    const g = await desk(false);
+    expect(py(g, "can_drop(0, 'beaver', 320, 200), can_drop(0, 'beaver', 200, 200), can_drop(0, 'beaver', 320, 150)")).toEqual([true, false, false]);
+    const crossing = (who: Game) => {
+      for (let t = 0; t < 600; t++) {
+        step(who);
+        const [x, y] = py(who, "k = instances('SnowKid')[0]\n[k.x, k.y]") as unknown as [number, number];
+        if (x > 320) return y;
+      }
+      return null;
+    };
+    py(g, "o = instance_create(320, 200, 'BeaverDam')\no.side = 1");
+    blue(g, "SnowKid", 250, 200);
+    expect(Math.abs(crossing(g)! - 96)).toBeLessThan(18);
+    // Your own dam doesn't stop your troops.
+    const h = await desk(false);
+    py(h, "o = instance_create(320, 200, 'BeaverDam')\no.side = 0");
+    blue(h, "SnowKid", 250, 200);
+    expect(Math.abs(crossing(h)! - 200)).toBeLessThan(18);
+  });
+
+  it("a Campfire warms your troops near it and melts their snow things, and burns out", async () => {
+    const g = await desk(false);
+    // Out of the towers' reach, or they'd shoot the red ones too.
+    py(g, "o = instance_create(250, 150, 'Campfire')\no.side = 0");
+    blue(g, "SnowKid", 265, 150);
+    py(g, "k = instances('SnowKid')[0]\nk.hp = 50\nk.pace = 0");
+    red(g, "Snowman", 235, 160);
+    red(g, "SnowKid", 240, 140);
+    py(g, "for u in instances('Unit'):\n    u.damage = 0");
+    step(g, 60);
+    expect(py(g, "round(instances('SnowKid')[0].hp) if instances('SnowKid')[0].side == 0 else round(instances('SnowKid')[1].hp)")).toBe(110);
+    expect(lost(g, "Snowman")).toEqual([180]);
+    expect(lost(g, "SnowKid")).toEqual([0]);
+    step(g, 20 * 60);
+    expect(count(g, "Campfire")).toBe(0);
+  });
+
+  it("Fireworks burst all over their circle, hurting theirs, never yours", async () => {
+    const g = await desk(false);
+    for (const [dx, dy] of [[-40, -40], [0, -40], [40, -40], [-40, 0], [40, 0], [-40, 40], [0, 40], [40, 40]]) red(g, "Snowman", 420 + dx!, 150 + dy!);
+    blue(g, "Snowman", 420, 150);
+    py(g, "for u in instances('Unit'):\n    u.damage = 0\n    u.pace = u.base_pace = 0");
+    play(g, 0, "fireworks", 420, 150);
+    step(g, 62 + 60);
+    expect(count(g, "Fireworks")).toBe(0);
+    expect(lost(g, "Snowman").reduce((a, b) => a + b, 0)).toBeGreaterThanOrEqual(3 * 90);
+    expect(lost(g, "Snowman", 0)).toEqual([0]);
+  });
+
+  it("Squirrel Thieves come two at a time, and a hit on a tower takes an energy from them", async () => {
+    const g = await desk(false);
+    play(g, 0, "squirrels", 200, 200);
+    step(g, 62);
+    expect(count(g, "Squirrel", 0)).toBe(2);
+    py(g, "[s.destroy() for s in instances('Squirrel')]");
+    blue(g, "Squirrel", 500, 200);
+    py(g, "global_vars.energy = [0.0, 6.0]");
+    for (let t = 0; t < 120 && py(g, "min(t.hp for t in instances('Tower') if t.side == 1 and not is_a(t, 'Keep'))") >= 1400; t++) step(g);
+    const [mine, theirs] = py(g, "global_vars.energy") as unknown as [number, number];
+    expect(mine).toBeGreaterThan(0.99);
+    expect(theirs).toBeLessThan(5.9);
+  });
+
+  it("the other player's game shows the new cards, and the same fireworks bursts, mirrored", async () => {
+    const { room, a, b } = await duel();
+    for (const [obj, x, y] of [["Kangaroo", 200, 150], ["Campfire", 150, 240], ["BeaverDam", 320, 96], ["Fireworks", 420, 150], ["Moose", 100, 200]] as const)
+      py(a.g, `o = instance_create(${x}, ${y}, '${obj}')\no.side = 0`);
+    room.step(12);
+    for (const obj of ["Kangaroo", "Campfire", "BeaverDam", "Fireworks", "Moose"]) expect(count(b.g, obj), obj).toBe(1);
+    const host = py(a.g, "f = instances('Fireworks')[0]\n[burst_at(f, k) for k in range(3)]") as unknown as [number, number][];
+    const other = py(b.g, "f = instances('Fireworks')[0]\n[burst_at(f, k) for k in range(3)]") as unknown as [number, number][];
+    other.forEach(([x, y], k) => {
+      expect(x).toBeCloseTo(640 - host[k]![0], 0);
+      expect(y).toBeCloseTo(host[k]![1], 0);
+    });
   });
 });

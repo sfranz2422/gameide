@@ -54,12 +54,15 @@ def new_match():
         order = deck_of(side)[:]
         random.shuffle(order)
         m.decks.append(order)
+    # Each side's card levels (upgrades): yours from your save, the other player's sent
+    # with them, the computer's your deck's average (the teacher's choice: a fair fight).
+    m.levels = [levels_of(side) for side in (0, 1)]
     m.crowns = [0, 0]
     m.clock = MATCH_STEPS
     m.overtime = False
     m.over = False
     m.winner = None                    # 0, 1, or -1 for a draw
-    for o in [o for name in ("Building", "Unit", "Deploy", "Snowball", "IcePatch", "Shot", "Avalanche", "Cocoa") for o in instances(name)]:
+    for o in [o for name in ("Building", "Unit", "Deploy", "Snowball", "IcePatch", "Shot", "Avalanche", "Cocoa", "Fireworks", "BeaverDam") for o in instances(name)]:
         o.destroy()
     for side in (0, 1):
         for kind, x, y in TOWERS:
@@ -76,8 +79,14 @@ def real_deck(cards):
 
 
 def my_deck():
-    """Your deck, as you picked it on the title (kept for next time), or the deck everyone starts with."""
-    return real_deck(save_get("deck")) or DECK[:]
+    """
+    Your deck, as you picked it on the title (kept for next time), or the deck everyone
+    starts with. A card to buy is only in it once it's bought.
+    """
+    d = real_deck(save_get("deck"))
+    if d and all(c not in SHOP_CARDS or owns(c) for c in d):
+        return d
+    return DECK[:]
 
 
 def deck_of(side):
@@ -150,6 +159,7 @@ def hurt(target, amount):
             for dy in (-9, 9):
                 c = instance_create(target.x, target.y + dy, "IceChunk")
                 c.side = target.side
+                upgrade(c, target.level)      # as strong as the golem was
     target.destroy()
 
 
@@ -244,6 +254,21 @@ def strike(u, t):
         damage *= CHARGE_HIT
         camera_shake(2, 6)
     u.run = 0
+    # A Fire Salamander melts snow things: snowmen, walls, ice, and the snow forts themselves.
+    if is_a(u, "Salamander") and type(t).__name__ in SNOWY:
+        damage *= MELT_HIT
+    # A Moose's hit knocks a troop on foot back down the lane, never into the creek.
+    if is_a(u, "Moose") and is_a(t, "Unit") and not t.flies:
+        nx = t.x + KNOCKBACK * forward(u.side)
+        if not on_the_gap(nx, t.y) and (nx < MID) == (t.x < MID):
+            t.x = clamp(nx, 8, VIEW_W - 8)
+    # Squirrel Thieves: a hit on a tower takes an energy from them, for you.
+    if is_a(u, "Squirrel") and is_a(t, "Tower") and global_vars.energy[t.side] >= 1:
+        global_vars.energy[t.side] -= 1
+        global_vars.energy[u.side] = min(float(ENERGY_MAX), global_vars.energy[u.side] + 1)
+    # A Hedgehog's spikes: hitting it up close hurts.
+    if is_a(t, "Hedgehog"):
+        hurt(u, THORNS * t.power)
     if is_a(u, "PolarBear"):
         for o in [o for o in instances("Unit") if o.side != u.side and not o.flies and o is not t
                   and point_distance(o.x, o.y, t.x, t.y) <= BEAR_SPLASH]:
@@ -296,7 +321,7 @@ def crown(x, y, won, color):
 TEAM = ["blue", "red"]
 
 
-def draw_troop(u, troop, size=1.0, tint=None):
+def draw_troop(u, troop, size=1.0, tint=None, lift=0):
     """
     A troop's picture: walking (two frames, one per few pixels moved) while it moves,
     attacking just after a blow, standing otherwise. Turned to face the way it marches.
@@ -317,7 +342,7 @@ def draw_troop(u, troop, size=1.0, tint=None):
     else:
         frame = (u.anim // 10) % 2 if u.still < 8 else 0
     face = u.face or forward(u.side)
-    draw_sprite_ext(f"{troop}_{TEAM[u.side]}", frame, u.x, u.y, face * size, size, 0,
+    draw_sprite_ext(f"{troop}_{TEAM[u.side]}", frame, u.x, u.y - lift, face * size, size, 0,
                     "#ffd0d0" if u.flash else tint or "white")
     if u.flash > 3:
         draw_sprite("spark", 0, u.x, u.y - u.radius)
@@ -330,5 +355,5 @@ def puff(x, y, kind="puff"):
 
 
 def deck_slot(k):
-    """Where card k of ALL_CARDS sits on the deck screen: two rows of eight."""
-    return 18 + (k % 8) * 77, 44 + (k // 8) * 116
+    """Where card k of ALL_CARDS sits on the deck screen: three rows of eight."""
+    return 18 + (k % 8) * 77, 30 + (k // 8) * 74

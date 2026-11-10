@@ -11,7 +11,7 @@ self.radius = WALL_R
 # === step
 super().on_step()
 if not (self.puppet or stopped()):
-    self.hp -= WALL_HP / WALL_LIFE
+    self.hp -= self.max_hp / WALL_LIFE      # an upgraded wall is stronger, and melts in the same time
     if self.hp <= 0:
         self.destroy()
 

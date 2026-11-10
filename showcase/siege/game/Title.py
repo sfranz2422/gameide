@@ -13,9 +13,10 @@ if not picking and mouse_check_pressed("left") and 250 <= mouse_x <= 390 and 290
     instance_create(0, 0, "Decks")
     picking = True
 if in_room():
-    # In a room: say you're here (and your deck: the host's game deals from it), wait
-    # for the other player, then both go to the field (not while you're picking a deck).
-    net_send({"here": 1, "deck": my_deck()})
+    # In a room: say you're here (and your deck and its levels: the host's game deals
+    # from them), wait for the other player, then both go to the field (not while
+    # you're picking a deck).
+    net_send({"here": 1, "deck": my_deck(), "levels": my_levels()})
     if opponent() is None:
         self.found = 0
     else:
@@ -55,3 +56,4 @@ else:
     draw_set_color("#2f6f9f")
     draw_rect(250, 290, 390, 318)
     words(VIEW_W / 2, 295, "Your deck", 15, "white", "center")
+coins_label(VIEW_W / 2, 330)

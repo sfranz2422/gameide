@@ -10,6 +10,7 @@ self.puppet = False         # True in the other player's game: a copy, moved by 
 self.hp = self.max_hp = 100
 self.radius = 16
 self.flash = 0
+self.level, self.power = 1, 1.0    # the card's level (upgrade): set as its card is played
 
 # === step
 if self.flash > 0:

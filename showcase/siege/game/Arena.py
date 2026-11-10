@@ -55,8 +55,11 @@ card = None if global_vars.pick is None else hand(0)[global_vars.pick]
 if card is not None and not global_vars.over:
     draw_set_alpha(0.12)
     draw_set_color("#ffffff")
-    if CARDS[card]["kind"] == "ice":
+    if CARDS[card]["kind"] in ("ice", "spell"):
         draw_rect(8, TOP, VIEW_W - 8, BOTTOM)
+    elif CARDS[card]["kind"] == "dam":
+        for ly in LANES:
+            draw_rect(MID - GAP - 6, ly - BRIDGE, MID + GAP + 6, ly + BRIDGE)
     else:
         draw_rect(8, TOP, MID - GAP, BOTTOM)
         # ...and just over the creek, where you've knocked their tower down.

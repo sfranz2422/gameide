@@ -47,6 +47,7 @@ for k in range(ENERGY_MAX):
         draw_set_color("#ffd23f" if fill >= 1 else "#a8892a")
         draw_rect(x, BOTTOM + 6, x + 31 * fill, BOTTOM + 14)
 words(128, BOTTOM + 3, str(int(e)), 14, "#ffd23f", "right")
+levels = my_levels()             # (yours: the host's game plays your cards at these too)
 for k, card in enumerate(hand(0)):
     x, y = card_xy(k)
     c = CARDS[card]
@@ -57,11 +58,12 @@ for k, card in enumerate(hand(0)):
     draw_set_color("#eef6fc" if affordable else "#8a99a8")
     draw_rect(x, y + lift, x + 72, y + 58 + lift)
     card_picture(card, x + 36, y + 21 + lift, 0.75)
-    words(x + 36, y + 40 + lift, c["name"], 9, "white", "center")
+    words(x + 36, y + 40 + lift, c["name"], name_size(c["name"]), "white", "center")
     draw_set_color("#7a4fd0")
     draw_circle(x + 8, y + 8 + lift, 9)
     words(x + 8, y + 1 + lift, str(c["cost"]), 12, "white", "center")
     words(x + 70, y + 1 + lift, str(k + 1), 9, "#4a6a8a", "right")
+    words(x + 36, y + 48 + lift, f"Level {levels[card]}", 8, "#ffd23f", "center")
 nx = 60
 words(nx, BOTTOM + 22, "Next", 10, "#b9d8ee", "center")
 card_picture(up_next(0), nx, BOTTOM + 52, 0.6)

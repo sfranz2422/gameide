@@ -152,3 +152,54 @@ likes; tell me when they're there.
 > same frames as the first set of cards: the blue-team sled riders; the polar bear;
 > an arctic fox; the frost fairy; the snow cannon; an avalanche of snow; a mug of hot
 > cocoa; the ice golem. Exactly eight cards, one picture each. Flat magenta background.
+
+---
+
+# Cards to buy (the teacher's picks, 2026-11-10): eight more, not only snow things
+
+Same style rules as above: one Gemini chat, attach picture 1 of the first set to every
+prompt, MAGENTA where marked, **every troop facing right**, **exactly the rows asked
+for and nothing else on the sheet**. These are visitors to the snowball war, so
+they're not made of snow, but they wear the same blue or red scarves and bands.
+Until they come, the game draws stand-ins (other troops' pictures, tinted).
+
+| Card | What it does |
+|---|---|
+| **Kangaroo** | hops straight over the frozen creek, anywhere |
+| **Fire Salamander** | small and hot: triple damage to snow things |
+| **Moose** | each hit knocks troops back down the lane |
+| **Hedgehog** | spiky: what hits it gets hurt back |
+| **Beaver Dam** | dropped on a bridge, the other side's troops must go round |
+| **Campfire** | warms your troops near it, melts their snow things |
+| **Fireworks** | bursts all over a wide circle |
+| **Squirrel Thieves** | two of them; each hit on a tower steals energy |
+
+**14. Visitors, blue team.** MAGENTA.
+> A sheet of five kinds of animal troops on the blue team, five rows, three drawings
+> in each row, ALL FACING RIGHT, each with a blue scarf or band: Row 1, a kangaroo:
+> crouched ready to hop, mid-hop in the air, then punching with its front paws. Row 2,
+> a small fire salamander with little flames along its back: walking (two steps, legs
+> clearly apart then together), then breathing a puff of fire. Row 3, a big moose with
+> wide antlers: walking (two steps), then charging head down. Row 4, a round hedgehog
+> with its spikes up: walking (two steps), then curled into a spiky ball. Row 5, a
+> squirrel carrying a little sack: running (two steps), then nibbling at something.
+> Flat magenta background.
+
+**15. Visitors, red team.** MAGENTA.
+> The same sheet with every blue thing red instead. Same rows, same poses, same size,
+> ALL FACING RIGHT.
+
+**16. New buildings and bits.** MAGENTA.
+> A sheet seen from slightly above, two rows with clear space between, nothing else:
+> Row 1, a campfire of crossed logs with a blue flag on a stick beside it, the same
+> with a red flag, the same campfire blazing up high. Row 2, a beaver dam of sticks and
+> mud wide enough to block a log bridge, with a blue flag; the same with a red flag;
+> one bright firework burst seen from above, colourful sparks in a ring.
+> Flat magenta background.
+
+**17. New card pictures.** MAGENTA.
+> Eight square portraits in two rows of four, each a close-up of ONE of these, in the
+> same frames as the first set of cards: the blue-team kangaroo; the fire salamander;
+> the moose; the hedgehog; the beaver dam (with a beaver on it); the campfire;
+> fireworks bursting in a night sky; two squirrels with a sack. Exactly eight cards,
+> one picture each. Flat magenta background.

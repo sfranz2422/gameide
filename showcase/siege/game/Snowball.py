@@ -7,6 +7,7 @@
 self.side = 0
 self.uid = next_uid()       # how the other player's game knows it again (Link)
 self.puppet = False         # True in the other player's game: a copy, moved by Link
+self.power = 1.0            # the card's level makes it stronger (upgrade)
 self.hit = set()
 self.roll = 0
 
@@ -18,11 +19,11 @@ self.roll += SNOWBALL_SPEED / SNOWBALL_R
 for u in instances("Unit"):
     if u.side != self.side and not u.flies and id(u) not in self.hit and point_distance(self.x, self.y, u.x, u.y) < SNOWBALL_R + u.radius:
         self.hit.add(id(u))
-        hurt(u, SNOWBALL_DAMAGE)
+        hurt(u, SNOWBALL_DAMAGE * self.power)
         sound_play("hit", volume=0.4)
 for b in instances("Building"):
     if b.side != self.side and point_distance(self.x, self.y, b.x, b.y) < SNOWBALL_R + b.radius:
-        hurt(b, SNOWBALL_TOWER)
+        hurt(b, SNOWBALL_TOWER * self.power)
         sound_play("crash", volume=0.4)
         self.destroy()
         return

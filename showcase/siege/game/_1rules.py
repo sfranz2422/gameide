@@ -67,8 +67,28 @@ CARDS = {
     "icegolem": {"cost": 4, "name": "Ice Golem", "kind": "unit", "object": "IceGolem", "count": 1,
                  "about": "Breaks into two ice chunks that keep fighting"},
 }
+# Eight to buy with coins (the teacher's picks, 2026-11-10: not only snow things). "price" is in coins.
+CARDS.update({
+    "kangaroo": {"cost": 4, "name": "Kangaroo", "kind": "unit", "object": "Kangaroo", "count": 1, "price": 80,
+                 "about": "Hops straight over the creek, anywhere"},
+    "salamander": {"cost": 3, "name": "Fire Salamander", "kind": "unit", "object": "Salamander", "count": 1, "price": 60,
+                   "about": "Triple damage to snow things"},
+    "moose": {"cost": 5, "name": "Moose", "kind": "unit", "object": "Moose", "count": 1, "price": 100,
+              "about": "Each hit knocks troops back down the lane"},
+    "hedgehog": {"cost": 3, "name": "Hedgehog", "kind": "unit", "object": "Hedgehog", "count": 1, "price": 60,
+                 "about": "Spiky: what hits it gets hurt back"},
+    "beaver": {"cost": 2, "name": "Beaver Dam", "kind": "dam", "object": "BeaverDam", "count": 1, "price": 80,
+               "about": "Drop it on a bridge: their troops must go round"},
+    "campfire": {"cost": 4, "name": "Campfire", "kind": "building", "object": "Campfire", "count": 1, "price": 80,
+                 "about": "Warms your troops near it; melts their snow things"},
+    "fireworks": {"cost": 3, "name": "Fireworks", "kind": "spell", "object": "Fireworks", "count": 1, "price": 100,
+                  "about": "Bursts all over a wide circle"},
+    "squirrels": {"cost": 3, "name": "Squirrel Thieves", "kind": "unit", "object": "Squirrel", "count": 2, "price": 60,
+                  "about": "Two; each hit on a tower steals 1 energy"},
+})
 DECK = ["kids", "snowman", "owl", "penguin", "yeti", "wall", "snowball", "ice"]   # the deck you start with
-ALL_CARDS = DECK + ["sled", "bear", "foxes", "fairy", "cannon", "avalanche", "cocoa", "icegolem"]
+SHOP_CARDS = ["kangaroo", "salamander", "moose", "hedgehog", "beaver", "campfire", "fireworks", "squirrels"]
+ALL_CARDS = DECK + ["sled", "bear", "foxes", "fairy", "cannon", "avalanche", "cocoa", "icegolem"] + SHOP_CARDS
 DECK_SIZE = 8
 HAND = 4
 
@@ -87,7 +107,29 @@ UNITS = {
     "Fairy": (220, 34, 70, 56, 1.0, 7, True, "all"),
     "IceGolem": (900, 48, 18, 70, 0.45, 13, False, "buildings"),
     "IceChunk": (220, 24, 16, 50, 0.7, 7, False, "ground"),      # what an Ice Golem breaks into: two
+    "Kangaroo": (440, 58, 18, 56, 1.05, 9, False, "ground"),
+    "Salamander": (170, 20, 14, 40, 0.95, 7, False, "ground"),
+    "Moose": (950, 72, 20, 74, 0.6, 13, False, "ground"),
+    "Hedgehog": (520, 28, 14, 50, 0.7, 8, False, "ground"),
+    "Squirrel": (130, 18, 14, 44, 1.4, 6, False, "buildings"),
 }
+# Snow things a Fire Salamander melts (triple damage), and a Campfire melts too.
+SNOWY = ("Snowman", "SnowWall", "IceGolem", "IceChunk", "SnowCannon", "Tower", "Keep")
+MELT_HIT = 3.0
+HOPS = ("Kangaroo",)                   # on foot, but over the creek anywhere (no bridge needed)
+KNOCKBACK = 26                         # a Moose's hit pushes a troop this far back down the lane
+THORNS = 30                            # a Hedgehog hit up close hurts the one hitting it this much
+DAM_LIFE = 9 * 60                      # a Beaver Dam blocks a bridge to the other side's troops this long
+CAMPFIRE = (500, 20 * 60, 46)          # hp, steps until it's burnt out, how far it warms
+CAMPFIRE_HEAL, CAMPFIRE_MELT = 1.0, 3.0   # each step: your troops near it healed, their snow things melted
+FIREWORKS_R, FIREWORKS_BURSTS, FIREWORKS_BURST_R = 64, 9, 20
+FIREWORKS_DAMAGE, FIREWORKS_TOWER, FIREWORKS_EVERY = 90, 30, 4
+
+# ---- coins and upgrades (the teacher's numbers, 2026-11-10)
+COINS_WIN_PLAYER, COINS_WIN_CPU, COINS_LOSS = 30, 10, 3   # a draw pays what a loss does
+MAX_LEVEL = 5
+LEVEL_BOOST = 0.10                     # each level: this much more health and damage (and longer-lasting spells)
+UPGRADE_COST = [20, 40, 80, 160]       # coins from level 1 to 2, 2 to 3, 3 to 4, 4 to 5
 CHARGE_RUN, CHARGE_HIT = 60, 2.0       # Sled Riders: pixels of run-up for a charge, and what it multiplies
 BEAR_SPLASH = 34                       # a Polar Bear's swipe reaches this far round what it hits
 CHILL, CHILL_STEPS = 0.5, 90           # a Frost Fairy's shot: pace times this, for this many steps
@@ -136,12 +178,15 @@ def can_drop(side, card, x, y):
     """
     Where a card may be dropped: troops, walls and snowballs on your own side of the
     creek, or just past it in a lane whose tower you've knocked down (the teacher's
-    ask); ice and spells (Avalanche, Hot Cocoa) anywhere.
+    ask); ice and spells (Avalanche, Hot Cocoa, Fireworks) anywhere; a Beaver Dam
+    only on a bridge.
     """
     if not (TOP + 6 <= y <= BOTTOM - 6 and 8 <= x <= VIEW_W - 8):
         return False
     if CARDS[card]["kind"] in ("ice", "spell"):
         return True
+    if CARDS[card]["kind"] == "dam":
+        return on_a_bridge(x, y)
     return own_half(side, x) or past_the_creek(side, x, y)
 
 
@@ -151,20 +196,39 @@ def past_the_creek(side, x, y):
     return 4 <= over <= BEYOND and any(abs(y - LANES[k]) <= BEYOND_LANE for k in fallen_lanes(1 - side))
 
 
+def on_a_bridge(x, y):
+    """On one of the log bridges (where a Beaver Dam goes)."""
+    return abs(x - MID) <= GAP + 6 and any(abs(y - ly) <= BRIDGE for ly in LANES)
+
+
+def dammed(lane, side):
+    """True if a Beaver Dam of the other side's blocks this lane's bridge to `side`'s troops."""
+    return any(d.side != side and abs(d.y - LANES[lane]) <= BRIDGE for d in instances("BeaverDam"))
+
+
 def on_the_gap(x, y):
     """In the creek and not on a bridge: where nothing on foot may stand."""
     return abs(x - MID) < GAP and all(abs(y - ly) > BRIDGE for ly in LANES)
 
 
-def waypoint(x, y, tx, ty):
+def waypoint(x, y, tx, ty, side=None):
     """
     Where a troop on foot at (x, y) heads next to reach (tx, ty): straight there if
     it's on the same side; if the creek is between them, to the near end of the nearer
-    lane's bridge, then over it.
+    lane's bridge, then over it. A bridge the other side has dammed is no way across:
+    it goes round by the other lane's (and if both are dammed, waits at the nearer).
     """
     if (x < MID) == (tx < MID):
         return tx, ty
-    ly = LANES[lane_of(y)]
+    lane = lane_of(y)
+    blocked = lambda k: side is not None and dammed(k, side)
+    over_water = abs(x - MID) < GAP and abs(y - LANES[lane]) <= BRIDGE    # already crossing: carries on
+    if blocked(lane) and not over_water and not blocked(1 - lane):
+        lane = 1 - lane
+    ly = LANES[lane]
+    near_end = (MID - (GAP + 4) if x < MID else MID + (GAP + 4), ly)
+    if blocked(lane) and not over_water:
+        return near_end                                              # both dammed: wait at the bank
     if abs(x - MID) <= GAP + 5 and abs(y - ly) <= BRIDGE - 4:
         return MID + (GAP + 10) * (1 if tx > MID else -1), ly       # on the bridge: across
-    return MID - (GAP + 4) if x < MID else MID + (GAP + 4), ly      # to the bridge's near end
+    return near_end                                                  # to the bridge's near end

@@ -666,7 +666,11 @@ through `play_card`, like the host's own. An opponent away (a question) holds th
 match (`halt`, `stopped()`); gone `GONE_STEPS`, the one still here wins. Pictures
 are the teacher's (`cut_sheets.py` → `art/`); `draw_troop` chooses a frame from
 where a troop is (moving or not, `swing` after a blow), so puppets animate too.
-Its board is wins against players only (`Hud`).
+Its board is wins against players only (`Hud`). **Coins, levels and the shop** are `_4cards.py` (2026-11-10): all kept in
+the save. A card's level reaches what it makes through `upgrade(o, level)` in `Deploy`, so
+a new card's objects need no level code of their own, only `self.power` for a spell's
+effect. In a room the levels go with the deck (Title's `net_send`) and the host reads them
+through `real_levels`, never trusting a number it didn't check.
 
 ## Pour Decisions
 

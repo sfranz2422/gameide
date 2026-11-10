@@ -8,7 +8,8 @@
 
 # Everything the other player's game shows, by its number in snapshot().
 KINDS = ["SnowKid", "Snowman", "Owl", "Penguin", "Yeti", "SnowWall", "Tower", "Keep", "Snowball", "IcePatch", "Deploy",
-         "SledRider", "PolarBear", "Fox", "Fairy", "IceGolem", "IceChunk", "SnowCannon", "Avalanche", "Cocoa"]
+         "SledRider", "PolarBear", "Fox", "Fairy", "IceGolem", "IceChunk", "SnowCannon", "Avalanche", "Cocoa",
+         "Kangaroo", "Salamander", "Moose", "Hedgehog", "Squirrel", "Campfire", "BeaverDam", "Fireworks"]
 GONE_STEPS = 150 * 60        # an opponent away this long (not just answering a question) has left
 SMOOTH = 0.35                # how far a puppet glides toward where the host says it is, each step
 
@@ -49,14 +50,16 @@ def snapshot():
     """The battle in a few hundred characters: what the other player's game draws."""
     m = global_vars
     things = []
-    for o in [o for name in ("Unit", "Building", "Snowball", "IcePatch", "Deploy", "Avalanche", "Cocoa") for o in instances(name)]:
+    for o in [o for name in ("Unit", "Building", "Snowball", "IcePatch", "Deploy", "Avalanche", "Cocoa", "BeaverDam", "Fireworks") for o in instances(name)]:
         k = KINDS.index(type(o).__name__)
         if is_a(o, "Deploy"):
             extra = [o.t, ALL_CARDS.index(o.card)]
         elif is_a(o, "Avalanche") or is_a(o, "Cocoa"):
             extra = [o.t, 0]
-        elif is_a(o, "IcePatch"):
-            extra = [o.life, 0]
+        elif is_a(o, "Fireworks"):
+            extra = [o.t, o.seed]
+        elif is_a(o, "IcePatch") or is_a(o, "BeaverDam"):
+            extra = [round(o.life), 0]
         elif is_a(o, "Snowball"):
             extra = [0, 0]
         else:
@@ -111,7 +114,9 @@ def show(g, puppets):
             o.t, o.card = a, ALL_CARDS[b]
         elif KINDS[k] in ("Avalanche", "Cocoa"):
             o.t = a
-        elif KINDS[k] == "IcePatch":
+        elif KINDS[k] == "Fireworks":
+            o.t, o.seed = a, b
+        elif KINDS[k] in ("IcePatch", "BeaverDam"):
             o.life = a
         elif KINDS[k] != "Snowball":
             o.hp = o.max_hp * a / 100

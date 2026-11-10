@@ -7,6 +7,7 @@
 self.side = 0
 self.uid = next_uid()       # how the other player's game knows it again (Link)
 self.puppet = False         # True in the other player's game: a copy, moved by Link
+self.power = 1.0            # the card's level makes it stronger (upgrade)
 self.life = ICE_LIFE
 
 # === step

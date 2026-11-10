@@ -24,6 +24,7 @@ for k in range(n):
     r = 0 if n == 1 else 12
     o = instance_create(self.x + math.cos(a) * r, self.y + math.sin(a) * r, c["object"])
     o.side = self.side
+    upgrade(o, level_of(self.side, self.card))
 sound_play("pop", volume=0.5)
 puff(self.x, self.y)
 self.destroy()

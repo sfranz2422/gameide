@@ -1,5 +1,14 @@
 # Progress
 
+## Tabletop Siege: coins, upgrades, and eight cards to buy (2026-11-10, waiting for review)
+- **Coins** (the teacher's numbers): every match pays once as it ends: 30 for beating a player, 10 for beating the computer, 3 for a loss or a draw. Shown on the end panel and the title; kept in the save.
+- **Upgrades**: every card from level 1 to 5, +10% health and damage a level (spells hit or heal harder, ice and dams last longer), for 20, 40, 80 and 160 coins. The level shows on each card in the hand and on the deck screen. An Ice Golem's chunks keep its level.
+- **The computer plays at your deck's average level** (a fair fight). **In a room** your levels go to the host with your deck, and the host plays your cards at them; made-up levels (not 1 to 5) are level 1. The save is the browser's, so a student with browser tools could give themselves coins or levels: like any game that keeps its own score, it touches no grade.
+- **Eight cards to buy** (the teacher's picks; all 16 earlier cards stay free): Kangaroo (hops the creek anywhere, 80), Fire Salamander (triple damage to snow things, 60), Moose (each hit knocks troops back, 100), Hedgehog (hurts what hits it, 60), Beaver Dam (dropped on a bridge, their troops go round by the other lane, 80), Campfire (warms yours, melts their snow things, 80), Fireworks (bursts all over a circle, 100), Squirrel Thieves (two; a tower hit steals an energy, 60). The deck screen shows all 24 in three rows: a card still in the shop is dimmed with its price, and the button under the cards buys or upgrades the one last clicked. A deck saved with a card never bought isn't played.
+- **Stand-in pictures** (other troops' pictures, tinted; a campfire, dam and fireworks drawn by the game) until the teacher's Gemini pictures: prompts 14-17 in `showcase/siege/PROMPTS.md`.
+- Also: the drop zone now lights the whole field for spells (it showed only your half, though they could already go anywhere).
+- Tests: 17 more; 40 sabotage cases, and four older cases pointed at their lines again.
+
 ## Tabletop Siege: the eight new cards' own pictures (2026-11-10, waiting for review)
 - The teacher's Gemini pictures 10-13 (`raw/snow/`) replace the stand-ins: sled riders sliding and crashing in a spray of snow, a polar bear, an arctic fox, a frost fairy (her shots a frosty spark), an ice golem that breaks up in a burst of ice into two little ice chunks, a snow cannon that fires with a puff, an avalanche wave rolling in and crashing down, hot cocoa with a warm glow of hearts, and eight card pictures. Sheet 12's rows are cut by columns (hearts and broken ice are many pieces).
 - Also: an older sabotage case had lost its line when dropping past the creek came in; pointed at it again.

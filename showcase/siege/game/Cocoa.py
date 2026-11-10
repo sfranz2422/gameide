@@ -6,6 +6,7 @@
 self.side = 0
 self.uid = next_uid()
 self.puppet = False
+self.power = 1.0            # the card's level makes it stronger (upgrade)
 self.t = 0
 
 # === step
@@ -15,7 +16,7 @@ self.t += 1
 if self.t == 1:
     for u in instances("Unit"):
         if u.side == self.side and point_distance(self.x, self.y, u.x, u.y) <= COCOA_R + u.radius:
-            u.hp = min(u.max_hp, u.hp + COCOA_HEAL)
+            u.hp = min(u.max_hp, u.hp + COCOA_HEAL * self.power)
     sound_play("pop", volume=0.5)
 if self.t >= 40:
     self.destroy()

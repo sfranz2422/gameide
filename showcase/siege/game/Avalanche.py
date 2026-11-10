@@ -7,6 +7,7 @@
 self.side = 0
 self.uid = next_uid()
 self.puppet = False
+self.power = 1.0            # the card's level makes it stronger (upgrade)
 self.t = 0
 
 # === step
@@ -16,7 +17,7 @@ self.t += 1
 if self.t == AVALANCHE_FALL:
     for o in enemies_of(self.side):
         if point_distance(self.x, self.y, o.x, o.y) <= AVALANCHE_R + o.radius:
-            hurt(o, AVALANCHE_TOWER if is_a(o, "Building") else AVALANCHE_DAMAGE)
+            hurt(o, (AVALANCHE_TOWER if is_a(o, "Building") else AVALANCHE_DAMAGE) * self.power)
     sound_play("crash", volume=0.6)
     camera_shake(3, 10)
 if self.t >= AVALANCHE_FALL + 20:

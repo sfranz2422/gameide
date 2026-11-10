@@ -23,6 +23,8 @@ self.face = None                 # which way it faces: 1 right, -1 left (None: t
 self.chill = 0                   # steps still slowed by a Frost Fairy's shot
 self.run = 0                     # pixels walked since its last blow (Sled Riders charge with it)
 self.px = self.py = None         # where it was last drawn (draw_troop: walking or standing)
+self.level, self.power = 1, 1.0    # the card's level (upgrade): set as its card is played
+self.hops = False                # a Kangaroo: on foot, but over the creek anywhere
 setup_unit(self, "SnowKid")
 
 # === step
@@ -63,7 +65,7 @@ else:
         pace *= ICE_SLOW
     if self.chill:
         pace *= CHILL
-    tx, ty = (t.x, t.y) if self.flies else waypoint(self.x, self.y, t.x, t.y)
+    tx, ty = (t.x, t.y) if self.flies or self.hops else waypoint(self.x, self.y, t.x, t.y, self.side)
     d = point_distance(self.x, self.y, tx, ty)
     if d > 0:
         if abs(tx - self.x) > 0.5:
@@ -81,7 +83,7 @@ for o in instances("Unit"):
             push = (gap - d) * 0.25
             nx, ny = self.x + (self.x - o.x) / d * push, self.y + (self.y - o.y) / d * push
             # Never pushed off a bridge into the creek.
-            if self.flies or not on_the_gap(nx, ny):
+            if self.flies or self.hops or not on_the_gap(nx, ny):
                 self.x, self.y = nx, ny
 self.y = clamp(self.y, TOP + 4, BOTTOM - 4)
 

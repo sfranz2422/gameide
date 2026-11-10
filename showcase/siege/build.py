@@ -43,7 +43,23 @@ VIEW_W, VIEW_H = RULES["VIEW_W"], RULES["VIEW_H"]
 ART = HERE / "art"
 _cut = _load("siege_cut", HERE / "cut_sheets.py")
 STAND_IN_CARDS = {"sled": "sled", "bear": "yeti_blue_0", "foxes": "penguin_blue_0", "fairy": "owl_blue_0",
-                  "cannon": "snow_wall", "avalanche": "heap", "cocoa": "mug", "icegolem": "snowman_blue_0"}
+                  "cannon": "snow_wall", "avalanche": "heap", "cocoa": "mug", "icegolem": "snowman_blue_0",
+                  # The eight to buy (2026-11-10): stand-ins until the teacher's pictures (PROMPTS 14-17).
+                  "kangaroo": ("fox_blue_0", (224, 168, 106)), "salamander": ("fox_blue_0", (255, 106, 42)),
+                  "moose": ("bear_blue_0", (176, 122, 72)), "hedgehog": ("chunk_blue", (154, 112, 72)),
+                  "beaver": ("bridge", (122, 74, 34)), "campfire": ("pine_0", (255, 120, 40)),
+                  "fireworks": ("sparkle", (255, 80, 200)), "squirrels": ("fox_blue_0", (200, 120, 58))}
+
+
+def stand_in(name):
+    """Another of the game's pictures for a card that has none yet, tinted if asked."""
+    tint = None
+    if isinstance(name, tuple):
+        name, tint = name
+    im = Image.open(ART / f"{name}.png").convert("RGBA")
+    if tint:
+        im = _tw.tinted(im, tint, 0.55)
+    return im
 TROOPS = ["kid", "snowman", "owl", "penguin", "yeti", "sled", "bear", "fox", "fairy", "icegolem"]
 GLIDE = {"owl", "fairy", "sled"}       # flying or sliding: their two frames aren't steps, so no legs-together frame
 # How wide each picture is drawn in the game (pixels): build.py fits the teacher's drawings to these.
@@ -163,7 +179,7 @@ def build(out):
         if (ART / f"card_{card}.png").exists():
             im = art(f"card_{card}")
         else:
-            im = _cut.framed(Image.open(ART / f"{STAND_IN_CARDS[card]}.png").convert("RGBA")).resize((44, 44), Image.LANCZOS)
+            im = _cut.framed(stand_in(STAND_IN_CARDS[card])).resize((44, 44), Image.LANCZOS)
         P.sprite(f"card_{card}", [im], (im.width // 2, im.height // 2))
     title = art("title", 1)
     k = max(VIEW_W / title.width, VIEW_H / title.height)
