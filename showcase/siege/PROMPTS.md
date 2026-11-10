@@ -102,3 +102,53 @@ then tell me. I copy them into `showcase/siege/raw/` straight away.
 > right behind theirs, snowy owls overhead, a frozen creek between them with a log
 > bridge, pine trees, soft snow falling, warm late-afternoon light. Leave the top
 > third simple for a title.
+
+---
+
+# More cards (the teacher's ask, 2026-11-10): eight new ones
+
+Same style rules as above: one Gemini chat, attach picture 1 of this set to every
+later prompt, MAGENTA where marked, **every troop facing right**, **exactly the rows
+asked for and nothing else on the sheet**. Name them in Downloads however Gemini
+likes; tell me when they're there.
+
+| Card | What it does |
+|---|---|
+| **Sled Riders** | fast, on a sled; their first hit after a run-up does double damage |
+| **Polar Bear** | fairly tough; each swipe hits everything around it |
+| **Arctic Foxes** | a pack of four, fast and weak |
+| **Frost Fairy** | flies; her shots slow what they hit |
+| **Snow Cannon** | a building: shoots far at troops on foot, melts after a while |
+| **Avalanche** | snow crashes down on a circle, hurting everything there |
+| **Hot Cocoa** | heals your own troops in a circle |
+| **Ice Golem** | when knocked out, breaks into two little ice chunks that keep fighting |
+
+**10. New troops, blue team.** MAGENTA.
+> A sheet of five more kinds of winter troops on the blue team, five rows, three
+> drawings in each row, ALL FACING RIGHT, with blue scarves, hats or bands: Row 1, two
+> kids riding a wooden sled together: sliding, sliding (a little bump), then crashing
+> into something with a spray of snow. Row 2, a big polar bear with a blue scarf:
+> walking (two steps, legs clearly apart then together), then swiping with a paw.
+> Row 3, an arctic fox with a blue band: running (two steps), then pouncing. Row 4, a
+> tiny frost fairy with icy wings and a blue ribbon: flying wings up, wings down, then
+> casting a frosty spark. Row 5, an ice golem made of chunky ice blocks with a blue
+> band: walking (two steps), then punching. Flat magenta background.
+
+**11. New troops, red team.** MAGENTA.
+> The same sheet with every blue thing red instead. Same rows, same poses, same size,
+> ALL FACING RIGHT.
+
+**12. New buildings, spells and bits.** MAGENTA.
+> A sheet seen from slightly above, three rows with clear space between, nothing else:
+> Row 1, a snow cannon (a little wooden cannon packed with snow) with a blue flag,
+> the same with a red flag, the same firing a snowball with a puff. Row 2, a crashing
+> wave of snow seen from above (an avalanche), a big steaming mug of hot cocoa, a
+> warm glow of hearts and steam (a healing effect). Row 3, a small chunk of ice with
+> a blue band (walking), the same with a red band, a spray of broken ice.
+> Flat magenta background.
+
+**13. New card pictures.** MAGENTA.
+> Eight square portraits in two rows of four, each a close-up of ONE of these, in the
+> same frames as the first set of cards: the blue-team sled riders; the polar bear;
+> an arctic fox; the frost fairy; the snow cannon; an avalanche of snow; a mug of hot
+> cocoa; the ice golem. Exactly eight cards, one picture each. Flat magenta background.
