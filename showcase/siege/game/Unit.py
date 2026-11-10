@@ -1,8 +1,8 @@
 # object: Unit
 # depth: 0
 # A troop: it marches on the other side's towers, stopping to fight whatever it
-# meets that it can fight. Troops on foot cross the gap only by a ruler; flyers go
-# straight. Its kinds (Soldier, Knight, Plane, Archer, Golem) set their numbers
+# meets that it can fight. Troops on foot cross the creek only by a bridge; flyers go
+# straight. Its kinds (SnowKid, Snowman, Owl, Penguin, Yeti) set their numbers
 # from UNITS in the rules, and draw themselves.
 #
 # How fast a troop walks is `pace`, not `speed`: `speed` is the engine's own (with
@@ -17,10 +17,10 @@ self.target = None
 self.cool = 0
 self.age = 0
 self.flash = 0
-self.glued = False
+self.slowed = False
 self.swing = 0                   # steps of the attacking picture still to show
 self.px = self.py = None         # where it was last drawn (draw_troop: walking or standing)
-setup_unit(self, "Soldier")
+setup_unit(self, "SnowKid")
 
 # === step
 if self.puppet or stopped():
@@ -32,16 +32,16 @@ t = self.target
 # Look again every so often (something nearer may have come), or when it's gone.
 if t is None or not instance_exists(t) or self.age % 20 == 0:
     self.target = t = pick_target(self)
-# Glue slows troops on foot (the other side's glue, not your own).
-self.glued = not self.flies and any(g.side != self.side and point_distance(self.x, self.y, g.x, g.y) < GLUE_R
-                                    for g in instances("Glue"))
+# IcePatch slows troops on foot (the other side's ice, not your own).
+self.slowed = not self.flies and any(g.side != self.side and point_distance(self.x, self.y, g.x, g.y) < ICE_R
+                                    for g in instances("IcePatch"))
 if t is None:
     return
 reach = self.range + self.radius + t.radius
 if point_distance(self.x, self.y, t.x, t.y) <= reach:
     if self.cool == 0:
         if self.range > 40:
-            shoot(self.x, self.y - 6, t, self.damage, self.side, "band")
+            shoot(self.x, self.y - 6, t, self.damage, self.side, "snowshot")
             sound_play("twang", volume=0.25)
         else:
             hurt(t, self.damage)
@@ -50,8 +50,8 @@ if point_distance(self.x, self.y, t.x, t.y) <= reach:
         self.swing = 14
 else:
     pace = self.pace
-    if self.glued:
-        pace *= GLUE_SLOW
+    if self.slowed:
+        pace *= ICE_SLOW
     tx, ty = (t.x, t.y) if self.flies else waypoint(self.x, self.y, t.x, t.y)
     d = point_distance(self.x, self.y, tx, ty)
     if d > 0:
@@ -66,7 +66,7 @@ for o in instances("Unit"):
         if 0 < d < gap:
             push = (gap - d) * 0.25
             nx, ny = self.x + (self.x - o.x) / d * push, self.y + (self.y - o.y) / d * push
-            # Never pushed off a ruler into the gap.
+            # Never pushed off a bridge into the creek.
             if self.flies or not on_the_gap(nx, ny):
                 self.x, self.y = nx, ny
 self.y = clamp(self.y, TOP + 4, BOTTOM - 4)

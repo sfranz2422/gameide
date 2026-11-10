@@ -1,7 +1,7 @@
 # object: Hand
 # depth: -100
 # Your four cards, the one up next, and your energy, along the bottom. Drag a card
-# onto the desk to play it, or click it and then click the desk (or press 1 to 4,
+# onto the field to play it, or click it and then click the field (or press 1 to 4,
 # then click).
 
 # === step
@@ -25,7 +25,7 @@ if mouse_check_pressed("left"):
             sound_play("nope", volume=0.4)
 if mouse_check_released("left") and m.drag:
     m.drag = False
-    # Let go over the desk: played. Let go back on the cards: still picked, to click the desk after.
+    # Let go over the field: played. Let go back on the cards: still picked, to click the field after.
     if m.pick is not None and my <= BOTTOM:
         if play(m.pick, mx, my):
             m.pick = None
@@ -34,7 +34,7 @@ if mouse_check_released("left") and m.drag:
 
 # === draw_gui
 m = global_vars
-draw_set_color("#3b2a1a")
+draw_set_color("#1d3550")
 draw_rect(0, BOTTOM + 2, VIEW_W, VIEW_H)
 # Energy: ten notches, filling.
 e = m.energy[0]
@@ -54,14 +54,14 @@ for k, card in enumerate(hand(0)):
     lift = -6 if m.pick == k else 0
     draw_set_color("#ffd23f" if m.pick == k else "#1b1208")
     draw_rect(x - 2, y - 2 + lift, x + 74, y + 60 + lift)
-    draw_set_color("#f4ecd8" if affordable else "#9a9184")
+    draw_set_color("#eef6fc" if affordable else "#8a99a8")
     draw_rect(x, y + lift, x + 72, y + 58 + lift)
     card_picture(card, x + 36, y + 21 + lift, 0.75)
     words(x + 36, y + 40 + lift, c["name"], 9, "white", "center")
     draw_set_color("#7a4fd0")
     draw_circle(x + 8, y + 8 + lift, 9)
     words(x + 8, y + 1 + lift, str(c["cost"]), 12, "white", "center")
-    words(x + 70, y + 1 + lift, str(k + 1), 9, "#5a4a3a", "right")
+    words(x + 70, y + 1 + lift, str(k + 1), 9, "#4a6a8a", "right")
 nx = 60
-words(nx, BOTTOM + 22, "Next", 10, "#cfb98a", "center")
+words(nx, BOTTOM + 22, "Next", 10, "#b9d8ee", "center")
 card_picture(up_next(0), nx, BOTTOM + 52, 0.6)

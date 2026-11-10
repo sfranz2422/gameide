@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """
 Builds the fourteenth showcase game, "Tabletop Siege", as a GameIDE project zip:
-toy soldiers, wind-up knights and paper planes battling across a kid's desk, one
-player against another (or the computer).
+a snowball war between two snow forts across a frozen creek, one player against
+another (or the computer). (It began as a battle across a kid's desk; the teacher
+asked for a new setting, and the name stayed.)
 
     python3 showcase/siege/build.py      # → showcase/siege/out/Siege.zip
 
@@ -10,9 +11,9 @@ Against the computer, or another player in a room (a code, or "Find me a match")
 The pictures are the teacher's, made with Gemini (PROMPTS.md), cut by
 cut_sheets.py into art/ at twice the game's size.
 
-THE GAME IS OBJECTS: Unit and its kinds (Soldier, Knight, Plane, Archer, Golem),
-Building and its kinds (Tower, Keep, Wall), Shot, Marble, Glue, Deploy (a card on
-its way), Arena (the desk and the clock), Hand (your cards), Hud, Cpu, Link (the
+THE GAME IS OBJECTS: Unit and its kinds (SnowKid, Snowman, Owl, Penguin, Yeti),
+Building and its kinds (Tower, Keep, SnowWall), Shot, Snowball, IcePatch, Deploy (a card on
+its way), Arena (the field and the clock), Hand (your cards), Hud, Cpu, Link (the
 room: the host runs the battle, the other game shows it), Title. Every
 number is in game/_1rules.py.
 """
@@ -40,11 +41,11 @@ VIEW_W, VIEW_H = RULES["VIEW_W"], RULES["VIEW_H"]
 
 
 ART = HERE / "art"
-TROOPS = ["soldier", "knight", "plane", "archer", "golem"]
+TROOPS = ["kid", "snowman", "owl", "penguin", "yeti"]
 # How wide each picture is drawn in the game (pixels): build.py fits the teacher's drawings to these.
-WIDE = {"wood": 256, "ruler": 72, "blocks": 48, "glue_puddle": 2 * RULES["GLUE_R"], "marble_blue": 2 * RULES["MARBLE_R"] + 2,
-        "marble_red": 2 * RULES["MARBLE_R"] + 2, "puff": 30, "spark": 18, "band": 12, "shaving": 10, "key": 16, "sparkle": 40,
-        "scissors": 34, "note": 26, "clip": 14, "coins": 22, "crayon": 34, "sharpener": 16}
+WIDE = {"snow": 256, "bridge": 64, "snow_wall": 48, "ice_patch": 2 * RULES["ICE_R"], "snowball_blue": 2 * RULES["SNOWBALL_R"] + 4,
+        "snowball_red": 2 * RULES["SNOWBALL_R"] + 4, "puff": 30, "spark": 20, "snowshot": 12, "icicle": 14, "swirl": 30, "sparkle": 40,
+        "pine_0": 26, "pine_1": 30, "pine_2": 36, "pine_3": 40, "sled": 34, "mug": 14, "cone": 12, "carrot": 16, "heap": 40}
 
 
 def art(name, k=0.5):
@@ -87,10 +88,10 @@ def passing(pic, legs_from=0.72, squeeze=0.55, lift=2):
 
 
 def icon_picture():
-    """The wind-up knight's card on a wooden tile."""
+    """The snowman's card on an icy tile."""
     tile = Image.new("RGBA", (128, 128))
-    ImageDraw.Draw(tile).rounded_rectangle((0, 0, 127, 127), radius=22, fill=(200, 149, 90, 255))
-    tile.alpha_composite(art("card_knight", 1).resize((108, 108), Image.LANCZOS), (10, 10))
+    ImageDraw.Draw(tile).rounded_rectangle((0, 0, 127, 127), radius=22, fill=(160, 205, 235, 255))
+    tile.alpha_composite(art("card_snowman", 1).resize((108, 108), Image.LANCZOS), (10, 10))
     return tile
 
 
@@ -107,7 +108,7 @@ def make_sounds(P):
     P.sound("overtime", join(*[tone(0.1, f, f, "square", 0.2) for f in (523, 659, 523, 659)]))
     P.sound("win", join(*[tone(0.12, f, f, "tri", 0.3) for f in (523, 659, 784)], tone(0.4, 1047, 1047, "tri", 0.3)))
     P.sound("lose", join(*[tone(0.18, f, f * 0.9, "tri", 0.3) for f in (392, 349, 330)], tone(0.4, 262, 250, "tri", 0.3)))
-    # A bouncy march, C major, toy-box instruments.
+    # A bouncy winter march, C major, sleigh-bell bright.
     melody = [72, 0, 76, 0, 79, 0, 76, 0, 77, 0, 74, 0, 71, 0, 74, 0, 72, 0, 76, 0, 79, 0, 84, 0, 83, 79, 77, 74, 72, 0, 0, 0]
     bass = [48, 48, 55, 55, 53, 53, 55, 55, 48, 48, 55, 55, 53, 55, 48, 48]
     P.sound("music", _tw.music_loop(melody, bass, 120, seed=8), volume=0.5)
@@ -120,26 +121,29 @@ def build(out):
     # One against one: rooms hold two, and the lobby offers "Find me a match".
     P.p["settings"]["netPlayers"] = 2
     P.sprite("icon", [icon_picture()], (64, 64))
-    # The troops: a sprite for each kind and team, frames walking, walking, attacking (a plane:
+    # The troops: a sprite for each kind and team, frames walking, walking, attacking (a owl:
     # flying, tilting, diving). Drawn facing right; the red side's are turned round. The origin
     # is a little below the middle: where the troop stands, for fights and the gap.
     for troop in TROOPS:
         for team in ("blue", "red"):
             frames = [art(f"{troop}_{team}_{k}") for k in range(3)]
-            if troop != "plane":
+            if troop != "owl":
                 frames[1] = passing(frames[0])
             w, h = frames[0].size
             P.sprite(f"{troop}_{team}", frames, (w // 2, round(h * 0.62)))
     for team in ("blue", "red"):
-        frames = [art(f"cup_{team}_{k}") for k in range(3)]
+        frames = [art(f"tower_{team}_{k}") for k in range(3)]
         w, h = frames[0].size
-        P.sprite(f"cup_{team}", frames, (w // 2, round(h * 0.68)))
-    for name in ("box_blue", "box_red", "box_broken"):
+        P.sprite(f"tower_{team}", frames, (w // 2, round(h * 0.72)))
+    for name in ("castle_blue", "castle_red", "castle_broken"):
         im = art(name)
         P.sprite(name, [im], (im.width // 2, round(im.height * 0.62)))
     for name, width in WIDE.items():
-        im = fitted(name, width) if name != "wood" else art(name).resize((width, width), Image.LANCZOS)
-        P.sprite(name, [im], (0, 0) if name == "wood" else (im.width // 2, im.height // 2))
+        im = fitted(name, width) if name != "snow" else art(name).resize((width, width), Image.LANCZOS)
+        if name == "bridge":
+            im = im.resize((width, 2 * RULES["BRIDGE"] + 6), Image.LANCZOS)   # logs from bank to bank, a lane wide
+        origin = (0, 0) if name == "snow" else (im.width // 2, im.height - 2) if name.startswith("pine") else (im.width // 2, im.height // 2)
+        P.sprite(name, [im], origin)
     for card in RULES["DECK"]:
         im = art(f"card_{card}")
         P.sprite(f"card_{card}", [im], (im.width // 2, im.height // 2))
@@ -185,7 +189,7 @@ def build(out):
         })
 
     room("Title", ["Title"])
-    room("Desk", ["Arena", "Hand", "Hud", "Cpu", "Link"])
+    room("Field", ["Arena", "Hand", "Hud", "Cpu", "Link"])
     out.parent.mkdir(parents=True, exist_ok=True)
     P.write(out)
     (out.parent / "project.json").write_text(json.dumps(P.p, indent=1))

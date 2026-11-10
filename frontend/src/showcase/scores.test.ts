@@ -271,14 +271,14 @@ on("siege")("Tabletop Siege's board", () => {
   it("is wins against other players, all told: never wins against the computer", async () => {
     const alone = await start(builtAt("siege"));
     expect(alone.project.settings.scoreboard).toEqual({ unit: "wins" });
-    alone.py('room_goto("Desk")');
+    alone.py('room_goto("Field")');
     alone.step(3);
     alone.py("end_match(0)");
     alone.step(3);
     expect(alone.scores).toEqual([]);
     // In a room (as the host, alone for the moment: the match is the game's own), wins count.
     const g = await start(builtAt("siege"), { wins: 4 }, { code: "KXTD", number: 1, name: "Ana", state: {} });
-    g.py('room_goto("Desk")');
+    g.py('room_goto("Field")');
     g.step(3);
     g.py("end_match(0)");
     g.step(3);

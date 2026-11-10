@@ -5,12 +5,12 @@
 
 
 def is_a(inst, name):
-    """True if the instance is that object or one of its kinds: is_a(o, "Unit") for a Knight."""
+    """True if the instance is that object or one of its kinds: is_a(o, "Unit") for a Snowman."""
     return any(c.__name__ == name for c in type(inst).__mro__)
 
 
 def words(x, y, text, size=14, color="white", align="left"):
-    """Text with a dark edge, to read on the desk's wood and the paper cards alike."""
+    """Text with a dark edge, to read on the snow and the cards alike."""
     draw_set_font("Ubuntu", size)
     draw_set_halign(align)
     draw_set_color("#1b1208")
@@ -56,7 +56,7 @@ def new_match():
     m.overtime = False
     m.over = False
     m.winner = None                    # 0, 1, or -1 for a draw
-    for o in instances("Building") + instances("Unit") + instances("Deploy") + instances("Marble") + instances("Glue") + instances("Shot"):
+    for o in instances("Building") + instances("Unit") + instances("Deploy") + instances("Snowball") + instances("IcePatch") + instances("Shot"):
         o.destroy()
     for side in (0, 1):
         for kind, x, y in TOWERS:
@@ -199,8 +199,8 @@ def pick_target(u):
     return (ahead or keep or theirs or [None])[0]
 
 
-def shoot(x, y, target, damage, side, kind="band"):
-    """A shot on its way: a rubber band (an archer's) or a pencil shaving (a tower's)."""
+def shoot(x, y, target, damage, side, kind="snowshot"):
+    """A shot on its way: a snowball (a penguin's slingshot) or an icicle (a tower's)."""
     s = instance_create(x, y, "Shot")
     s.target, s.damage, s.side, s.kind = target, damage, side, kind
     return s
@@ -260,7 +260,7 @@ def draw_troop(u, troop):
     if u.swing > 0:
         u.swing -= 1
         frame = 2
-    elif troop == "plane":
+    elif troop == "owl":
         frame = (getattr(u, "anim", 0) // 12) % 2
     else:
         frame = (u.anim // 10) % 2 if u.still < 8 else 0

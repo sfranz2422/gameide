@@ -1,5 +1,11 @@
 # Progress
 
+## Tabletop Siege becomes a snowball fort war (2026-11-10, waiting for review)
+- **The teacher's new setting**, from 9 new Gemini pictures (`showcase/siege/raw/snow/`, cut by `cut_sheets.py`): a snowy field, a frozen creek with a log bridge in each lane, snow-brick fort towers that crack and crumble, ice castles for keeps, pine trees and winter things about the field, swirling snowflakes as troops arrive, snowballs and icicles in flight. The game plays exactly as before.
+- **The cards:** Snow Kids (3), Snowman (slows as it melts), Snowy Owl (flies; towers only), Penguin (a slingshot; hits owls), Yeti (huge; buildings only), Snow Wall, Big Snowball (rolls down a lane), Ice Patch (slows the other side). The code's objects are named the same way (SnowKid, Snowman, Owl, Penguin, Yeti, SnowWall, Snowball, IcePatch), since students read it; the battle's room is Field.
+- Gemini drew three kid cards and put the wall, snowball and ice on one: the first kid is Snow Kids, and those three cards are framed from the winter-things sheet. The cutter now cuts a sheet row by row (a pair of mittens is two pieces), and the effects by columns (a swirl of snowflakes is many).
+- Every troop faces right this time (checked at full size).
+
 ## Tabletop Siege: what the teacher found playing it (2026-11-10, waiting for review)
 - **Golems walked backwards**: they face right like the others after all (seen small, I'd read the drawing wrong and turned them round).
 - **Legs jittered**: Gemini's two walking frames are nearly one pose, so the second is now a legs-together step (as in Undertow), and the frame changes on a steady beat rather than every few pixels, standing only after a moment still.

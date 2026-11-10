@@ -1,11 +1,11 @@
-# object: Soldier
+# object: SnowKid
 # parent: Unit
-# A toy soldier: cheap, small, and they come three at a time.
+# A snow kid in a bobble hat: cheap, small, and they come three at a time.
 
 # === create
 super().on_create()
-setup_unit(self, "Soldier")
+setup_unit(self, "SnowKid")
 
 # === draw
-draw_troop(self, "soldier")
+draw_troop(self, "kid")
 super().on_draw()

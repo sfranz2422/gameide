@@ -650,8 +650,12 @@ on a fish wanted a colour. Call a game's own numbers something else (`pace`, `li
 
 ## Tabletop Siege
 
-`showcase/siege/`: a 1v1 lane battle on a desk (the teacher's pick, an original game
-in the genre). Every number is in `game/_1rules.py`; the troops are objects (Unit
+`showcase/siege/`: a 1v1 lane battle (the teacher's pick, an original game in the
+genre), now a **snowball fort war** across a frozen creek (2026-11-10: the teacher
+replaced the first setting, a kid's desk; its pictures are in `raw/desk/`, the
+snow ones in `raw/snow/`). Objects and cards are named for the snow setting
+(SnowKid, Snowman, Owl, Penguin, Yeti, SnowWall, Snowball, IcePatch; rooms
+Title and Field). Every number is in `game/_1rules.py`; the troops are objects (Unit
 and its kinds; Building, Tower, Keep, Wall), `_2battle.py` is what they share. The
 computer (`Cpu`) plays side 1 alone. In a room (`netPlayers` 2), the host's game
 runs the battle and sends `snapshot()` each step; the other game runs no battle

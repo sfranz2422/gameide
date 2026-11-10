@@ -365,7 +365,7 @@ test("Tabletop Siege: Find me a match pairs two players, and each sees the other
   const [one, two] = players.map((p) => p.page) as [Page, Page];
   // Paired into the same room.
   await expect(two.getByTestId("net-room-code")).toHaveText((await one.getByTestId("net-room-code").textContent())!);
-  for (const p of [one, two]) await expect.poll(() => py(p, "room_name()"), { timeout: 30_000 }).toBe("Desk");
+  for (const p of [one, two]) await expect.poll(() => py(p, "room_name()"), { timeout: 30_000 }).toBe("Field");
   expect(await py(one, "runs_battle()")).toBe(true);
   expect(await py(two, "runs_battle()")).toBe(false);
   // Each plays a card on their own left: each then sees one of their own (blue, left) and one of theirs (red, right).

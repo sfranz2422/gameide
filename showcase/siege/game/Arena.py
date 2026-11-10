@@ -1,7 +1,7 @@
 # object: Arena
 # depth: 1000
-# The desk: two school desks pushed together, the gap between them, and a ruler
-# across it in each lane. It runs the match's clock, and starts a new match (in
+# The field: snow either side of a frozen creek, and a log bridge across it in
+# each lane. It runs the match's clock, and starts a new match (in
 # the game that runs the battle: alone, or the room's host).
 
 # === create
@@ -24,40 +24,38 @@ if runs_battle():
 question_ok(global_vars.over)
 
 # === draw
-# Two desks of wood (the teacher's picture, repeated), and the gap between them.
+# The snowy field (the teacher's picture, repeated), and the frozen creek down the middle.
 for x in range(0, VIEW_W, 256):
     for y in range(0, VIEW_H, 256):
-        draw_sprite("wood", 0, x, y)
-draw_set_alpha(0.08)
-draw_set_color("#000000")
-draw_rect(MID + GAP, 0, VIEW_W, VIEW_H)          # the right-hand desk a shade darker, so they read as two
-draw_set_alpha(1)
-draw_set_color("#2a1d12")
+        draw_sprite("snow", 0, x, y)
+draw_set_color("#7fb9da")
 draw_rect(MID - GAP, 0, MID + GAP, VIEW_H)
-draw_set_color("#140d07")
-draw_rect(MID - 3, 0, MID + 3, VIEW_H)
-# Things on the desks, out of the way of the fighting.
-for name, x, y, turn in DESK_THINGS:
+draw_set_color("#a9d8f0")
+draw_rect(MID - GAP + 3, 0, MID + GAP - 3, VIEW_H)
+draw_set_color("#d6f0fb")
+for y in range(8, VIEW_H, 34):
+    draw_line(MID - 6, y, MID + 2, y + 14, 2)      # cracks in the ice
+# Pine trees and things in the snow, out of the way of the fighting.
+for name, x, y, turn in FIELD_THINGS:
     draw_sprite_ext(name, 0, x, y, 1, 1, turn)
-# Across the gap in each lane: rulers laid side by side.
+# A log bridge across the creek in each lane.
 for ly in LANES:
-    for k in (-1, 0, 1):
-        draw_sprite("ruler", 0, MID, ly + k * (BRIDGE * 2 / 3))
-# Where a tower stood and fell: its heap.
+    draw_sprite("bridge", 0, MID, ly)
+# Where a tower stood and fell: its heap of snow bricks.
 for side in (0, 1):
     for kind, x, y in TOWERS:
         x = mirror_x(x, side)
         if not any(abs(t.x - x) < 4 and abs(t.y - y) < 4 for t in instances("Tower")) and global_vars.match_no:
             if kind == "keep":
-                draw_sprite("box_broken", 0, x, y)
+                draw_sprite("castle_broken", 0, x, y)
             else:
-                draw_sprite_ext("cup_" + TEAM[side], 2, x, y, 1, 1)
+                draw_sprite_ext("tower_" + TEAM[side], 2, x, y, 1, 1)
 # Where a card in hand may go, while one is being played.
 card = None if global_vars.pick is None else hand(0)[global_vars.pick]
 if card is not None and not global_vars.over:
     draw_set_alpha(0.12)
     draw_set_color("#ffffff")
-    if CARDS[card]["kind"] == "glue":
+    if CARDS[card]["kind"] == "ice":
         draw_rect(8, TOP, VIEW_W - 8, BOTTOM)
     else:
         draw_rect(8, TOP, MID - GAP, BOTTOM)
@@ -66,5 +64,5 @@ if card is not None and not global_vars.over:
         ok = can_drop(0, card, mouse_x, mouse_y) and global_vars.energy[0] >= CARDS[card]["cost"]
         draw_set_alpha(0.5)
         draw_set_color("#3ecf8e" if ok else "#ff4f4f")
-        draw_circle(mouse_x, mouse_y, GLUE_R if card == "glue" else 16)
+        draw_circle(mouse_x, mouse_y, ICE_R if card == "ice" else 16)
         draw_set_alpha(1)

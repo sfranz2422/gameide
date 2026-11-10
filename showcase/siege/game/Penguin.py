@@ -1,11 +1,11 @@
-# object: Archer
+# object: Penguin
 # parent: Unit
-# A rubber-band archer: shoots from afar, and can hit paper planes.
+# A penguin with a slingshot: shoots from afar, and can hit owls.
 
 # === create
 super().on_create()
-setup_unit(self, "Archer")
+setup_unit(self, "Penguin")
 
 # === draw
-draw_troop(self, "archer")
+draw_troop(self, "penguin")
 super().on_draw()

@@ -50,7 +50,7 @@ async function desk(cpu = true): Promise<Game> {
   const g = await start();
   tap(g, "space");
   step(g, 2);
-  expect(py(g, "room_name()")).toBe("Desk");
+  expect(py(g, "room_name()")).toBe("Field");
   if (!cpu) py(g, "[c.destroy() for c in instances('Cpu')]");
   return g;
 }
@@ -62,16 +62,16 @@ function play(g: Game, side: number, card: string, x: number, y: number) {
 }
 
 describe.skipIf(!have)("Tabletop Siege: a match against the computer", () => {
-  it("the art: every troop of both teams in its three poses, the cups and lunchboxes, the eight cards", () => {
+  it("the art: every troop of both teams in its three poses, the towers and ice castles, the eight cards", () => {
     const project = JSON.parse(readFileSync(BUILT, "utf8")) as Project;
     const frames = (n: string) => project.sprites.find((x) => x.name === n)?.frames.length;
-    for (const troop of ["soldier", "knight", "plane", "archer", "golem"]) for (const team of ["blue", "red"]) expect(frames(`${troop}_${team}`), troop).toBe(3);
+    for (const troop of ["kid", "snowman", "owl", "penguin", "yeti"]) for (const team of ["blue", "red"]) expect(frames(`${troop}_${team}`), troop).toBe(3);
     for (const team of ["blue", "red"]) {
-      expect(frames(`cup_${team}`)).toBe(3);
-      expect(frames(`box_${team}`)).toBe(1);
+      expect(frames(`tower_${team}`)).toBe(3);
+      expect(frames(`castle_${team}`)).toBe(1);
     }
-    for (const card of ["soldiers", "knight", "plane", "archer", "golem", "wall", "marble", "glue"]) expect(frames(`card_${card}`), card).toBe(1);
-    for (const n of ["wood", "ruler", "title", "box_broken", "puff", "spark", "band", "shaving", "key", "icon"]) expect(frames(n), n).toBe(1);
+    for (const card of ["kids", "snowman", "owl", "penguin", "yeti", "wall", "snowball", "ice"]) expect(frames(`card_${card}`), card).toBe(1);
+    for (const n of ["snow", "bridge", "title", "castle_broken", "puff", "spark", "snowshot", "icicle", "swirl", "snow_wall", "ice_patch", "icon"]) expect(frames(n), n).toBe(1);
   });
 
   it("a match starts with three towers a side, 5 energy, a hand of four, and three minutes", async () => {
@@ -86,7 +86,7 @@ describe.skipIf(!have)("Tabletop Siege: a match against the computer", () => {
 
   it("playing a card: it costs energy, waits a moment, arrives, and the next card comes into the hand", async () => {
     const g = await desk(false);
-    // Whatever the shuffle dealt (the golem costs 6): enough energy for any card.
+    // Whatever the shuffle dealt (the yeti costs 6): enough energy for any card.
     py(g, "global_vars.energy[0] = 10");
     const [first, next] = py(g, "(hand(0)[1], up_next(0))") as unknown as [string, string];
     const cost = py(g, `CARDS['${first}']['cost']`) as unknown as number;
@@ -101,100 +101,100 @@ describe.skipIf(!have)("Tabletop Siege: a match against the computer", () => {
 
   it("not enough energy, or the wrong side of the desk: refused", async () => {
     const g = await desk(false);
-    py(g, "d = global_vars.decks[0]\nd.remove('golem')\nd.insert(0, 'golem')\nglobal_vars.energy[0] = 5");
+    py(g, "d = global_vars.decks[0]\nd.remove('yeti')\nd.insert(0, 'yeti')\nglobal_vars.energy[0] = 5");
     expect(py(g, "play_card(0, 0, 200, 150)")).toBe(false);
     py(g, "global_vars.energy[0] = 10");
     expect(py(g, "play_card(0, 0, 450, 150)")).toBe(false);
     expect(py(g, "play_card(0, 0, 200, 150)")).toBe(true);
-    // Glue goes anywhere.
-    expect(play(g, 0, "glue", 450, 150)).toBe(true);
+    // IcePatch goes anywhere.
+    expect(play(g, 0, "ice", 450, 150)).toBe(true);
   });
 
-  it("troops on foot cross only by a ruler; a knight with an archer behind knocks down the tower at the end of their lane", async () => {
+  it("troops on foot cross only by a ruler; a snowman with an penguin behind knocks down the tower at the end of their lane", async () => {
     const g = await desk(false);
-    play(g, 0, "knight", 200, 230);
+    play(g, 0, "snowman", 200, 230);
     step(g, 20);
-    play(g, 0, "archer", 150, 230);
+    play(g, 0, "penguin", 150, 230);
     let worst = 0;
     let onGap = false;
     for (let t = 0; t < 60 * 40 && count(g, "Tower", 1) === 3; t++) {
       step(g);
-      const ks = py(g, "[(k.x, k.y) for k in instances('Knight')]") as unknown as [number, number][];
+      const ks = py(g, "[(k.x, k.y) for k in instances('Snowman')]") as unknown as [number, number][];
       for (const [x, y] of ks) if (py(g, `on_the_gap(${x}, ${y})`)) onGap = true;
       worst = Math.max(worst, ks.length);
     }
     expect(onGap).toBe(false);
     expect(count(g, "Tower", 1)).toBe(2);
     expect(py(g, "global_vars.crowns")).toEqual([1, 0]);
-    // The bottom lane's tower fell (the knight's lane), not the top's.
+    // The bottom lane's tower fell (the snowman's lane), not the top's.
     expect(py(g, "[round(t.y) for t in instances('Tower') if t.side == 1 and not is_a(t, 'Keep')]")).toEqual([96]);
   });
 
-  it("towers shoot troops that come near; a lone soldier never gets there", async () => {
+  it("towers shoot troops that come near; a lone kid never gets there", async () => {
     const g = await desk(false);
-    py(g, "s = instance_create(400, 200, 'Soldier')\ns.side = 0");
+    py(g, "s = instance_create(400, 200, 'SnowKid')\ns.side = 0");
     step(g, 60 * 8);
-    expect(count(g, "Soldier")).toBe(0);
+    expect(count(g, "SnowKid")).toBe(0);
     expect(py(g, "min(t.hp / t.max_hp for t in instances('Tower') if t.side == 1)")).toBeGreaterThan(0.9);
   });
 
-  it("a paper plane flies over the gap and past troops, for the towers; soldiers can't hit it, an archer can", async () => {
+  it("a paper owl flies over the gap and past troops, for the towers; kids can't hit it, an penguin can", async () => {
     const g = await desk(false);
-    py(g, "p = instance_create(300, 60, 'Plane')\np.side = 0\ns = instance_create(330, 70, 'Soldier')\ns.side = 1");
+    py(g, "p = instance_create(300, 60, 'Owl')\np.side = 0\ns = instance_create(330, 70, 'SnowKid')\ns.side = 1");
     step(g, 30);
-    expect(py(g, "instances('Plane')[0].target is not None and is_a(instances('Plane')[0].target, 'Tower')")).toBe(true);
-    expect(py(g, "instances('Plane')[0].hp == instances('Plane')[0].max_hp")).toBe(true);
-    expect(py(g, "can_hit(instances('Soldier')[0], instances('Plane')[0])")).toBe(false);
-    py(g, "a = instance_create(400, 60, 'Archer')\na.side = 1");
-    expect(py(g, "can_hit(instances('Archer')[0], instances('Plane')[0])")).toBe(true);
+    expect(py(g, "instances('Owl')[0].target is not None and is_a(instances('Owl')[0].target, 'Tower')")).toBe(true);
+    expect(py(g, "instances('Owl')[0].hp == instances('Owl')[0].max_hp")).toBe(true);
+    expect(py(g, "can_hit(instances('SnowKid')[0], instances('Owl')[0])")).toBe(false);
+    py(g, "a = instance_create(400, 60, 'Penguin')\na.side = 1");
+    expect(py(g, "can_hit(instances('Penguin')[0], instances('Owl')[0])")).toBe(true);
   });
 
-  it("an eraser golem walks past troops for the buildings", async () => {
+  it("an eraser yeti walks past troops for the buildings", async () => {
     const g = await desk(false);
-    py(g, "e = instance_create(200, 96, 'Golem')\ne.side = 0\ns = instance_create(240, 96, 'Soldier')\ns.side = 1");
+    py(g, "e = instance_create(200, 96, 'Yeti')\ne.side = 0\ns = instance_create(240, 96, 'SnowKid')\ns.side = 1");
     step(g, 25);
-    expect(py(g, "is_a(instances('Golem')[0].target, 'Building')")).toBe(true);
+    expect(py(g, "is_a(instances('Yeti')[0].target, 'Building')")).toBe(true);
   });
 
-  it("a marble bowls over each troop once, and stops at a building", async () => {
+  it("a snowball bowls over each troop once, and stops at a building", async () => {
     const g = await desk(false);
-    py(g, "for x in (380, 420):\n    s = instance_create(x, 200, 'Soldier')\n    s.side = 1\n    s.pace = 0\nk = instance_create(460, 200, 'Knight')\nk.side = 1\nk.base_pace = 0");
-    play(g, 0, "marble", 250, 200);
+    py(g, "for x in (380, 420):\n    s = instance_create(x, 200, 'SnowKid')\n    s.side = 1\n    s.pace = 0\nk = instance_create(460, 200, 'Snowman')\nk.side = 1\nk.base_pace = 0");
+    play(g, 0, "snowball", 250, 200);
     step(g, 62 + 50);
-    expect(count(g, "Soldier", 1)).toBe(0);
-    // The knight is bowled over once, not every step the marble touches it.
-    expect(py(g, "[k.max_hp - k.hp for k in instances('Knight')]")).toEqual([150]);
+    expect(count(g, "SnowKid", 1)).toBe(0);
+    // The snowman is bowled over once, not every step the snowball touches it.
+    expect(py(g, "[k.max_hp - k.hp for k in instances('Snowman')]")).toEqual([150]);
     step(g, 60);
-    expect(count(g, "Marble")).toBe(0);
+    expect(count(g, "Snowball")).toBe(0);
     expect(py(g, "min(t.hp for t in instances('Tower') if t.side == 1 and abs(t.y - 200) < 5)")).toBeLessThan(1400);
   });
 
-  it("glue slows the other side's troops, not your own", async () => {
+  it("ice slows the other side's troops, not your own", async () => {
     const g = await desk(false);
-    play(g, 1, "glue", 200, 150);
+    play(g, 1, "ice", 200, 150);
     step(g, 62);
-    py(g, "a = instance_create(195, 150, 'Knight')\na.side = 0\nb = instance_create(205, 160, 'Knight')\nb.side = 1");
+    py(g, "a = instance_create(195, 150, 'Snowman')\na.side = 0\nb = instance_create(205, 160, 'Snowman')\nb.side = 1");
     step(g, 2);
-    expect(py(g, "[k.glued for k in sorted(instances('Knight'), key=lambda k: k.side)]")).toEqual([true, false]);
+    expect(py(g, "[k.slowed for k in sorted(instances('Snowman'), key=lambda k: k.side)]")).toEqual([true, false]);
   });
 
   it("a block wall draws attackers to it, and crumbles by itself", async () => {
     const g = await desk(false);
     play(g, 0, "wall", 250, 200);
     step(g, 62);
-    py(g, "k = instance_create(360, 200, 'Knight')\nk.side = 1");
+    py(g, "k = instance_create(360, 200, 'Snowman')\nk.side = 1");
     step(g, 25);
-    expect(py(g, "is_a(instances('Knight')[0].target, 'Wall')")).toBe(true);
-    py(g, "[k.destroy() for k in instances('Knight')]");
+    expect(py(g, "is_a(instances('Snowman')[0].target, 'SnowWall')")).toBe(true);
+    py(g, "[k.destroy() for k in instances('Snowman')]");
     step(g, 40 * 60 + 5);
-    expect(count(g, "Wall")).toBe(0);
+    expect(count(g, "SnowWall")).toBe(0);
   });
 
-  it("a lone knight hurts a tower but doesn't take it; the keep sleeps until it's hit or a tower falls", async () => {
+  it("a lone snowman hurts a tower but doesn't take it; the keep sleeps until it's hit or a tower falls", async () => {
     const g = await desk(false);
-    play(g, 0, "knight", 200, 96);
+    play(g, 0, "snowman", 200, 96);
     step(g, 60 * 40);
-    expect(count(g, "Knight")).toBe(0);
+    expect(count(g, "Snowman")).toBe(0);
     const hp = py(g, "[t.hp for t in instances('Tower') if t.side == 1 and abs(t.y - 96) < 5][0]") as unknown as number;
     expect(hp).toBeLessThan(1400 * 0.6);
     expect(hp).toBeGreaterThan(0);
@@ -207,22 +207,22 @@ describe.skipIf(!have)("Tabletop Siege: a match against the computer", () => {
   it("with its lane's tower down, a troop goes on to the keep (not across to the other lane's), and the keep fights back", async () => {
     const g = await desk(false);
     py(g, "t = [t for t in instances('Tower') if t.side == 1 and not is_a(t, 'Keep') and t.y > 150][0]\nhurt(t, 99999)");
-    py(g, "k = instance_create(420, 200, 'Knight')\nk.side = 0");
+    py(g, "k = instance_create(420, 200, 'Snowman')\nk.side = 0");
     step(g, 25);
-    expect(py(g, "type(instances('Knight')[0].target).__name__")).toBe("Keep");
+    expect(py(g, "type(instances('Snowman')[0].target).__name__")).toBe("Keep");
     step(g, 60 * 6);
-    expect(py(g, "[k.hp < k.max_hp for k in instances('Knight')]")).toEqual([true]);
+    expect(py(g, "[k.hp < k.max_hp for k in instances('Snowman')]")).toEqual([true]);
     expect(py(g, "[k.hp < k.max_hp for k in instances('Keep') if k.side == 1]")).toEqual([true]);
   });
 
   it("a troop fights only what's in its own lane, and a tower shoots only at its own", async () => {
     const g = await desk(false);
-    // A red soldier in the top lane, on our half: a knight dropped in the bottom lane walks on.
-    py(g, "s = instance_create(200, 96, 'Soldier')\ns.side = 1\ns.pace = 0\nk = instance_create(200, 200, 'Knight')\nk.side = 0");
+    // A red kid in the top lane, on our half: a snowman dropped in the bottom lane walks on.
+    py(g, "s = instance_create(200, 96, 'SnowKid')\ns.side = 1\ns.pace = 0\nk = instance_create(200, 200, 'Snowman')\nk.side = 0");
     step(g, 25);
-    expect(py(g, "type(instances('Knight')[0].target).__name__")).toBe("Tower");
-    // A knight at the bottom tower, crowded up toward the middle: the top tower doesn't shoot it.
-    py(g, "[o.destroy() for o in instances('Unit')]\nk = instance_create(500, 168, 'Knight')\nk.side = 0\nk.base_pace = 0");
+    expect(py(g, "type(instances('Snowman')[0].target).__name__")).toBe("Tower");
+    // A snowman at the bottom tower, crowded up toward the middle: the top tower doesn't shoot it.
+    py(g, "[o.destroy() for o in instances('Unit')]\nk = instance_create(500, 168, 'Snowman')\nk.side = 0\nk.base_pace = 0");
     step(g, 60 * 3);
     expect(py(g, "[t.target is None for t in instances('Tower') if t.side == 1 and not is_a(t, 'Keep') and t.y < 150]")).toEqual([true]);
     expect(py(g, "[t.target is not None for t in instances('Tower') if t.side == 1 and not is_a(t, 'Keep') and t.y > 150]")).toEqual([true]);
@@ -265,12 +265,12 @@ describe.skipIf(!have)("Tabletop Siege: a match against the computer", () => {
 
   it("the computer defends: troops sent at it are met", async () => {
     const g = await desk();
-    play(g, 0, "knight", 280, 96);
+    play(g, 0, "snowman", 280, 96);
     // Enough to answer, not enough to push or to spend because it's full.
-    // (A hand it can defend with: one of golem, plane, marble and glue alone is 1 deal in 70.)
-    py(g, "global_vars.energy[1] = 6\nc = instances('Cpu')[0]\nc.save_for = 9\nglobal_vars.decks[1] = ['knight', 'soldiers', 'wall', 'archer', 'golem', 'plane', 'marble', 'glue']");
+    // (A hand it can defend with: one of yeti, owl, snowball and ice alone is 1 deal in 70.)
+    py(g, "global_vars.energy[1] = 6\nc = instances('Cpu')[0]\nc.save_for = 9\nglobal_vars.decks[1] = ['snowman', 'kids', 'wall', 'penguin', 'yeti', 'owl', 'snowball', 'ice']");
     step(g, 60 * 6);
-    // Something of its own, dropped in the knight's lane on its side of the desk.
+    // Something of its own, dropped in the snowman's lane on its side of the desk.
     expect((py(g, "[(round(o.x), round(o.y)) for o in instances('Unit') + instances('Deploy') + instances('Building') if o.side == 1 and not is_a(o, 'Tower') and abs(o.y - 96) < 60 and o.x > 330]") as unknown as unknown[]).length).toBeGreaterThan(0);
   });
 
@@ -335,8 +335,8 @@ async function duel() {
   const a = await room.join(1, "Ana");
   const b = await room.join(2, "Ben");
   room.step(100);
-  expect(py(a.g, "room_name()")).toBe("Desk");
-  expect(py(b.g, "room_name()")).toBe("Desk");
+  expect(py(a.g, "room_name()")).toBe("Field");
+  expect(py(b.g, "room_name()")).toBe("Field");
   room.step(3);
   return { room, a, b };
 }
@@ -350,7 +350,7 @@ describe.skipIf(!have)("Tabletop Siege: two players", () => {
     expect(py(a.g, "room_name()")).toBe("Title");
     await room.join(2, "Ben");
     room.step(100);
-    expect(room.seats.map((s) => py(s.g, "room_name()"))).toEqual(["Desk", "Desk"]);
+    expect(room.seats.map((s) => py(s.g, "room_name()"))).toEqual(["Field", "Field"]);
     expect(room.seats.map((s) => count(s.g, "Cpu"))).toEqual([0, 0]);
   });
 
@@ -371,7 +371,7 @@ describe.skipIf(!have)("Tabletop Siege: two players", () => {
     py(a.g, "global_vars.energy[1] = 10");
     room.step(3);
     const card = py(b.g, "hand(0)[0]") as unknown as string;
-    const x = card === "glue" ? 200 : 200;
+    const x = card === "ice" ? 200 : 200;
     expect(py(b.g, `play(0, ${x}, 200)`)).toBe(true);
     room.step(3);
     expect(py(a.g, "[(round(d.x), round(d.y), d.side, d.card) for d in instances('Deploy')]")).toEqual([[440, 200, 1, card]]);
@@ -385,7 +385,7 @@ describe.skipIf(!have)("Tabletop Siege: two players", () => {
 
   it("a play the host may not allow is refused: the wrong half, or too little energy", async () => {
     const { room, a, b } = await duel();
-    py(a.g, "global_vars.energy[1] = 10\nd = global_vars.decks[1]\nd.remove('knight')\nd.insert(0, 'knight')");
+    py(a.g, "global_vars.energy[1] = 10\nd = global_vars.decks[1]\nd.remove('snowman')\nd.insert(0, 'snowman')");
     room.step(3);
     // A changed game asking for a drop on the host's half (host x 200).
     py(b.g, "net_tell(1, {'play': [0, 200, 150], 'n': global_vars.match_no})");
@@ -445,7 +445,7 @@ describe.skipIf(!have)("Tabletop Siege: two players", () => {
 
   it("a big battle still fits in what a game may send", async () => {
     const { room, a } = await duel();
-    py(a.g, "for k in range(120):\n    u = instance_create(60 + k * 4, 40 + (k % 11) * 20, 'Soldier')\n    u.side = k % 2");
+    py(a.g, "for k in range(120):\n    u = instance_create(60 + k * 4, 40 + (k % 11) * 20, 'SnowKid')\n    u.side = k % 2");
     room.step(30);
     const sizes = a.g.sent.filter((o) => o.state).slice(-10).map((o) => JSON.stringify(o.state).length);
     expect(Math.max(...sizes)).toBeLessThanOrEqual(2000);

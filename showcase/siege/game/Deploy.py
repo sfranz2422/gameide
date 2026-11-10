@@ -1,10 +1,10 @@
 # object: Deploy
 # depth: -20
-# A card just played: a wind-up key turns where it was dropped, and a moment later
-# its troops (or its wall, marble or glue) are there.
+# A card just played: snowflakes swirl where it was dropped, and a moment later
+# its troops (or its wall, snowball or ice) are there.
 
 # === create
-self.card = "soldiers"
+self.card = "kids"
 self.side = 0
 self.uid = next_uid()       # how the other player's game knows it again (Link)
 self.puppet = False         # True in the other player's game: a copy, moved by Link
@@ -36,5 +36,5 @@ draw_circle(self.x, self.y, 16)
 draw_set_alpha(1)
 draw_set_color("#ffffff")
 draw_circle(self.x, self.y, 16 * (1 - k) + 2, True)
-# A wind-up key, turning as it winds.
-draw_sprite_ext("key", 0, self.x, self.y, 1, 1, self.t * 12)
+# A swirl of snowflakes, turning as the troops gather.
+draw_sprite_ext("swirl", 0, self.x, self.y, 0.6 + 0.4 * k, 0.6 + 0.4 * k, self.t * 8)

@@ -1,13 +1,13 @@
 # script: duel
 # Two players in a room. The host's game (net_host()) runs the battle, exactly as
 # against the computer, with the other player as side 1; every step it sends a
-# small picture of the desk ("g", snapshot()). The other player's game runs no
+# small picture of the field ("g", snapshot()). The other player's game runs no
 # battle of its own: it shows copies ("puppets") of the same objects, mirrored so
 # that each player sees themselves blue on the left, and its card plays go to the
 # host privately, which checks them as it checks its own (play_card).
 
 # Everything the other player's game shows, by its number in snapshot().
-KINDS = ["Soldier", "Knight", "Plane", "Archer", "Golem", "Wall", "Tower", "Keep", "Marble", "Glue", "Deploy"]
+KINDS = ["SnowKid", "Snowman", "Owl", "Penguin", "Yeti", "SnowWall", "Tower", "Keep", "Snowball", "IcePatch", "Deploy"]
 GONE_STEPS = 150 * 60        # an opponent away this long (not just answering a question) has left
 SMOOTH = 0.35                # how far a puppet glides toward where the host says it is, each step
 
@@ -31,7 +31,7 @@ def play(slot, x, y):
     """
     Your card in hand slot `slot`, played at (x, y) on your screen. The host's game
     plays it; the other player's sends it to the host (mirrored into the host's
-    desk), which plays it if it may. True if it went.
+    field), which plays it if it may. True if it went.
     """
     m = global_vars
     if runs_battle():
@@ -48,19 +48,19 @@ def snapshot():
     """The battle in a few hundred characters: what the other player's game draws."""
     m = global_vars
     things = []
-    for o in instances("Unit") + instances("Building") + instances("Marble") + instances("Glue") + instances("Deploy"):
+    for o in instances("Unit") + instances("Building") + instances("Snowball") + instances("IcePatch") + instances("Deploy"):
         k = KINDS.index(type(o).__name__)
         if is_a(o, "Deploy"):
             extra = [o.t, DECK.index(o.card)]
-        elif is_a(o, "Glue"):
+        elif is_a(o, "IcePatch"):
             extra = [o.life, 0]
-        elif is_a(o, "Marble"):
+        elif is_a(o, "Snowball"):
             extra = [0, 0]
         else:
             extra = [round(100 * max(0, o.hp) / o.max_hp), (1 if o.flash else 0) + (2 if getattr(o, "awake", False) else 0)
                      + (4 if getattr(o, "swing", 0) > 0 else 0)]
         things.append([o.uid, k, o.side, round(o.x), round(o.y)] + extra)
-    shots = [[round(s.x), round(s.y), s.side, 1 if s.kind == "shaving" else 0] for s in instances("Shot")]
+    shots = [[round(s.x), round(s.y), s.side, 1 if s.kind == "icicle" else 0] for s in instances("Shot")]
     g = {"n": m.match_no, "t": m.clock, "c": m.crowns, "e": round(m.energy[1], 2), "h": m.decks[1][:HAND + 1],
          "o": m.overtime, "x": m.over, "w": m.winner, "a": m.again, "u": things, "s": shots, "z": m.halt}
     # A room's word is at most NET_STATE_LIMIT characters: in a very big battle, the shots go first.
@@ -88,7 +88,7 @@ def show(g, puppets):
     m.energy[0] = g["e"]
     m.decks[0] = list(g["h"]) + [c for c in DECK if c not in g["h"]]
     m.again = [g["a"][1], g["a"][0]]
-    m.shots = [(VIEW_W - x, y, 1 - side, "shaving" if kind else "band") for x, y, side, kind in g["s"]]
+    m.shots = [(VIEW_W - x, y, 1 - side, "icicle" if kind else "snowshot") for x, y, side, kind in g["s"]]
     seen = set()
     for uid, k, side, x, y, a, b in g["u"]:
         seen.add(uid)
@@ -105,9 +105,9 @@ def show(g, puppets):
         o.y += (y - o.y) * SMOOTH
         if KINDS[k] == "Deploy":
             o.t, o.card = a, DECK[b]
-        elif KINDS[k] == "Glue":
+        elif KINDS[k] == "IcePatch":
             o.life = a
-        elif KINDS[k] != "Marble":
+        elif KINDS[k] != "Snowball":
             o.hp = o.max_hp * a / 100
             o.flash = 6 if b & 1 else 0
             if KINDS[k] == "Keep":

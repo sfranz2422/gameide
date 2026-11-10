@@ -1,12 +1,12 @@
-# object: Plane
+# object: Owl
 # parent: Unit
-# A paper plane: flies over the gap and everything else, and only attacks
-# buildings. Only archers and towers can hit it.
+# A snowy owl: flies over the creek and everything else, and only attacks
+# buildings. Only penguins and towers can hit it.
 
 # === create
 super().on_create()
-setup_unit(self, "Plane")
+setup_unit(self, "Owl")
 
 # === draw
-draw_troop(self, "plane")
+draw_troop(self, "owl")
 super().on_draw()

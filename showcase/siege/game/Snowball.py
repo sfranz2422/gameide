@@ -1,6 +1,6 @@
-# object: Marble
+# object: Snowball
 # depth: -2
-# A marble rolling down the desk toward the other side: it bowls over each troop
+# A big snowball rolling down a lane toward the other side: it bowls over each troop
 # on foot that it meets (once each), and stops against a building.
 
 # === create
@@ -13,16 +13,16 @@ self.roll = 0
 # === step
 if self.puppet or stopped():
     return
-self.x += MARBLE_SPEED * forward(self.side)
-self.roll += MARBLE_SPEED / MARBLE_R
+self.x += SNOWBALL_SPEED * forward(self.side)
+self.roll += SNOWBALL_SPEED / SNOWBALL_R
 for u in instances("Unit"):
-    if u.side != self.side and not u.flies and id(u) not in self.hit and point_distance(self.x, self.y, u.x, u.y) < MARBLE_R + u.radius:
+    if u.side != self.side and not u.flies and id(u) not in self.hit and point_distance(self.x, self.y, u.x, u.y) < SNOWBALL_R + u.radius:
         self.hit.add(id(u))
-        hurt(u, MARBLE_DAMAGE)
+        hurt(u, SNOWBALL_DAMAGE)
         sound_play("hit", volume=0.4)
 for b in instances("Building"):
-    if b.side != self.side and point_distance(self.x, self.y, b.x, b.y) < MARBLE_R + b.radius:
-        hurt(b, MARBLE_TOWER)
+    if b.side != self.side and point_distance(self.x, self.y, b.x, b.y) < SNOWBALL_R + b.radius:
+        hurt(b, SNOWBALL_TOWER)
         sound_play("crash", volume=0.4)
         self.destroy()
         return
@@ -30,4 +30,4 @@ if self.x < -20 or self.x > VIEW_W + 20:
     self.destroy()
 
 # === draw
-draw_sprite_ext("marble_" + TEAM[self.side], 0, self.x, self.y, 1, 1, math.degrees(-self.roll) * forward(self.side))
+draw_sprite_ext("snowball_" + TEAM[self.side], 0, self.x, self.y, 1, 1, math.degrees(-self.roll) * forward(self.side))

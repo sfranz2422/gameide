@@ -9,27 +9,27 @@ if not sound_playing("music"):
 # === step
 self.t += 1
 if in_room():
-    # In a room: say you're here, wait for the other player, then both go to the desk.
+    # In a room: say you're here, wait for the other player, then both go to the field.
     net_send({"here": 1})
     if opponent() is None:
         self.found = 0
     else:
         self.found = getattr(self, "found", 0) + 1
         if self.found > 90:
-            room_goto("Desk")
+            room_goto("Field")
     return
 if keyboard_check_pressed("space") or keyboard_check_pressed("enter") or \
         mouse_check_pressed("left") and 220 <= mouse_x <= 420 and 236 <= mouse_y <= 276:
-    room_goto("Desk")
+    room_goto("Field")
 
 # === draw
 draw_sprite("title", 0, 0, 0)
 draw_set_alpha(0.35)
-draw_set_color("#2a1d12")
+draw_set_color("#14263a")
 draw_rect(0, 0, VIEW_W, 175)
 draw_set_alpha(1)
 words(VIEW_W / 2, 60, "Tabletop Siege", 44, "white", "center")
-words(VIEW_W / 2, 118, "Toy soldiers, wind-up knights and paper planes, battling across a desk.", 14, "#fff2d8", "center")
+words(VIEW_W / 2, 118, "A snowball war: snow kids, snowmen, owls and yetis, fort against fort.", 14, "#fff2d8", "center")
 words(VIEW_W / 2, 150, "Drag cards onto your side. Knock down their towers.", 14, "#fff2d8", "center")
 if in_room():
     them = opponent()
