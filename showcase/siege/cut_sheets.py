@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
-Cuts the teacher's 13 Gemini pictures for the snowball fort war (PROMPTS.md, in
-order, copied into raw/snow/ as 01.jpeg … 13.jpeg; 10-13 are the eight more cards) into the named pictures in
+Cuts the teacher's 17 Gemini pictures for the snowball fort war (PROMPTS.md, in
+order, copied into raw/snow/ as 01.jpeg … 17.jpeg; 10-13 are the eight more cards,
+14-17 the eight to buy) into the named pictures in
 art/, which build.py reads. Both raw/ and art/ are committed, so the art can't be
 lost. (raw/desk/ holds the first set, the desk, which the teacher replaced.)
 
@@ -35,8 +36,10 @@ key_out = _climb.key_out
 TROOPS = ["kid", "snowman", "owl", "penguin", "yeti"]
 # In the game, each troop's frame (the canvas its drawing stands on, feet on the bottom).
 TROOP_SIZE = {"kid": (24, 28), "snowman": (30, 34), "owl": (32, 26), "penguin": (24, 28), "yeti": (44, 46),
-              "sled": (40, 28), "bear": (44, 32), "fox": (30, 20), "fairy": (22, 24), "icegolem": (36, 38)}
+              "sled": (40, 28), "bear": (44, 32), "fox": (30, 20), "fairy": (22, 24), "icegolem": (36, 38),
+              "kangaroo": (32, 32), "salamander": (34, 16), "moose": (46, 40), "hedgehog": (24, 18), "squirrel": (20, 20)}
 NEW_TROOPS = ["sled", "bear", "fox", "fairy", "icegolem"]
+SHOP_TROOPS = ["kangaroo", "salamander", "moose", "hedgehog", "squirrel"]
 
 
 def raw(n):
@@ -248,6 +251,28 @@ def main():
     # 13: the new cards' pictures.
     im, boxes = sheet(13, [4, 4])
     each(im, boxes, [f"card_{c}" for c in ("sled", "bear", "foxes", "fairy", "cannon", "avalanche", "cocoa", "icegolem")], (44, 44))
+    # 14, 15: the cards to buy's troops (the teacher's ask, 2026-11-10), five rows of three.
+    # A salamander's flames and its fire breath are many pieces: each row is cut by columns.
+    for n, team in ((14, "blue"), (15, "red")):
+        im = key_out(raw(n))
+        boxes = []
+        for y0, y1 in bands(im, 5):
+            band = im.crop((0, y0, im.width, y1))
+            boxes += [(b[0], b[1] + y0, b[2], b[3] + y0) for b in columns(band, 3)]
+        for r, troop in enumerate(SHOP_TROOPS):
+            group(im, boxes[r * 3:r * 3 + 3], [f"{troop}_{team}_{k}" for k in range(3)], TROOP_SIZE[troop])
+    # 16: campfires (blue, red, blazing), beaver dams (blue, red), a firework burst.
+    im = key_out(raw(16))
+    boxes = []
+    for y0, y1 in bands(im, 2):
+        band = im.crop((0, y0, im.width, y1))
+        boxes += [(b[0], b[1] + y0, b[2], b[3] + y0) for b in columns(band, 3)]
+    group(im, boxes[0:3], ["campfire_blue", "campfire_red", "campfire_blaze"], (36, 36))
+    group(im, boxes[3:5], ["beaver_blue", "beaver_red"], (44, 30))
+    each(im, [boxes[5]], ["firework"], (40, 40))
+    # 17: the cards to buy's pictures.
+    im, boxes = sheet(17, [4, 4])
+    each(im, boxes, [f"card_{c}" for c in ("kangaroo", "salamander", "moose", "hedgehog", "beaver", "campfire", "fireworks", "squirrels")], (44, 44))
     print(len(list(ART.glob("*.png"))), "pictures in", ART)
 
 

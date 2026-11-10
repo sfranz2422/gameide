@@ -43,12 +43,7 @@ VIEW_W, VIEW_H = RULES["VIEW_W"], RULES["VIEW_H"]
 ART = HERE / "art"
 _cut = _load("siege_cut", HERE / "cut_sheets.py")
 STAND_IN_CARDS = {"sled": "sled", "bear": "yeti_blue_0", "foxes": "penguin_blue_0", "fairy": "owl_blue_0",
-                  "cannon": "snow_wall", "avalanche": "heap", "cocoa": "mug", "icegolem": "snowman_blue_0",
-                  # The eight to buy (2026-11-10): stand-ins until the teacher's pictures (PROMPTS 14-17).
-                  "kangaroo": ("fox_blue_0", (224, 168, 106)), "salamander": ("fox_blue_0", (255, 106, 42)),
-                  "moose": ("bear_blue_0", (176, 122, 72)), "hedgehog": ("chunk_blue", (154, 112, 72)),
-                  "beaver": ("bridge", (122, 74, 34)), "campfire": ("pine_0", (255, 120, 40)),
-                  "fireworks": ("sparkle", (255, 80, 200)), "squirrels": ("fox_blue_0", (200, 120, 58))}
+                  "cannon": "snow_wall", "avalanche": "heap", "cocoa": "mug", "icegolem": "snowman_blue_0"}
 
 
 def stand_in(name):
@@ -60,8 +55,11 @@ def stand_in(name):
     if tint:
         im = _tw.tinted(im, tint, 0.55)
     return im
-TROOPS = ["kid", "snowman", "owl", "penguin", "yeti", "sled", "bear", "fox", "fairy", "icegolem"]
-GLIDE = {"owl", "fairy", "sled"}       # flying or sliding: their two frames aren't steps, so no legs-together frame
+TROOPS = ["kid", "snowman", "owl", "penguin", "yeti", "sled", "bear", "fox", "fairy", "icegolem",
+          "kangaroo", "salamander", "moose", "hedgehog", "squirrel"]
+# Flying, sliding or hopping: their two frames aren't steps, so no legs-together frame
+# (a kangaroo's are crouched and mid-hop).
+GLIDE = {"owl", "fairy", "sled", "kangaroo"}
 # How wide each picture is drawn in the game (pixels): build.py fits the teacher's drawings to these.
 WIDE = {"snow": 256, "bridge": 64, "snow_wall": 48, "ice_patch": 2 * RULES["ICE_R"], "snowball_blue": 2 * RULES["SNOWBALL_R"] + 4,
         "snowball_red": 2 * RULES["SNOWBALL_R"] + 4, "puff": 30, "spark": 20, "snowshot": 12, "icicle": 14, "swirl": 30, "sparkle": 40,
@@ -161,6 +159,11 @@ def build(out):
     for team in ("blue", "red"):
         c = art(f"chunk_{team}")
         P.sprite(f"chunk_{team}", [c, passing(c), c], (c.width // 2, round(c.height * 0.62)))
+    for name in ("campfire_blue", "campfire_red", "campfire_blaze", "beaver_blue", "beaver_red"):
+        im = art(name)
+        P.sprite(name, [im], (im.width // 2, round(im.height * 0.6)))
+    im = art("firework")
+    P.sprite("firework", [im], (im.width // 2, im.height // 2))
     for name in ("cannon_blue", "cannon_red", "cannon_fire"):
         im = art(name)
         P.sprite(name, [im], (im.width // 2, round(im.height * 0.7)))

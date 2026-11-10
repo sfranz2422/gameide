@@ -36,4 +36,4 @@ for k in range(min(FIREWORKS_BURSTS, self.t // FIREWORKS_EVERY)):
     age = self.t - (k + 1) * FIREWORKS_EVERY
     if age < 16:
         bx, by = burst_at(self, k)
-        draw_sprite_ext("sparkle", 0, bx, by, 0.4 + age / 16, 0.4 + age / 16, k * 40, colors[k % len(colors)], 1 - age / 16)
+        draw_sprite_ext("firework", 0, bx, by, 0.3 + 0.7 * age / 16, 0.3 + 0.7 * age / 16, k * 40, colors[k % len(colors)], 1 - age / 16)

@@ -1,5 +1,8 @@
 # Progress
 
+## Tabletop Siege: the cards to buy's own pictures (2026-11-10, waiting for review)
+- The teacher's Gemini pictures 14-17 (`raw/snow/`) replace the stand-ins: a kangaroo (crouched, mid-hop, punching), a fire salamander (breathing fire), a moose (charging), a hedgehog (curling into a spiky ball), a squirrel with its sack; campfires with each side's flag (blazing up now and then, and while melting something), beaver dams, a firework burst (each Fireworks burst, tinted), and eight card pictures. The salamander's flames and the firework are many pieces, so those rows are cut by columns.
+
 ## Tabletop Siege: coins, upgrades, and eight cards to buy (2026-11-10, waiting for review)
 - **Coins** (the teacher's numbers): every match pays once as it ends: 30 for beating a player, 10 for beating the computer, 3 for a loss or a draw. Shown on the end panel and the title; kept in the save.
 - **Upgrades**: every card from level 1 to 5, +10% health and damage a level (spells hit or heal harder, ice and dams last longer), for 20, 40, 80 and 160 coins. The level shows on each card in the hand and on the deck screen. An Ice Golem's chunks keep its level.
