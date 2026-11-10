@@ -58,7 +58,8 @@ def snapshot():
             extra = [0, 0]
         else:
             extra = [round(100 * max(0, o.hp) / o.max_hp), (1 if o.flash else 0) + (2 if getattr(o, "awake", False) else 0)
-                     + (4 if getattr(o, "swing", 0) > 0 else 0)]
+                     + (4 if getattr(o, "swing", 0) > 0 else 0)
+                     + (8 if is_a(o, "Unit") and (o.face or forward(o.side)) < 0 else 0)]
         things.append([o.uid, k, o.side, round(o.x), round(o.y)] + extra)
     shots = [[round(s.x), round(s.y), s.side, 1 if s.kind == "icicle" else 0] for s in instances("Shot")]
     g = {"n": m.match_no, "t": m.clock, "c": m.crowns, "e": round(m.energy[1], 2), "h": m.decks[1][:HAND + 1],
@@ -114,6 +115,8 @@ def show(g, puppets):
                 o.awake = bool(b & 2)
             if b & 4:
                 o.swing = max(getattr(o, "swing", 0), 6)
+            if is_a(o, "Unit"):
+                o.face = 1 if b & 8 else -1       # facing left on the host's field is right on this, mirrored one
     for uid in list(puppets):
         if uid not in seen:
             o = puppets[uid]

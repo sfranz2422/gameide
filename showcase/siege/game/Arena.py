@@ -59,6 +59,9 @@ if card is not None and not global_vars.over:
         draw_rect(8, TOP, VIEW_W - 8, BOTTOM)
     else:
         draw_rect(8, TOP, MID - GAP, BOTTOM)
+        # ...and just over the creek, where you've knocked their tower down.
+        for k in fallen_lanes(1):
+            draw_rect(MID + GAP + 4, max(TOP, LANES[k] - BEYOND_LANE), MID + GAP + BEYOND, min(BOTTOM, LANES[k] + BEYOND_LANE))
     draw_set_alpha(1)
     if TOP <= mouse_y <= BOTTOM:
         ok = can_drop(0, card, mouse_x, mouse_y) and global_vars.energy[0] >= CARDS[card]["cost"]

@@ -96,13 +96,27 @@ def own_half(side, x):
     return x < MID - GAP if side == 0 else x > MID + GAP
 
 
+BEYOND = 90                    # how far past the creek you may drop troops in a lane whose tower you knocked down
+BEYOND_LANE = 56               # ...that close to the lane, up or down
+
+
 def can_drop(side, card, x, y):
-    """Where a card may be dropped: troops and walls on your own side of the creek; a snowball starts on your half; ice anywhere."""
+    """
+    Where a card may be dropped: troops, walls and snowballs on your own side of the
+    creek, or just past it in a lane whose tower you've knocked down (the teacher's
+    ask); ice anywhere.
+    """
     if not (TOP + 6 <= y <= BOTTOM - 6 and 8 <= x <= VIEW_W - 8):
         return False
     if CARDS[card]["kind"] == "ice":
         return True
-    return own_half(side, x)
+    return own_half(side, x) or past_the_creek(side, x, y)
+
+
+def past_the_creek(side, x, y):
+    """Just over the creek, in a lane whose tower the other side has lost."""
+    over = x - (MID + GAP) if side == 0 else (MID - GAP) - x      # how far past the creek's far bank
+    return 4 <= over <= BEYOND and any(abs(y - LANES[k]) <= BEYOND_LANE for k in fallen_lanes(1 - side))
 
 
 def on_the_gap(x, y):

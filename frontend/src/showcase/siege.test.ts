@@ -228,6 +228,30 @@ describe.skipIf(!have)("Tabletop Siege: a match against the computer", () => {
     expect(py(g, "[t.target is not None for t in instances('Tower') if t.side == 1 and not is_a(t, 'Keep') and t.y > 150]")).toEqual([true]);
   });
 
+  it("knock a tower down, and you may drop troops just past the creek in that lane", async () => {
+    const g = await desk(false);
+    expect(play(g, 0, "snowman", 380, 200)).toBe(false);
+    py(g, "t = [t for t in instances('Tower') if t.side == 1 and not is_a(t, 'Keep') and t.y > 150][0]\nhurt(t, 99999)");
+    step(g);
+    expect(play(g, 0, "snowman", 380, 200)).toBe(true);
+    // Not in the other lane, and not far over.
+    expect(play(g, 0, "snowman", 380, 96)).toBe(false);
+    expect(play(g, 0, "snowman", 460, 200)).toBe(false);
+    // The other side the same, mirrored.
+    expect(play(g, 1, "snowman", 260, 96)).toBe(false);
+    py(g, "t = [t for t in instances('Tower') if t.side == 0 and not is_a(t, 'Keep') and t.y < 150][0]\nhurt(t, 99999)");
+    step(g);
+    expect(play(g, 1, "snowman", 260, 96)).toBe(true);
+  });
+
+  it("troops turn to face what they're fighting, even behind them", async () => {
+    const g = await desk(false);
+    // Away from the towers' reach: a blue snowman with a red kid just behind it.
+    py(g, "a = instance_create(250, 200, 'Snowman')\na.side = 0\na.base_pace = 0\nb = instance_create(232, 200, 'SnowKid')\nb.side = 1\nb.pace = 0");
+    step(g, 10);
+    expect(py(g, "(instances('Snowman')[0].face, instances('SnowKid')[0].face)")).toEqual([-1, 1]);
+  });
+
   it("the keep falling wins at once, with all three crowns", async () => {
     const g = await desk(false);
     py(g, "k = [t for t in instances('Keep') if t.side == 1][0]\nhurt(k, 99999)");
@@ -395,6 +419,16 @@ describe.skipIf(!have)("Tabletop Siege: two players", () => {
     py(b.g, "net_tell(1, {'play': [0, 500, 150], 'n': global_vars.match_no})");
     room.step(3);
     expect(count(a.g, "Deploy")).toBe(0);
+  });
+
+  it("a troop faces the same way in both games: mirrored, as the field is", async () => {
+    const { room, a, b } = await duel();
+    // On the host's field a blue snowman turns left, to a red kid behind it.
+    py(a.g, "u = instance_create(250, 200, 'Snowman')\nu.side = 0\nu.base_pace = 0\nk = instance_create(232, 200, 'SnowKid')\nk.side = 1\nk.pace = 0");
+    room.step(6);
+    expect(py(a.g, "instances('Snowman')[0].face")).toBe(-1);
+    // On the other player's (mirrored) field, it's red and turned right.
+    expect(py(b.g, "[(round(o.x), o.side, o.face) for o in instances('Snowman')]")).toEqual([[390, 1, 1]]);
   });
 
   it("troops fight and the crowns and winner read the right way round in both games", async () => {

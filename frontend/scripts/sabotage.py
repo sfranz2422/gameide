@@ -1792,6 +1792,12 @@ CASES = [
  ('siege: fights in any lane', _sg("_2battle"), 'if can_hit(u, o) and abs(o.y - u.y) <= LANE_SIGHT:', 'if can_hit(u, o):', "only what's in its own lane", SIEGE),
  ('siege: towers reach the other lane', _sg("Tower"), '            and (is_a(self, "Keep") or abs(u.y - self.y) <= LANE_SIGHT)]', '            ]', "only what's in its own lane", SIEGE),
 
+ # Tabletop Siege: past the creek, and facing the enemy (the teacher's asks, 2026-11-10)
+ ('siege: never past the creek', _sg("_1rules"), '    return own_half(side, x) or past_the_creek(side, x, y)', '    return own_half(side, x)', "drop troops just past the creek", SIEGE),
+ ('siege: past the creek in any lane', _sg("_1rules"), 'and any(abs(y - LANES[k]) <= BEYOND_LANE for k in fallen_lanes(1 - side))', 'and any(abs(y - LANES[k]) <= BEYOND_LANE for k in range(2))', "drop troops just past the creek", SIEGE),
+ ('siege: backs to the enemy', _sg("Unit"), '    if abs(t.x - self.x) > 2:\n        self.face = 1 if t.x > self.x else -1\n', '', "turn to face what they're fighting", SIEGE),
+ ('siege: facing not sent', _sg("_3duel"), '                o.face = 1 if b & 8 else -1', '                o.face = -1 if b & 8 else 1', "faces the same way in both games", SIEGE),
+
  ('tell: the page drops them', NETS, '    if (o.tells && !this.away) this.tells.push(...o.tells);\n', '', "one player on a WebSocket and one polling", E2E),
 
 ]

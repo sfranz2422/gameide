@@ -19,6 +19,7 @@ self.age = 0
 self.flash = 0
 self.slowed = False
 self.swing = 0                   # steps of the attacking picture still to show
+self.face = None                 # which way it faces: 1 right, -1 left (None: the way its side marches)
 self.px = self.py = None         # where it was last drawn (draw_troop: walking or standing)
 setup_unit(self, "SnowKid")
 
@@ -39,6 +40,9 @@ if t is None:
     return
 reach = self.range + self.radius + t.radius
 if point_distance(self.x, self.y, t.x, t.y) <= reach:
+    # Turned to face what it's fighting (the teacher's ask: they hit things behind them).
+    if abs(t.x - self.x) > 2:
+        self.face = 1 if t.x > self.x else -1
     if self.cool == 0:
         if self.range > 40:
             shoot(self.x, self.y - 6, t, self.damage, self.side, "snowshot")
@@ -55,6 +59,8 @@ else:
     tx, ty = (t.x, t.y) if self.flies else waypoint(self.x, self.y, t.x, t.y)
     d = point_distance(self.x, self.y, tx, ty)
     if d > 0:
+        if abs(tx - self.x) > 0.5:
+            self.face = 1 if tx > self.x else -1      # facing the way it walks
         step = min(pace, d)
         self.x += (tx - self.x) / d * step
         self.y += (ty - self.y) / d * step

@@ -1,5 +1,10 @@
 # Progress
 
+## Tabletop Siege: past the creek, and facing the enemy (2026-11-10, waiting for review)
+- **Knock a tower down and you may drop troops just past the creek** in that lane (the teacher's ask; 90 pixels over, near the lane), the drop zone showing it; the same for the other side, mirrored, and checked by the host's game.
+- **Troops turn to face what they're fighting** (even behind them), and face the way they walk; the other player's game shows them turned the same way, mirrored.
+- Tests: 3 more; 4 sabotage cases.
+
 ## Tabletop Siege becomes a snowball fort war (2026-11-10, waiting for review)
 - **The teacher's new setting**, from 9 new Gemini pictures (`showcase/siege/raw/snow/`, cut by `cut_sheets.py`): a snowy field, a frozen creek with a log bridge in each lane, snow-brick fort towers that crack and crumble, ice castles for keeps, pine trees and winter things about the field, swirling snowflakes as troops arrive, snowballs and icicles in flight. The game plays exactly as before.
 - **The cards:** Snow Kids (3), Snowman (slows as it melts), Snowy Owl (flies; towers only), Penguin (a slingshot; hits owls), Yeti (huge; buildings only), Snow Wall, Big Snowball (rolls down a lane), Ice Patch (slows the other side). The code's objects are named the same way (SnowKid, Snowman, Owl, Penguin, Yeti, SnowWall, Snowball, IcePatch), since students read it; the battle's room is Field.

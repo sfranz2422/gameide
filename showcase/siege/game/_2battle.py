@@ -65,6 +65,12 @@ def new_match():
             setup_tower(t, kind)
 
 
+def fallen_lanes(side):
+    """The lanes where `side` has lost its tower (by the lane's number in LANES)."""
+    standing = [t for t in instances("Tower") if t.side == side and not is_a(t, "Keep")]
+    return [k for k, ly in enumerate(LANES) if not any(abs(t.y - ly) < 4 for t in standing)]
+
+
 def hand(side):
     return global_vars.decks[side][:HAND]
 
@@ -264,7 +270,8 @@ def draw_troop(u, troop):
         frame = (getattr(u, "anim", 0) // 12) % 2
     else:
         frame = (u.anim // 10) % 2 if u.still < 8 else 0
-    draw_sprite_ext(f"{troop}_{TEAM[u.side]}", frame, u.x, u.y, forward(u.side), 1, 0, "#ffd0d0" if u.flash else "white")
+    face = u.face or forward(u.side)
+    draw_sprite_ext(f"{troop}_{TEAM[u.side]}", frame, u.x, u.y, face, 1, 0, "#ffd0d0" if u.flash else "white")
     if u.flash > 3:
         draw_sprite("spark", 0, u.x, u.y - u.radius)
 
