@@ -42,7 +42,7 @@ VIEW_W, VIEW_H = RULES["VIEW_W"], RULES["VIEW_H"]
 ART = HERE / "art"
 TROOPS = ["soldier", "knight", "plane", "archer", "golem"]
 # How wide each picture is drawn in the game (pixels): build.py fits the teacher's drawings to these.
-WIDE = {"wood": 256, "ruler": 72, "blocks": 30, "glue_puddle": 2 * RULES["GLUE_R"], "marble_blue": 2 * RULES["MARBLE_R"] + 2,
+WIDE = {"wood": 256, "ruler": 72, "blocks": 48, "glue_puddle": 2 * RULES["GLUE_R"], "marble_blue": 2 * RULES["MARBLE_R"] + 2,
         "marble_red": 2 * RULES["MARBLE_R"] + 2, "puff": 30, "spark": 18, "band": 12, "shaving": 10, "key": 16, "sparkle": 40,
         "scissors": 34, "note": 26, "clip": 14, "coins": 22, "crayon": 34, "sharpener": 16}
 
@@ -57,6 +57,33 @@ def fitted(name, width):
     im = Image.open(ART / f"{name}.png").convert("RGBA")
     im = im.crop(im.getbbox())
     return im.resize((width, max(1, round(im.height * width / im.width))), Image.LANCZOS)
+
+
+def passing(pic, legs_from=0.72, squeeze=0.55, lift=2):
+    """
+    The step between strides: the legs (below `legs_from` of the drawn height) drawn
+    together under the body, the body a touch higher. Gemini's two walking frames came
+    back almost the same pose, so walking looked like jittering on the spot (as in
+    Undertow and Snowcap Scramble); now it's stride, together, stride.
+    """
+    box = pic.getbbox()
+    if box is None:
+        return pic.copy()
+    top = box[1] + round((box[3] - box[1]) * legs_from)
+    w, h = pic.size
+    legs = pic.crop((0, top, w, h))
+    lb = legs.getbbox()
+    out = pic.copy()
+    if lb is None:
+        return out
+    part = legs.crop(lb)
+    narrow = part.resize((max(1, round(part.width * squeeze)), part.height), Image.NEAREST)
+    out.paste((0, 0, 0, 0), (lb[0], top + lb[1], lb[2], top + lb[3]))
+    mid = (lb[0] + lb[2]) // 2
+    out.alpha_composite(narrow, (mid - narrow.width // 2, top + lb[1]))
+    lifted = Image.new("RGBA", (w, h))
+    lifted.alpha_composite(out.crop((0, lift, w, h)), (0, 0))
+    return lifted
 
 
 def icon_picture():
@@ -99,6 +126,8 @@ def build(out):
     for troop in TROOPS:
         for team in ("blue", "red"):
             frames = [art(f"{troop}_{team}_{k}") for k in range(3)]
+            if troop != "plane":
+                frames[1] = passing(frames[0])
             w, h = frames[0].size
             P.sprite(f"{troop}_{team}", frames, (w // 2, round(h * 0.62)))
     for team in ("blue", "red"):

@@ -26,8 +26,8 @@ TOWERS = [  # (kind, x, y) for the left side; the right side's are mirrored
 ]
 TOWER_STATS = {
     #        hp,  damage, range, steps between shots, radius
-    "tower": (1400, 40, 110, 48, 18),
-    "keep": (2400, 50, 118, 48, 24),
+    "tower": (1400, 40, 88, 48, 18),    # short of the other lane: a cup shoots only what's at its own
+    "keep": (2400, 50, 126, 48, 24),
 }
 
 # ---- the cards: everyone has the same eight
@@ -60,12 +60,13 @@ UNITS = {
     "Soldier": (110, 22, 16, 48, 0.85, 6, False, "ground"),
     "Knight": (760, 82, 18, 66, 0.62, 10, False, "ground"),
     "Plane": (200, 64, 18, 58, 1.35, 8, True, "buildings"),
-    "Archer": (170, 44, 92, 62, 0.7, 7, False, "all"),
+    "Archer": (170, 44, 60, 62, 0.7, 7, False, "all"),     # in a tower's reach when it shoots one
     "Golem": (2000, 96, 20, 84, 0.34, 15, False, "buildings"),
 }
 SIGHT = 100                    # how near a troop notices something to fight
+LANE_SIGHT = 52                # ...and only in its own lane: no further up or down than this
 UNWIND = 1500                  # steps for a knight to slow to half speed
-WALL_HP, WALL_LIFE = 800, 40 * 60
+WALL_HP, WALL_LIFE, WALL_R = 800, 40 * 60, 22
 MARBLE_DAMAGE, MARBLE_TOWER, MARBLE_SPEED, MARBLE_R = 150, 80, 4.2, 11
 GLUE_R, GLUE_LIFE, GLUE_SLOW = 42, 5 * 60, 0.45
 WIND_UP = 60                   # steps between dropping a card and its troops arriving

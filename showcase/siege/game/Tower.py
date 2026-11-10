@@ -18,7 +18,10 @@ if self.puppet or stopped():
 self.cool = max(0, self.cool - 1)
 t = self.target
 if t is None or not instance_exists(t) or point_distance(self.x, self.y, t.x, t.y) > self.range:
-    near = [u for u in instances("Unit") if u.side != self.side and point_distance(self.x, self.y, u.x, u.y) <= self.range]
+    # A lane's cup shoots only troops in its own lane (the teacher saw one shooting those at
+    # the other cup, crowded toward the middle); the keep covers both.
+    near = [u for u in instances("Unit") if u.side != self.side and point_distance(self.x, self.y, u.x, u.y) <= self.range
+            and (is_a(self, "Keep") or abs(u.y - self.y) <= LANE_SIGHT)]
     self.target = t = min(near, key=lambda u: point_distance(self.x, self.y, u.x, u.y)) if near else None
 if t is not None and self.cool == 0:
     shoot(self.x, self.y - 14, t, self.damage, self.side, "shaving")

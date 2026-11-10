@@ -204,6 +204,30 @@ describe.skipIf(!have)("Tabletop Siege: a match against the computer", () => {
     expect(py(g, "[k.awake for k in instances('Keep') if k.side == 1]")).toEqual([true]);
   });
 
+  it("with its lane's tower down, a troop goes on to the keep (not across to the other lane's), and the keep fights back", async () => {
+    const g = await desk(false);
+    py(g, "t = [t for t in instances('Tower') if t.side == 1 and not is_a(t, 'Keep') and t.y > 150][0]\nhurt(t, 99999)");
+    py(g, "k = instance_create(420, 200, 'Knight')\nk.side = 0");
+    step(g, 25);
+    expect(py(g, "type(instances('Knight')[0].target).__name__")).toBe("Keep");
+    step(g, 60 * 6);
+    expect(py(g, "[k.hp < k.max_hp for k in instances('Knight')]")).toEqual([true]);
+    expect(py(g, "[k.hp < k.max_hp for k in instances('Keep') if k.side == 1]")).toEqual([true]);
+  });
+
+  it("a troop fights only what's in its own lane, and a tower shoots only at its own", async () => {
+    const g = await desk(false);
+    // A red soldier in the top lane, on our half: a knight dropped in the bottom lane walks on.
+    py(g, "s = instance_create(200, 96, 'Soldier')\ns.side = 1\ns.pace = 0\nk = instance_create(200, 200, 'Knight')\nk.side = 0");
+    step(g, 25);
+    expect(py(g, "type(instances('Knight')[0].target).__name__")).toBe("Tower");
+    // A knight at the bottom tower, crowded up toward the middle: the top tower doesn't shoot it.
+    py(g, "[o.destroy() for o in instances('Unit')]\nk = instance_create(500, 168, 'Knight')\nk.side = 0\nk.base_pace = 0");
+    step(g, 60 * 3);
+    expect(py(g, "[t.target is None for t in instances('Tower') if t.side == 1 and not is_a(t, 'Keep') and t.y < 150]")).toEqual([true]);
+    expect(py(g, "[t.target is not None for t in instances('Tower') if t.side == 1 and not is_a(t, 'Keep') and t.y > 150]")).toEqual([true]);
+  });
+
   it("the keep falling wins at once, with all three crowns", async () => {
     const g = await desk(false);
     py(g, "k = [t for t in instances('Keep') if t.side == 1][0]\nhurt(k, 99999)");

@@ -1754,7 +1754,7 @@ CASES = [
  ('siege: no overtime', _sg("_2battle"), '    elif not m.overtime:', '    elif False:', "overtime with double energy", SIEGE),
  ('siege: overtime, same energy', _sg("_2battle"), '    rate = 2 if m.overtime else 1', '    rate = 1', "overtime with double energy", SIEGE),
  ('siege: the keep never sleeps', _sg("Keep"), 'self.awake = False', 'self.awake = True', "the keep sleeps", SIEGE),
- ('siege: towers blind', _sg("Tower"), 'point_distance(self.x, self.y, u.x, u.y) <= self.range]', 'point_distance(self.x, self.y, u.x, u.y) <= 0]', "towers shoot troops", SIEGE),
+ ('siege: towers blind', _sg("Tower"), 'point_distance(self.x, self.y, u.x, u.y) <= self.range\n', 'point_distance(self.x, self.y, u.x, u.y) <= 0\n', "towers shoot troops", SIEGE),
  ('siege: questions mid-battle', _sg("Arena"), 'question_ok(global_vars.over)', 'question_ok(True)', "questions wait for the end", SIEGE),
  ('siege: the computer sits still', _sg("Cpu"), 'if threats:\n    t = threats[0]', 'if False and threats:\n    t = threats[0]', "the computer defends", SIEGE),
  ('siege: walking with the engine\'s speed', _sg("Unit"), 'self.age += 1\n', 'self.age += 1\nself.speed = self.pace\n', "a lone knight hurts a tower", SIEGE),
@@ -1786,6 +1786,11 @@ CASES = [
  ('undertow: the Mimic sees no further', _ut("_4play"), '    reach = LIGHT[global_vars.role or "crew"] * SIGHT', '    reach = LIGHT["crew"] * SIGHT', "others show only inside your light", UND),
  ('undertow: bodies seen from afar', _ut("Director"), '        body.visible = in_sight(body.x, body.y)', '        body.visible = True', "others show only inside your light", UND),
  ('undertow: the role stays on screen', _ut("Hud"), '        global_vars.role_flash -= 1\n', '', "your role shows big for five seconds", UND),
+
+ # Tabletop Siege, the teacher's first play (2026-11-10)
+ ('siege: on to the other lane', _sg("_2battle"), '    return (ahead or keep or theirs or [None])[0]', '    return min(theirs, key=lambda t: point_distance(u.x, u.y, t.x, t.y)) if theirs else None', "goes on to the keep", SIEGE),
+ ('siege: fights in any lane', _sg("_2battle"), 'if can_hit(u, o) and abs(o.y - u.y) <= LANE_SIGHT:', 'if can_hit(u, o):', "only what's in its own lane", SIEGE),
+ ('siege: towers reach the other lane', _sg("Tower"), '            and (is_a(self, "Keep") or abs(u.y - self.y) <= LANE_SIGHT)]', '            ]', "only what's in its own lane", SIEGE),
 
  ('tell: the page drops them', NETS, '    if (o.tells && !this.away) this.tells.push(...o.tells);\n', '', "one player on a WebSocket and one polling", E2E),
 

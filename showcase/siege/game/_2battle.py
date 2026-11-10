@@ -179,17 +179,24 @@ def can_hit(u, o):
 
 
 def pick_target(u):
-    """The nearest thing it can fight within sight, or else the nearest of the other side's towers."""
+    """
+    The nearest thing it can fight within sight in its own lane (the teacher's ask: a
+    troop dropped in the bottom lane went off after one in the top), or else the other
+    side's tower at the end of its lane, and once that's down, their keep.
+    """
     best, near = None, SIGHT
     for o in enemies_of(u.side):
-        if can_hit(u, o):
+        if can_hit(u, o) and abs(o.y - u.y) <= LANE_SIGHT:
             d = point_distance(u.x, u.y, o.x, o.y) - o.radius
             if d < near:
                 best, near = o, d
     if best is not None:
         return best
-    towers = [t for t in instances("Tower") if t.side != u.side]
-    return min(towers, key=lambda t: point_distance(u.x, u.y, t.x, t.y)) if towers else None
+    theirs = [t for t in instances("Tower") if t.side != u.side]
+    lane_y = LANES[lane_of(u.y)]
+    ahead = [t for t in theirs if not is_a(t, "Keep") and abs(t.y - lane_y) < 4]
+    keep = [t for t in theirs if is_a(t, "Keep")]
+    return (ahead or keep or theirs or [None])[0]
 
 
 def shoot(x, y, target, damage, side, kind="band"):
@@ -235,8 +242,6 @@ def crown(x, y, won, color):
 # ---- drawing, from the teacher's pictures
 
 TEAM = ["blue", "red"]
-# Gemini drew every troop facing right but the golem, which faces left.
-FACES_LEFT = {"golem"}
 
 
 def draw_troop(u, troop):
@@ -247,15 +252,19 @@ def draw_troop(u, troop):
     """
     moved = u.px is not None and abs(u.x - u.px) + abs(u.y - u.py) > 0.05
     u.px, u.py = u.x, u.y
+    # Steps on a steady beat while it walks; it stands only after a moment still, so a
+    # troop nudged by its neighbours doesn't flicker between walking and standing.
+    u.still = 0 if moved else getattr(u, "still", 0) + 1
+    if u.still < 8:
+        u.anim = getattr(u, "anim", 0) + 1
     if u.swing > 0:
         u.swing -= 1
         frame = 2
     elif troop == "plane":
-        frame = 1 if int(u.x / 20) % 2 else 0
+        frame = (getattr(u, "anim", 0) // 12) % 2
     else:
-        frame = int((u.x + u.y) / 7) % 2 if moved else 0
-    facing = forward(u.side) * (-1 if troop in FACES_LEFT else 1)
-    draw_sprite_ext(f"{troop}_{TEAM[u.side]}", frame, u.x, u.y, facing, 1, 0, "#ffd0d0" if u.flash else "white")
+        frame = (u.anim // 10) % 2 if u.still < 8 else 0
+    draw_sprite_ext(f"{troop}_{TEAM[u.side]}", frame, u.x, u.y, forward(u.side), 1, 0, "#ffd0d0" if u.flash else "white")
     if u.flash > 3:
         draw_sprite("spark", 0, u.x, u.y - u.radius)
 

@@ -1,5 +1,14 @@
 # Progress
 
+## Tabletop Siege: what the teacher found playing it (2026-11-10, waiting for review)
+- **Golems walked backwards**: they face right like the others after all (seen small, I'd read the drawing wrong and turned them round).
+- **Legs jittered**: Gemini's two walking frames are nearly one pose, so the second is now a legs-together step (as in Undertow), and the frame changes on a steady beat rather than every few pixels, standing only after a moment still.
+- **A cup shot troops at the other lane's cup**: each lane's cup now shoots only troops in its own lane (crowding had pushed them toward the middle, in reach); the keep covers both. Archers' reach is shorter, so they stand where a cup can answer.
+- **After the first cup fell, troops went across to the other lane's** instead of the keep; now a troop goes for its own lane's cup, then the keep. **The keep "never attacked"**: nothing came near it, for that reason; it does now (tested).
+- **A troop dropped in the bottom lane went after one in the top**: troops fight only what's in their own lane.
+- **The block wall** is bigger.
+- Tests: 2 more; 3 sabotage cases, and an older one pointed at the rewritten line.
+
 ## Undertow: in the dark, and the role kept secret (2026-11-10, waiting for review)
 - **Nobody shows outside your light** (the teacher's ask): the station stays dimly lit, but other players, their numbers, and anyone frozen appear only inside your own lamp's circle (70% of it, where it's bright enough to make them out). A Mimic's eyes see further, as before; ghosts see everyone. Frozen crew no longer glow: they're found by walking into them.
 - **Your role flashes for five seconds** at the start of a round (big, in the middle: "You are a Mimic", who the other Mimics are, "Freeze the crew with F"), then it's off the screen, so a classmate glancing over can't read it. The Mimic's freeze timer is gone too; "F: freeze #3" still shows when someone is in reach and it's ready.
