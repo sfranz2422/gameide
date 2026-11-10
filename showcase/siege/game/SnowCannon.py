@@ -25,21 +25,13 @@ if t is None or not instance_exists(t) or point_distance(self.x, self.y, t.x, t.
             and point_distance(self.x, self.y, u.x, u.y) <= self.range and abs(u.y - self.y) <= LANE_SIGHT]
     self.target = t = min(near, key=lambda u: point_distance(self.x, self.y, u.x, u.y)) if near else None
 if t is not None and self.cool == 0:
-    shoot(self.x + 10 * forward(self.side), self.y - 6, t, self.damage, self.side, "snowshot")
+    shoot(self.x + 18 * forward(self.side), self.y - 6, t, self.damage, self.side, "snowshot")
     self.cool = self.rate
     sound_play("shoot", volume=0.3)
 
 # === draw
-# (Drawn by the game until the teacher's own picture comes.)
-draw_set_color("#8a5a2b")
-draw_rect(self.x - 12, self.y, self.x + 12, self.y + 8)
-draw_set_color("#3b2a1a")
-draw_circle(self.x - 8, self.y + 9, 5)
-draw_circle(self.x + 8, self.y + 9, 5)
-draw_set_color("#ffffff" if self.flash else "#5a6a7a")
-f = forward(self.side)
-draw_rect(min(self.x, self.x + 18 * f), self.y - 8, max(self.x, self.x + 18 * f), self.y)
-draw_set_color(SIDE_COLOR[self.side])
-draw_rect(self.x - 3, self.y - 20, self.x + 7, self.y - 14)
-draw_line(self.x - 3, self.y - 20, self.x - 3, self.y, 2)
+# Just fired: the firing picture (and its puff of snow) for a moment.
+fired = self.cool > self.rate - 10
+name = "cannon_fire" if fired else "cannon_" + TEAM[self.side]
+draw_sprite_ext(name, 0, self.x, self.y, forward(self.side), 1, 0, "#ffd0d0" if self.flash else "white")
 super().on_draw()

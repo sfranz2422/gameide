@@ -128,6 +128,6 @@ def show(g, puppets):
             if instance_exists(o):
                 # A troop knocked out, or a card's troops arriving: the same puff as in the host's game.
                 if is_a(o, "Unit") or is_a(o, "Deploy"):
-                    puff(o.x, o.y)
+                    puff(o.x, o.y, "ice_burst" if is_a(o, "IceGolem") else "puff")
                 o.destroy()
             del puppets[uid]

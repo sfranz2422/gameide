@@ -66,12 +66,15 @@ describe.skipIf(!have)("Tabletop Siege: a match against the computer", () => {
   it("the art: every troop of both teams in its three poses, the towers and ice castles, the eight cards", () => {
     const project = JSON.parse(readFileSync(BUILT, "utf8")) as Project;
     const frames = (n: string) => project.sprites.find((x) => x.name === n)?.frames.length;
-    for (const troop of ["kid", "snowman", "owl", "penguin", "yeti"]) for (const team of ["blue", "red"]) expect(frames(`${troop}_${team}`), troop).toBe(3);
+    for (const troop of ["kid", "snowman", "owl", "penguin", "yeti", "sled", "bear", "fox", "fairy", "icegolem", "chunk"])
+      for (const team of ["blue", "red"]) expect(frames(`${troop}_${team}`), troop).toBe(3);
     for (const team of ["blue", "red"]) {
       expect(frames(`tower_${team}`)).toBe(3);
       expect(frames(`castle_${team}`)).toBe(1);
     }
-    for (const card of ["kids", "snowman", "owl", "penguin", "yeti", "wall", "snowball", "ice"]) expect(frames(`card_${card}`), card).toBe(1);
+    for (const card of ["kids", "snowman", "owl", "penguin", "yeti", "wall", "snowball", "ice",
+                        "sled", "bear", "foxes", "fairy", "cannon", "avalanche", "cocoa", "icegolem"]) expect(frames(`card_${card}`), card).toBe(1);
+    for (const n of ["cannon_blue", "cannon_red", "cannon_fire", "avalanche", "cocoa", "heal", "ice_burst"]) expect(frames(n), n).toBe(1);
     for (const n of ["snow", "bridge", "title", "castle_broken", "puff", "spark", "snowshot", "icicle", "swirl", "snow_wall", "ice_patch", "icon"]) expect(frames(n), n).toBe(1);
   });
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Cuts the teacher's 9 Gemini pictures for the snowball fort war (PROMPTS.md, in
-order, copied into raw/snow/ as 01.jpeg … 09.jpeg) into the named pictures in
+Cuts the teacher's 13 Gemini pictures for the snowball fort war (PROMPTS.md, in
+order, copied into raw/snow/ as 01.jpeg … 13.jpeg; 10-13 are the eight more cards) into the named pictures in
 art/, which build.py reads. Both raw/ and art/ are committed, so the art can't be
 lost. (raw/desk/ holds the first set, the desk, which the teacher replaced.)
 
@@ -34,7 +34,9 @@ key_out = _climb.key_out
 
 TROOPS = ["kid", "snowman", "owl", "penguin", "yeti"]
 # In the game, each troop's frame (the canvas its drawing stands on, feet on the bottom).
-TROOP_SIZE = {"kid": (24, 28), "snowman": (30, 34), "owl": (32, 26), "penguin": (24, 28), "yeti": (44, 46)}
+TROOP_SIZE = {"kid": (24, 28), "snowman": (30, 34), "owl": (32, 26), "penguin": (24, 28), "yeti": (44, 46),
+              "sled": (40, 28), "bear": (44, 32), "fox": (30, 20), "fairy": (22, 24), "icegolem": (36, 38)}
+NEW_TROOPS = ["sled", "bear", "fox", "fairy", "icegolem"]
 
 
 def raw(n):
@@ -224,6 +226,28 @@ def main():
          ["card_kids", "card_snowman", "card_owl", "card_penguin", "card_yeti"], (44, 44))
     # 9: the title.
     save(raw(9).convert("RGBA"), "title")
+    # 10, 11: the eight new cards' troops (the teacher's ask, 2026-11-10), five rows of three.
+    for n, team in ((10, "blue"), (11, "red")):
+        im = key_out(raw(n))
+        boxes = row_boxes(im, [3] * 5)
+        for r, troop in enumerate(NEW_TROOPS):
+            group(im, boxes[r * 3:r * 3 + 3], [f"{troop}_{team}_{k}" for k in range(3)], TROOP_SIZE[troop])
+    # 12: cannons, the avalanche, cocoa and its warm glow, ice chunks and broken ice. Hearts,
+    # broken ice and a cannon's shot are many small pieces: each row is cut by its columns.
+    im = key_out(raw(12))
+    boxes = []
+    for y0, y1 in bands(im, 3):
+        band = im.crop((0, y0, im.width, y1))
+        boxes += [(b[0], b[1] + y0, b[2], b[3] + y0) for b in columns(band, 3)]
+    group(im, boxes[0:3], ["cannon_blue", "cannon_red", "cannon_fire"], (44, 32))
+    each(im, [boxes[3]], ["avalanche"], (60, 48))
+    each(im, [boxes[4]], ["cocoa"], (26, 26))
+    each(im, [boxes[5]], ["heal"], (40, 40))
+    group(im, boxes[6:8], ["chunk_blue", "chunk_red"], (20, 20))
+    each(im, [boxes[8]], ["ice_burst"], (40, 40))
+    # 13: the new cards' pictures.
+    im, boxes = sheet(13, [4, 4])
+    each(im, boxes, [f"card_{c}" for c in ("sled", "bear", "foxes", "fairy", "cannon", "avalanche", "cocoa", "icegolem")], (44, 44))
     print(len(list(ART.glob("*.png"))), "pictures in", ART)
 
 

@@ -1743,7 +1743,7 @@ CASES = [
  # Tabletop Siege (phase 1: a match against the computer)
  ('siege: troops wade the gap', _sg("_1rules"), '    if (x < MID) == (tx < MID):\n        return tx, ty', '    if True:\n        return tx, ty', "cross only by a ruler", SIEGE),
  ('siege: free cards', _sg("_2battle"), '    if m.energy[side] < CARDS[card]["cost"] or not can_drop(side, card, x, y):', '    if not can_drop(side, card, x, y):', "not enough energy", SIEGE),
- ('siege: drop anywhere', _sg("_1rules"), '    return own_half(side, x)\n', '    return True\n', "not enough energy", SIEGE),
+ ('siege: drop anywhere', _sg("_1rules"), '    return own_half(side, x) or past_the_creek(side, x, y)', '    return True', "not enough energy", SIEGE),
  ('siege: the hand never turns over', _sg("_2battle"), '    deck.insert(slot, deck.pop(HAND - 1))\n    deck.append(card)', '    deck.insert(slot, card)', "the next card comes into the hand", SIEGE),
  ('siege: kids swat planes', _sg("_2battle"), '        return u.targets == "all"', '        return True', "kids can't hit it", SIEGE),
  ('siege: golems pick fights', _sg("_2battle"), '    if u.targets == "buildings":\n        return is_a(o, "Building")', '    if False:\n        return is_a(o, "Building")', "yeti walks past troops", SIEGE),

@@ -44,10 +44,12 @@ ART = HERE / "art"
 _cut = _load("siege_cut", HERE / "cut_sheets.py")
 STAND_IN_CARDS = {"sled": "sled", "bear": "yeti_blue_0", "foxes": "penguin_blue_0", "fairy": "owl_blue_0",
                   "cannon": "snow_wall", "avalanche": "heap", "cocoa": "mug", "icegolem": "snowman_blue_0"}
-TROOPS = ["kid", "snowman", "owl", "penguin", "yeti"]
+TROOPS = ["kid", "snowman", "owl", "penguin", "yeti", "sled", "bear", "fox", "fairy", "icegolem"]
+GLIDE = {"owl", "fairy", "sled"}       # flying or sliding: their two frames aren't steps, so no legs-together frame
 # How wide each picture is drawn in the game (pixels): build.py fits the teacher's drawings to these.
 WIDE = {"snow": 256, "bridge": 64, "snow_wall": 48, "ice_patch": 2 * RULES["ICE_R"], "snowball_blue": 2 * RULES["SNOWBALL_R"] + 4,
         "snowball_red": 2 * RULES["SNOWBALL_R"] + 4, "puff": 30, "spark": 20, "snowshot": 12, "icicle": 14, "swirl": 30, "sparkle": 40,
+        "avalanche": 2 * RULES["AVALANCHE_R"] + 10, "cocoa": 22, "heal": 2 * RULES["COCOA_R"], "ice_burst": 40,
         "pine_0": 26, "pine_1": 30, "pine_2": 36, "pine_3": 40, "sled": 34, "mug": 14, "cone": 12, "carrot": 16, "heap": 40}
 
 
@@ -130,7 +132,7 @@ def build(out):
     for troop in TROOPS:
         for team in ("blue", "red"):
             frames = [art(f"{troop}_{team}_{k}") for k in range(3)]
-            if troop != "owl":
+            if troop not in GLIDE:
                 frames[1] = passing(frames[0])
             w, h = frames[0].size
             P.sprite(f"{troop}_{team}", frames, (w // 2, round(h * 0.62)))
@@ -138,6 +140,14 @@ def build(out):
         frames = [art(f"tower_{team}_{k}") for k in range(3)]
         w, h = frames[0].size
         P.sprite(f"tower_{team}", frames, (w // 2, round(h * 0.72)))
+    # An Ice Golem's chunks: one drawing each, walking with a legs-together step, and the
+    # same drawing for a blow.
+    for team in ("blue", "red"):
+        c = art(f"chunk_{team}")
+        P.sprite(f"chunk_{team}", [c, passing(c), c], (c.width // 2, round(c.height * 0.62)))
+    for name in ("cannon_blue", "cannon_red", "cannon_fire"):
+        im = art(name)
+        P.sprite(name, [im], (im.width // 2, round(im.height * 0.7)))
     for name in ("castle_blue", "castle_red", "castle_broken"):
         im = art(name)
         P.sprite(name, [im], (im.width // 2, round(im.height * 0.62)))

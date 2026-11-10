@@ -144,7 +144,7 @@ def hurt(target, amount):
         sound_play("crash", volume=0.7)
         camera_shake(4, 12)
     elif is_a(target, "Unit"):
-        puff(target.x, target.y)
+        puff(target.x, target.y, "ice_burst" if is_a(target, "IceGolem") else "puff")
         # An Ice Golem breaks into two ice chunks that keep fighting.
         if is_a(target, "IceGolem"):
             for dy in (-9, 9):
@@ -312,7 +312,7 @@ def draw_troop(u, troop, size=1.0, tint=None):
     if u.swing > 0:
         u.swing -= 1
         frame = 2
-    elif troop == "owl":
+    elif troop in ("owl", "fairy", "sled"):
         frame = (getattr(u, "anim", 0) // 12) % 2
     else:
         frame = (u.anim // 10) % 2 if u.still < 8 else 0
@@ -323,8 +323,10 @@ def draw_troop(u, troop, size=1.0, tint=None):
         draw_sprite("spark", 0, u.x, u.y - u.radius)
 
 
-def puff(x, y):
-    instance_create(x, y, "Puff")
+def puff(x, y, kind="puff"):
+    p = instance_create(x, y, "Puff")
+    p.kind = kind
+    return p
 
 
 def deck_slot(k):

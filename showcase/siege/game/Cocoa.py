@@ -22,9 +22,5 @@ if self.t >= 40:
 
 # === draw
 k = self.t / 40
-draw_set_alpha(0.35 * (1 - k))
-draw_set_color("#ffcf8a")
-draw_circle(self.x, self.y, COCOA_R)
-draw_set_alpha(1)
-draw_sprite_ext("mug", 0, self.x, self.y - 10 * k, 1.6, 1.6, 0, "white", 1 - k)
-draw_sprite_ext("sparkle", 0, self.x, self.y - 16 - 10 * k, 0.6, 0.6, 0, "white", 1 - k)
+draw_sprite_ext("heal", 0, self.x, self.y, 0.6 + 0.4 * k, 0.6 + 0.4 * k, 0, "white", 1 - k)
+draw_sprite_ext("cocoa", 0, self.x, self.y - 10 * k, 1, 1, 0, "white", 1 - k)

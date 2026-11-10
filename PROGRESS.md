@@ -1,5 +1,9 @@
 # Progress
 
+## Tabletop Siege: the eight new cards' own pictures (2026-11-10, waiting for review)
+- The teacher's Gemini pictures 10-13 (`raw/snow/`) replace the stand-ins: sled riders sliding and crashing in a spray of snow, a polar bear, an arctic fox, a frost fairy (her shots a frosty spark), an ice golem that breaks up in a burst of ice into two little ice chunks, a snow cannon that fires with a puff, an avalanche wave rolling in and crashing down, hot cocoa with a warm glow of hearts, and eight card pictures. Sheet 12's rows are cut by columns (hearts and broken ice are many pieces).
+- Also: an older sabotage case had lost its line when dropping past the creek came in; pointed at it again.
+
 ## Tabletop Siege: eight more cards, and your own deck (2026-11-10, waiting for review)
 - **Eight new cards** (the teacher's picks): Sled Riders (fast; the first hit after a run-up does double), Polar Bear (each swipe hits everything around), Arctic Foxes (a pack of four), Frost Fairy (flies; her shots slow what they hit), Snow Cannon (a building: shoots far at troops on foot, melts), Avalanche (snow crashes down on a circle; towers a little), Hot Cocoa (heals your troops in a circle), Ice Golem (breaks into two ice chunks that keep fighting). Every number in `_1rules.py`.
 - **Pick your deck** (the teacher's choice): "Your deck" on the title (in a room too, while you wait) shows all 16; click to take one in or leave it out, Done at 8; kept for next time. A match deals from it. In a room your deck goes with you and the host's game deals from it, if it's 8 different real cards (else the starting deck). The computer uses the starting deck.

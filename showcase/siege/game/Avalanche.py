@@ -28,10 +28,9 @@ draw_set_alpha(0.25 + 0.25 * k)
 draw_set_color("#6f8fa8")
 draw_circle(self.x, self.y, AVALANCHE_R * k)
 draw_set_alpha(1)
+# The wave of snow rolls in from above and crashes down on the circle.
 if self.t < AVALANCHE_FALL:
-    # Snow falling into the circle.
-    for n in range(5):
-        a = n * 1.26
-        draw_sprite_ext("puff", 0, self.x + math.cos(a) * 26, self.y + math.sin(a) * 18 - 60 * (1 - k), 0.7, 0.7)
+    draw_sprite_ext("avalanche", 0, self.x, self.y - 50 * (1 - k), 0.5 + 0.5 * k, 0.5 + 0.5 * k, 0, "white", 0.5 + 0.5 * k)
 else:
-    draw_sprite_ext("heap", 0, self.x, self.y, 1.4, 1.2, 0, "white", 1 - (self.t - AVALANCHE_FALL) / 20)
+    fade = 1 - (self.t - AVALANCHE_FALL) / 20
+    draw_sprite_ext("avalanche", 0, self.x, self.y, 1, 1 - 0.4 * (1 - fade), 0, "white", fade)
