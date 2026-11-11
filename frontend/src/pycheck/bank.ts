@@ -4,6 +4,8 @@
  * it's the teacher's own browser, here: the server never runs uploaded code
  * (backend/pycheck.py). Each becomes the ```quiz predict block it amounts to.
  */
+import { pyodideURLs } from "../python/pyodideSource";
+
 const OPEN = /^ {0,3}(`{3,}|~{3,})[ \t]*py(?:thon)?[ \t]+predict[ \t]*$/i;
 const HINT = /^\s*#\s*hint\s*:/i;
 
@@ -67,7 +69,7 @@ export function browserRunner(): { run: Run; stop: () => void } {
       };
       w.addEventListener("message", on);
     });
-    w.postMessage({ indexURL: new URL("pyodide/", document.baseURI).href });
+    w.postMessage({ indexURLs: pyodideURLs() });
   };
   const stop = () => {
     worker?.terminate();

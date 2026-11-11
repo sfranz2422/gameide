@@ -24,7 +24,7 @@ export type InputMessage =
   | { k: "pads"; pads: PadState[] };
 
 export type ToWorker =
-  | { type: "init"; indexURL: string; interrupt: SharedArrayBuffer | null }
+  | { type: "init"; indexURLs: string[]; interrupt: SharedArrayBuffer | null }
   | { type: "play"; def: GameDefinition; canvas: OffscreenCanvas; debug: boolean }
   | { type: "stop" }
   | { type: "input"; events: InputMessage[] }

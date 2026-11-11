@@ -1,12 +1,13 @@
 /// <reference lib="webworker" />
 /** Runs a teacher's predict block and answers what it printed (pycheck/bank.ts). */
 import { loadPyodide, type PyodideInterface } from "pyodide";
+import { loadFirst } from "../python/pyodideSource";
 
 let py: PyodideInterface | null = null;
 
-self.onmessage = async (e: MessageEvent<{ indexURL?: string; code?: string }>) => {
-  if (e.data.indexURL) {
-    py = await loadPyodide({ indexURL: e.data.indexURL });
+self.onmessage = async (e: MessageEvent<{ indexURLs?: string[]; code?: string }>) => {
+  if (e.data.indexURLs) {
+    py = await loadFirst(e.data.indexURLs, (indexURL) => loadPyodide({ indexURL }));
     self.postMessage({ ready: true });
     return;
   }

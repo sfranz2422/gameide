@@ -22,12 +22,14 @@ import type { GameDefinition, NetMessageIn, NetOut, NetPlayerState, SoundOrder }
 import type { TouchSpec } from "../engine/engine";
 import { layoutForPython } from "../engine/layout";
 import runtimeSource from "./runtime.py?raw";
+import { loadFirst } from "./pyodideSource";
 
 let pyodidePromise: Promise<PyodideInterface> | null = null;
 
 export interface LoadOptions {
-  /** Where pyodide.asm.wasm and friends are served. Omit in node. */
-  indexURL?: string;
+  /** Where pyodide.asm.wasm and friends are served, tried in order
+   *  (python/pyodideSource.ts). Omit in node. */
+  indexURLs?: string[];
 }
 
 /**
@@ -38,7 +40,9 @@ export interface LoadOptions {
 export function getPyodide(options: LoadOptions = {}): Promise<PyodideInterface> {
   if (!pyodidePromise) {
     pyodidePromise = import("pyodide").then(({ loadPyodide }) =>
-      loadPyodide(options.indexURL ? { indexURL: options.indexURL } : {}),
+      options.indexURLs?.length
+        ? loadFirst(options.indexURLs, (indexURL) => loadPyodide({ indexURL }))
+        : loadPyodide(),
     );
     // A failed load (offline on first visit) must not be cached forever.
     pyodidePromise.catch(() => (pyodidePromise = null));

@@ -24,6 +24,7 @@ import type { PythonGameError, TouchSpec } from "../engine/engine";
 import type { GameDefinition, NetMessageIn, NetOut, NetPlayerState } from "../engine/game";
 import { attachInput, KEY_CODE, readPads, type InputSink } from "../engine/input";
 import { SoundPlayer } from "./sound";
+import { pyodideURLs } from "../python/pyodideSource";
 import type { FromWorker, GameState, InputMessage, ToWorker, WorkerStats } from "../python/protocol";
 
 export const HANG_MS = 2000;
@@ -153,10 +154,8 @@ export class GameHost {
       this.events.output([{ text: `The game engine failed: ${ev.message}`, kind: "err" }]);
       this.setState("crashed");
     });
-    // From the page's base, not its address: the play page at /play/<id>
-    // has <base href="/">, and an exported game may sit in any folder.
-    const indexURL = new URL("pyodide/", document.baseURI).href;
-    this.send({ type: "init", indexURL, interrupt: sab });
+    // jsdelivr first, then our own copy (python/pyodideSource.ts).
+    this.send({ type: "init", indexURLs: pyodideURLs(), interrupt: sab });
   }
 
   private send(msg: ToWorker, transfer: Transferable[] = []) {

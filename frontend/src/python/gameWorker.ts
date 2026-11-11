@@ -205,7 +205,7 @@ self.onmessage = async (ev: MessageEvent<ToWorker>) => {
   try {
     switch (msg.type) {
       case "init": {
-        const py = await getPyodide({ indexURL: msg.indexURL });
+        const py = await getPyodide({ indexURLs: msg.indexURLs });
         if (msg.interrupt) {
           interrupt = new Int32Array(msg.interrupt);
           py.setInterruptBuffer(interrupt);

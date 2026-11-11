@@ -5,10 +5,13 @@ import type { Plugin } from "vite";
 import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
 
-// Pyodide is served from our own origin, out of node_modules, rather than
-// from a CDN. Two reasons: the version the browser runs is then exactly the
-// version the Vitest suites run (they load the same package in node), and a
-// school network that blocks jsdelivr cannot stop a game from starting.
+// Pyodide is copied from node_modules into dist/pyodide/ and served from our
+// own origin — but since Nov 2026 only as the FALLBACK: pages load it from
+// jsdelivr first (src/python/pyodideSource.ts), because our copy cost 6.5 MB of
+// the Render workspace's bandwidth per student per day. Ours is still what an
+// exported game carries, and what loads when a school filter blocks jsdelivr.
+// The CDN address uses the installed version (`define` below), so the browser
+// still runs exactly the version the Vitest suites run.
 //
 // Only the files the runtime actually fetches are copied. Wheels for extra
 // packages are not part of the npm package and are not needed — student game
@@ -91,6 +94,9 @@ const ISOLATION = {
 
 export default defineConfig({
   plugins: [react(), servePyodide()],
+  // The installed Pyodide's version, for the CDN address the page loads it
+  // from (src/python/pyodideSource.ts), so the two can never differ.
+  define: { __PYODIDE_VERSION__: JSON.stringify(require("pyodide/package.json").version) },
   // Relative paths throughout, so an exported game (the player page and
   // its files, store/html5.ts) works from any folder of any web host —
   // itch.io serves each game under a path of its own. The play page on our
