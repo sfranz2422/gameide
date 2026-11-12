@@ -296,7 +296,7 @@ code (the harness turns bytecode caching off for that reason), or a
 mistyped case name ran nothing and still reported success (the harness now
 refuses unknown names).
 
-**The showcase games' runners** (`GM`, `MM`, `FB`, `GF`, `BB`, `HC`, `KT`, `TD`, `SM`, `RP`, `CLIMB`, `UND`, `SIEGE`, `SAND` — not `CL`, which is classes.py) rebuild
+**The showcase games' runners** (`GM`, `MM`, `FB`, `GF`, `BB`, `HC`, `KT`, `TD`, `SM`, `RP`, `CLIMB`, `UND`, `SIEGE`, `SAND`, `FLAGS` — not `CL`, which is classes.py) rebuild
 that game from the sabotaged source before its playtest and again after. A
 build that **refuses** (Greenside's course checks, Ridgeline Rally's stage
 checks) leaves the old `out/project.json`, and the test passes on it: a
@@ -718,3 +718,20 @@ library) are linked to that row by the import (app.py's `known` hook). Teachers'
 tutorials from `gameide_tutorials` were moved into `library_items` with their
 slugs (`tutorials.migrate`), so `t:<slug>` still finds them; visibility
 (private / classes / site) lives on the library row.
+
+## Snowfort Flags
+
+`showcase/flags/`: capture the flag as a snowball fight (the teacher's ask, 2026-11-12),
+in a park bigger than the screen (`_2map.py`: Red's half as letters, Blue's its mirror;
+the build refuses a park with unreachable floor). Every number is in `game/_1rules.py`;
+`_3match.py` decides every hit, pickup and capture; computer kids (`_4bots.py`) act only
+through the same `throw()` and walking as a player. **Bots fill the teams** to 4 a side
+(the teacher's choice, unlike Undertow): with more than 8 players there are none.
+In a room (`_7room.py`, `Remote`) the host's game is the referee as in Undertow: it runs
+the match and every bot and sends `g`; a player's own throw flies at once as a copy and
+the host throws the real one from where it thinks they are; the host's copy of a player
+follows them at no more than `CATCH_UP` × walking pace, so a faked position gets nowhere.
+A snowball only hits low (near either end of its arc). Art is the teacher's Gemini
+sheets (`raw/`), cut by `cut_sheets.py` into `art/`; without it the build draws stand-ins.
+Bots that have nowhere to walk think every step, so anything counted per think must be
+counted from the match clock (`wait_from`): a 20 s wait was once over in one.

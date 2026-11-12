@@ -53,8 +53,10 @@ UND = "undertow"   # …or Undertow's, rebuilt the same way
 SIEGE = "siege"    # …or Tabletop Siege's, rebuilt the same way
 def _sg(n): return f"../showcase/siege/game/{n}.py"
 SAND = "sand"      # …or Pour Decisions', rebuilt the same way
+FLAGS = "flags"    # …or Snowfort Flags', rebuilt the same way
 def _sd(n): return f"../showcase/sand/game/{n}.py"
 def _ut(n): return f"../showcase/undertow/game/{n}.py"
+def _fl(n): return f"../showcase/flags/game/{n}.py"
 SMR, SML, SMB = "../showcase/smash/game/_2rules.py", "../showcase/smash/game/_1levels.py", "../showcase/smash/build.py"
 def _sm(n): return f"../showcase/smash/game/{n}.py"
 def _rp(n): return f"../showcase/rpg/game/{n}.py"
@@ -1867,6 +1869,23 @@ CASES = [
  ('sand: Esc never puts down', _sd("Director"), '        if self.picked:\n            put_down(self)\n        else:\n            room_goto("Title")', '        room_goto("Title")', "Esc puts a picked tube down", SAND),
  ('sand: the pad is ignored', _sd("_5keys"), ' or any(gamepad_check_pressed(b) for b in buttons)', '', "a gamepad's d-pad", SAND),
  ('sand: the second page never shows', _sd("_5keys"), '        j = c.i - global_vars.page * CARDS_A_PAGE', '        j = c.i', "two pages of 24", SAND),
+ ('flags: no capture', _fl("_3match"), '            capture(kid)', '            pass', "grab theirs, bring it home", FLAGS),
+ ('flags: a high snowball hits', _fl("Snowball"), 'if self.z < LOW and ball_hits(self, other):', 'if ball_hits(self, other):', "a high one sails over", FLAGS),
+ ('flags: the woods hide nobody', _fl("_3match"), '            reach = WOODS_SIGHT if in_woods(a.x, a.y) or in_woods(b.x, b.y) else SIGHT', '            reach = SIGHT', "seen only from close by", FLAGS),
+ ('flags: the flag stays with the fallen', _fl("_3match"), '    if kid.carry is not None:\n        drop_flag(kid.carry, kid.x, kid.y)\n', '', "knocked down carrying it", FLAGS),
+ ('flags: a standoff never ends', _fl("_4bots"), '        if (standoff and bot.role != "defend") or ', '        if ', "both flags taken", FLAGS),
+ ('flags: capture with your flag gone', _fl("_3match"), '    if kid.carry is not None and mine is not None and mine.state == "home":', '    if kid.carry is not None and mine is not None:', "no capture while your own flag", FLAGS),
+ ('flags: a tie ends the match', _fl("_3match"), '            if a != b:', '            if True:', "time up", FLAGS),
+ ('flags: bots throw blind', _fl("_4bots"), '    for e in global_vars.sees.get(bot, []):', '    for e in kids(other_team(bot.team)):', "throw only at someone they can see", FLAGS),
+ ('flags: the creek is walkable', "../showcase/flags/build.py", '"wall", "ice", "ice_l", "ice_r")]', '"wall")]', "the creek stops kids", FLAGS),
+ ('flags: the host follows a player anywhere at once', _fl("_1rules"), 'CATCH_UP = 1.7', 'CATCH_UP = 40', "a changed game gets nowhere", FLAGS),
+ ("flags: a player's own throw is real", _fl("_7room"), '    b = throw(kid, tx, ty, charge, real=False)', '    b = throw(kid, tx, ty, charge)', "the host throws it for real", FLAGS),
+ ("flags: every capture on the host's board", _fl("_3match"), '        if m["caps"][m["counted"]] == global_vars.player.tag:', '        if True:', "goes on their board, not the host's", FLAGS),
+ ('flags: away players can be hit', _fl("_3match"), 'kid.team is None or kid.away or kid.stun > 0', 'kid.team is None or kid.stun > 0', "answering a question", FLAGS),
+ ('flags: away keeps the flag', _fl("Remote"), '        if not self.away and self.carry is not None:\n            drop_flag(self.carry, self.x, self.y)\n', '', "answering a question", FLAGS),
+ ('flags: a new host starts from nothing', _fl("_7room"), '            apply_g(g, True)', '            pass', "the host leaves mid-match", FLAGS),
+ ('flags: nobody fills the teams', _fl("_7room"), '        while len(ks) < size:', '        while False:', "dealt evenly with computer kids", FLAGS),
+ ('flags: a carrier waits at home for ever', _fl("_4bots"), 'if mine.state == "carried" and bot.wait_t > STANDOFF_WAIT:', 'if False:', "nobody else to fetch them", FLAGS),
 
  # Tabletop Siege: coins, upgrades and eight cards to buy (the teacher's asks, 2026-11-10)
  ('siege: paid every step', _sg("Hud"), 'if m.over and self.counted != m.match_no:', 'if m.over:', "a match pays coins once", SIEGE),
@@ -1946,7 +1965,7 @@ for name, f, old, new, test, *extra in CASES:
             failed = any(l.startswith("FAIL") and test in l for l in out.splitlines())
             ran = "ok   " in out or "FAIL " in out
         else:
-            if runner in ([GM], [MM], [FB], [GF], [BB], [HC], [KT], [TD], [SM], [RP], [CLIMB], [UND], [SIEGE], [SAND]):
+            if runner in ([GM], [MM], [FB], [GF], [BB], [HC], [KT], [TD], [SM], [RP], [CLIMB], [UND], [SIEGE], [SAND], [FLAGS]):
                 subprocess.run(["python3", str(ROOT.parent / f"showcase/{runner[0]}/build.py")], capture_output=True)
             cmd = ["npx", "playwright", "test", "-g", test] if runner == [E2E] else ["npx", "vitest", "run", "-t", test]
             r = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True)
@@ -1957,6 +1976,6 @@ for name, f, old, new, test, *extra in CASES:
         if not failed: bad.append(name)
     finally:
         p.write_text(src)
-        if runner in ([GM], [MM], [FB], [GF], [BB], [HC], [KT], [TD], [SM], [RP], [CLIMB], [UND], [SIEGE], [SAND]):
+        if runner in ([GM], [MM], [FB], [GF], [BB], [HC], [KT], [TD], [SM], [RP], [CLIMB], [UND], [SIEGE], [SAND], [FLAGS]):
             subprocess.run(["python3", str(ROOT.parent / f"showcase/{runner[0]}/build.py")], capture_output=True)
 print("ALL SABOTAGES CAUGHT" if not bad else f"NOT CAUGHT: {bad}")

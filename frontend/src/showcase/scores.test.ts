@@ -313,3 +313,23 @@ on("siege")("Tabletop Siege's board", () => {
     expect(g.scores).toEqual([5]);
   });
 });
+
+on("flags")("Snowfort Flags' board", () => {
+  it("is the flags you've captured, all told: never the computer's", async () => {
+    const g = await start(builtAt("flags"), { captures: 6 });
+    expect(g.project.settings.scoreboard).toEqual({ unit: "captures" });
+    g.py('room_goto("Field")');
+    g.step(3);
+    g.py("for b in instances('Bot'): b.destroy()");
+    g.step();
+    // A computer kid's capture: nothing on the board.
+    g.py("k = instance_create(*stand_of('blue'), 'Kid')\nk.team = 'blue'\nf = flag_of('red')\nf.state, f.carrier, k.carry = 'carried', k, f");
+    g.step(2);
+    expect(g.py("global_vars.m['score']['blue']")).toBe(1);
+    expect(g.scores).toEqual([]);
+    // Yours: the total, kept.
+    g.py("me = global_vars.player\nf = flag_of('blue')\nf.state, f.carrier, me.carry = 'carried', me, f\nme.x, me.y = stand_of('red')");
+    g.step(2);
+    expect(g.scores).toEqual([7]);
+  });
+});
