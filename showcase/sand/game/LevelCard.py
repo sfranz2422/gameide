@@ -7,6 +7,8 @@
 # === create
 super().on_create()
 self.wide = 156
+self.high = 58
+self.shown = True       # on the page showing (Title's lay_out_cards)
 self.size = 13
 self.i = 0
 

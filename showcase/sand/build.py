@@ -313,8 +313,11 @@ def build(out):
         })
 
     # The title first: the game starts in the first room.
-    cards = [("LevelCard", VIEW_W / 2 - 3 * 168 + 6 + (i % 6) * 168, 156 + (i // 6) * 72, f"self.i = {i}\n") for i in range(len(LEVELS))]
-    room("Title", [("Title", 0, 0, ""), ("ShapesButton", VIEW_W / 2 - 75, 470, "")] + cards)
+    # 24 cards a page; Title's lay_out_cards (_5keys.py) moves them as the page changes.
+    cards = [("LevelCard", VIEW_W / 2 - 3 * 168 + 6 + (i % 6) * 168 if i < 24 else -1000, 156 + (i // 6) * 72 if i < 24 else -1000,
+              f"self.i = {i}\n") for i in range(len(LEVELS))]
+    pages = [("PageButton", VIEW_W / 2 - 75 + (k * 2 - 1) * 170, 470, f"self.to = {k}\n") for k in range(2)]
+    room("Title", [("Title", 0, 0, ""), ("ShapesButton", VIEW_W / 2 - 75, 470, "")] + pages + cards)
     buttons = ["LevelsButton", "UndoButton", "RestartButton", "TubeButton"]
     room("Play", [("Director", 0, 0, "")] + [(b, VIEW_W / 2 - 2 * 170 + 10 + k * 170, 520, "") for k, b in enumerate(buttons)])
 

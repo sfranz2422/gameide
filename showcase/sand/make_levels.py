@@ -42,8 +42,41 @@ PLAN = [
     ("Rainbow Desert", 9, 2, False, 0.8),
     ("Nine Lives", 9, 2, True, 0.7),
     ("The Grand Sort", 10, 2, False, 0.9),
+    # The second shelf (2026-11-12, the teacher's ask for more): one empty tube with
+    # many colours, more of them covered, and the hardest of the seeds tried.
+    ("Second Wind", 6, 1, False, 0.5),
+    ("Sand Glass", 7, 2, True, 0.8),
+    ("Kasbah", 7, 1, False, 0.5),
+    ("Salt Flats", 8, 2, True, 0.8),
+    ("Silk Road", 8, 1, False, 0.5),
+    ("Starfall", 9, 2, False, 0.95),
+    ("Hidden Spring", 6, 1, True, 0.8),
+    ("Crowded Market", 9, 1, False, 0.5),
+    ("Desert Bloom", 9, 2, True, 0.9),
+    ("Ten Tall Tubes", 10, 2, False, 1.0),
+    ("Whirlwind", 7, 1, True, 0.8),
+    ("Golden Hour", 10, 2, True, 0.8),
+    ("Mesa", 8, 1, True, 0.6),
+    ("Echo Canyon", 9, 1, False, 0.9),
+    ("Long Shadows", 10, 2, True, 0.95),
+    ("Shifting Sands", 8, 1, False, 1.0),
+    ("Sun Temple", 10, 2, True, 1.0),
+    ("Quicksand", 8, 1, True, 1.0),
+    ("Night Caravan", 9, 1, True, 0.6),
+    ("Dust Devil", 9, 1, False, 1.0),
+    ("Last Oasis", 7, 1, True, 1.0),
+    ("The Deep Dig", 9, 1, True, 0.9),
+    ("Mirage City", 10, 2, True, 1.0),
+    ("Grand Finale", 9, 1, True, 1.0),
 ]
 TRIES = 60
+# The first shelf's levels were found among TRIES * 4 seeds each, from 1000 * n.
+# Saves keep stars and points by a level's number, so those must stay exactly as
+# they are: only the levels after FIRST_SHELF search further (one empty tube and
+# eight or nine colours can be finished about once in a hundred deals), from
+# seeds of their own.
+FIRST_SHELF = 24
+MORE_SEEDS = 12000
 
 
 def deal(rng, colours, empty):
@@ -62,12 +95,16 @@ def main():
     out = []
     for n, (name, colours, empty, hidden, hard) in enumerate(PLAN):
         found = []
-        for seed in range(TRIES * 4):
-            rng = random.Random(1000 * n + seed)
+        first = n < FIRST_SHELF
+        for seed in range(TRIES * 4 if first else MORE_SEEDS):
+            rng = random.Random(1000 * n + seed if first else 1_000_000 + 100_000 * n + seed)
             tubes = deal(rng, colours, empty)
             if not fair(tubes):
                 continue
-            r = solve([list(t) for t in tubes], CAP)
+            try:
+                r = solve([list(t) for t in tubes], CAP)
+            except RuntimeError:     # too many arrangements to be sure of its par
+                continue
             if r is None:
                 continue
             found.append((r[0], seed, tubes))

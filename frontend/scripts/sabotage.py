@@ -1862,6 +1862,11 @@ CASES = [
  ('sand: questions mid-pour', _sd("Director"), 'question_ok(not instance_exists("Pour"))', 'question_ok(True)', "never while sand is pouring", SAND),
  ('sand: the board is the last level', _sd("_4play"), '    high_score(sum(save_get(f"points_{i}", 0) for i in range(len(LEVELS))))', '    high_score(points)', "Pour Decisions' board", SAND),
  ('sand: the board ignores stars', _sd("_2sand"), '    return 10 * par * stars', '    return 10 * par', "Pour Decisions' board", SAND),
+ ('sand: keys never pour', _sd("Director"), '    if act("ok"):\n        tap(self.cursor)', '    if act("ok"):\n        pass', "solved in par with keys alone", SAND),
+ ('sand: right stops at the row end', _sd("_5keys"), '        return min(row, key=lambda o: centre(o)[0] * dx)', '        return cur', "go round a row", SAND),
+ ('sand: Esc never puts down', _sd("Director"), '        if self.picked:\n            put_down(self)\n        else:\n            room_goto("Title")', '        room_goto("Title")', "Esc puts a picked tube down", SAND),
+ ('sand: the pad is ignored', _sd("_5keys"), ' or any(gamepad_check_pressed(b) for b in buttons)', '', "a gamepad's d-pad", SAND),
+ ('sand: the second page never shows', _sd("_5keys"), '        j = c.i - global_vars.page * CARDS_A_PAGE', '        j = c.i', "two pages of 24", SAND),
 
  # Tabletop Siege: coins, upgrades and eight cards to buy (the teacher's asks, 2026-11-10)
  ('siege: paid every step', _sg("Hud"), 'if m.over and self.counted != m.match_no:', 'if m.over:', "a match pays coins once", SIEGE),

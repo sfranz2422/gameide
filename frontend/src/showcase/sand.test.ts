@@ -10,6 +10,7 @@ import { describe, expect, it } from "vitest";
 import { buildGame } from "../python/codegen";
 import { PythonGame } from "../python/bridge";
 import { KEY_CODE } from "../engine/input";
+import { PAD_BUTTONS } from "../engine/layout";
 import type { Project } from "../store/project";
 
 const BUILT = resolve(__dirname, "../../../showcase/sand/out/project.json");
@@ -61,9 +62,13 @@ function settle(g: PythonGame) {
   for (let k = 0; k < 600 && py(g, 'instance_exists("Pour")'); k++) step(g);
   step(g, 2);
 }
-const cardAt = (i: number): [number, number] => [512 - 3 * 168 + 6 + (i % 6) * 168 + 78, 156 + Math.floor(i / 6) * 72 + 29];
+/** Where level i's card is on its page (24 a page). */
+const cardAt = (i: number): [number, number] => [512 - 3 * 168 + 6 + ((i % 24) % 6) * 168 + 78, 156 + Math.floor((i % 24) / 6) * 72 + 29];
+/** The button that shows levels 25-48. */
+const PAGE_2: [number, number] = [512 - 75 + 170 + 75, 470 + 22];
 async function level(i: number, save: Record<string, unknown> = {}) {
   const g = await start({ ...(i ? { [`stars_${i - 1}`]: 1 } : {}), ...save });
+  if (i >= 24) click(g, ...PAGE_2);
   click(g, ...cardAt(i));
   step(g, 2);
   expect(py(g, "room_name()")).toBe("Play");
@@ -349,11 +354,194 @@ describe.runIf(have)("Pour Decisions", () => {
   }, 60_000);
 
   it("every level's tubes are dealt as written, all the same height of sand", async () => {
-    for (const i of [0, 12, 23]) {
+    for (const i of [0, 12, 23, 24, 47]) {
       const g = await level(i);
       expect(sand(g)).toEqual(py(g, `LEVELS[${i}]["tubes"]`));
       step(g, 30);
       expect(py(g, 'all(t.image_angle == 0 and t.y == t.home_y for t in global_vars.director.tubes)')).toBe(true);
     }
   }, 120_000);
+  describe("from the keyboard and a gamepad", () => {
+    /** The key that moves the tube cursor one step nearer tube i: up or down to its row, then along it. */
+    const towards = (g: PythonGame, i: number) => py<string | null>(g, `(lambda d, t: None if d.cursor is t else
+        ("up" if t.home_y < d.cursor.home_y else "down") if t.home_y != d.cursor.home_y else
+        ("left" if t.home_x < d.cursor.home_x else "right"))(global_vars.director, global_vars.director.tubes[${i}])`);
+    function cursorTo(g: PythonGame, i: number) {
+      for (let k = 0; k < 20; k++) {
+        const key = towards(g, i);
+        if (!key) return;
+        press(g, key);
+      }
+      throw new Error(`the cursor never reached tube ${i}`);
+    }
+    const focused = (g: PythonGame) => py<string | number | null>(g,
+      "(lambda f: None if f is None else f.i if hasattr(f, 'i') else f.words)(global_vars.focus)");
+
+    it("a level chosen and solved in par with keys alone, across two rows of tubes", async () => {
+      const g = await start(Object.fromEntries(Array.from({ length: 9 }, (_, k) => [`stars_${k}`, 1])));
+      // Cards 0..9 are open; the cursor starts on the first, and arrows walk the grid.
+      expect(focused(g)).toBe(0);
+      press(g, "right");
+      press(g, "right");
+      press(g, "down");
+      expect(focused(g)).toBe(8);
+      press(g, "right");
+      expect(focused(g)).toBe(9);
+      press(g, "space");
+      step(g, 2);
+      expect(py(g, "room_name()")).toBe("Play");
+      expect(py(g, "global_vars.director.level")).toBe(9);
+      expect(py(g, "len(set(t.home_y for t in global_vars.director.tubes))")).toBe(2);
+      const plan = py<[number, number][]>(g, "bot_plan()");
+      for (const [a, b] of plan) {
+        cursorTo(g, a);
+        press(g, "space");
+        cursorTo(g, b);
+        press(g, "enter");
+        settle(g);
+      }
+      step(g, 3);
+      expect(py(g, "global_vars.director.won")).toBe(true);
+      expect(py(g, "global_vars.director.pours")).toBe(py(g, "LEVELS[9]['par']"));
+      expect(g.saved().stars_9).toBe(3);
+      // On the Sorted! panel, Next level is chosen, and Space takes it.
+      step(g, 2);
+      expect(focused(g)).toBe("Next level");
+      press(g, "space");
+      step(g, 2);
+      expect(py(g, "global_vars.director.level")).toBe(10);
+    }, 180_000);
+
+    it("left and right go round a row; up and down move between the rows", async () => {
+      const g = await level(9);
+      const d = "global_vars.director";
+      const row = (y: string) => py<number[]>(g, `sorted([i for i, t in enumerate(${d}.tubes) if t.home_y == ${y}], key=lambda i: ${d}.tubes[i].home_x)`);
+      const top = row(`min(t.home_y for t in ${d}.tubes)`);
+      const bottom = row(`max(t.home_y for t in ${d}.tubes)`);
+      const at = () => py<number>(g, `${d}.tubes.index(${d}.cursor)`);
+      step(g);
+      py(g, `${d}.cursor = ${d}.tubes[${top[0]}]`);
+      press(g, "left");
+      expect(at()).toBe(top.at(-1));
+      press(g, "right");
+      expect(at()).toBe(top[0]);
+      press(g, "d");
+      expect(at()).toBe(top[1]);
+      press(g, "down");
+      expect(bottom).toContain(at());
+      press(g, "down"); // the bottom edge: stays
+      expect(bottom).toContain(at());
+      press(g, "w");
+      expect(top).toContain(at());
+    }, 60_000);
+
+    it("Esc puts a picked tube down, then goes back to the levels; Z undoes, R restarts, X adds a tube", async () => {
+      const g = await level(1);
+      const d = "global_vars.director";
+      const [a, b] = py<[number, number]>(g, "bot_plan()[0]");
+      cursorTo(g, a);
+      press(g, "space");
+      expect(py(g, `${d}.picked is ${d}.tubes[${a}]`)).toBe(true);
+      press(g, "escape");
+      expect(py(g, `${d}.picked is None`)).toBe(true);
+      expect(py(g, "room_name()")).toBe("Play");
+      press(g, "space");
+      cursorTo(g, b);
+      press(g, "space");
+      settle(g);
+      expect(py(g, `${d}.pours`)).toBe(1);
+      const before = py<string[]>(g, `["".join(s) for s, h in ${d}.history[0]]`);
+      press(g, "u");
+      expect(sand(g)).toEqual(before);
+      const n = py<number>(g, `len(${d}.tubes)`);
+      press(g, "x");
+      expect(py(g, `len(${d}.tubes)`)).toBe(n + 1);
+      press(g, "r");
+      step(g, 2);
+      expect(py(g, `[${d}.pours, len(${d}.tubes)]`)).toEqual([0, n]);
+      press(g, "backspace");
+      step(g, 2);
+      expect(py(g, "room_name()")).toBe("Title");
+    }, 60_000);
+
+    it("a gamepad's d-pad and A do what the arrows and Space do", async () => {
+      const g = await start({ stars_0: 1 });
+      const pad = (button: string) => {
+        const buttons = PAD_BUTTONS.map((b) => b === button);
+        g.engine.input.pads([{ connected: true, axes: [0, 0, 0, 0], buttons } as never]);
+        step(g);
+        g.engine.input.pads([{ connected: true, axes: [0, 0, 0, 0], buttons: PAD_BUTTONS.map(() => false) } as never]);
+        step(g);
+      };
+      pad("right");
+      expect(focused(g)).toBe(1);
+      pad("a");
+      step(g, 2);
+      expect(py(g, "global_vars.director.level")).toBe(1);
+      expect(py(g, "global_vars.director.cursor is not None")).toBe(true);
+      const c = py<number>(g, "global_vars.director.tubes.index(global_vars.director.cursor)");
+      pad("right");
+      expect(py<number>(g, "global_vars.director.tubes.index(global_vars.director.cursor)")).toBe(c + 1);
+      pad("b");
+      step(g, 2);
+      expect(py(g, "room_name()")).toBe("Title");
+    }, 60_000);
+
+    it("the levels come two pages of 24: arrows reach the page button, and Esc from level 30 comes back to its page", async () => {
+      const g = await start({ stars_28: 1, stars_23: 1 });
+      expect(py(g, "len(LEVELS)")).toBe(48);
+      expect(py(g, "global_vars.page")).toBe(0);
+      expect(py(g, "sum(1 for c in instances('LevelCard') if c.shown)")).toBe(24);
+      // Only level 1 is open on this page: down goes to the buttons below, right along them.
+      press(g, "down");
+      expect(focused(g)).toBe("Shapes: off");
+      press(g, "right");
+      expect(focused(g)).toBe("Levels 25-48 >");
+      press(g, "space");
+      expect(py(g, "global_vars.page")).toBe(1);
+      expect(py(g, "sorted(c.i for c in instances('LevelCard') if c.shown)")).toEqual(Array.from({ length: 24 }, (_, k) => k + 24));
+      // Level 30 (index 29) is open: its card is where level 6's was.
+      click(g, ...cardAt(29));
+      step(g, 2);
+      expect(py(g, "global_vars.director.level")).toBe(29);
+      press(g, "escape");
+      step(g, 2);
+      expect(py(g, "[room_name(), global_vars.page]")).toEqual(["Title", 1]);
+      expect(focused(g)).toBe(29);
+      // Back to the first page with the mouse too.
+      click(g, 512 - 75 - 170 + 75, 470 + 22);
+      expect(py(g, "global_vars.page")).toBe(0);
+    }, 60_000);
+
+    it("the cursor shows once a key is used, and hides when the mouse moves", async () => {
+      const g = await level(2);
+      step(g);
+      expect(py(g, "keyed()")).toBe(false);
+      press(g, "right");
+      expect(py(g, "keyed()")).toBe(true);
+      const box = () => g.engine.drawList.filter((c) => c[0] === "rect" && c[6] === 0xffd23f).length;
+      expect(box()).toBeGreaterThan(0);
+      g.engine.input.mouseMove(300, 300);
+      step(g, 2);
+      expect(py(g, "keyed()")).toBe(false);
+      expect(box()).toBe(0);
+    }, 60_000);
+
+    it("the new levels get harder: fewer empty tubes, more covered, and a higher par than the first 24", async () => {
+      const g = await start();
+      const [early, late] = py<[number, number]>(g,
+        "[sum(l['par'] for l in LEVELS[:24]) / 24, sum(l['par'] for l in LEVELS[24:]) / 24]");
+      expect(late).toBeGreaterThan(early + 5);
+      expect(py(g, "sum(1 for l in LEVELS[24:] if l['tubes'].count('') == 1)")).toBeGreaterThan(10);
+      expect(py(g, "sum(1 for l in LEVELS[24:] if l['hidden'])")).toBeGreaterThan(10);
+    }, 60_000);
+
+    it("the bot finishes level 25 in par", async () => {
+      const g = await level(24);
+      const n = solveByTapping(g);
+      expect(n).toBe(py(g, "LEVELS[24]['par']"));
+      step(g, 3);
+      expect(py(g, "global_vars.director.won")).toBe(true);
+    }, 120_000);
+  });
 });

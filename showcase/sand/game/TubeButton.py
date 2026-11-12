@@ -5,7 +5,7 @@
 
 # === create
 super().on_create()
-self.words = "+ Tube"
+self.words = "+ Tube (X)"
 
 # === step
 self.off = global_vars.director.extra or global_vars.director.won
