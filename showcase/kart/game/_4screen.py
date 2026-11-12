@@ -177,15 +177,16 @@ def draw_hud(t):
         text(VIEW_W / 2, 130, "GO!", MINT, 72, "center")
 
 
-def draw_title(t, cup_best):
+def draw_title(t):
     draw_set_alpha(0.55)
     draw_set_color(SHADOW)
     draw_rect(0, 60, VIEW_W, 196)
     draw_set_alpha(1)
     text(VIEW_W / 2, 72, "Zoomtown Cup", GOLD, 58, "center")
     text(VIEW_W / 2, 146, "Press Space to race", INK if t % 60 < 42 else MINT, 20, "center")
-    if cup_best:
-        text(VIEW_W / 2, 172, "Best cup: " + ordinal(cup_best), GOLD, 14, "center")
+    bests = [f"{c['name']} {ordinal(save_get(cup_key(k)))}" for k, c in enumerate(CUPS) if save_get(cup_key(k))]
+    if bests:
+        text(VIEW_W / 2, 172, "Best: " + ",  ".join(bests), GOLD, 14, "center")
     text(VIEW_W / 2, VIEW_H - 70, "Arrows steer. Up or X is the gas, Down is the brake, Space uses an item.", INK, 13, "center")
     text(VIEW_W / 2, VIEW_H - 48, "Hold Z through a corner to drift, and let go for a boost.", INK, 13, "center")
 
@@ -204,8 +205,10 @@ def draw_menu(game, t):
     draw_set_alpha(1)
     text(VIEW_W / 2, 32, "Ready to race", GOLD, 28, "center")
     rows = menu_rows(game)
+    cup_ok = cup_open(game.cup_i)
     words = {"mode": MODES[game.mode_i], "racer": RACERS[game.racer]["name"], "go": "GO!",
-             "track": TRACKS[game.track_i]["name"]}
+             "track": TRACKS[game.track_i]["name"],
+             "cup": CUPS[game.cup_i]["name"] + ("" if cup_ok else " (locked)")}
     y = 84
     for i, row in enumerate(rows):
         on = i == game.row
@@ -226,6 +229,19 @@ def draw_menu(game, t):
         best = save_get("best_" + TRACKS[game.track_i]["name"])
         if best:
             text(90, y + 4, "Best: " + clock(best), MINT, 14)
+    elif not cup_ok:
+        # One line a cup: the words beside the racer's numbers have only half the panel.
+        need = CUPS[game.cup_i]["after"]
+        for k, c in enumerate(need):
+            words = ("Win the " if k == 0 else "and the ") + CUPS[c]["name"] + (" to open it." if k == len(need) - 1 else "")
+            text(90, y + 4 + k * 18, words, RED if t - game.locked_at < 60 else INK, 13)
+    else:
+        best = save_get(cup_key(game.cup_i))
+        names = [TRACKS[k]["name"] for k in cup_tracks(game)]
+        text(90, y + 4, ", ".join(names[:2]), MINT, 12)
+        text(90, y + 20, ", ".join(names[2:]), MINT, 12)
+        if best:
+            text(90, y + 40, "Best: " + ordinal(best), GOLD, 13)
 
 
 def draw_results(game, t):
@@ -263,13 +279,14 @@ def draw_standings(game, t):
     draw_set_color(SHADOW)
     draw_rect(120, 24, VIEW_W - 120, VIEW_H - 24)
     draw_set_alpha(1)
-    over = game.cup_race >= len(TRACKS)
+    tracks = cup_tracks(game)
+    over = game.cup_race >= len(tracks)
     table = cup_table(game)
     place = next(i for i, w in enumerate(table) if w == game.racer) + 1
     if over:
-        text(VIEW_W / 2, 32, "You won the cup!" if place == 1 else f"You came {ordinal(place)} in the cup", GOLD, 26, "center")
+        text(VIEW_W / 2, 32, f"You won the {CUPS[game.cup_i]['name']}!" if place == 1 else f"You came {ordinal(place)} in the cup", GOLD, 26, "center")
     else:
-        text(VIEW_W / 2, 32, f"After race {game.cup_race} of {len(TRACKS)}", GOLD, 24, "center")
+        text(VIEW_W / 2, 32, f"After race {game.cup_race} of {len(tracks)}", GOLD, 24, "center")
     y = 74
     for p, who in enumerate(table):
         c = GOLD if who == game.racer else INK
@@ -277,5 +294,5 @@ def draw_standings(game, t):
         text(VIEW_W - 170, y, str(game.cup_points[who]), c, 16, "right")
         y += 24
     if t > 40:
-        words = "Press Space" if over else "Next: " + TRACKS[game.cup_race]["name"]
+        words = "Press Space" if over else "Next: " + TRACKS[tracks[game.cup_race]]["name"]
         text(VIEW_W / 2, VIEW_H - 54, words, INK if t % 60 < 42 else MINT, 16, "center")

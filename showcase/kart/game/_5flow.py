@@ -10,8 +10,35 @@ PATH_EVERY = 4         # a time trial notes where you are this often, for your g
 
 
 def menu_rows(game):
-    """The menu's rows: only a time trial asks which track."""
-    return ["mode", "racer", "track", "go"] if MODES[game.mode_i] == "Time trial" else ["mode", "racer", "go"]
+    """The menu's rows: a cup asks which cup, a time trial which track."""
+    return ["mode", "racer", "track", "go"] if MODES[game.mode_i] == "Time trial" else ["mode", "cup", "racer", "go"]
+
+
+def cup_key(c):
+    """Where a cup's best place is saved. The first cup's name is from before there were three,
+    so a player who won it then still has it won."""
+    return "cup_best" if c == 0 else f"cup_best_{c}"
+
+
+def cup_won(c):
+    return save_get(cup_key(c)) == 1
+
+
+def cup_open(c):
+    """A cup with "after" opens once each of those cups has been won."""
+    return all(cup_won(w) for w in CUPS[c].get("after", []))
+
+
+def open_tracks():
+    """The tracks a time trial offers: every track of every open cup."""
+    return [t for c in range(len(CUPS)) if cup_open(c) for t in CUPS[c]["tracks"]]
+
+
+def next_track(track_i, side):
+    """The open track before or after this one, for the menu's arrows."""
+    tracks = open_tracks()
+    at = tracks.index(track_i) if track_i in tracks else 0
+    return tracks[(at + side) % len(tracks)]
 
 
 def new_race(track_i, player=None, rivals=True):
@@ -50,12 +77,16 @@ def finish_race(game):
     game.best = save_get("best_" + name)
 
 
+def cup_tracks(game):
+    return CUPS[game.cup_i]["tracks"]
+
+
 def end_cup(game):
-    """A cup's end: the best place kept between visits."""
+    """A cup's end: its best place kept between visits. Winning one can open another."""
     place = cup_table(game).index(game.racer) + 1
-    best = save_get("cup_best")
+    best = save_get(cup_key(game.cup_i))
     if best is None or place < best:
-        save_set("cup_best", place)
+        save_set(cup_key(game.cup_i), place)
 
 
 def move_camera(kart, snap=False):
@@ -88,8 +119,9 @@ def keep_best(track, steps):
     best = save_get("best_" + track)
     if best is None or steps < best:
         save_set("best_" + track, steps)
-        # The school's board: all four tracks' best times added up, once there are four.
-        times = [save_get("best_" + t["name"]) for t in TRACKS]
+        # The school's board: the first cup's four best times added up, once there are four.
+        # Only the first cup's, so the board means what it meant before there were three.
+        times = [save_get("best_" + TRACKS[t]["name"]) for t in CUPS[0]["tracks"]]
         if None not in times:
             high_score(sum(times) / 60)
         return True

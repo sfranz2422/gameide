@@ -16,6 +16,8 @@ self.row = 0
 self.mode_i = 0                 # Cup or Time trial
 self.racer = 0
 self.track_i = 0
+self.cup_i = 0                  # which of CUPS
+self.locked_at = -999           # when GO was pressed on a locked cup, to say why
 self.cup_race = 0
 self.cup_points = [0] * len(RACERS)
 RACE["camera"] = {"x": 0, "y": 0, "a": 0}
@@ -62,16 +64,21 @@ elif self.mode == "menu":
             self.mode_i = (self.mode_i + side) % len(MODES)
         elif row == "racer":
             self.racer = (self.racer + side) % len(RACERS)
+        elif row == "cup":
+            self.cup_i = (self.cup_i + side) % len(CUPS)
         elif row == "track":
-            self.track_i = (self.track_i + side) % len(TRACKS)
+            self.track_i = next_track(self.track_i, side)
     if keyboard_check_pressed("escape"):
         self.mode, self.since = "title", self.t
+    elif go and row == "go" and self.t - self.since > 10 and MODES[self.mode_i] == "Cup" and not cup_open(self.cup_i):
+        sound_play("beep", volume=0.7)
+        self.locked_at = self.t
     elif go and row == "go" and self.t - self.since > 10:
         sound_play("click")
         if MODES[self.mode_i] == "Cup":
             self.cup_race = 0
             self.cup_points = [0] * len(RACERS)
-            new_race(0, self.racer)
+            new_race(cup_tracks(self)[0], self.racer)
         else:
             new_race(self.track_i, self.racer, False)
         self.mode, self.since = "race", self.t
@@ -93,7 +100,7 @@ elif self.mode == "results":
         sound_play("click")
         if RACE["rivals"]:
             self.mode, self.since = "standings", self.t
-            if self.cup_race >= len(TRACKS):
+            if self.cup_race >= len(cup_tracks(self)):
                 end_cup(self)
         else:
             self.mode, self.since = "menu", self.t
@@ -101,11 +108,11 @@ elif self.mode == "results":
 elif self.mode == "standings":
     if go and self.t - self.since > 40:
         sound_play("click")
-        if self.cup_race >= len(TRACKS):
+        if self.cup_race >= len(cup_tracks(self)):
             self.mode, self.since = "title", self.t
             new_race(0)
         else:
-            new_race(self.cup_race, self.racer)
+            new_race(cup_tracks(self)[self.cup_race], self.racer)
             self.mode, self.since = "race", self.t
 
 # === end_step
@@ -134,7 +141,7 @@ draw_floor(f"track_{n}", 0, cam["x"], cam["y"], cam["a"], CAM_HEIGHT, HORIZON, F
 
 # === draw_gui
 if self.mode == "title":
-    draw_title(self.t, save_get("cup_best"))
+    draw_title(self.t)
 elif self.mode == "menu":
     draw_menu(self, self.t)
 elif self.mode == "race":

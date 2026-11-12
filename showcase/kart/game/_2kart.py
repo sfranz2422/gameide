@@ -24,6 +24,9 @@ SPARK_1, SPARK_2 = 45, 110        # steps of drifting to earn a small and a big 
 BOOST_1, BOOST_2 = 45, 90         # how many steps those boosts last
 KART_R = 10                       # how close two karts get: their collision circles
 LOST = 70                         # further than this past the hedge, a kart is put back on the road
+UNSTICK = 2                       # pixels a step a kart inside a hedge is eased back towards the road
+STUCK_STEPS = 45                  # a computer driver this long on the gas and barely moving is stuck...
+BACK_OUT_STEPS = 40               # ...and backs out this long, steering the other way
 
 
 def angle_diff(a, b):
@@ -53,6 +56,22 @@ def find_on_road(kart, line):
     tx, ty = (bx - ax) / STEP, (by - ay) / STEP
     kart.side = (kart.x - ax) * -ty + (kart.y - ay) * tx
     kart.off = abs(kart.side)
+
+
+def computer_unstuck(kart, gas, steer):
+    """A computer driver pressed against a hedge (the end of one, on the inside of a tight
+    bend, can reach the grass) backs out and tries again, as a person would: with only
+    the gas it pressed on there for the rest of the race. Answers (gas, brake, steer)."""
+    if kart.backing > 0:
+        kart.backing -= 1
+        return False, True, -kart.back_steer
+    moving_now = RACE["count"] == 0 and kart.spin == 0 and kart.done is None
+    kart.stuck = kart.stuck + 1 if gas and moving_now and kart.v < 0.4 else 0
+    if kart.stuck > STUCK_STEPS:
+        kart.stuck = 0
+        kart.backing = BACK_OUT_STEPS
+        kart.back_steer = 1 if steer >= 0 else -1
+    return gas, False, steer
 
 
 def computer_keys(kart, skill):

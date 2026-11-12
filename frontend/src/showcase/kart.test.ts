@@ -4,7 +4,8 @@
  * own keys, from the title to the results; then the rules one at a time:
  * the objects are there, laps can't be cheated, the grass, the hedges all the
  * way round, karts bumping, drifting and its boosts, the computer's drivers,
- * and the build refusing a track that can't be raced.
+ * the build refusing a track that can't be raced, and the three cups (the third
+ * locked until the first two are won).
  * Runs when the game has been built (python3 showcase/kart/build.py).
  */
 import { execFileSync } from "node:child_process";
@@ -23,14 +24,15 @@ async function start(save: Record<string, unknown> = {}) {
   const project = JSON.parse(readFileSync(BUILT, "utf8")) as Project;
   const { def } = buildGame(project, new Map());
   let saved: Record<string, unknown> = save;
+  const scores: number[] = [];
   const { game, error } = await PythonGame.load({ ...def, save } as typeof def, {
     stdout: () => undefined, stderr: () => undefined, warning: () => undefined,
-    save: (d) => (saved = d),
+    save: (d) => (saved = d), score: (n) => scores.push(n),
   });
   if (error) throw new Error(`${error.object} ${error.event} line ${error.line}: ${error.message}`);
   step(game, 2);
   py(game, `g = instances('Game')[0]\n${BOT}`);
-  return Object.assign(game, { saved: () => saved });
+  return Object.assign(game, { saved: () => saved, scores });
 }
 
 function step(game: PythonGame, n = 1) {
@@ -56,6 +58,7 @@ async function racing(save: Record<string, unknown> = {}) {
   press(g, "space");
   expect(py(g, "g.mode")).toBe("menu");
   step(g, 12);
+  press(g, "down");
   press(g, "down");
   press(g, "down");
   press(g, "space");
@@ -221,7 +224,7 @@ def beside(k):
     hold(g, "up", false);
   }, 60_000);
 
-  it.each([0, 1, 2, 3])("the hedges hold all the way round track %i: no kart gets through, on either side", async (t) => {
+  it.each([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11])("the hedges hold all the way round track %i: no kart gets through, on either side", async (t) => {
     const g = await racing();
     py(g, `g.mode = 'watching'
 new_race(${t}, 0)
@@ -355,7 +358,7 @@ run(59)`);
   it("every track can be raced: the computer's drivers finish each, items and all", async () => {
     const g = await start();
     py(g, "g.mode = 'watching'");
-    for (let t = 0; t < 4; t++) {
+    for (let t = 0; t < (py(g, "len(TRACKS)") as number); t++) {
       py(g, `new_race(${t})\nRACE['count'] = 0`);
       for (let i = 0; i < 16000 && !py(g, "all(c.done for c in RACE['karts'])"); i++) step(g);
       expect(py(g, "RACE['track']['name']")).toBe(py(g, `TRACKS[${t}]['name']`));
@@ -363,7 +366,8 @@ run(59)`);
       // An item can cost a driver a few seconds; a driver stuck somewhere costs far more.
       expect(py(g, "max(c.done for c in RACE['karts']) < 1.35 * min(c.done for c in RACE['karts'])")).toBe(true);
     }
-  }, 400_000);
+    expect(py(g, "len(TRACKS)")).toBe(12);
+  }, 900_000);
 
   it("a cup is four races, and its result is kept", async () => {
     const g = await start();
@@ -389,11 +393,112 @@ run(59)`);
     expect(py(g, "instance_number('PlayerKart')")).toBe(0);
   }, 120_000);
 
+  it("three cups of four, every track in one, the first cup as it always was", async () => {
+    const g = await start();
+    expect(py(g, "[c['name'] for c in CUPS]")).toEqual(["Zoomtown Cup", "Wild Cup", "Thunder Cup"]);
+    expect(py(g, "sorted(t for c in CUPS for t in c['tracks'])")).toEqual([...Array(12).keys()]);
+    expect(py(g, "[TRACKS[t]['name'] for t in CUPS[0]['tracks']]")).toEqual(["Sunny Meadow", "Cactus Canyon", "Frostbite Pass", "Starlight Speedway"]);
+    expect(py(g, "len(set(t['name'] for t in TRACKS))")).toBe(12);
+  }, 60_000);
+
+  it("the Thunder Cup is locked until the first two are won, and says so", async () => {
+    const g = await start();
+    expect(py(g, "[cup_open(c) for c in range(3)]")).toEqual([true, true, false]);
+    // A time trial offers only open cups' tracks, and its arrows skip the rest.
+    expect(py(g, "open_tracks()")).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
+    expect(py(g, "next_track(7, 1)")).toBe(0);
+    expect(py(g, "next_track(0, -1)")).toBe(7);
+    press(g, "space");
+    step(g, 12);
+    press(g, "down");                 // the cup
+    press(g, "right");
+    expect(py(g, "CUPS[g.cup_i]['name']")).toBe("Wild Cup");
+    press(g, "right");
+    expect(py(g, "CUPS[g.cup_i]['name']")).toBe("Thunder Cup");
+    press(g, "down");
+    press(g, "down");
+    press(g, "space");
+    expect(py(g, "g.mode")).toBe("menu");
+    expect(py(g, "g.locked_at > 0")).toBe(true);
+    // Coming second in the Wild Cup isn't winning it.
+    py(g, 'save_set("cup_best", 1)\nsave_set("cup_best_1", 2)');
+    expect(py(g, "cup_open(2)")).toBe(false);
+    py(g, 'save_set("cup_best_1", 1)');
+    expect(py(g, "cup_open(2)")).toBe(true);
+    expect(py(g, "open_tracks()")).toEqual([...Array(12).keys()]);
+    step(g, 12);
+    press(g, "space");
+    expect(py(g, "g.mode")).toBe("race");
+    expect(py(g, "RACE['track']['name']")).toBe("Lava Crater");
+  }, 60_000);
+
+  it("winning the Wild Cup is kept, and with the first cup won opens the Thunder Cup", async () => {
+    // A save from before there were three cups: its one cup was the first.
+    const g = await start({ cup_best: 1 });
+    expect(py(g, "cup_won(0)")).toBe(true);
+    py(g, "g.cup_points = [0] * 8\ng.racer = 2\ng.cup_i = 1\ng.cup_race = 0\nnew_race(cup_tracks(g)[0], 2)\ng.mode = 'race'");
+    for (let t = 0; t < 4; t++) {
+      expect(py(g, "RACE['track_i']")).toBe(4 + t);
+      py(g, "RACE['count'] = 0\nRACE['karts'][0].progress = RACE['track']['laps'] * len(RACE['line'])");
+      step(g, 2);
+      expect(py(g, "g.mode")).toBe("results");
+      step(g, 45);
+      press(g, "space");
+      step(g, 45);
+      if (t < 3) press(g, "space");
+    }
+    expect(g.saved()).toMatchObject({ cup_best: 1, cup_best_1: 1 });
+    expect(g.saved()).not.toHaveProperty("cup_best_2");
+    expect(py(g, "cup_open(2)")).toBe(true);
+  }, 120_000);
+
+  it("the school's board is still the first cup's four best times added up", async () => {
+    const g = await start();
+    for (const t of [4, 5, 6, 7]) py(g, `keep_best(TRACKS[${t}]['name'], 3000)`);
+    step(g);
+    expect(g.scores).toEqual([]);
+    for (const t of [0, 1, 2]) py(g, `keep_best(TRACKS[${t}]['name'], 3000)`);
+    step(g);
+    expect(g.scores).toEqual([]);
+    py(g, "keep_best(TRACKS[3]['name'], 3000)");
+    step(g);
+    expect(g.scores).toEqual([200]);
+  }, 60_000);
+
+  it("the Grand Circuit, the last race of all, is four laps: the longest race", async () => {
+    const g = await start();
+    expect(py(g, "TRACKS[CUPS[-1]['tracks'][-1]]['name']")).toBe("Grand Circuit");
+    expect(py(g, "TRACKS[11]['laps']")).toBe(4);
+    expect(py(g, "max(range(12), key=lambda t: TRACKS[t]['laps'] * len(centre_line(TRACKS[t])))")).toBe(11);
+  }, 60_000);
+
+  it("a kart shoved into a hedge is eased back out, and a computer driver pinned there backs out", async () => {
+    const g = await racing();
+    py(g, `you = RACE['karts'][0]
+for c in RACE['karts'][1:]:
+    c.x, c.y = 10, 10
+h = instances('Hedge')[40]
+you.x, you.y = h.x, h.y
+you.i = min(range(len(RACE['line'])), key=lambda i: math.hypot(RACE['line'][i][0] - h.x, RACE['line'][i][1] - h.y))
+you.v = 0`);
+    expect(py(g, "you.place_meeting(you.x, you.y, 'Hedge')")).toBe(true);
+    step(g, 60);
+    expect(py(g, "you.place_meeting(you.x, you.y, 'Hedge')")).toBe(false);
+    // On the gas and getting nowhere, a computer driver brakes (backs up) a while, then tries again.
+    py(g, "them = RACE['karts'][1]\nthem.done = None\nthem.spin = 0\nthem.v = 0.1\nthem.stuck = STUCK_STEPS\nkeys = computer_unstuck(them, True, 0.5)");
+    expect(py(g, "keys")).toEqual([true, false, 0.5]);
+    expect(py(g, "them.backing")).toBe(py(g, "BACK_OUT_STEPS"));
+    expect(py(g, "computer_unstuck(them, True, 0.5)")).toEqual([false, true, -1]);
+    // Not while the lights are counting down: nobody moves then.
+    py(g, "them.backing = 0\nthem.stuck = 0\nRACE['count'] = 100\nfor _ in range(STUCK_STEPS + 5):\n    computer_unstuck(them, True, 0)");
+    expect(py(g, "them.backing")).toBe(0);
+  }, 60_000);
+
   it("the menu picks the racer, the mode and a time trial's track", async () => {
     const g = await start();
     press(g, "space");
     step(g, 12);
-    expect(py(g, "menu_rows(g)")).toEqual(["mode", "racer", "go"]);
+    expect(py(g, "menu_rows(g)")).toEqual(["mode", "cup", "racer", "go"]);
     press(g, "right");                // Time trial
     expect(py(g, "MODES[g.mode_i]")).toBe("Time trial");
     expect(py(g, "menu_rows(g)")).toEqual(["mode", "racer", "track", "go"]);

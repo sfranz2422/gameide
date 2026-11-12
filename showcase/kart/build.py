@@ -24,6 +24,7 @@ import colorsys
 import importlib.util
 import json
 import math
+import os
 import random
 import sys
 from pathlib import Path
@@ -40,7 +41,11 @@ def _load(name, path):
 
 HERE = Path(__file__).resolve().parent
 _tw = _load("thornwood_build", HERE.parent / "build.py")
-GEMINI = Path("~/Downloads/kart").expanduser()
+# The teacher's Gemini pictures, as the build uses them, kept in the repo (art/): the
+# sheets were only ever in ~/Downloads/kart, which went, and out/ is not in git, so
+# for a while the only copy was one zip. art_from_zip.py remakes art/ from a zip built
+# with them. KART_ART names another folder.
+GEMINI = Path(os.environ.get("KART_ART", HERE / "art")).expanduser()
 MAP_INNER = 110
 
 GAME = {}
@@ -306,7 +311,10 @@ def tree(seed):
 
 def restyle(im, scene):
     """The meadow's hedges and trees for another place: only their greens change."""
-    hue, sat, val = {"desert": (0.075, 0.62, 0.95), "snow": (0.58, 0.14, 1.28), "night": (0.68, 0.7, 0.5)}[scene]
+    hue, sat, val = {"desert": (0.075, 0.62, 0.95), "snow": (0.58, 0.14, 1.28), "night": (0.68, 0.7, 0.5),
+                     "beach": (0.47, 0.9, 1.05), "jungle": (0.33, 1.25, 0.8), "haunted": (0.78, 0.45, 0.45),
+                     "city": (0.62, 0.25, 0.55), "lava": (0.05, 0.55, 0.4), "candy": (0.93, 0.75, 1.3),
+                     "cloud": (0.6, 0.08, 1.45)}[scene]
     out = im.copy()
     px = out.load()
     for y in range(out.height):

@@ -116,6 +116,15 @@ self.on_grass = self.off > RACE["track"]["half"]
 if self.off > RACE["track"]["half"] + RACE["track"]["verge"] + LOST:
     self.x, self.y = RACE["line"][self.i]
     self.v = 0.0
+# Shoved into a hedge by another kart (karts push each other apart, hedge or no
+# hedge), a kart can't drive out: every way is blocked, and on a new track a
+# computer driver sat there for the rest of the race. It's eased back to the road.
+if self.place_meeting(self.x, self.y, "Hedge"):
+    cx, cy = RACE["line"][self.i]
+    d = math.hypot(cx - self.x, cy - self.y)
+    if d > UNSTICK:
+        self.x += (cx - self.x) / d * UNSTICK
+        self.y += (cy - self.y) / d * UNSTICK
 
 # A lap is every point of the road, in order: going back over the line takes
 # the lap off again, so backing and forth over it pays nothing.

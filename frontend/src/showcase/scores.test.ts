@@ -152,8 +152,11 @@ on("kart")("Zoomtown Cup's board", () => {
   it("is all four tracks' best times added up, once there are four, and lowest wins", async () => {
     const g = await start(builtAt("kart"));
     expect(g.project.settings.scoreboard).toEqual({ lowest: true, unit: "time" });
-    const n = g.py("len(TRACKS)") as number;
+    // The first cup's four: the later cups' tracks (TRACKS[4:]) don't count towards it.
+    const n = g.py("len(CUPS[0]['tracks'])") as number;
     expect(n).toBe(4);
+    expect(g.py("CUPS[0]['tracks']")).toEqual([0, 1, 2, 3]);
+    g.py('keep_best(TRACKS[4]["name"], 3600)');
     for (let i = 0; i < n - 1; i++) g.py(`keep_best(TRACKS[${i}]["name"], 3600)`);
     g.step();
     expect(g.scores).toEqual([]);
