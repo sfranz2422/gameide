@@ -24,9 +24,9 @@ def words(x, y, text, size=16, color="white", align="left"):
     draw_set_halign("left")
 
 
-def deal_jobs(seed):
-    """Which panels a player must fix: JOBS_EACH of them, by number in STATIONS."""
-    return sorted(random.Random(seed).sample(range(len(STATIONS)), JOBS_EACH))
+def deal_jobs(seed, count=None):
+    """Which panels a player must fix: `count` of them (JOBS_EACH unless told, fewer in a duel), by number in STATIONS."""
+    return sorted(random.Random(seed).sample(range(len(STATIONS)), JOBS_EACH if count is None else count))
 
 
 def gui_mouse():

@@ -89,7 +89,7 @@ def try_freeze(n):
     if global_vars.role != "mimic" or not playing() or global_vars.cool > 0 or global_vars.g["ph"] != "play":
         return False
     to_host({"freeze": n, "r": global_vars.g["r"]})
-    global_vars.cool = FREEZE_WAIT
+    global_vars.cool = freeze_wait(len(global_vars.g["in"]))
     sound_play("freeze", volume=0.6)
     return True
 
@@ -104,7 +104,8 @@ def try_report(n):
 
 def try_call():
     """The beacon: a meeting, once a round."""
-    if not playing() or global_vars.g["ph"] != "play" or global_vars.calls_left <= 0:
+    if (not playing() or global_vars.g["ph"] != "play" or global_vars.calls_left <= 0
+            or not meetings_allowed(len(global_vars.g["in"]))):
         return False
     global_vars.calls_left -= 1
     to_host({"call": 1, "r": global_vars.g["r"]})
@@ -146,15 +147,15 @@ def start_round(d):
     mimics = random.sample(here, mimic_count(len(here)))
     d.roles = {n: ("mimic" if n in mimics else "crew") for n in here}
     d.done, d.calls, d.votes = {}, {}, {}
-    d.coolness = {n: FIRST_WAIT for n in mimics}
+    d.coolness = {n: first_wait(len(here)) for n in mimics}
     d.seen = {n: d.t for n in here}
     d.dealt_at = d.t
     crew = len(here) - len(mimics)
     g.update({"ph": "play", "r": g["r"] + 1, "t": 0, "in": here, "fz": [], "out": [], "left": [], "b": [],
-              "jobs": [0, crew * JOBS_EACH], "call": None, "found": None, "voted": [], "tally": [],
+              "jobs": [0, crew * jobs_each(len(here))], "call": None, "found": None, "voted": [], "tally": [],
               "ej": None, "em": None, "win": None, "why": "", "mm": []})
     for n in here:
-        word = {"role": d.roles[n], "jobs": deal_jobs(random.randrange(1 << 30)),
+        word = {"role": d.roles[n], "jobs": deal_jobs(random.randrange(1 << 30), jobs_each(len(here))),
                 "mates": [m for m in mimics if m != n] if n in mimics else [], "r": g["r"]}
         if n == me:
             take_role(word)
@@ -185,12 +186,12 @@ def run_round(d):
             if sender in g["in"] and w["me"] in ("crew", "mimic") and sender not in d.roles:
                 d.roles[sender] = w["me"]
             if d.roles.get(sender) == "crew" and isinstance(w.get("done"), int):
-                d.done[sender] = max(0, min(JOBS_EACH, w["done"]))
+                d.done[sender] = max(0, min(jobs_each(len(g["in"])), w["done"]))
             # Reloaded mid-round, and doesn't know who they are: tell them again (not just
             # after dealing, when their word from before the deal may cross the deal on the way).
             if (w["me"] is None and sender in d.roles and sender != me and g["ph"] != "over"
                     and d.t - getattr(d, "dealt_at", 0) > 180):
-                net_tell(sender, {"role": d.roles[sender], "jobs": deal_jobs(random.randrange(1 << 30)),
+                net_tell(sender, {"role": d.roles[sender], "jobs": deal_jobs(random.randrange(1 << 30), jobs_each(len(g["in"]))),
                                   "mates": [m for m, r in d.roles.items() if r == "mimic" and m != sender]
                                   if d.roles[sender] == "mimic" else [], "r": g["r"]})
         elif "freeze" in w and g["ph"] == "play":
@@ -202,7 +203,7 @@ def run_round(d):
                 g["fz"].append(n)
                 suit = next((p.get("s") for p in net_players() if p.number == n), global_vars.player.suit if n == me else "coral")
                 g["b"].append([n, round(b[0]), round(b[1]), suit])
-                d.coolness[sender] = FREEZE_WAIT
+                d.coolness[sender] = freeze_wait(len(g["in"]))
         elif "report" in w and g["ph"] == "play":
             n = w["report"]
             body = next((b for b in g["b"] if b[0] == n), None)
@@ -212,7 +213,7 @@ def run_round(d):
         elif "call" in w and g["ph"] == "play":
             a = where(sender)
             bx, by = tile_middle(*BEACON)
-            if alive(sender) and d.calls.get(sender, 0) < CALLS_EACH and a and point_distance(a[0], a[1], bx, by) <= REACH + SLACK:
+            if alive(sender) and meetings_allowed(len(g["in"])) and d.calls.get(sender, 0) < CALLS_EACH and a and point_distance(a[0], a[1], bx, by) <= REACH + SLACK:
                 d.calls[sender] = d.calls.get(sender, 0) + 1
                 start_meeting(d, sender, None)
         elif "vote" in w and g["ph"] == "meeting":
@@ -231,7 +232,7 @@ def run_round(d):
         for n in d.coolness:
             d.coolness[n] -= 1
         crew = [n for n in g["in"] if d.roles.get(n) == "crew" and n not in g["left"]]
-        g["jobs"] = [sum(d.done.get(n, 0) for n in crew), len(crew) * JOBS_EACH]
+        g["jobs"] = [sum(d.done.get(n, 0) for n in crew), len(crew) * jobs_each(len(g["in"]))]
         end_if_won(d)
     elif g["ph"] == "meeting":
         g["t"] -= 1
@@ -247,7 +248,7 @@ def run_round(d):
         g["t"] -= 1
         if g["t"] <= 0:
             g["ph"] = "play"
-            d.coolness = {n: FIRST_WAIT for n, r in d.roles.items() if r == "mimic"}
+            d.coolness = {n: first_wait(len(g["in"])) for n, r in d.roles.items() if r == "mimic"}
             end_if_won(d)
     elif g["ph"] == "over":
         g["t"] -= 1

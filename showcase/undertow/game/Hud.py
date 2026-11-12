@@ -21,6 +21,10 @@ if room and g["ph"] == "lobby":
         text = f"{here} here. Waiting for #{net_host()} to start."
     words(VIEW_W / 2, VIEW_H - 40, text, 16, "#ffd23f", "center")
     words(VIEW_W / 2, 30, f"Room {net_room()}: walk about while everyone joins.", 12, "#9fb9cf", "center")
+    if MIN_PLAYERS <= here <= 2:
+        words(VIEW_W / 2, VIEW_H - 20, "A duel: one Mimic hunts one crew member, who must finish their jobs first.", 12, "#9fb9cf", "center")
+    elif MIN_PLAYERS <= here and small_room(here):
+        words(VIEW_W / 2, VIEW_H - 20, "A small room: the Mimic must freeze everyone to win.", 12, "#9fb9cf", "center")
     return
 if room and net_me().number not in g["in"] and g["ph"] != "over":
     words(VIEW_W / 2, VIEW_H - 40, "A round is on: you'll be in the next one.", 14, "#9fb9cf", "center")

@@ -448,10 +448,9 @@ bad`) as unknown as unknown[];
     expect(py(g, "tile_xy(19, 20)[2]")).toBe(44);
   });
 
-  it("waiting: two can't start a round; others see who will start it", async () => {
+  it("waiting: one alone can't start a round; others see who will start it", async () => {
     const room = new Room();
     await room.join(1, "Ana");
-    await room.join(2, "Ben");
     room.step(40);
     key(room.seat(1).g, "enter", true);
     room.step(2);
@@ -459,13 +458,19 @@ bad`) as unknown as unknown[];
     room.step(5);
     expect(G(room.seat(1), "ph")).toBe("lobby");
     // Only the host's Enter counts.
-    await room.join(3, "Cai");
+    await room.join(2, "Ben");
     room.step(40);
     key(room.seat(2).g, "enter", true);
     room.step(2);
     key(room.seat(2).g, "enter", false);
     room.step(5);
     expect(G(room.seat(2), "ph")).toBe("lobby");
+    // Two is enough: a duel.
+    key(room.seat(1).g, "enter", true);
+    room.step(2);
+    key(room.seat(1).g, "enter", false);
+    room.step(5);
+    expect(room.all("global_vars.g['ph'] == 'play'")).toBe(true);
   });
 
   it("a Mimic freezes crew in reach with F, never from afar, and must wait between", async () => {
@@ -665,14 +670,58 @@ bad`) as unknown as unknown[];
     expect(G(room.seat(1), "ej")).toBe(undefined);
   });
 
-  it("the Mimics win when they're as many as the crew", async () => {
+  /** The Mimic `m` freezes each of `crew` in turn, its wait cut short each time. */
+  function freezeAll(room: Room, m: number, crew: number[]) {
+    for (const n of crew) {
+      py(room.seat(m).g, "global_vars.cool = 0");
+      py(room.seat(1).g, `global_vars.director.coolness[${m}] = 0`);
+      put(room, n, ...hub(-200, 0));
+      put(room, m, ...hub(-180, 0));
+      py(room.seat(m).g, `try_freeze(${n})`);
+      room.step(10);
+    }
+  }
+
+  it("the Mimics win when they're as many as the crew (five or more)", async () => {
+    const room = await round(5, 2);
+    freezeAll(room, 2, [3, 4]);
+    expect(G(room.seat(1), "fz")).toEqual([3, 4]);
+    expect(G(room.seat(1), "ph")).toBe("play");
+    freezeAll(room, 2, [5]);
+    expect(room.all("global_vars.g['ph'] == 'over' and global_vars.g['win'] == 'mimics'")).toBe(true);
+  });
+
+  it("a small room: the Mimic must freeze everyone, and waits longer for each", async () => {
     const room = await round(3, 2);
-    py(room.seat(2).g, "global_vars.cool = 0");
-    py(room.seat(1).g, "global_vars.director.coolness[2] = 0");
-    put(room, 3, ...hub(-200, 0));
-    put(room, 2, ...hub(-180, 0));
-    py(room.seat(2).g, "try_freeze(3)");
-    room.step(10);
+    // Twenty seconds before the first freeze, forty between: not twelve and twenty-five.
+    expect(py(room.seat(1).g, "global_vars.director.coolness[2]")).toBeGreaterThan(15 * 60);
+    freezeAll(room, 2, [3]);
+    // One Mimic and one crew member left: in a big room that's the Mimics' win, here it isn't.
+    expect(room.all("global_vars.g['ph'] == 'play'")).toBe(true);
+    expect(py(room.seat(1).g, "global_vars.director.coolness[2]")).toBeGreaterThan(35 * 60);
+    expect(py(room.seat(2).g, "global_vars.cool")).toBeGreaterThan(35 * 60);
+    freezeAll(room, 2, [1]);
+    expect(room.all("global_vars.g['ph'] == 'over' and global_vars.g['win'] == 'mimics'")).toBe(true);
+  });
+
+  it("a duel: three jobs each, no meetings, and the crew win by finishing first", async () => {
+    const room = await round(2, 2);
+    expect(G(room.seat(1), "jobs")).toEqual([0, 3]);
+    expect(room.all("len(global_vars.jobs) == 3")).toBe(true);
+    // The beacon does nothing with two: a vote could only tie. Not even a changed game's call.
+    put(room, 1, ...hub(0, 0));
+    expect(py(room.seat(1).g, "try_call()")).toBe(false);
+    py(room.seat(1).g, "to_host({'call': 1, 'r': global_vars.g['r']})");
+    room.step(5);
+    expect(G(room.seat(1), "ph")).toBe("play");
+    py(room.seat(1).g, "global_vars.done = set(global_vars.jobs)");
+    room.step(70);
+    expect(room.all("global_vars.g['ph'] == 'over' and global_vars.g['win'] == 'crew'")).toBe(true);
+  });
+
+  it("a duel: one freeze and the Mimic wins", async () => {
+    const room = await round(2, 1);
+    freezeAll(room, 1, [2]);
     expect(room.all("global_vars.g['ph'] == 'over' and global_vars.g['win'] == 'mimics'")).toBe(true);
   });
 

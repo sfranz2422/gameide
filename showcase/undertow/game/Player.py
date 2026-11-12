@@ -63,7 +63,7 @@ if not held:
         for s in instances("Station"):
             if s.i in global_vars.jobs and s.i not in global_vars.done and point_distance(self.x, self.y, s.x, s.y) < REACH:
                 near = ("job", s)
-    if near is None and playing() and g["ph"] == "play" and global_vars.calls_left > 0:
+    if near is None and playing() and g["ph"] == "play" and global_vars.calls_left > 0 and meetings_allowed(len(g["in"])):
         for b in instances("Beacon"):
             if point_distance(self.x, self.y, b.x, b.y) < REACH:
                 near = ("beacon", b)

@@ -12,7 +12,7 @@
 # If the host leaves, or is answering a question, the next player's game takes
 # over from its copy of "g", and everyone tells it their role again.
 
-MIN_PLAYERS = 3          # to start a round (4 or more is better)
+MIN_PLAYERS = 2          # to start a round: two is a duel, a Mimic hunting one crew member
 MAX_PLAYERS = 25         # a room holds this many (build.py asks the server for it: settings.netPlayers)
 FREEZE_REACH = 48        # pixels between a Mimic and who they freeze
 FREEZE_WAIT = 25 * 60    # steps between a Mimic's freezes
@@ -28,6 +28,15 @@ SLACK = 40               # pixels the host allows for the room's delay
 LIGHT = {"crew": 150, "mimic": 210, "ghost": 260}
 SIGHT = 0.7                  # others are seen only this far into your light: past it they're too dim to make
                              # out, but their number (which the dark doesn't cover) still showed
+# Small rooms (the teacher's ask, 2026-11-12: a class of three or four could start a
+# round, but with one Mimic the round ended at the first freeze or two, as soon as
+# there were as many Mimics as crew). Up to SMALL_ROOM players, the Mimic must
+# freeze EVERY crew member, and waits longer for each; in a duel there are fewer
+# jobs, and no meetings (two votes can only tie).
+SMALL_ROOM = 4
+SMALL_FREEZE_WAIT = 40 * 60
+SMALL_FIRST_WAIT = 20 * 60
+DUEL_JOBS = 3
 ROLE_FLASH = 5 * 60          # steps your role is shown at the start of a round, then hidden from your screen
 
 # What can be said in a meeting: a phrase, and what it needs filled in
@@ -50,6 +59,31 @@ PHRASE_KEYS = [p[0] for p in PHRASES]
 def mimic_count(players):
     """How many Mimics a round has: one, two from 7 players, three from 13."""
     return 1 if players <= 6 else 2 if players <= 12 else 3
+
+
+def small_room(count):
+    """Small-room rules for a round of this many players: the Mimic must freeze everyone."""
+    return count <= SMALL_ROOM
+
+
+def freeze_wait(count):
+    """Steps between a Mimic's freezes, in a round of `count` players."""
+    return SMALL_FREEZE_WAIT if small_room(count) else FREEZE_WAIT
+
+
+def first_wait(count):
+    """Steps before a Mimic's first freeze, after a round or a meeting starts."""
+    return SMALL_FIRST_WAIT if small_room(count) else FIRST_WAIT
+
+
+def jobs_each(count):
+    """How many jobs each crew member is given: fewer in a duel, where one does them all."""
+    return DUEL_JOBS if count <= 2 else JOBS_EACH
+
+
+def meetings_allowed(count):
+    """Meetings need three: with two, the vote is always a tie."""
+    return count > 2
 
 
 def phrase_text(key, n=None, room=None):
@@ -103,7 +137,10 @@ def tally(votes, voters):
 
 
 def winner(g, roles):
-    """Who has won, and why, or (None, ""): every Mimic sent up, the jobs all done, or as many Mimics as crew."""
+    """
+    Who has won, and why, or (None, ""): every Mimic sent up, the jobs all done, or
+    as many Mimics as crew — in a small room, no crew left at all.
+    """
     gone = ghosts(g)
     crew = [n for n in g["in"] if roles.get(n) == "crew" and n not in gone]
     mimics = [n for n in g["in"] if roles.get(n) == "mimic" and n not in gone]
@@ -112,6 +149,6 @@ def winner(g, roles):
     done, total = g["jobs"]
     if total and done >= total:
         return "crew", "The crew fixed the whole station."
-    if len(mimics) >= len(crew):
+    if len(mimics) >= len(crew) and not (small_room(len(g["in"])) and crew):
         return "mimics", "The Mimics took over the station."
     return None, ""

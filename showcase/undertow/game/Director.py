@@ -84,7 +84,7 @@ if g["r"] != self.round_seen:
     if me not in g["in"]:
         global_vars.role = None
     global_vars.calls_left = CALLS_EACH
-    global_vars.cool = FIRST_WAIT
+    global_vars.cool = first_wait(len(g["in"]))
     sit_down(g)
 if g["ph"] != self.phase_seen:
     was, self.phase_seen = self.phase_seen, g["ph"]
@@ -98,7 +98,7 @@ if g["ph"] != self.phase_seen:
     if g["ph"] in ("meeting", "result") and not instances("Meeting"):
         instance_create(0, 0, "Meeting")
     if g["ph"] == "play" and was == "result":
-        global_vars.cool = FIRST_WAIT
+        global_vars.cool = first_wait(len(g["in"]))
     if g["ph"] == "lobby":
         global_vars.role = None
         global_vars.jobs = []
