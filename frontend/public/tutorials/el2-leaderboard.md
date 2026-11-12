@@ -89,4 +89,4 @@ Match each one to where it shows or keeps a score:
 
 Your game now has players competing with each other, and all it took was one line. Share your link and see who can beat you.
 
-Next: **Game Elements 3: Advanced Techniques**.
+Next: **8. Online Rooms**.

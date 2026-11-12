@@ -18,6 +18,7 @@ import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { checkGame, checkProject, readCheck } from "../checks/checks";
 import { KEY_CODE } from "../engine/input";
+import type { NetOut } from "../engine/game";
 import { PythonGame } from "../python/bridge";
 import { buildGame } from "../python/codegen";
 import { TUTORIAL_STARTERS } from "../store/templates";
@@ -150,6 +151,42 @@ describe("tutorial series", () => {
     game.step();
     game.step();
     expect(scores).toEqual([7]);
+  });
+
+  it("the online lesson's game, in a room: Player 1 alone is sent, a partner is drawn, their shots arrive", { timeout: 60_000 }, async () => {
+    const series = SERIES.find((s) => s.lessons.some((l) => l.key === "el2-online"))!;
+    const n = series.lessons.findIndex((l) => l.key === "el2-online");
+    const { project } = await TUTORIAL_STARTERS[`${series.name}-${n}`]!();
+    for (const e of Object.values(series.lessons[n]!.edits)) applyEdit(project, e);
+    const nets: NetOut[] = [];
+    const { def } = buildGame(project, new Map());
+    const { game, error } = await PythonGame.load(
+      { ...def, net: { code: "KXTD", number: 1, name: "Nia", state: {} } },
+      { stdout: () => undefined, stderr: () => undefined, warning: () => undefined, net: (o) => nets.push(o) },
+    );
+    expect(error).toBeFalsy();
+    const py = (c: string) => game.evalPython(c) as never;
+    game.step();
+    py('room_goto("Room1")');
+    game.step();
+    // One with no x yet (still on the title screen) is skipped, not an error.
+    game.netArrive([{ number: 2, name: "Oli", state: { x: 100, y: 50, vx: 4, vy: 0 } }, { number: 3, name: "Ana", state: {} }], []);
+    game.engine.input.keyDown(KEY_CODE.get("right")!);
+    game.engine.input.keyDown(KEY_CODE.get("space")!);
+    for (let i = 0; i < 3; i++) expect(game.step()).toBeFalsy();
+    game.engine.input.keyUp(KEY_CODE.get("right")!);
+    game.engine.input.keyUp(KEY_CODE.get("space")!);
+    // What went out is Player 1, never Player 2 (which runs the same Step event), moving right.
+    const p1 = py('[(p.x, p.y) for p in instances("Player") if p.pad == 0][0]') as [number, number];
+    const sent = nets.map((o) => o.state).filter(Boolean).at(-1) as Record<string, number>;
+    expect([sent.x, sent.y, sent.vx, sent.vy]).toEqual([p1[0], p1[1], 4, 0]);
+    expect(nets.flatMap((o) => o.msgs ?? []).length).toBeGreaterThan(0);
+    expect(py("[(p.name, round(p.draw_x)) for p in net_players() if p.draw_x is not None]")).toEqual([["Oli", expect.any(Number)]]);
+    // A partner's shot is a bullet here.
+    const before = py("instance_number('Bullet')") as number;
+    game.netArrive(null, [{ from: 2, data: { x: 120, y: 60 }, age: 0 }]);
+    expect(game.step()).toBeFalsy();
+    expect(py("instance_number('Bullet')")).toBe(before + 1);
   });
 
   for (const series of SERIES) {

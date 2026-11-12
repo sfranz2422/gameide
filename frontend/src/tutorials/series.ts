@@ -400,6 +400,26 @@ draw_text(320, 250, f"Best: {global_vars.best}")
 draw_text(320, 320, "Press Space to play again")
 `;
 
+// Lesson 8, Online Rooms. Only Player 1 sends: Player 2 runs the same Step event.
+const SEND_XY = `if self.pad == 0:
+    net_send({"x": self.x, "y": self.y})
+`;
+const SEND_MOVING = `if self.pad == 0:
+    net_send({"x": self.x, "y": self.y, "vx": move_x * speed, "vy": move_y * speed})
+`;
+const P_STEP_SHOUT = P_STEP_OWN_KEYS.replace(
+  `    instance_create(self.x + 24, self.y + 12, "Bullet")\n`,
+  `    instance_create(self.x + 24, self.y + 12, "Bullet")\n    net_shout({"x": self.x + 24, "y": self.y + 12})\n`,
+);
+const othersDraw = (names: boolean) => `draw_set_alpha(0.5)
+for p in net_players():
+    if p.draw_x is not None:
+        draw_sprite("player", 0, p.draw_x, p.draw_y)
+${names ? "        draw_text(p.draw_x, p.draw_y - 20, p.name)\n" : ""}`;
+const SHOTS_ARRIVE = `for m in net_messages():
+    instance_create(m.data["x"], m.data["y"], "Bullet")
+`;
+
 export const DODGE2: Series = {
   name: "dodge2",
   continues: DODGE,
@@ -484,6 +504,16 @@ export const DODGE2: Series = {
       key: "el2-leaderboard",
       edits: {
         1: { code: { "EndScreen.create": 'save_set("best", global_vars.best)\nhigh_score(global_vars.score)\n' } },
+      },
+    },
+    {
+      key: "el2-online",
+      edits: {
+        1: { code: { "Player.step": P_STEP_OWN_KEYS + SEND_XY } },
+        2: { objects: [{ name: "Others", sprite: null }], place: [{ object: "Others", x: 0, y: 0 }], code: { "Others.draw": othersDraw(false) } },
+        4: { code: { "Player.step": P_STEP_OWN_KEYS + SEND_MOVING } },
+        5: { code: { "Player.step": P_STEP_SHOUT + SEND_MOVING, "Others.step": SHOTS_ARRIVE } },
+        6: { code: { "Others.draw": othersDraw(true) } },
       },
     },
   ],

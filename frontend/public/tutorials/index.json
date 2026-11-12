@@ -288,6 +288,14 @@
   "description": "Put your score on a board beside your published game, where students at your school can try to beat it."
 },
  {
+  "key": "el2-online",
+  "title": "8. Online Rooms",
+  "level": "Game Elements 2: Adding to the Fun",
+  "time": "25 min",
+  "starter": "dodge2-7",
+  "description": "Play your published game with a friend on another computer: send where you are, draw where they are, and shout when you fire."
+ },
+ {
   "key": "el3-angled",
   "title": "1. Angled Movement",
   "level": "Game Elements 3: Advanced Techniques",
