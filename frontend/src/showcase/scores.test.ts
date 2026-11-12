@@ -333,3 +333,26 @@ on("flags")("Snowfort Flags' board", () => {
     expect(g.scores).toEqual([7]);
   });
 });
+
+on("lemon")("Squeeze's board", () => {
+  it("is the money at the end of a summer, in whole dollars; not before the summer ends", async () => {
+    const g = await start(builtAt("lemon"));
+    expect(g.project.settings.scoreboard).toEqual({ unit: "dollars" });
+    g.py('global_vars.s = new_summer(4)\nglobal_vars.s["plan"]["buy"] = {"lemons": 0, "sugar": 0, "ice": 0, "cups": 0}\nroom_goto("Morning")');
+    g.step(2);
+    // A day that isn't the last: nothing on the board.
+    g.py('do_act("open", None)');
+    g.step(2);
+    g.py("global_vars.speed = 4");
+    for (let k = 0; k < 3000 && (g.py("room_name()") as string) === "Street"; k++) g.step();
+    expect(g.scores).toEqual([]);
+    // The last day: the money, in dollars.
+    g.py('do_act("next", None)');
+    g.step(2);
+    g.py('s = global_vars.s\ns["day"] = DAYS - 1\ns["money"] = 15099\ns["plan"]["buy"] = {"lemons": 0, "sugar": 0, "ice": 0, "cups": 0}\ndo_act("open", None)');
+    g.step(2);
+    g.py("global_vars.speed = 4");
+    for (let k = 0; k < 3000 && (g.py("room_name()") as string) === "Street"; k++) g.step();
+    expect(g.scores).toEqual([150]);
+  }, 120_000);
+});

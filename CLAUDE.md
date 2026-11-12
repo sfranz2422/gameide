@@ -296,7 +296,7 @@ code (the harness turns bytecode caching off for that reason), or a
 mistyped case name ran nothing and still reported success (the harness now
 refuses unknown names).
 
-**The showcase games' runners** (`GM`, `MM`, `FB`, `GF`, `BB`, `HC`, `KT`, `TD`, `SM`, `RP`, `CLIMB`, `UND`, `SIEGE`, `SAND`, `FLAGS` — not `CL`, which is classes.py) rebuild
+**The showcase games' runners** (`GM`, `MM`, `FB`, `GF`, `BB`, `HC`, `KT`, `TD`, `SM`, `RP`, `CLIMB`, `UND`, `SIEGE`, `SAND`, `FLAGS`, `LEMON` — not `CL`, which is classes.py) rebuild
 that game from the sabotaged source before its playtest and again after. A
 build that **refuses** (Greenside's course checks, Ridgeline Rally's stage
 checks) leaves the old `out/project.json`, and the test passes on it: a
@@ -735,3 +735,13 @@ A snowball only hits low (near either end of its arc). Art is the teacher's Gemi
 sheets (`raw/`), cut by `cut_sheets.py` into `art/`; without it the build draws stand-ins.
 Bots that have nowhere to walk think every step, so anything counted per think must be
 counted from the match clock (`wait_from`): a 20 s wait was once over in one.
+
+## Squeeze
+
+`showcase/lemon/`: a lemonade stand over a 30-day summer (the teacher's ask, 2026-11-12;
+one player, the teacher's Gemini art in `raw/`, cut by `cut_sheets.py` into `art/`).
+Every number is in `game/_1rules.py`, and **money is whole cents** so the evening's
+ledger adds up exactly. `_2summer.py` is the whole economy (buying, spoiling, melting,
+who stops and buys, what they think), pure enough for the tests' sensible and silly bots
+to play a summer. The weather comes from the summer's seed, so reloading can't buy a
+better day. Python check questions only on the title, morning and evening screens.

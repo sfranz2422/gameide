@@ -54,9 +54,11 @@ SIEGE = "siege"    # …or Tabletop Siege's, rebuilt the same way
 def _sg(n): return f"../showcase/siege/game/{n}.py"
 SAND = "sand"      # …or Pour Decisions', rebuilt the same way
 FLAGS = "flags"    # …or Snowfort Flags', rebuilt the same way
+LEMON = "lemon"    # …or Squeeze's, rebuilt the same way
 def _sd(n): return f"../showcase/sand/game/{n}.py"
 def _ut(n): return f"../showcase/undertow/game/{n}.py"
 def _fl(n): return f"../showcase/flags/game/{n}.py"
+def _lm(n): return f"../showcase/lemon/game/{n}.py"
 SMR, SML, SMB = "../showcase/smash/game/_2rules.py", "../showcase/smash/game/_1levels.py", "../showcase/smash/build.py"
 def _sm(n): return f"../showcase/smash/game/{n}.py"
 def _rp(n): return f"../showcase/rpg/game/{n}.py"
@@ -1877,6 +1879,15 @@ CASES = [
  ('flags: capture with your flag gone', _fl("_3match"), '    if kid.carry is not None and mine is not None and mine.state == "home":', '    if kid.carry is not None and mine is not None:', "no capture while your own flag", FLAGS),
  ('flags: a tie ends the match', _fl("_3match"), '            if a != b:', '            if True:', "time up", FLAGS),
  ('flags: bots throw blind', _fl("_4bots"), '    for e in global_vars.sees.get(bot, []):', '    for e in kids(other_team(bot.team)):', "throw only at someone they can see", FLAGS),
+ ('lemon: soft lemons kept', _lm("_2summer"), '    s["lemons"] = [b for b in s["lemons"] if b[0] > s["day"] - LEMON_DAYS]\n', '', "lemons go soft on their fourth day", LEMON),
+ ('lemon: the newest lemons used first', _lm("_2summer"), '    for b in s["lemons"]:\n        took', '    for b in reversed(s["lemons"]):\n        took', "lemons go soft on their fourth day", LEMON),
+ ('lemon: the ice keeps overnight', _lm("_2summer"), '    kept = COOLER_KEPT_OVERNIGHT if has(s, "cooler") else ICE_KEPT_OVERNIGHT', '    kept = 1.0', "lemons go soft on their fourth day", LEMON),
+ ('lemon: sales never reach the till', _lm("_2summer"), '    s["money"] += t["price"]\n', '', "the evening's ledger adds up", LEMON),
+ ('lemon: any price will do', _lm("_2summer"), '    if would_pay(s, who, t["pink"]) < t["price"]:', '    if False:', "who buys", LEMON),
+ ('lemon: selling on with no cups', _lm("_2summer"), '    if s["cups"] < 1:', '    if s["cups"] < -100:', "running out stops the selling", LEMON),
+ ('lemon: no sugar tastes fine', _lm("_2summer"), '    if lemons >= who["lemons"] + TASTE_SLACK or sugar <= who["sugar"] - TASTE_SLACK:', '    if lemons >= who["lemons"] + TASTE_SLACK:', "what they think", LEMON),
+ ('lemon: the summer never ends', _lm("_2summer"), '    if s["day"] >= DAYS - 1:', '    if s["day"] >= DAYS:', "the end of the summer", LEMON),
+ ("lemon: the keys can't change a number", _lm("_4keys"), '            if dx and cur.object_name == "Stepper":', '            if False:', "from the keyboard alone", LEMON),
  ('flags: the woods note never stops', _fl("Match"), 'self.was_in_woods = inside\n', '', "says why, every time you walk in", FLAGS),
  ('flags: the woods as dim as before', _fl("_1rules"), 'WOODS_DARK = 0.96 ', 'WOODS_DARK = 0.82 ', "says why, every time you walk in", FLAGS),
  ('flags: the creek is walkable', "../showcase/flags/build.py", '"wall", "ice", "ice_l", "ice_r")]', '"wall")]', "the creek stops kids", FLAGS),
@@ -1967,7 +1978,7 @@ for name, f, old, new, test, *extra in CASES:
             failed = any(l.startswith("FAIL") and test in l for l in out.splitlines())
             ran = "ok   " in out or "FAIL " in out
         else:
-            if runner in ([GM], [MM], [FB], [GF], [BB], [HC], [KT], [TD], [SM], [RP], [CLIMB], [UND], [SIEGE], [SAND], [FLAGS]):
+            if runner in ([GM], [MM], [FB], [GF], [BB], [HC], [KT], [TD], [SM], [RP], [CLIMB], [UND], [SIEGE], [SAND], [FLAGS], [LEMON]):
                 subprocess.run(["python3", str(ROOT.parent / f"showcase/{runner[0]}/build.py")], capture_output=True)
             cmd = ["npx", "playwright", "test", "-g", test] if runner == [E2E] else ["npx", "vitest", "run", "-t", test]
             r = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True)
@@ -1978,6 +1989,6 @@ for name, f, old, new, test, *extra in CASES:
         if not failed: bad.append(name)
     finally:
         p.write_text(src)
-        if runner in ([GM], [MM], [FB], [GF], [BB], [HC], [KT], [TD], [SM], [RP], [CLIMB], [UND], [SIEGE], [SAND], [FLAGS]):
+        if runner in ([GM], [MM], [FB], [GF], [BB], [HC], [KT], [TD], [SM], [RP], [CLIMB], [UND], [SIEGE], [SAND], [FLAGS], [LEMON]):
             subprocess.run(["python3", str(ROOT.parent / f"showcase/{runner[0]}/build.py")], capture_output=True)
 print("ALL SABOTAGES CAUGHT" if not bad else f"NOT CAUGHT: {bad}")
