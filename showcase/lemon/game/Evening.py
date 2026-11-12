@@ -10,9 +10,11 @@ global_vars.focus = None
 s = global_vars.s
 self.t = s["history"][-1]
 self.buys = []
+# The board: the money tonight, in whole dollars, every evening (the teacher's choice:
+# sent only at the summer's end, the board stayed empty until someone played all 30
+# days). The board keeps each player's best, so it ranks the most money made.
+high_score(s["money"] // 100)
 if s["finished"]:
-    # The board: the money at the end of the summer, in whole dollars.
-    high_score(s["money"] // 100)
     self.first = make_button(VIEW_W / 2 - 150, 498, 300, 56, "Back to the title", "title", size=22)
     self.first.hot = True
 else:

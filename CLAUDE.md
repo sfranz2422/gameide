@@ -745,3 +745,5 @@ ledger adds up exactly. `_2summer.py` is the whole economy (buying, spoiling, me
 who stops and buys, what they think), pure enough for the tests' sensible and silly bots
 to play a summer. The weather comes from the summer's seed, so reloading can't buy a
 better day. Python check questions only on the title, morning and evening screens.
+The school board gets the money every evening (the teacher's choice: only at the
+summer's end, it stayed empty for weeks); it keeps each player's best.

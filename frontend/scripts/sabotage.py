@@ -1879,6 +1879,7 @@ CASES = [
  ('flags: capture with your flag gone', _fl("_3match"), '    if kid.carry is not None and mine is not None and mine.state == "home":', '    if kid.carry is not None and mine is not None:', "no capture while your own flag", FLAGS),
  ('flags: a tie ends the match', _fl("_3match"), '            if a != b:', '            if True:', "time up", FLAGS),
  ('flags: bots throw blind', _fl("_4bots"), '    for e in global_vars.sees.get(bot, []):', '    for e in kids(other_team(bot.team)):', "throw only at someone they can see", FLAGS),
+ ('lemon: the board waits for the summer to end', _lm("Evening"), 'high_score(s["money"] // 100)\nif s["finished"]:\n', 'if s["finished"]:\n    high_score(s["money"] // 100)\n', "from the first day on", LEMON),
  ('lemon: soft lemons kept', _lm("_2summer"), '    s["lemons"] = [b for b in s["lemons"] if b[0] > s["day"] - LEMON_DAYS]\n', '', "lemons go soft on their fourth day", LEMON),
  ('lemon: the newest lemons used first', _lm("_2summer"), '    for b in s["lemons"]:\n        took', '    for b in reversed(s["lemons"]):\n        took', "lemons go soft on their fourth day", LEMON),
  ('lemon: the ice keeps overnight', _lm("_2summer"), '    kept = COOLER_KEPT_OVERNIGHT if has(s, "cooler") else ICE_KEPT_OVERNIGHT', '    kept = 1.0', "lemons go soft on their fourth day", LEMON),
