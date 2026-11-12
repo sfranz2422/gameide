@@ -55,10 +55,12 @@ def _sg(n): return f"../showcase/siege/game/{n}.py"
 SAND = "sand"      # …or Pour Decisions', rebuilt the same way
 FLAGS = "flags"    # …or Snowfort Flags', rebuilt the same way
 LEMON = "lemon"    # …or Squeeze's, rebuilt the same way
+COOK = "cooking"   # …or Order Up!'s, rebuilt the same way
 def _sd(n): return f"../showcase/sand/game/{n}.py"
 def _ut(n): return f"../showcase/undertow/game/{n}.py"
 def _fl(n): return f"../showcase/flags/game/{n}.py"
 def _lm(n): return f"../showcase/lemon/game/{n}.py"
+def _ck(n): return f"../showcase/cooking/game/{n}.py"
 SMR, SML, SMB = "../showcase/smash/game/_2rules.py", "../showcase/smash/game/_1levels.py", "../showcase/smash/build.py"
 def _sm(n): return f"../showcase/smash/game/{n}.py"
 def _rp(n): return f"../showcase/rpg/game/{n}.py"
@@ -1879,7 +1881,26 @@ CASES = [
  ('flags: capture with your flag gone', _fl("_3match"), '    if kid.carry is not None and mine is not None and mine.state == "home":', '    if kid.carry is not None and mine is not None:', "no capture while your own flag", FLAGS),
  ('flags: a tie ends the match', _fl("_3match"), '            if a != b:', '            if True:', "time up", FLAGS),
  ('flags: bots throw blind', _fl("_4bots"), '    for e in global_vars.sees.get(bot, []):', '    for e in kids(other_team(bot.team)):', "throw only at someone they can see", FLAGS),
+ ('cooking: nothing ever burns', _ck("_2kitchen"), '    if item["keep"] is None or slot["t"] < done + item["keep"]:', '    if True:', "then burns", COOK),
+ ('cooking: the top bun before the patty', _ck("_2kitchen"), '            return "patty" in parts', '            return True', "the top bun closes it", COOK),
+ ('cooking: any burger will do', _ck("_2kitchen"), '    return plate_done(plate, dish) and sorted(plate["parts"]) == sorted(order["parts"])', '    return plate_done(plate, dish)', "a wrong burger isn't taken", COOK),
+ ('cooking: tips ignore the wait', _ck("_2kitchen"), '    share = max(0, cust.wait) / cust.full', '    share = 1', "the smaller the tip", COOK),
+ ('cooking: patience never runs out', _ck("Customer"), '    if self.wait <= 0:\n        lose(k, self)', '    if False:\n        lose(k, self)', "go home hungry", COOK),
+ ('cooking: combos never grow', _ck("_2kitchen"), '        k["combo"] += 1', '        pass', "a combo", COOK),
+ ('cooking: the noodle bar always open', _ck("_2kitchen"), '    if r > 0 and p["stars"][r - 1][DAYS_EACH - 1] == 0:', '    if False:', "the noodle bar opens", COOK),
+ ('cooking: the hot grill does nothing', _ck("_2kitchen"), '        steps *= FAST', '        steps *= 1', "upgrades: faster cooking", COOK),
+ ('cooking: questions mid-rush', _ck("Kitchen"), 'question_ok(False)', 'question_ok(True)', "questions come between days", COOK),
+ ('cooking: the board gets the day, not the total', _ck("_2kitchen"), '        high_score(total_stars(p))', '        high_score(st)', "Order Up!'s board", COOK),
+ ('cooking: a tapped pop goes in the bin', _ck("_2kitchen"), '    k["held"] = None if k["held"] == i else i\n    return "select"', '    return bin_shelf(k, i)', "tap the pop, then the customer", COOK),
+ ('cooking: their bubble is not them', _ck("Customer"), 'self.high = 264 ', 'self.high = 170 ', "tap the pop, then the customer", COOK),
+ ('cooking: a drag is only a tap', _ck("_5acts"), '        if not d["moved"]:\n            press(d["from"])', '        if True:\n            press(d["from"])', "drag the pop to the customer", COOK),
+ ('cooking: a drag ignores where it is let go', _ck("_2kitchen"), '        if kind == "source":\n            k["sel"] = dst[1]\n', '        if kind == "source":\n', "drag the pop to the customer", COOK),
+ ('cooking: anything dragged to a customer is taken', _ck("_2kitchen"), '            if item is None or item not in needs(cust):', '            if item is None:', "straight from the fountain", COOK),
  ('lemon: the board waits for the summer to end', _lm("Evening"), 'high_score(s["money"] // 100)\nif s["finished"]:\n', 'if s["finished"]:\n    high_score(s["money"] // 100)\n', "from the first day on", LEMON),
+ ('cooking: the star goals as hard as before', _ck("_1rules"), 'STAR_SHARES = (0.40, 0.58, 0.85)', 'STAR_SHARES = (0.45, 0.65, 0.85)', "a little easier", COOK),
+ ('cooking: patience as short as before', _ck("_1rules"), 'PATIENCE = 37.5 * FPS', 'PATIENCE = 30 * FPS', "a little easier", COOK),
+ ('cooking: the late days as busy as before', _ck("_1rules"), '"customers": 5 + round(1.2 * d),', '"customers": 5 + round(1.6 * d),', "a little easier", COOK),
+ ('cooking: food burns as soon as before', _ck("_1rules"), '"patty":     {"cook": 6.0 * FPS, "keep": 7.0 * FPS,', '"patty":     {"cook": 6.0 * FPS, "keep": 5.0 * FPS,', "a little easier", COOK),
  ('lemon: soft lemons kept', _lm("_2summer"), '    s["lemons"] = [b for b in s["lemons"] if b[0] > s["day"] - LEMON_DAYS]\n', '', "lemons go soft on their fourth day", LEMON),
  ('lemon: the newest lemons used first', _lm("_2summer"), '    for b in s["lemons"]:\n        took', '    for b in reversed(s["lemons"]):\n        took', "lemons go soft on their fourth day", LEMON),
  ('lemon: the ice keeps overnight', _lm("_2summer"), '    kept = COOLER_KEPT_OVERNIGHT if has(s, "cooler") else ICE_KEPT_OVERNIGHT', '    kept = 1.0', "lemons go soft on their fourth day", LEMON),
@@ -1979,7 +2000,7 @@ for name, f, old, new, test, *extra in CASES:
             failed = any(l.startswith("FAIL") and test in l for l in out.splitlines())
             ran = "ok   " in out or "FAIL " in out
         else:
-            if runner in ([GM], [MM], [FB], [GF], [BB], [HC], [KT], [TD], [SM], [RP], [CLIMB], [UND], [SIEGE], [SAND], [FLAGS], [LEMON]):
+            if runner in ([GM], [MM], [FB], [GF], [BB], [HC], [KT], [TD], [SM], [RP], [CLIMB], [UND], [SIEGE], [SAND], [FLAGS], [LEMON], [COOK]):
                 subprocess.run(["python3", str(ROOT.parent / f"showcase/{runner[0]}/build.py")], capture_output=True)
             cmd = ["npx", "playwright", "test", "-g", test] if runner == [E2E] else ["npx", "vitest", "run", "-t", test]
             r = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True)
@@ -1990,6 +2011,6 @@ for name, f, old, new, test, *extra in CASES:
         if not failed: bad.append(name)
     finally:
         p.write_text(src)
-        if runner in ([GM], [MM], [FB], [GF], [BB], [HC], [KT], [TD], [SM], [RP], [CLIMB], [UND], [SIEGE], [SAND], [FLAGS], [LEMON]):
+        if runner in ([GM], [MM], [FB], [GF], [BB], [HC], [KT], [TD], [SM], [RP], [CLIMB], [UND], [SIEGE], [SAND], [FLAGS], [LEMON], [COOK]):
             subprocess.run(["python3", str(ROOT.parent / f"showcase/{runner[0]}/build.py")], capture_output=True)
 print("ALL SABOTAGES CAUGHT" if not bad else f"NOT CAUGHT: {bad}")

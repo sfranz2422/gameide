@@ -356,3 +356,22 @@ on("lemon")("Squeeze's board", () => {
     expect(g.scores.at(-1)).toBe(150);
   }, 120_000);
 });
+
+on("cooking")("Order Up!'s board", () => {
+  it("is every star earned, all days of both restaurants; a day replayed no better sends nothing", async () => {
+    const g = await start(builtAt("cooking"), { progress: { coins: 0, stars: [[3, 2, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], ups: [[], []] } });
+    expect(g.project.settings.scoreboard).toEqual({ unit: "stars" });
+    // Day 3 of the burger shack, closed with coins for two stars.
+    g.py('start_day(0, 2)');
+    g.step(2);
+    g.py('k = global_vars.k\nk["arrivals"] = []\nk["coins"] = star_goals(k["goal"])[1]');
+    g.step(3);
+    expect(g.scores).toEqual([7]);
+    // Day 1 again, with nothing: its three stars stay, and the board hears nothing.
+    g.py('start_day(0, 0)');
+    g.step(2);
+    g.py('global_vars.k["arrivals"] = []');
+    g.step(3);
+    expect(g.scores).toEqual([7]);
+  });
+});

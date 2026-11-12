@@ -296,7 +296,7 @@ code (the harness turns bytecode caching off for that reason), or a
 mistyped case name ran nothing and still reported success (the harness now
 refuses unknown names).
 
-**The showcase games' runners** (`GM`, `MM`, `FB`, `GF`, `BB`, `HC`, `KT`, `TD`, `SM`, `RP`, `CLIMB`, `UND`, `SIEGE`, `SAND`, `FLAGS`, `LEMON` — not `CL`, which is classes.py) rebuild
+**The showcase games' runners** (`GM`, `MM`, `FB`, `GF`, `BB`, `HC`, `KT`, `TD`, `SM`, `RP`, `CLIMB`, `UND`, `SIEGE`, `SAND`, `FLAGS`, `LEMON`, `COOK` — not `CL`, which is classes.py) rebuild
 that game from the sabotaged source before its playtest and again after. A
 build that **refuses** (Greenside's course checks, Ridgeline Rally's stage
 checks) leaves the old `out/project.json`, and the test passes on it: a
@@ -747,3 +747,20 @@ to play a summer. The weather comes from the summer's seed, so reloading can't b
 better day. Python check questions only on the title, morning and evening screens.
 The school board gets the money every evening (the teacher's choice: only at the
 summer's end, it stayed empty for weeks); it keeps each player's best.
+
+## Order Up!
+
+`showcase/cooking/`: a time-management cooking game (the teacher's ask, 2026-11-12: in
+the genre of Cooking Fever, so an ORIGINAL one: own name, restaurants, people, look).
+Two restaurants of 10 days, Bun Run Burgers then Lantern Noodles. Every number is in
+`game/_1rules.py`; `_2kitchen.py` is the rules (cooking windows, what goes on a plate,
+serving, tips, combos, stars); every press goes through one `tap()`, so mouse, touch,
+keys and the tests' bots all play the same way, and every drag through one `drop()`
+that does what tapping the two things in turn would. A press is a tap or a drag only
+when it's let go (`pointer()`, run by Kitchen, never by each Spot). A tap on a drink on
+the shelf picks it up: it used to bin it, and the pop never reached the customer. Stars are fractions of the most a day
+could make. Python check questions only between days. Art: the teacher's Gemini sheets
+(`raw/`, `PROMPTS.md`) cut by `cut_sheets.py` into `art/`; Gemini drew four customer frames
+as the wrong person, so `SAME_PERSON` there stands another of theirs in. Difficulty was
+eased at the teacher's ask (2026-11-12): patience, how long food keeps, the first two
+star goals and the late crowds; the third star was kept where it was, so nothing got harder.
