@@ -114,6 +114,28 @@ while todo:
     expect(py(g, "instances('Snowball')[0].x") as number).toBeGreaterThan(COLS_MID(g));
   }, 60_000);
 
+  it("walking into the woods: it goes dark, and says why, every time you walk in", async () => {
+    const g = await quiet();
+    const [wx, wy] = py(g, "tile_middle(*next((c, r) for r in range(2, 14) for c in range(10, 40) if GRID[r][c] == 'w' and all(GRID[r][c - i] == '.' for i in range(1, 7))))") as unknown as [number, number];
+    put(g, wx - 120, wy);
+    step(g, 5);
+    expect(py(g, "global_vars.woods_note")).toBe(0);
+    put(g, wx, wy);
+    step(g, 2);
+    expect(py(g, "global_vars.woods_note") as number).toBeGreaterThan(0);
+    // Darker than it was (0.82), and it goes once the note's time is up.
+    step(g, 60);
+    expect(py(g, "instances('Match')[0].dark") as number).toBeGreaterThan(0.9);
+    step(g, 4 * 60);
+    expect(py(g, "global_vars.woods_note")).toBe(0);
+    // Out and back in: said again.
+    put(g, wx - 120, wy);
+    step(g, 3);
+    put(g, wx, wy);
+    step(g, 2);
+    expect(py(g, "global_vars.woods_note") as number).toBeGreaterThan(0);
+  }, 60_000);
+
   it("in the woods you're seen only from close by; a pine between hides you", async () => {
     const g = await quiet();
     const [ox, oy] = OPEN(g);

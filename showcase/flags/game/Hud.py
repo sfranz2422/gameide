@@ -34,6 +34,11 @@ draw_set_alpha(1)
 if me.stock == 0:
     words(12, VIEW_H - 46, "Out of snowballs: hold E at a drift", 12, "#ffe27a")
 draw_minimap(me.team)
+if global_vars.woods_note > 0:
+    draw_set_alpha(min(1, global_vars.woods_note / 30))     # fades out over its last half second
+    words(VIEW_W / 2, VIEW_H / 2 + 50, WOODS_NOTE[0], 16, "#ffffff", "center")
+    words(VIEW_W / 2, VIEW_H / 2 + 72, WOODS_NOTE[1], 12, "#dceeff", "center")
+    draw_set_alpha(1)
 
 # Which way: home with their flag, or to their flag.
 mine, theirs = flag_of(me.team), flag_of(other_team(me.team))

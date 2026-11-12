@@ -60,8 +60,10 @@ DROP_RETURN = 20 * 60        # a dropped flag nobody touches goes home after thi
 # ---- seeing
 SIGHT = 330                  # how far a kid can see someone (if nothing's in the way)…
 WOODS_SIGHT = 120            # …but someone in the woods, only this far
-WOODS_DARK = 0.82            # how dark it gets in the woods…
+WOODS_DARK = 0.96            # how dark it gets in the woods (the teacher asked for darker: 0.82 was)…
 WOODS_LIGHT = 150            # …all but this far round you
+WOODS_NOTE_STEPS = 4 * 60    # how long "In the pine woods…" stays up, each time you walk in
+WOODS_NOTE = ("In the pine woods: you're harder to see.", "So is everyone else. Only those close by can spot you.")
 SIGHT_EVERY = 15             # steps between working out who can see whom
 
 # ---- the computer kids

@@ -46,6 +46,8 @@ else:
             kid.sprite = kid_sprite(team, kid.look)
 self.dark = 0
 self.shown = -1
+self.was_in_woods = False
+global_vars.woods_note = 0     # steps left showing WOODS_NOTE (Hud)
 
 # === step
 global_vars.m_t += 1
@@ -62,7 +64,15 @@ count_mine()
 
 # The woods: dark all round, but for a circle round you.
 me = global_vars.player
-want = WOODS_DARK if in_woods(me.x, me.y) else 0
+inside = in_woods(me.x, me.y)
+want = WOODS_DARK if inside else 0
+# Every time you walk in, say why the screen went dark (the teacher's ask: a
+# player took the darkness for a bug). Yours alone: not the match's shared news.
+if inside and not self.was_in_woods:
+    global_vars.woods_note = WOODS_NOTE_STEPS
+self.was_in_woods = inside
+if global_vars.woods_note > 0:
+    global_vars.woods_note -= 1
 self.dark = approach(self.dark, want, 0.04)
 if round(self.dark, 2) != self.shown:
     self.shown = round(self.dark, 2)

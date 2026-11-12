@@ -1877,6 +1877,8 @@ CASES = [
  ('flags: capture with your flag gone', _fl("_3match"), '    if kid.carry is not None and mine is not None and mine.state == "home":', '    if kid.carry is not None and mine is not None:', "no capture while your own flag", FLAGS),
  ('flags: a tie ends the match', _fl("_3match"), '            if a != b:', '            if True:', "time up", FLAGS),
  ('flags: bots throw blind', _fl("_4bots"), '    for e in global_vars.sees.get(bot, []):', '    for e in kids(other_team(bot.team)):', "throw only at someone they can see", FLAGS),
+ ('flags: the woods note never stops', _fl("Match"), 'self.was_in_woods = inside\n', '', "says why, every time you walk in", FLAGS),
+ ('flags: the woods as dim as before', _fl("_1rules"), 'WOODS_DARK = 0.96 ', 'WOODS_DARK = 0.82 ', "says why, every time you walk in", FLAGS),
  ('flags: the creek is walkable', "../showcase/flags/build.py", '"wall", "ice", "ice_l", "ice_r")]', '"wall")]', "the creek stops kids", FLAGS),
  ('flags: the host follows a player anywhere at once', _fl("_1rules"), 'CATCH_UP = 1.7', 'CATCH_UP = 40', "a changed game gets nowhere", FLAGS),
  ("flags: a player's own throw is real", _fl("_7room"), '    b = throw(kid, tx, ty, charge, real=False)', '    b = throw(kid, tx, ty, charge)', "the host throws it for real", FLAGS),
