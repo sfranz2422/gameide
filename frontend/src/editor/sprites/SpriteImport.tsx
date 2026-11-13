@@ -405,6 +405,17 @@ export function SpriteImport({
             <p className="muted small" data-testid="slice-summary">
               {chosen.length} frame{chosen.length === 1 ? "" : "s"}, {fw} × {fh}
             </p>
+            {(mode === "grid" || mode === "strip" || mode === "find") && frameCount > 1 && (
+              // To take a few from a big sheet: leave them all out, then click the ones wanted.
+              <div className="row">
+                <button className="btn small" onClick={() => setSkipped(new Set(Array.from({ length: frameCount }, (_, i) => i)))} data-testid="slice-none">
+                  Leave out all
+                </button>
+                <button className="btn small" onClick={() => setSkipped(new Set())} disabled={!skipped.size} data-testid="slice-all">
+                  Keep all
+                </button>
+              </div>
+            )}
             <label className="num">
               Speed
               <input type="number" min={1} max={60} value={fps} onChange={(e) => setFps(Math.max(1, Math.min(60, Number(e.target.value) || 1)))} aria-label="Frames per second" />

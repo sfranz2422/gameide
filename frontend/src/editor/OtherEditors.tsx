@@ -22,7 +22,7 @@ export function SpritePicker({
   onClose,
 }: {
   onPick: (key: string) => void;
-  onDraw: (width: number, height: number) => void;
+  onDraw: (width: number, height: number, name: string) => void;
   onImport: () => void;
   onLibrary: () => void;
   onClose: () => void;
@@ -30,6 +30,7 @@ export function SpritePicker({
   const [thumbs, setThumbs] = useState<Record<string, string>>({});
   const [w, setW] = useState(32);
   const [h, setH] = useState(32);
+  const [name, setName] = useState("drawing");
   const side = (v: number) => Math.max(1, Math.min(MAX_DRAW_SIDE, Math.round(v) || 1));
   useEffect(() => {
     const out: Record<string, string> = {};
@@ -49,6 +50,10 @@ export function SpritePicker({
         <div className="import-own draw-own" data-tutorial="draw-sprite">
           <b>Draw your own</b>
           <span className="muted small">A clear picture to draw on, this many pixels across and down. Small is easier: 16 or 32 is plenty for a character.</span>
+          <label className="num">
+            Name
+            <input value={name} onChange={(e) => setName(e.target.value)} aria-label="New sprite's name" data-testid="draw-name" />
+          </label>
           <div className="row">
             {[16, 32, 64].map((n) => (
               <button key={n} className={`btn small ${w === n && h === n ? "on" : ""}`} onClick={() => (setW(n), setH(n))}>
@@ -62,7 +67,7 @@ export function SpritePicker({
             <label className="num">
               <input type="number" min={1} max={MAX_DRAW_SIDE} value={h} onChange={(e) => setH(side(Number(e.target.value)))} aria-label="Height" data-testid="draw-height" />
             </label>
-            <button className="btn go" onClick={() => onDraw(w, h)} data-testid="draw-new">
+            <button className="btn go" onClick={() => onDraw(w, h, name)} data-testid="draw-new">
               Start drawing
             </button>
           </div>

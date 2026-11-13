@@ -3,7 +3,7 @@
  * and the checks in a tutorial's steps (```check), one per line —
  *
  *   object Player exists                    also sprite, room, sound, font, script, tileset
- *   Player has sprite
+ *   Player has sprite                       or "has sprite hero": that one
  *   Player has event step                   the event's name as the editor shows it
  *   Player.step uses keyboard_check         or "Player uses …", or "uses …" anywhere; "avoids …"
  *   Player.step is written in blocks        or in python, or in an event sheet
@@ -13,6 +13,8 @@
  *   tileset town is cut 16 × 16 with spacing 1   (x or ×; "with spacing" may be left off)
  *   tileset garden has an autotile set      or "has at least 2 autotile sets"
  *   sprite robot is 96 × 128                its frames' size
+ *   sprite hero has a drawing on every frame  no frame left empty (reads the pictures)
+ *   sprite hero's frames are all different    no two frames the same picture (reads the pictures)
  *   room Level1 has at least 30 tiles       painted, on any tile layer ("tiles" isn't an object here)
  *   room Level1 has at least 2 tile layers  or "has a tile layer using ground"
  *   room Level1 is at least 1600 wide       or "tall"
@@ -106,7 +108,7 @@ type Change = "increased" | "decreased" | "changed" | "stayed the same";
 
 export type Check =
   | { kind: "exists"; what: "object" | "sprite" | "room" | "sound" | "font" | "script" | "tileset"; name: string }
-  | { kind: "has-sprite"; object: string }
+  | { kind: "has-sprite"; object: string; sprite?: string }
   | { kind: "has-event"; object: string; event: string }
   | { kind: "mode"; object: string; event: string; mode: "python" | "blocks" | "sheet" | "scene" }
   | { kind: "uses"; avoid: boolean; word: string; object: string | null; event: string | null }
@@ -116,6 +118,8 @@ export type Check =
   | { kind: "cut"; tileset: string; w: number; h: number; spacing: number | null }
   | { kind: "autotiles"; tileset: string; atLeast: boolean; n: number }
   | { kind: "sprite-size"; sprite: string; w: number; h: number }
+  | { kind: "drawn"; sprite: string }
+  | { kind: "frames-differ"; sprite: string }
   | { kind: "tiles"; room: string; atLeast: boolean; n: number }
   | { kind: "tile-layers"; room: string; atLeast: boolean; n: number }
   | { kind: "tile-layer-using"; room: string; tileset: string }
@@ -136,7 +140,7 @@ export function readCheck(line: string): Check {
   const s = line.trim();
   if ((m = new RegExp(String.raw`^(object|sprite|room|sound|font|script|tileset)\s+${NAME}\s+exists$`, "i").exec(s)))
     return { kind: "exists", what: m[1]!.toLowerCase() as "object", name: m[2]! };
-  if ((m = new RegExp(String.raw`^${NAME}\s+has\s+(?:a\s+)?sprite$`, "i").exec(s))) return { kind: "has-sprite", object: m[1]! };
+  if ((m = new RegExp(String.raw`^${NAME}\s+has\s+(?:a\s+)?sprite(?:\s+${NAME})?$`, "i").exec(s))) return { kind: "has-sprite", object: m[1]!, ...(m[2] ? { sprite: m[2] } : {}) };
   if ((m = new RegExp(String.raw`^${NAME}\s+has\s+(?:an?\s+)?event\s+(.+)$`, "i").exec(s))) return { kind: "has-event", object: m[1]!, event: m[2]! };
   if ((m = new RegExp(String.raw`^${NAME}\.(.+?)\s+is\s+(?:written\s+)?in\s+(python|blocks|code blocks|an event sheet|event sheets?|a sheet|a scene|scene mode)$`, "i").exec(s))) {
     const how = m[3]!.toLowerCase();
@@ -156,6 +160,8 @@ export function readCheck(line: string): Check {
     return { kind: "cut", tileset: m[1]!, w: Number(m[2]), h: Number(m[3]), spacing: m[4] === undefined ? null : Number(m[4]) };
   if ((m = new RegExp(String.raw`^tileset\s+${NAME}\s+has\s+(?:an|(at least\s+)?(\d+))\s+autotile\s+sets?$`, "i").exec(s)))
     return { kind: "autotiles", tileset: m[1]!, atLeast: m[3] === undefined || !!m[2], n: m[3] === undefined ? 1 : Number(m[3]) };
+  if ((m = new RegExp(String.raw`^sprite\s+${NAME}\s+has\s+(?:a\s+)?drawing\s+on\s+every\s+frame$`, "i").exec(s))) return { kind: "drawn", sprite: m[1]! };
+  if ((m = new RegExp(String.raw`^sprite\s+${NAME}'s\s+frames\s+are\s+all\s+different$`, "i").exec(s))) return { kind: "frames-differ", sprite: m[1]! };
   if ((m = new RegExp(String.raw`^sprite\s+${NAME}\s+is\s+(\d+)\s*[x×]\s*(\d+)$`, "i").exec(s)))
     return { kind: "sprite-size", sprite: m[1]!, w: Number(m[2]), h: Number(m[3]) };
   if ((m = new RegExp(String.raw`^room\s+${NAME}\s+has\s+(at least\s+)?(\d+)\s+tiles?$`, "i").exec(s)))
@@ -231,7 +237,9 @@ export function checkProject(p: Project, c: Check): { ok: boolean; detail: strin
     case "has-sprite": {
       const o = p.objects.find((x) => same(x.name, c.object));
       if (!o) return { ok: false, detail: `There's no object called ${c.object}.` };
-      return o.sprite && p.sprites.some((s) => s.id === o.sprite) ? { ok: true, detail: "" } : { ok: false, detail: `${o.name} doesn't have a sprite yet.` };
+      const sp = p.sprites.find((s) => s.id === o.sprite);
+      if (!sp) return { ok: false, detail: `${o.name} doesn't have a sprite yet.` };
+      return !c.sprite || same(sp.name, c.sprite) ? { ok: true, detail: "" } : { ok: false, detail: `${o.name}'s sprite is ${sp.name}, not ${c.sprite}.` };
     }
     case "has-event": {
       const o = p.objects.find((x) => same(x.name, c.object));
@@ -301,6 +309,14 @@ export function checkProject(p: Project, c: Check): { ok: boolean; detail: strin
       return (c.atLeast ? n >= c.n : n === c.n)
         ? { ok: true, detail: "" }
         : { ok: false, detail: `${ts.name} has ${n} autotile set${n === 1 ? "" : "s"} with all 16 slots filled, not ${c.atLeast ? "at least " : ""}${c.n}. Make one under Autotile sets, and fill its slots.` };
+    }
+    case "drawn":
+    case "frames-differ": {
+      // These look at the pictures (checkPictures); here only whether there's a sprite to look at.
+      const sp = p.sprites.find((x) => same(x.name, c.sprite));
+      if (!sp) return { ok: false, detail: `There's no sprite called ${c.sprite} yet.` };
+      if (c.kind === "frames-differ" && sp.frames.length < 2) return { ok: false, detail: `${sp.name} has only one frame: add another (Copy frame) and change it.` };
+      return null;
     }
     case "sprite-size": {
       const sp = p.sprites.find((x) => same(x.name, c.sprite));
@@ -472,7 +488,13 @@ export function printedOk(printed: string, want: string): { ok: boolean; detail:
  * the ones that play the game, one at a time, each from a fresh start.
  * `progress` says which is being run, for the page.
  */
-export async function runTests(tests: TestLine[], project: Project, run: GameRunner | null, progress: (i: number) => void = () => {}): Promise<TestResult[]> {
+export async function runTests(
+  tests: TestLine[],
+  project: Project,
+  run: GameRunner | null,
+  progress: (i: number) => void = () => {},
+  pictures?: Map<string, Blob>,
+): Promise<TestResult[]> {
   const out: TestResult[] = [];
   for (const [i, t] of tests.entries()) {
     progress(i);
@@ -482,6 +504,10 @@ export async function runTests(tests: TestLine[], project: Project, run: GameRun
       out.push({ ...t, ...quick });
       continue;
     }
+    if (c.kind === "drawn" || c.kind === "frames-differ") {
+      out.push({ ...t, ...(pictures ? await checkPictures(project, c, pictures) : { ok: false, detail: "This check looks at the game's pictures, which aren't here." }) });
+      continue;
+    }
     if (!run) {
       out.push({ ...t, ok: false, detail: "This check plays the game, which can't run here." });
       continue;
@@ -489,4 +515,44 @@ export async function runTests(tests: TestLine[], project: Project, run: GameRun
     out.push({ ...t, ...(await checkGame(run, c)) });
   }
   return out;
+}
+
+// ---------------------------------------------------------------- the pictures
+
+/** A picture's RGBA bytes. In a browser by decoding it; tests hand in their own. */
+export type Decode = (b: Blob) => Promise<{ data: Uint8ClampedArray; width: number; height: number }>;
+
+const decodeBlob: Decode = async (b) => {
+  const bmp = await createImageBitmap(b);
+  const c = new OffscreenCanvas(bmp.width, bmp.height);
+  const x = c.getContext("2d")!;
+  x.drawImage(bmp, 0, 0);
+  bmp.close();
+  return { data: x.getImageData(0, 0, c.width, c.height).data, width: c.width, height: c.height };
+};
+
+/**
+ * Checks that read a sprite's pictures: is every frame drawn on (a pixel at
+ * least half solid, as a mask counts it), and is every frame a different
+ * picture. Frames are numbered from 0 in what they say, as the editor numbers
+ * them.
+ */
+export async function checkPictures(p: Project, c: Extract<Check, { kind: "drawn" | "frames-differ" }>, pictures: Map<string, Blob>, decode: Decode = decodeBlob): Promise<{ ok: boolean; detail: string }> {
+  const sp = p.sprites.find((x) => same(x.name, c.sprite));
+  if (!sp) return { ok: false, detail: `There's no sprite called ${c.sprite} yet.` };
+  const pics: Uint8ClampedArray[] = [];
+  for (const [i, id] of sp.frames.entries()) {
+    const b = pictures.get(id);
+    if (!b) return { ok: false, detail: `Frame ${i} of ${sp.name} hasn't loaded yet: try again in a moment.` };
+    pics.push((await decode(b)).data);
+  }
+  if (c.kind === "drawn") {
+    const empty = pics.findIndex((d) => !d.some((v, i) => i % 4 === 3 && v >= 128));
+    return empty < 0 ? { ok: true, detail: "" } : { ok: false, detail: `Frame ${empty} of ${sp.name} is still empty: draw something on it.` };
+  }
+  for (let i = 0; i < pics.length; i++)
+    for (let j = i + 1; j < pics.length; j++)
+      if (pics[i]!.length === pics[j]!.length && pics[i]!.every((v, k) => v === pics[j]![k]))
+        return { ok: false, detail: `Frames ${i} and ${j} of ${sp.name} are the same picture: change one a little.` };
+  return { ok: true, detail: "" };
 }

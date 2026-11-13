@@ -58,8 +58,10 @@ describe("tutorials", () => {
       expect(t.steps.length, entry.key).toBeGreaterThanOrEqual(4);
       expect(tutorialProblems(t, TARGETS), entry.key).toEqual([]);
       expect(Object.keys(TUTORIAL_STARTERS), entry.key).toContain(t.meta.starter);
-      // Code is shown to type, never handed over.
-      expect(md, entry.key).not.toMatch(/copy/i);
+      // Code is shown to type, never handed over. (The sprite editor's own
+      // buttons, named in bold, are the one exception: a drawing lesson has
+      // to say which to press.)
+      expect(md.replace(/\*\*Copy( frame)?\*\*/g, ""), entry.key).not.toMatch(/copy/i);
     }
   });
 

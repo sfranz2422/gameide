@@ -17,9 +17,10 @@
  * without it a beginner reading "look in the Console" had to leave the
  * lesson to see their output, and find the way back, after every Play.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useContext } from "react";
 import { createPortal } from "react-dom";
 import { api } from "../store/api";
+import { ProjectContext } from "../editor/useProject";
 import { readCheck, runTests, type GameRunner, type TestResult } from "../checks/checks";
 import type { ConsoleLine } from "../editor/RunPanes";
 import type { Project, TutorialProgress } from "../store/project";
@@ -53,6 +54,8 @@ const OUTPUT_LINES = 8;
 
 export function TutorialPane({ md, progress, onProgress, project, runner, earns, output, assignment = null, practice = false }: TutorialPaneProps) {
   const t = useMemo(() => parseTutorial(md), [md]);
+  // The open game's pictures, for checks that look at them ("sprite hero has a drawing on every frame").
+  const pictures = useContext(ProjectContext)?.assets;
   const printing = useMemo(() => t.steps.some((s) => s.checks.some((c) => readCheck(c.label).kind === "prints")), [t]);
   const last = Math.max(0, t.steps.length - 1);
   const [at, setAt] = useState(() => Math.min(progress.step, last));
@@ -96,7 +99,7 @@ export function TutorialPane({ md, progress, onProgress, project, runner, earns,
   };
   const check = async () => {
     setResults(null);
-    const r = await runTests(step.checks, project, runner, setRunning);
+    const r = await runTests(step.checks, project, runner, setRunning, pictures);
     setRunning(null);
     setResults(r);
     if (r.every((x) => x.ok)) {

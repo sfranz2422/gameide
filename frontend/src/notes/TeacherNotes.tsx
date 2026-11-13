@@ -220,7 +220,7 @@ export function CheckAll({ slug, onDone }: { slug: string; onDone: () => void })
         if (!project) continue;
         const assets = await loadAssets(store, project);
         const runner = hostRunner(host, () => buildGame(project, assets).def, watch);
-        const results = await runTests(tests, project, runner);
+        const results = await runTests(tests, project, runner, undefined, assets);
         await api(`/api/assignments/${slug}/tests/verify`, { json: { student: w.student, results } });
         done++;
         onDone();

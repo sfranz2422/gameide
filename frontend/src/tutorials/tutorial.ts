@@ -73,7 +73,7 @@ export interface Tutorial {
  */
 export const MAKE_LEVEL = "Now You Can Make";
 
-export const LEVELS = ["Python Basics", "Getting Started", "Art and Tiles", "Game Elements 1: The Basics", "Game Elements 2: Adding to the Fun", "Game Elements 3: Advanced Techniques", "Starter Projects", "Top-Down", "Shooters", "Advanced Python"];
+export const LEVELS = ["Python Basics", "Getting Started", "Art and Tiles", "Draw Your Own", "Game Elements 1: The Basics", "Game Elements 2: Adding to the Fun", "Game Elements 3: Advanced Techniques", "Starter Projects", "Top-Down", "Shooters", "Advanced Python"];
 
 const HEADER = /^\s*---[ \t]*\n([\s\S]*?)\n---[ \t]*(?:\n|$)/;
 const HIGHLIGHT = /^highlight\s*:\s*([\w-]+)\s*$/i;

@@ -5,6 +5,7 @@ showcase games' pictures: the teacher's Google Gemini sheets, already cut into
 one picture each by every game's cut_sheets.py (showcase/<game>/art/).
 
     python3 frontend/scripts/make_gemini_library.py [game …]
+    python3 frontend/scripts/make_gemini_library.py tutorial   (lesson 4's sheet only)
 
 Every pack credits Gemini: a License.txt beside its sheets, and `credit` in
 src/library/geminiPacks.ts (written here), which the library shows on the
@@ -190,7 +191,26 @@ def build(gid):
             "sheets": sheets}
 
 
+def tutorial_sheet():
+    """
+    The Draw Your Own shelf's lesson 4 cuts a real Gemini sheet with Find the
+    pictures: Snowcap Scramble's first climber sheet as Gemini drew it (pink
+    background and all), at half size so it downloads quickly. Its credit file
+    goes beside it.
+    """
+    art = ROOT / "frontend" / "public" / "tutorials" / "art"
+    im = Image.open(SHOW / "climber" / "raw" / "01.jpeg").convert("RGB")
+    im.resize((im.width // 2, im.height // 2), Image.LANCZOS).save(art / "snow-climbers.jpg", quality=88)
+    (art / "License-gemini.txt").write_text(
+        "snow-climbers.jpg: made with Google Gemini (an AI picture maker) by GameIDE's teacher\n"
+        "for the showcase game Snowcap Scramble.\n\n"
+        "You may use it in your games. Please give credit, for example in your game's credits\n"
+        f"or its description:\n\n    {CREDIT}\n")
+
+
 def main():
+    if sys.argv[1:] == ["tutorial"]:
+        return tutorial_sheet()
     wanted = sys.argv[1:] or list(GAMES)
     packs = {}
     if TS.exists():
@@ -207,6 +227,7 @@ def main():
         " * from the showcase games' pictures. Don't edit by hand; run the script.\n */\n"
         'import type { LibraryPack } from "./library";\n\n'
         f"export const GEMINI_PACKS: LibraryPack[] = {json.dumps(ordered, indent=2)};\n")
+    tutorial_sheet()
 
 
 if __name__ == "__main__":

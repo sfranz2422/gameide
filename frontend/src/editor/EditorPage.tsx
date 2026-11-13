@@ -555,11 +555,13 @@ export function EditorPage({ store, id }: { store: ProjectStore; id: string }) {
               setLibrary(true);
             }}
             onImport={() => chooseFile()}
-            onDraw={async (width, height) => {
+            onDraw={async (width, height, name) => {
               setPicking(false);
               // As an imported picture would be, from a clear one: a free name, a centred origin.
+              // A name is used in code, so only letters, digits and _ (the importer's rule too).
+              const safe = name.trim().replace(/[^A-Za-z0-9_]+/g, "_").replace(/^(?=\d)/, "_") || "drawing";
               const { sprite, assets: made } = await spriteFromFrames(
-                { name: "drawing", width, height, frames: [await blankPicture(width, height)], fps: 8, origin: "center" },
+                { name: safe, width, height, frames: [await blankPicture(width, height)], fps: 8, origin: "center" },
                 (projectRef.current?.sprites ?? []).map((s) => s.name),
               );
               await addAssets(made);

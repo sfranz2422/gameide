@@ -569,6 +569,72 @@ async function artTown(): Promise<Built> {
   return { project: p, assets };
 }
 
+// ------------------------------------------------- Draw Your Own lessons
+
+/*
+ * The Draw Your Own shelf (public/tutorials/draw-*.md). Lesson 1 starts
+ * empty; the others open with what the lessons before made: a 32 × 32 hero
+ * drawn the way a student would (one frame after lesson 1, two walking
+ * frames after lesson 2) and a Hero that moves with the arrow keys. The code
+ * is the lessons' own, word for word.
+ */
+export const DRAW_MOVE = `self.x += (keyboard_check("right") - keyboard_check("left")) * 4
+self.y += (keyboard_check("down") - keyboard_check("up")) * 4
+`;
+
+export const DRAW_ANIMATE = `move_x = keyboard_check("right") - keyboard_check("left")
+move_y = keyboard_check("down") - keyboard_check("up")
+self.x += move_x * 4
+self.y += move_y * 4
+if move_x != 0 or move_y != 0:
+    self.image_speed = 1
+else:
+    self.image_speed = 0
+    self.image_index = 0
+if move_x != 0:
+    self.image_xscale = move_x
+`;
+
+/** A little person, pixel by pixel; `stride` 1 puts the legs apart, the second frame of a walk. */
+async function heroFrame(stride: 0 | 1): Promise<Blob> {
+  const c = new OffscreenCanvas(32, 32);
+  const x = c.getContext("2d")!;
+  const box = (col: string, l: number, t: number, w: number, h: number) => ((x.fillStyle = col), x.fillRect(l, t, w, h));
+  box("#5c3a24", 11, 3, 10, 4); // hair
+  box("#e8c9a8", 11, 6, 10, 8); // face
+  box("#000000", 13, 9, 2, 2); // eyes
+  box("#000000", 18, 9, 2, 2);
+  box("#e8414f", 10, 14, 12, 9); // shirt
+  box("#e8c9a8", 7, 15, 3, 6); // arms
+  box("#e8c9a8", 22, 15, 3, 6);
+  box("#1c3f8c", 11, 23, 10, 3); // trousers
+  if (stride) {
+    box("#1c3f8c", 9, 26, 4, 4);
+    box("#1c3f8c", 19, 26, 4, 4);
+    box("#3b4252", 8, 30, 5, 2);
+    box("#3b4252", 19, 30, 5, 2);
+  } else {
+    box("#1c3f8c", 11, 26, 4, 4);
+    box("#1c3f8c", 17, 26, 4, 4);
+    box("#3b4252", 11, 30, 5, 2);
+    box("#3b4252", 16, 30, 5, 2);
+  }
+  return c.convertToBlob({ type: "image/png" });
+}
+
+function drawStart(after: 1 | 2) {
+  return async (): Promise<Built> => {
+    const p = blankProject("My game");
+    const frames = after === 1 ? [await heroFrame(0)] : [await heroFrame(0), await heroFrame(1)];
+    const { sprite, assets } = await spriteFromFrames({ name: "hero", frames, width: 32, height: 32, fps: 8, origin: "center" }, []);
+    p.sprites.push(sprite);
+    const hero = obj(p, "Hero", sprite);
+    ev(hero, { type: "step" }, after === 1 ? DRAW_MOVE : DRAW_ANIMATE);
+    p.rooms[0]!.instances.push(newInstance(p.rooms[0]!, hero.id, 320, 240));
+    return { project: p, assets };
+  };
+}
+
 /** Templates for tutorials only, by their `starter:` name. */
 export const TUTORIAL_STARTERS: Record<string, () => Promise<Built>> = {
   ...Object.fromEntries(SERIES.flatMap((s) => s.lessons.map((_, n) => [`${s.name}-${n}`, seriesStart(s, n)]))),
@@ -576,6 +642,8 @@ export const TUTORIAL_STARTERS: Record<string, () => Promise<Built>> = {
   coins,
   platformer,
   "coins-start": coinsStart,
+  "draw-1": drawStart(1),
+  "draw-2": drawStart(2),
   "platformer-start": platformerStart,
   "player-start": playerStart,
   "python-start": pythonStart,

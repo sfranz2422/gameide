@@ -1,0 +1,7 @@
+snow-climbers.jpg: made with Google Gemini (an AI picture maker) by GameIDE's teacher
+for the showcase game Snowcap Scramble.
+
+You may use it in your games. Please give credit, for example in your game's credits
+or its description:
+
+    Art made with Google Gemini

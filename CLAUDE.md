@@ -540,6 +540,13 @@ header; steps are `---` slides; ` ```check ` blocks gate Next (strict); a
   Each is walked step by step in `makes.test.ts`, its code taken from its
   own markdown: add a new one there, or its checks are never run.
 - **No Copy button on tutorial code**, ever (the teacher's decision).
+  tutorials.test.ts fails on "copy" anywhere in a built-in; the sprite
+  editor's buttons in bold (**Copy**, **Copy frame**) are the one exception.
+- **Draw Your Own** (`draw-*.md`, starters `draw-1`/`draw-2` whose code is
+  `DRAW_MOVE`/`DRAW_ANIMATE` in templates.ts, the lessons' own words) is
+  walked by `e2e/draw.editor.spec.ts`. Its picture checks ("has a drawing on
+  every frame", "frames are all different") need the game's pictures:
+  `runTests(…, pictures)`, from `ProjectContext` in the panes.
 - **A check states only what its own step asks students to type** (the
   teacher's rule, and a must). Students read the check block and type what
   it mentions: a check naming code the step never asked for had them typing

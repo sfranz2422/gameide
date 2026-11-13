@@ -1,5 +1,16 @@
 # Progress
 
+## Draw Your Own: four lessons on drawing sprites and using them (2026-11-13, waiting for review)
+- A new shelf on the Learn page, after Art and Tiles (your 2026-10-30 order keeps Art and Tiles third):
+  1. **Draw a Sprite**: Draw your own (named **hero**, 32 × 32), the pencil, colours, Fill, the eraser and Undo; a Hero object, in the room, moved with the arrow keys; change the drawing and Play again.
+  2. **Animate It** (starts with lesson 1's hero): Copy frame, legs moved, Show last frame, Play and speed in the editor; then walking only while moving, facing the way it goes (`image_speed`, `image_index`, `image_xscale`).
+  3. **Shapes and Flips**: a 16 × 16 coin from two circles (Filled, Shift), coins to collect; an enemy made by pasting the hero into a new sprite, Flip ↔ and Fill; it walks at you and `room_restart()`.
+  4. **Pictures from a Sheet**: downloads `snow-climbers.jpg` (Snowcap Scramble's climber sheet as Gemini drew it, half size, with `License-gemini.txt`), cuts it with Find the pictures (Leave out all, then three poses), puts it on the Hero, and **credits Gemini in the game**: a Credits object drawing "Art made with Google Gemini".
+- Two quiz questions in each; every step's checks state only what that step asks.
+- New for them: two checks that read the pictures, `sprite hero has a drawing on every frame` and `sprite hero's frames are all different` (the lesson pane, the notes' tests and the teacher's Check all hand in the game's pictures); `Hero has sprite climber` names which sprite; a **Name** box on Draw your own; **Leave out all** / **Keep all** in the importer; starters `draw-1` and `draw-2`.
+- Your rule against "copy" in tutorials (no copying code) now lets through only the sprite editor's buttons named in bold, **Copy** and **Copy frame**: a drawing lesson has to say which to press. Everything else was reworded (lesson 3 is "Shapes and Flips", not "Shapes, Copy and Flip").
+- Tests: `e2e/draw.editor.spec.ts` does all four lessons as a student would, drawing with the mouse, and every step's checks must pass; 4 unit tests for the new checks; 5 sabotage cases.
+
 ## Fix: drawn frames didn't animate when Play was pressed (2026-11-13, waiting for review)
 - The sprite editor's Play (under the frames) did nothing while a drawing tool was chosen, and a drawn sprite opens with the pencil, so a student's own animation never played there. It plays now with any tool; a click on the picture while it plays stops it on that frame (rather than drawing on a moving one). The game itself always animated them.
 - Tests: 1 browser test; 1 sabotage case.

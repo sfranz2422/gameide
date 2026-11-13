@@ -19,8 +19,9 @@ import { pythonLanguage } from "@codemirror/lang-python";
 import { highlightCode, tagHighlighter, tags as t } from "@lezer/highlight";
 import DOMPurify from "dompurify";
 import { marked } from "marked";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useContext } from "react";
 import { api } from "../store/api";
+import { ProjectContext } from "../editor/useProject";
 import { allTests, runTests, type GameRunner, type TestResult } from "../checks/checks";
 import type { Project } from "../store/project";
 import { announceXp } from "../xp/runXp";
@@ -732,11 +733,13 @@ function withoutCode(prompt: string): string {
 function TestsCard({ notes, assignment, project, runner, practice }: { notes: string; assignment: string; project: Project; runner: GameRunner | null; practice: boolean }) {
   // Every tests block in the notes is checked together, wherever this one is.
   const tests = useMemo(() => allTests(notes), [notes]);
+  // The open game's pictures, for checks that look at them ("sprite hero has a drawing on every frame").
+  const pictures = useContext(ProjectContext)?.assets;
   const [results, setResults] = useState<TestResult[] | null>(null);
   const [running, setRunning] = useState<number | null>(null);
   const check = async () => {
     setResults(null);
-    const r = await runTests(tests, project, runner, setRunning);
+    const r = await runTests(tests, project, runner, setRunning, pictures);
     setRunning(null);
     setResults(r);
     if (!practice)
