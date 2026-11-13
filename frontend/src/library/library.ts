@@ -4,6 +4,11 @@
  * owed (it's kind to give one). So a student never has to hunt for art, or
  * wonder whether they may use it.
  *
+ * Then the Gemini packs (geminiPacks.ts, made by
+ * scripts/make_gemini_library.py): the showcase games' pictures, which the
+ * teacher made with Google Gemini. Those carry a `credit` the library shows
+ * wherever they are, and ask students to give it (the teacher's wish).
+ *
  * The pictures are in public/library/kenney/<pack>/ (each pack's own
  * License.txt beside them), the "packed" sheets: tiles edge to edge, no
  * spacing. A sheet can become a tileset whole, or its cells a sprite's
@@ -30,11 +35,15 @@ export interface LibraryPack {
   preview: string;
   about: string;
   sheets: LibrarySheet[];
+  /** Words a game using the pack should credit it with: set for packs that ask for credit (Gemini's). */
+  credit?: string;
 }
+
+import { GEMINI_PACKS } from "./geminiPacks";
 
 const k = (pack: string, file: string) => `library/kenney/${pack}/${file}`;
 
-export const LIBRARY: LibraryPack[] = [
+const KENNEY: LibraryPack[] = [
   {
     id: "pixel-platformer",
     name: "Pixel Platformer",
@@ -262,6 +271,8 @@ export const LIBRARY: LibraryPack[] = [
     ],
   },
 ];
+
+export const LIBRARY: LibraryPack[] = [...KENNEY, ...GEMINI_PACKS];
 
 // ---------------------------------------------------------------- cutting
 // Here, not in LibraryBrowser.tsx: the tutorial starters (store/templates.ts)

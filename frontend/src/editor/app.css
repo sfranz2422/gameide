@@ -4392,6 +4392,22 @@ a.btn {
   border-radius: 6px;
   image-rendering: pixelated;
 }
+/* The Gemini packs' credit: on the pack's card, and in a box on its page. */
+.library-credit-tag {
+  justify-self: start;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 11px;
+  background: var(--panel-2);
+  color: var(--text);
+}
+.library-credit {
+  margin: 6px 0 10px;
+  padding: 8px 12px;
+  border-left: 3px solid var(--accent);
+  border-radius: 6px;
+  background: var(--panel-2);
+}
 .library-sheet {
   margin: 12px 0;
   display: grid;

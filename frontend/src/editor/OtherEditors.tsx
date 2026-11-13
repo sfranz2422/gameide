@@ -73,7 +73,7 @@ export function SpritePicker({
         </button>
         <button className="import-own" onClick={onLibrary} data-testid="open-library" data-tutorial="open-library">
           <b>Free art library…</b>
-          <span className="muted small">Characters, tiles and ships by Kenney, free for any game (public domain). Sprites, or whole tilesets.</span>
+          <span className="muted small">Characters, tiles and ships by Kenney, free for any game (public domain), and the showcase games' art made with Google Gemini (please credit it). Sprites, or whole tilesets.</span>
         </button>
         <p className="muted small">Or start with one of these:</p>
         <div className="sprite-grid">

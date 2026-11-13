@@ -312,6 +312,7 @@ CASES = [
  ("found frames float", "src/store/findPictures.ts", '  return { x: Math.floor((fw - b.w) / 2), y: align === "bottom" ? fh - b.h : Math.floor((fh - b.h) / 2) };', "  return { x: Math.floor((fw - b.w) / 2), y: Math.floor((fh - b.h) / 2) + 0 * align.length };", "coloured sheet become frames", E2E),
  ("a drag joins nothing", "src/editor/sprites/SpriteImport.tsx", "      if (hit.length < 2) continue;", "      if (hit.length < 99) continue;", "coloured sheet become frames", E2E),
  ("background never removed", "src/editor/sprites/SpriteImport.tsx", "    const data = keyOut(pixels.data, bg, tol);", '    const data = keyOut(pixels.data, { kind: "clear" }, tol);', "coloured sheet become frames", E2E),
+ ("Gemini uncredited", "src/library/LibraryBrowser.tsx", "            {pack.credit && (\n              <p className=\"library-credit\"", "            {pack.credit && pack.sheets.length < 0 && (\n              <p className=\"library-credit\"", "every pack opens", E2E),
  # Phase 5: rooms and the camera
  ("snap rounds", RO, "  return grid > 0 ? Math.floor(v / grid + 1e-6) * grid : Math.round(v);", "  return grid > 0 ? Math.round(v / grid) * grid : Math.round(v);", "snaps to grid lines"),
  ("snap noise", RO, "  return grid > 0 ? Math.floor(v / grid + 1e-6) * grid : Math.round(v);", "  return grid > 0 ? Math.floor(v / grid) * grid : Math.round(v);", "snaps to grid lines"),

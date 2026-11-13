@@ -83,6 +83,15 @@ engine failure in the player is shown, never a silent black screen.
 - Tests read the canvas only once `data-loaded="1"`: just after choosing a
   frame it still shows the last one's pixels.
 
+## The Gemini art library
+
+- `scripts/make_gemini_library.py` makes `public/library/gemini/<game>/` and
+  `src/library/geminiPacks.ts` (generated: run the script, don't edit) from
+  `showcase/<game>/art/`. Rerun it when a game's art changes.
+- **Every Gemini pack credits Gemini** (the teacher's ask): `credit` on the
+  pack, shown on its card and page, and its License.txt. library.test.ts and
+  a sabotage case hold it.
+
 ## Find the pictures
 
 - Import's fourth way to cut (`store/findPictures.ts`, pure; the importer

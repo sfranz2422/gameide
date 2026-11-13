@@ -18,8 +18,9 @@ function pngSize(file: string): [number, number] {
 }
 
 describe("the free art library", () => {
-  it("lists packs, each with sheets", () => {
+  it("lists packs, each with sheets, the showcase games' Gemini art among them", () => {
     expect(LIBRARY.length).toBeGreaterThanOrEqual(4);
+    expect(LIBRARY.filter((p) => p.id.startsWith("gemini-")).length).toBeGreaterThanOrEqual(8);
     for (const p of LIBRARY) expect(p.sheets.length, p.id).toBeGreaterThan(0);
   });
 
@@ -36,8 +37,15 @@ describe("the free art library", () => {
     }
   });
 
-  it("carries each pack's licence, and every one is CC0", () => {
+  it("carries each pack's licence, and every one is CC0 (Kenney's) or credits Gemini (the showcase games')", () => {
     for (const p of LIBRARY) {
+      if (p.id.startsWith("gemini-")) {
+        // The teacher's ask: Gemini's art says where it came from, on the pack and beside its pictures.
+        expect(p.credit, p.id).toMatch(/Google Gemini/);
+        const licence = resolve(PUBLIC, dirname(p.sheets[0]!.file), "License.txt");
+        expect(readFileSync(licence, "utf8"), licence).toContain(p.credit!);
+        continue;
+      }
       const licence = resolve(PUBLIC, dirname(p.sheets[0]!.file), "License.txt");
       expect(existsSync(licence), licence).toBe(true);
       // In Kenney's words, or (older packs, like Space Shooter Redux) the CC0 deed's own address.

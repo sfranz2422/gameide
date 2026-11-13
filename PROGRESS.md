@@ -1,5 +1,12 @@
 # Progress
 
+## The showcase games' Gemini art in the free art library (2026-11-13, waiting for review)
+- **Eight new packs** in Add a sprite → Free art library, one per game whose pictures are here: Snowcap Scramble, Order Up!, Snowfort Flags, Zoomtown Cup, Squeeze, The Lanterns of Hollowmere, Tabletop Siege, Undertow. About 1,000 pictures, 15 MB, made by `scripts/make_gemini_library.py` from each game's cut pictures (`showcase/<game>/art/`).
+- Sorted into sheets students already know how to use: **Characters** (each character's poses together on a row: click them in order, shift-click for a run, and they're one animated sprite), Big characters, Things, Small things, Big things, **Ground tiles** (offered as a tileset), Backgrounds. Shrunk to game size (Order Up! and Squeeze keep theirs at twice); a sheet shrinks all its pictures alike, so characters stay one size beside each other. Game titles are left out.
+- **Gemini gets the credit** (the teacher's ask): "Made with Google Gemini" on every one of their cards, the library's opening words say so, each pack's page has a box asking students to credit it in their game ("Art made with Google Gemini"), every pack has a License.txt saying the same, and the sprites it makes are named `gemini-<game>-…`. A test fails on a Gemini pack without its credit.
+- Not here: football, baseball, mystery, Greymire and Ridgeline Rally, whose pictures are only in zips (see the showcase notes). The script takes any game with an `art/` folder; add one to `GAMES` to include it.
+- Tests: the library checks (every sheet a whole number of cells; Gemini packs credit Gemini in the pack and its License.txt), every pack opens with its credit shown or not, a Gemini climber's six poses become a sprite; 1 sabotage case.
+
 ## Find the pictures: cutting up a sheet that isn't a grid (2026-11-13, waiting for review)
 - A fourth way to cut a picture in Import, beside Whole picture, Equal frames and Grid: **Find the pictures**, for a page of drawings scattered on a background, as Gemini draws them.
 - The background is found from the corners (see-through corners mean it's already clear) and made see-through, with a soft edge and the background colour taken out of it, so outlines have no pink rim. **Background match** says how close counts as background.

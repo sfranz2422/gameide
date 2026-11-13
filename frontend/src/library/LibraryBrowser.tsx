@@ -38,12 +38,14 @@ export function LibraryBrowser({
           <>
             <p className="muted small">
               Packs by Kenney, free for anything: they're public domain (CC0), so your games can use them, share them, even sell them. A credit is kind, not required.
+              Then the art of GameIDE's own showcase games, <b>made with Google Gemini</b>: free for your games too, and please credit it.
             </p>
             <div className="library-packs">
               {LIBRARY.map((p) => (
                 <button key={p.id} className="library-pack" onClick={() => setPack(p)} data-testid={`library-${p.id}`}>
                   <img src={p.preview} alt="" />
                   <b>{p.name}</b>
+                  {p.credit && <span className="library-credit-tag">Made with Google Gemini</span>}
                   <span className="muted small">{p.about}</span>
                 </button>
               ))}
@@ -52,11 +54,16 @@ export function LibraryBrowser({
         ) : (
           <>
             <p className="muted small">
-              By {pack.author} · {pack.licence} ·{" "}
+              {pack.credit ? "Made with" : "By"} {pack.author} · {pack.licence} ·{" "}
               <a href={pack.url} target="_blank" rel="noreferrer">
-                kenney.nl
+                {new URL(pack.url).hostname.replace(/^www\./, "")}
               </a>
             </p>
+            {pack.credit && (
+              <p className="library-credit" data-testid="library-credit">
+                Using these pictures? Give credit in your game, for example on its title screen or in its description: <b>{pack.credit}</b>
+              </p>
+            )}
             {pack.sheets.map((s) => (
               <SheetPicker key={s.file} pack={pack} sheet={s} onSprite={onSprite} onTileset={onTileset} />
             ))}

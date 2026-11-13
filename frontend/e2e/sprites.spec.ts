@@ -257,9 +257,30 @@ test("the free art library: every pack opens, with its preview, and every sheet 
     const sheets = page.locator('[data-testid^="sheet-canvas-"]');
     expect(await sheets.count(), id).toBeGreaterThan(0);
     for (const s of await sheets.all()) await expect(s, `${id}: ${await s.getAttribute("data-testid")}`).toHaveAttribute("data-ready", "1", { timeout: 20_000 });
+    // Gemini's packs ask for credit, in words a student can copy into their game; Kenney's don't need it.
+    if (id.startsWith("library-gemini-")) await expect(page.getByTestId("library-credit"), id).toContainText("Art made with Google Gemini");
+    else await expect(page.getByTestId("library-credit"), id).toHaveCount(0);
     await page.getByRole("button", { name: "← All packs" }).click();
   }
+  expect(packs.filter((id) => id.startsWith("library-gemini-")).length).toBeGreaterThanOrEqual(8);
   expect(errors).toEqual([]);
+});
+
+test("the free art library: a Gemini character's frames become a sprite named for the pack", async ({ page }) => {
+  await fromTemplate(page, "empty");
+  await page.getByTestId("add-sprites").click();
+  await page.getByTestId("open-library").click();
+  await expect(page.getByTestId("library-gemini-climber")).toContainText("Made with Google Gemini");
+  await page.getByTestId("library-gemini-climber").click();
+  const sheet = page.getByTestId("sheet-canvas-Characters");
+  await expect(sheet).toHaveAttribute("data-ready", "1");
+  const box = (await sheet.boundingBox())!;
+  const cell = box.width / 9; // nine 112-pixel cells across: a climber's six poses, then the next one's
+  await sheet.click({ position: { x: cell / 2, y: cell / 2 } });
+  await sheet.click({ position: { x: cell * 5.5, y: cell / 2 }, modifiers: ["Shift"] });
+  await page.getByTestId("sheet-sprite-Characters").click();
+  await expect(treeItem(page, "gemini-climber-characters-0")).toBeVisible();
+  await expect(page.getByTestId("sprite-frames").getByRole("button", { name: /^Frame \d$/ })).toHaveCount(6);
 });
 
 test("a sprite drawn in the editor is the picture the game plays", async ({ page }) => {

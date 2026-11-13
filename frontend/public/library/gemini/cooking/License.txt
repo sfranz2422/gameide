@@ -1,0 +1,9 @@
+Order Up!: pictures for GameIDE's art library
+
+Made with Google Gemini (an AI picture maker) by GameIDE's teacher for the showcase game Order Up!,
+then cut apart and shrunk to game size for the art library.
+
+You may use them in your games. Please give credit, for example in your game's
+credits or its description:
+
+    Art made with Google Gemini
