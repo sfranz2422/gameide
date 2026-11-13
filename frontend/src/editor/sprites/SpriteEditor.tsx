@@ -197,11 +197,15 @@ export function SpriteEditor({ spriteId, addFrames, startTool = "origin" }: { sp
   const frameId = sprite?.frames[cur] ?? null;
   const width = sprite?.width ?? 1, height = sprite?.height ?? 1;
 
+  // The animation preview plays with any tool chosen: once it was off while a
+  // drawing tool was (so frames wouldn't change under the pencil), and a drawn
+  // sprite, which opens with the pencil, never animated when Play was pressed.
+  // A click on the picture stops it instead (paintDown).
   useEffect(() => {
-    if (!sprite || sprite.frames.length < 2 || !playing || paints(tool)) return;
+    if (!sprite || sprite.frames.length < 2 || !playing) return;
     const t = setInterval(() => setFrame((f) => (f + 1) % sprite.frames.length), 1000 / Math.max(1, Math.min(60, fps)));
     return () => clearInterval(t);
-  }, [sprite, playing, fps, tool]);
+  }, [sprite, playing, fps]);
 
   /** Puts on the canvas: pix (or the shape being dragged), with a lifted piece over it. */
   const show = () => {
@@ -538,6 +542,8 @@ export function SpriteEditor({ spriteId, addFrames, startTool = "origin" }: { sp
   const ink = () => fromHex(color);
 
   const paintDown = (e: React.PointerEvent) => {
+    // Playing: the first click stops on the frame shown, to draw on it next.
+    if (playing) return setPlaying(false);
     const p = pix.current;
     // Not until the frame shown is the one loaded: a stroke on the last
     // frame's pixels would be saved over this one.
@@ -866,7 +872,7 @@ export function SpriteEditor({ spriteId, addFrames, startTool = "origin" }: { sp
             {Icon.trash()} Frame {cur}
           </button>
           {n > 1 && (
-            <button className="btn small" onClick={() => setPlaying((p) => !p)}>
+            <button className="btn small" onClick={() => (anchor(), setSel(null), setPlaying((p) => !p))} data-testid="frames-play">
               {playing ? "Pause" : "Play"}
             </button>
           )}

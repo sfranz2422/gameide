@@ -1,5 +1,9 @@
 # Progress
 
+## Fix: drawn frames didn't animate when Play was pressed (2026-11-13, waiting for review)
+- The sprite editor's Play (under the frames) did nothing while a drawing tool was chosen, and a drawn sprite opens with the pencil, so a student's own animation never played there. It plays now with any tool; a click on the picture while it plays stops it on that frame (rather than drawing on a moving one). The game itself always animated them.
+- Tests: 1 browser test; 1 sabotage case.
+
 ## The showcase games' Gemini art in the free art library (2026-11-13, waiting for review)
 - **Eight new packs** in Add a sprite → Free art library, one per game whose pictures are here: Snowcap Scramble, Order Up!, Snowfort Flags, Zoomtown Cup, Squeeze, The Lanterns of Hollowmere, Tabletop Siege, Undertow. About 1,000 pictures, 15 MB, made by `scripts/make_gemini_library.py` from each game's cut pictures (`showcase/<game>/art/`).
 - Sorted into sheets students already know how to use: **Characters** (each character's poses together on a row: click them in order, shift-click for a run, and they're one animated sprite), Big characters, Things, Small things, Big things, **Ground tiles** (offered as a tileset), Backgrounds. Shrunk to game size (Order Up! and Squeeze keep theirs at twice); a sheet shrinks all its pictures alike, so characters stay one size beside each other. Game titles are left out.

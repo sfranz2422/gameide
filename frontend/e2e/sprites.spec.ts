@@ -442,6 +442,31 @@ test("a picture pasted while drawing goes into the drawing, not into a new sprit
   await expect(page.locator('[data-tutorial="folder-sprites"]').getByRole("button", { name: /^drawing/ })).toHaveCount(1);
 });
 
+test("drawn frames animate when Play is pressed, with the pencil still chosen; a click stops on a frame", async ({ page }) => {
+  await fromTemplate(page, "empty");
+  await drawNew(page, 8);
+  await stroke(page, 8, [0, 0], [0, 0]);
+  await page.getByTestId("new-frame").click();
+  await expect(page.getByTestId("sprite-frames").getByRole("button", { name: /^Frame \d$/ })).toHaveCount(2);
+  await stroke(page, 8, [7, 7], [7, 7]);
+  await expect(page.getByTestId("paint-pencil")).toHaveAttribute("aria-checked", "true");
+  await page.getByTestId("frames-play").click();
+  // Both frames come round (8 a second), the canvas showing each.
+  const seen = new Set<string>();
+  await expect
+    .poll(async () => {
+      seen.add(await page.locator(".frame.on span").innerText());
+      return seen.size;
+    })
+    .toBe(2);
+  // A click on the picture stops the animation rather than drawing on a moving frame.
+  const lit = (await litPixels(page))[2];
+  const b = (await page.getByTestId("sprite-canvas").boundingBox())!;
+  await page.mouse.click(b.x + b.width / 2, b.y + b.height / 2);
+  await expect(page.getByTestId("frames-play")).toHaveText("Play");
+  expect((await litPixels(page))[2]).toBe(lit);
+});
+
 test("a frame button pressed the moment a stroke ends keeps the stroke", async ({ page }) => {
   await fromTemplate(page, "empty");
   await drawNew(page, 8);
