@@ -1283,6 +1283,126 @@ button:focus-visible {
 .checker.tool-mask {
   cursor: cell;
 }
+.checker canvas {
+  position: relative; /* over the onion skin, which is positioned */
+  display: block;
+  image-rendering: pixelated;
+}
+.checker .onion {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0.3;
+  image-rendering: pixelated;
+  pointer-events: none;
+}
+.checker .selection {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+.checker .selection rect {
+  fill: rgba(255, 255, 255, 0.06);
+  stroke: #fff;
+  stroke-width: 1.5px;
+  stroke-dasharray: 5 4;
+  vector-effect: non-scaling-stroke;
+  animation: ants 0.6s linear infinite;
+}
+@keyframes ants {
+  to {
+    stroke-dashoffset: -9;
+  }
+}
+.edit-bar {
+  align-items: center;
+  max-width: 640px;
+}
+.edit-bar .sep {
+  width: 1px;
+  height: 20px;
+  margin: 0 4px;
+  background: var(--border);
+}
+.checker.tool-select {
+  cursor: cell;
+}
+.checker.tool-line,
+.checker.tool-rect,
+.checker.tool-ellipse {
+  cursor: crosshair;
+}
+.checker.tool-pencil,
+.checker.tool-eraser,
+.checker.tool-fill,
+.checker.tool-picker {
+  cursor: crosshair;
+}
+.pixel-grid {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: linear-gradient(to right, rgba(255, 255, 255, 0.13) 1px, transparent 1px), linear-gradient(to bottom, rgba(255, 255, 255, 0.13) 1px, transparent 1px);
+}
+.brush-mark {
+  position: absolute;
+  pointer-events: none;
+  outline: 1px solid rgba(255, 255, 255, 0.8);
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.45);
+  opacity: 0.85;
+}
+.sprite-tools {
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.zoom-buttons {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.paint-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  max-width: 560px;
+}
+.paint-color input {
+  width: 40px;
+  height: 32px;
+  padding: 0;
+  border: 2px solid var(--border);
+  border-radius: 6px;
+  background: none;
+  cursor: pointer;
+}
+.swatches {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 3px;
+  max-width: 420px;
+}
+.swatch {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 4px;
+  cursor: pointer;
+}
+.swatch.on {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.swatches.own .muted {
+  margin-right: 4px;
+}
 .checker img {
   image-rendering: pixelated;
   display: block;
@@ -4315,3 +4435,18 @@ a.btn {
 .bank-settings { display: flex; flex-wrap: wrap; gap: 16px; }
 .bank-setting { display: flex; flex-direction: column; gap: 4px; max-width: 240px; }
 .bank-setting input { width: 90px; }
+
+/* "Draw your own" in Add a sprite: a card like Import, but not one big button. */
+.import-own.draw-own {
+  cursor: default;
+}
+.draw-own .row {
+  align-items: center;
+  margin-top: 4px;
+}
+.draw-own .num {
+  margin: 0;
+}
+.draw-own .num input {
+  width: 64px;
+}

@@ -160,6 +160,13 @@ async function looksLikeImage(file: Blob): Promise<boolean> {
   return s.startsWith("\x89PNG") || (b[0] === 0xff && b[1] === 0xd8) || s.startsWith("GIF8") || (s.startsWith("RIFF") && s.slice(8, 12) === "WEBP");
 }
 
+/** A clear picture to draw on, as a PNG. */
+export function blankPicture(width: number, height: number): Promise<Blob> {
+  const c = new OffscreenCanvas(width, height);
+  c.getContext("2d"); // convertToBlob throws on a canvas that has never had a context
+  return c.convertToBlob({ type: "image/png" });
+}
+
 /** Cuts rectangles out of a picture, each as a PNG. */
 export async function cutFrames(image: ImageBitmap, rects: Rect[]): Promise<Blob[]> {
   const out: Blob[] = [];

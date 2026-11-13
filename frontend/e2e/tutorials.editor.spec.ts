@@ -227,18 +227,21 @@ test("Now you can make: a whole-game tutorial sits just after the lesson it buil
   await expect(page.getByTestId("starter-bomb")).toBeVisible();
   await page.getByTestId("starter-car").click();
   // The car is drawn (a ready-made sprite is painted when it's added): read its picture back.
-  const img = page.getByTestId("sprite-canvas").locator("img");
-  await expect(img).toHaveAttribute("alt", "car");
-  const lit = await img.evaluate(async (el: HTMLImageElement) => {
-    await el.decode();
-    const c = new OffscreenCanvas(el.naturalWidth, el.naturalHeight);
-    const x = c.getContext("2d")!;
-    x.drawImage(el, 0, 0);
-    const d = x.getImageData(0, 0, c.width, c.height).data;
-    let n = 0;
-    for (let i = 3; i < d.length; i += 4) if (d[i]! > 0) n++;
-    return [c.width, c.height, n];
-  });
+  const pixels = page.getByTestId("sprite-pixels");
+  await expect(pixels).toHaveAttribute("aria-label", "car");
+  // The canvas is filled once the picture has loaded: wait for it to have something on it.
+  let lit: number[] = [];
+  await expect
+    .poll(async () => {
+      lit = await pixels.evaluate((el: HTMLCanvasElement) => {
+        const d = el.getContext("2d")!.getImageData(0, 0, el.width, el.height).data;
+        let n = 0;
+        for (let i = 3; i < d.length; i += 4) if (d[i]! > 0) n++;
+        return [el.width, el.height, n];
+      });
+      return lit[2];
+    })
+    .toBeGreaterThan(0);
   expect(lit.slice(0, 2)).toEqual([40, 24]);
   expect(lit[2]).toBeGreaterThan(300);
 });

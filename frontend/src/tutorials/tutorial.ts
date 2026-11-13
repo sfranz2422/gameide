@@ -194,7 +194,7 @@ export const TARGETS = [
   "add-*", "resource-*", "object-*", "room-tab-*",
   "object-editor", "object-sprite", "object-properties", "object-parent", "object-depth", "event-list", "add-event", "code-editor",
   "tab-blocks", "tab-sheet", "tab-scene", "scene-editor", "scene-python", "blocks-workspace", "blocks-python", "event-sheet", "sheet-python", "generated-class",
-  "sprite-editor", "sprite-origin-tool", "sprite-mask", "sprite-mask-tool", "room-editor", "room-canvas", "room-layers", "room-camera",
+  "sprite-editor", "sprite-origin-tool", "sprite-mask", "sprite-mask-tool", "sprite-paint-tools", "sprite-colors", "sprite-edit-tools", "draw-sprite", "room-editor", "room-canvas", "room-layers", "room-camera",
   "tileset-editor", "tileset-solid", "tileset-picture", "tileset-cut", "import-picture", "tile-palette", "room-tools", "add-tile-layer", "room-size", "open-library", "autotile-sets", "autotile-brushes", "sound-editor", "font-editor",
   "play", "stop", "game-pane", "game-canvas", "fullscreen", "debug-toggle", "console", "docs", "docs-tab", "notes-tab",
   "project-name", "publish", "game-settings", "editor-tabs",

@@ -54,6 +54,35 @@ engine failure in the player is shown, never a silent black screen.
   (`useFrameUrls`), never in a useMemo: React runs effect cleanups twice in
   development and revoked pictures still on screen.
 
+## Drawing sprites
+
+- The sprite editor's paint tools (`editor/sprites/SpriteEditor.tsx`) draw on
+  `pix`, the frame's RGBA bytes; `paintOps.ts` is the pure part (pencil,
+  line, fill, colours; tested without a canvas). The canvas shows `pix`; there
+  is no `<img>` of the frame any more (tests read `sprite-pixels`).
+- **A stroke is saved as it ends**: a new asset for that frame (assets never
+  change, put_asset), the mask refitted, one undo step each (`group:
+  paint:<id>`). Saves are chained, so a quick second stroke can't land first.
+- `shownId` is the picture `pix` holds. A frame whose id differs (Undo,
+  another frame) is loaded afresh; the one just saved isn't, or a stroke drawn
+  while it saved would vanish. A paint tool does nothing until the shown frame
+  has loaded, or it would paint the last frame's pixels over this one.
+- An OffscreenCanvas that never had a context throws on `convertToBlob`
+  (`blankPicture` takes one first).
+- **Frame-list changes go through `changeFrames(edit)`**, which puts down a
+  lifted piece, waits for saves, and edits `framesRef` (the newest list, with
+  `recent` for pictures not yet in `assets`). A button working from the
+  render's `sprite.frames` lost a stroke still saving.
+- A selection being moved is `float` (lifted off `pix`, drawn over it by
+  `show`), put down by `anchor` — on Enter, another tool, another frame, a
+  frame button, or closing the tab.
+- Copy/paste is a page-wide variable, never the system clipboard: a picture
+  there, pasted, makes a new sprite. A picture pasted while a paint tool is
+  chosen is taken by the sprite editor's capturing listener first;
+  EditorPage's skips a paste already `defaultPrevented`.
+- Tests read the canvas only once `data-loaded="1"`: just after choosing a
+  frame it still shows the last one's pixels.
+
 ## Rooms and the camera
 
 - The room editor's geometry is in `editor/rooms/roomOps.ts` (pure, tested);

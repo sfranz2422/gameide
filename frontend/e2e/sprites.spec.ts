@@ -36,6 +36,47 @@ async function drop(page: Page, name: string, p: Paint) {
   );
 }
 
+/** The sprite editor's canvas: [width, height, how many pixels aren't clear]. */
+async function litPixels(page: Page): Promise<number[]> {
+  // Once the frame shown has loaded: just after choosing a frame, the canvas still has the last one's pixels.
+  await expect(page.getByTestId("sprite-pixels")).toHaveAttribute("data-loaded", "1");
+  return page.getByTestId("sprite-pixels").evaluate((el: HTMLCanvasElement) => {
+    const d = el.getContext("2d")!.getImageData(0, 0, el.width, el.height).data;
+    let n = 0;
+    for (let i = 3; i < d.length; i += 4) if (d[i]! > 0) n++;
+    return [el.width, el.height, n];
+  });
+}
+
+/** The colour of pixels on the sprite editor's canvas, as [r, g, b, a]. */
+async function canvasAt(page: Page, points: [number, number][]): Promise<number[][]> {
+  await expect(page.getByTestId("sprite-pixels")).toHaveAttribute("data-loaded", "1");
+  return page.getByTestId("sprite-pixels").evaluate((el: HTMLCanvasElement, pts) => {
+    const x = el.getContext("2d")!;
+    return pts.map(([px, py]) => [...x.getImageData(px, py, 1, 1).data]);
+  }, points);
+}
+
+/** Drags across the sprite canvas from one sprite pixel to another, through the middles of pixels. */
+async function stroke(page: Page, size: number, from: [number, number], to: [number, number]) {
+  const b = (await page.getByTestId("sprite-canvas").boundingBox())!;
+  const px = b.width / size;
+  await page.mouse.move(b.x + (from[0] + 0.5) * px, b.y + (from[1] + 0.5) * px);
+  await page.mouse.down();
+  await page.mouse.move(b.x + (to[0] + 0.5) * px, b.y + (to[1] + 0.5) * px, { steps: 3 });
+  await page.mouse.up();
+}
+
+/** Add a sprite → Draw your own, `size` square. */
+async function drawNew(page: Page, size: number) {
+  await page.getByTestId("add-sprites").click();
+  await page.getByTestId("draw-width").fill(String(size));
+  await page.getByTestId("draw-height").fill(String(size));
+  await page.getByTestId("draw-new").click();
+  await expect(treeItem(page, "drawing")).toBeVisible();
+  await expect(page.getByTestId("paint-pencil")).toHaveAttribute("aria-checked", "true");
+}
+
 const STRIP: Paint = {
   width: 64,
   height: 16,
@@ -186,16 +227,9 @@ test("the free art library's Sports pack: the golf ball as a sprite, the pitch a
   await page.getByTestId("sheet-sprite-Balls and equipment").click();
   await expect(page.getByTestId("sprite-frames").getByRole("button", { name: /^Frame \d$/ })).toHaveCount(1);
   // The golf ball, 8 pixels across, in the middle of its 32-pixel cell: drawn there, and nothing round it.
-  const lit = await page.getByTestId("sprite-canvas").locator("img").evaluate(async (el: HTMLImageElement) => {
-    await el.decode();
-    const c = new OffscreenCanvas(el.naturalWidth, el.naturalHeight);
-    const x = c.getContext("2d")!;
-    x.drawImage(el, 0, 0);
-    const d = x.getImageData(0, 0, c.width, c.height).data;
-    let n = 0;
-    for (let i = 3; i < d.length; i += 4) if (d[i]! > 0) n++;
-    return [c.width, c.height, n];
-  });
+  // Read once the picture has loaded onto the editor's canvas.
+  let lit: number[] = [];
+  await expect.poll(async () => (lit = await litPixels(page))[2]).toBeGreaterThan(0);
   expect(lit.slice(0, 2)).toEqual([32, 32]);
   expect(lit[2]).toBeGreaterThan(30);
   expect(lit[2]).toBeLessThan(80);
@@ -226,4 +260,181 @@ test("the free art library: every pack opens, with its preview, and every sheet 
     await page.getByRole("button", { name: "← All packs" }).click();
   }
   expect(errors).toEqual([]);
+});
+
+test("a sprite drawn in the editor is the picture the game plays", async ({ page }) => {
+  const errors = watchErrors(page);
+  await fromTemplate(page, "empty");
+  await drawNew(page, 16);
+  // A line across the middle, drawn in three moves: every pixel between them is painted.
+  await stroke(page, 16, [2, 8], [13, 8]);
+  // Saved: the automatic mask is refitted to the line.
+  await expect(page.getByText("Box: 2, 8 to 14, 9")).toBeVisible();
+  expect((await litPixels(page))[2]).toBe(12);
+  await page.getByTestId("mask-kind").selectOption("precise");
+
+  await page.getByTestId("add-objects").click();
+  await page.getByRole("textbox", { name: "Name", exact: true }).fill("Bar");
+  await page.getByRole("textbox", { name: "Name", exact: true }).press("Enter");
+  await page.getByTestId("object-sprite").selectOption({ label: "drawing" });
+  await placeInRoom(page, "Room1 start", "Bar", 320, 224);
+
+  await playAndWait(page);
+  // Exact-pixel masks are read from the picture as the game starts: the
+  // line collides and the clear corner doesn't, so the game has the drawing.
+  const hits = await py(page, `
+b = instances("Bar")[0]
+(collision_point(b.x - 3 + 0.5, b.y + 0.5, "Bar") is b, collision_point(b.x - 6 + 0.5, b.y - 6 + 0.5, "Bar") is None)`);
+  expect(hits).toEqual([true, true]);
+  expect(errors.filter((e) => !e.includes("502"))).toEqual([]);
+});
+
+test("drawing: undo takes back one stroke, fill stops at lines, and the eraser and picker work", async ({ page }) => {
+  const errors = watchErrors(page);
+  await fromTemplate(page, "empty");
+  await drawNew(page, 8);
+  // A wall down the middle, then a second stroke along the top.
+  await stroke(page, 8, [4, 0], [4, 7]);
+  await expect(page.getByText("Box: 4, 0 to 5, 8")).toBeVisible();
+  await stroke(page, 8, [0, 0], [3, 0]);
+  await expect(page.getByText("Box: 0, 0 to 5, 8")).toBeVisible();
+  // One Undo is one stroke: the top line goes, the wall stays.
+  await page.keyboard.press("ControlOrMeta+z");
+  await expect(page.getByText("Box: 4, 0 to 5, 8")).toBeVisible();
+  await expect.poll(async () => (await canvasAt(page, [[1, 0]]))[0]![3]).toBe(0);
+  expect((await canvasAt(page, [[4, 3]]))[0]![3]).toBe(255);
+
+  // Fill left of the wall in blue: the right of it stays clear.
+  await page.getByTestId("paint-color").fill("#0000ff");
+  await page.getByTestId("paint-fill").click();
+  await stroke(page, 8, [1, 3], [1, 3]);
+  await expect(page.getByText("Box: 0, 0 to 5, 8")).toBeVisible();
+  const [left, right, wall] = await canvasAt(page, [[0, 7], [6, 3], [4, 3]]);
+  expect(left).toEqual([0, 0, 255, 255]);
+  expect(right![3]).toBe(0);
+  // The picker takes the wall's colour (the red it was drawn in) and goes back to the pencil.
+  await page.getByTestId("paint-picker").click();
+  await stroke(page, 8, [4, 3], [4, 3]);
+  await expect(page.getByTestId("paint-pencil")).toHaveAttribute("aria-checked", "true");
+  await expect(page.getByTestId("paint-color")).toHaveValue("#" + wall!.slice(0, 3).map((v) => v.toString(16).padStart(2, "0")).join(""));
+  // The eraser clears the wall's bottom pixel.
+  await page.getByTestId("paint-eraser").click();
+  await stroke(page, 8, [4, 7], [4, 7]);
+  await expect.poll(async () => (await canvasAt(page, [[4, 7]]))[0]![3]).toBe(0);
+
+  // Copy frame: a second frame, the same picture, ready to change.
+  await page.getByTestId("copy-frame").click();
+  await expect(page.getByTestId("sprite-frames").getByRole("button", { name: /^Frame \d$/ })).toHaveCount(2);
+  await expect.poll(async () => (await canvasAt(page, [[0, 7]]))[0]).toEqual([0, 0, 255, 255]);
+  expect(errors.filter((e) => !e.includes("502"))).toEqual([]);
+});
+
+test("drawing: lines and boxes, a selection moved and pasted, flips, every frame turned, onion skin and a strip", async ({ page }) => {
+  const errors = watchErrors(page);
+  await fromTemplate(page, "empty");
+  await drawNew(page, 8);
+  const lit = async () => (await litPixels(page))[2];
+  const alpha = async (x: number, y: number) => (await canvasAt(page, [[x, y]]))[0]![3];
+
+  // A line along the bottom, then a box's edge in the corner: one undo step each.
+  await page.getByTestId("paint-line").click();
+  await stroke(page, 8, [0, 7], [7, 7]);
+  await expect(page.getByText("Box: 0, 7 to 8, 8")).toBeVisible();
+  await page.getByTestId("paint-rect").click();
+  await stroke(page, 8, [2, 2], [0, 0]);
+  await expect(page.getByText("Box: 0, 0 to 8, 8")).toBeVisible();
+  expect(await lit()).toBe(16);
+  expect(await alpha(1, 1)).toBe(0);
+  await page.keyboard.press("ControlOrMeta+z");
+  await expect(page.getByText("Box: 0, 7 to 8, 8")).toBeVisible();
+  // Filled this time.
+  await page.getByTestId("paint-filled").check();
+  await stroke(page, 8, [0, 0], [2, 2]);
+  await expect(page.getByText("Box: 0, 0 to 8, 8")).toBeVisible();
+  await expect.poll(lit).toBe(17);
+
+  // Select the square, copy it, drag it four pixels right and put it down.
+  await page.getByTestId("paint-select").click();
+  await stroke(page, 8, [0, 0], [2, 2]);
+  await expect(page.getByTestId("selection")).toBeVisible();
+  await page.keyboard.press("ControlOrMeta+c");
+  await stroke(page, 8, [1, 1], [5, 1]);
+  await page.keyboard.press("Enter");
+  await expect.poll(() => alpha(0, 0)).toBe(0);
+  expect(await alpha(4, 0)).toBe(255);
+  expect(await lit()).toBe(17);
+  // Paste: the copy comes back where it was copied from, ready to drag; Enter puts it down.
+  await page.keyboard.press("ControlOrMeta+v");
+  await page.keyboard.press("Enter");
+  await expect.poll(lit).toBe(26);
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("selection")).toHaveCount(0);
+
+  // Nothing selected: Flip ↕ flips the whole frame, the line now along the top.
+  await expect(page.getByTestId("paint-target")).toHaveText("Acts on this frame.");
+  await page.getByTestId("paint-flipV").click();
+  await expect.poll(() => alpha(3, 0)).toBe(255);
+  expect(await alpha(3, 7)).toBe(0);
+
+  // A second frame, then a quarter turn of every frame: the top row becomes the right column in both.
+  await page.getByTestId("copy-frame").click();
+  await expect(page.getByTestId("sprite-frames").getByRole("button", { name: /^Frame \d$/ })).toHaveCount(2);
+  await page.getByTestId("paint-every-frame").check();
+  await expect(page.getByTestId("paint-target")).toHaveText("Acts on every frame.");
+  await page.getByTestId("paint-rotateCW").click();
+  await expect.poll(() => alpha(7, 3)).toBe(255);
+  expect(await alpha(3, 0)).toBe(0);
+  // The last frame, faintly, under this one.
+  await page.getByTestId("paint-onion").check();
+  await expect(page.getByTestId("onion")).toBeVisible();
+  await page.getByRole("button", { name: "Frame 0" }).click();
+  await expect.poll(() => alpha(7, 3)).toBe(255);
+  expect(await alpha(3, 0)).toBe(0);
+
+  // The frames as one strip: two 8 × 8 frames side by side.
+  const [download] = await Promise.all([page.waitForEvent("download"), page.getByTestId("save-strip").click()]);
+  expect(download.suggestedFilename()).toBe("drawing_strip2.png");
+  const png = await (await import("node:fs/promises")).readFile(await download.path());
+  expect([png.readUInt32BE(16), png.readUInt32BE(20)]).toEqual([16, 8]);
+  expect(errors.filter((e) => !e.includes("502"))).toEqual([]);
+});
+
+test("a picture pasted while drawing goes into the drawing, not into a new sprite", async ({ page }) => {
+  await fromTemplate(page, "empty");
+  await drawNew(page, 8);
+  const b64 = await pngIn(page, { width: 2, height: 2, rects: [[0, 0, 2, 2, "#0f0"]] });
+  await page.evaluate((b64) => {
+    const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+    const dt = new DataTransfer();
+    dt.items.add(new File([bytes], "bit.png", { type: "image/png" }));
+    document.body.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }));
+  }, b64);
+  await expect(page.getByTestId("selection")).toBeVisible();
+  await expect(page.getByTestId("paint-select")).toHaveAttribute("aria-checked", "true");
+  // Dragged one pixel over before it's put down.
+  await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("Enter");
+  await expect(page.getByText("Box: 1, 0 to 3, 2")).toBeVisible();
+  expect((await litPixels(page))[2]).toBe(4);
+  // No import dialog, no second sprite.
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(page.locator('[data-tutorial="folder-sprites"]').getByRole("button", { name: /^drawing/ })).toHaveCount(1);
+});
+
+test("a frame button pressed the moment a stroke ends keeps the stroke", async ({ page }) => {
+  await fromTemplate(page, "empty");
+  await drawNew(page, 8);
+  // Stroke and click in one go, from the page, so the click comes while the stroke is still saving.
+  await page.getByTestId("sprite-canvas").evaluate((el) => {
+    const r = el.getBoundingClientRect();
+    const at = (x: number) => ({ clientX: r.left + (x + 0.5) * (r.width / 8), clientY: r.top + 0.5 * (r.height / 8), bubbles: true, pointerId: 1, button: 0 });
+    el.dispatchEvent(new PointerEvent("pointerdown", at(0)));
+    el.dispatchEvent(new PointerEvent("pointermove", at(5)));
+    el.dispatchEvent(new PointerEvent("pointerup", at(5)));
+    (document.querySelector('[data-testid="copy-frame"]') as HTMLButtonElement).click();
+  });
+  await expect(page.getByTestId("sprite-frames").getByRole("button", { name: /^Frame \d$/ })).toHaveCount(2);
+  await page.getByRole("button", { name: "Frame 0" }).click();
+  await expect(page.getByText("Box: 0, 0 to 6, 1")).toBeVisible();
+  await expect.poll(async () => (await litPixels(page))[2]).toBe(6);
 });

@@ -1,5 +1,24 @@
 # Progress
 
+## Drawing sprites, part 2: select, copy and paste, flip and turn, shapes, onion skin, strips (2026-11-13, waiting for review)
+- **Shapes**: Line, Box and Circle, dragged; Shift makes a square or a circle; Filled for boxes and circles; lines and box edges take the brush size; the right mouse button draws them clear. Each shape is one undo step.
+- **Select**: drag a box (marching ants); drag inside it to move what's in it, or nudge it with the arrow keys; Enter puts it down, Escape puts it down and lets go, Delete clears it, Ctrl+A selects everything. A moved piece's clear pixels don't cut holes in what's under it.
+- **Copy, Cut, Paste** (buttons and Ctrl+C / X / V): nothing selected copies the whole frame. What's copied can be pasted into another frame or another sprite; it comes back where it was copied from, ready to drag. **A picture pasted from another program** while a drawing tool is chosen goes into the drawing (with any other tool, or none open, it still makes a new sprite, as before).
+- **Flip ↔, Flip ↕, Turn ⟲, Turn ⟳**: the selection; with nothing selected, the frame; with **Every frame** ticked, all of them (a walk turned round). Quarter turns only (other angles smudge pixel art; `image_angle` turns sprites in a game). A frame that isn't square keeps its size when turned, centred, and loses what turns off its edges; the editor says so beside the buttons.
+- **Show last frame** (onion skin): the frame before, faintly under the one being drawn.
+- **Save as strip**: the frames side by side as one PNG (`<name>_strip<n>.png`), which Import's Equal frames cuts back into the same frames.
+- Fixed on the way: a frame button (Copy frame, Move, Delete) pressed while a stroke was still saving used the list from before the stroke, and the stroke was lost. Frame changes now wait for saves and work from the newest list.
+- Tests: 8 more unit tests, 3 more browser tests (shapes, select/move/copy/paste, flips, every frame, onion, strip; a pasted picture; a frame button pressed mid-save), 13 more sabotage cases. Three of them were MISSes at first and found real holes in the tests: a test read the canvas before the frame had loaded (the canvas now says `data-loaded`), and a unit test's clear pixel landed on a clear one.
+
+## Drawing sprites, part 1: draw one and play it (2026-11-13, waiting for review)
+- **Draw your own** is the first choice in Add a sprite: a clear picture of any size up to 256 × 256 (16, 32 and 64 are one click; 32 × 32 to start). It opens with the pencil, named `drawing` (then `drawing2`…), origin in the middle.
+- **The sprite editor draws**, on any sprite (imported pictures and the free library's too): **Pencil** (brush 1 to 4 pixels; the right mouse button erases), **Eraser**, **Fill** (stops at lines, never leaks through a corner), **Pick colour** (takes a pixel's colour and goes back to the pencil). Colours: any colour from the colour box, 32 starting swatches of GameIDE's own, and the picture's own colours ("In this picture"), for touching up art someone else drew. Zoom − / +, a pixel grid (6× and up), and a checkerboard of one square a pixel while drawing. Origin and Mask are the same as before, in the same row.
+- **Frames to animate**: New frame (clear) and Copy frame (this one, to change a little), after the frame shown.
+- **Saved stroke by stroke**: each stroke becomes a new picture for that frame (a stored picture never changes), the automatic mask refits to it, and **Undo takes back one stroke** (the top bar's or Ctrl+Z). The game uses the drawing the next time Play is pressed; nothing else to do.
+- Each saved stroke is a new small file in the game's 40 MB (a 32 × 32 drawing is well under 1 KB a stroke), the price of Undo working stroke by stroke. Worth watching if students make big pictures.
+- Not yet (part 2, if wanted): lines, boxes and circles; mirror drawing; flip and turn; resizing the picture; seeing the last frame faintly under this one (onion skin); select and move.
+- Tests: 8 unit tests (pencil, line gaps, fill, colours), 2 browser tests (a drawn sprite collides by its exact pixels in a running game; undo, fill, picker, eraser, copy frame); 8 sabotage cases.
+
 ## Tabletop Siege: the cards to buy's own pictures (2026-11-10, waiting for review)
 - The teacher's Gemini pictures 14-17 (`raw/snow/`) replace the stand-ins: a kangaroo (crouched, mid-hop, punching), a fire salamander (breathing fire), a moose (charging), a hedgehog (curling into a spiky ball), a squirrel with its sack; campfires with each side's flag (blazing up now and then, and while melting something), beaver dams, a firework burst (each Fireworks burst, tinted), and eight card pictures. The salamander's flames and the firework are many pieces, so those rows are cut by columns.
 

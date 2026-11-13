@@ -17,7 +17,7 @@ import { RoomEditor } from "./rooms/RoomEditor";
 import { TilesetEditor } from "./tiles/TilesetEditor";
 import { SpriteEditor } from "./sprites/SpriteEditor";
 import { SpriteImport, type ImportResult } from "./sprites/SpriteImport";
-import { decodeImage, type Decoded } from "../store/imageTools";
+import { blankPicture, decodeImage, type Decoded } from "../store/imageTools";
 import { refitMask, spriteFromFrames } from "../store/spriteOps";
 import { newId, newTileset } from "../store/project";
 import { LibraryBrowser } from "../library/LibraryBrowser";
@@ -74,6 +74,8 @@ export function EditorPage({ store, id }: { store: ProjectStore; id: string }) {
   const [scriptFocus, setScriptFocus] = useState<{ id: string; line: number; nonce: number } | null>(null);
   const [roomFocus, setRoomFocus] = useState<{ roomId: string; instanceId: string; line: number; nonce: number } | null>(null);
   const [picking, setPicking] = useState(false);
+  /** A sprite just made to draw on: it opens with the pencil, not the origin tool. */
+  const [drawn, setDrawn] = useState<string | null>(null);
   const [library, setLibrary] = useState(false);
   const [importing, setImporting] = useState<{ source: Decoded; fileName: string; appendTo?: string } | null>(null);
   const [dropping, setDropping] = useState(false);
@@ -293,6 +295,8 @@ export function EditorPage({ store, id }: { store: ProjectStore; id: string }) {
       else addLines([{ kind: "err", text: "Only pictures (PNG, JPG, GIF) can be dropped here." }]);
     };
     const paste = (e: ClipboardEvent) => {
+      // Taken already: the sprite editor pastes a picture into the drawing while a paint tool is chosen.
+      if (e.defaultPrevented) return;
       const t = e.target as HTMLElement | null;
       if (t && (t.closest(".cm-editor") || t.tagName === "INPUT" || t.tagName === "TEXTAREA")) return;
       const f = [...(e.clipboardData?.files ?? [])].find((x) => x.type.startsWith("image/"));
@@ -442,7 +446,9 @@ export function EditorPage({ store, id }: { store: ProjectStore; id: string }) {
                   focus={focus}
                 />
               )}
-              {current?.kind === "sprites" && <SpriteEditor key={current.id} spriteId={current.id} addFrames={() => chooseFile(current.id)} />}
+              {current?.kind === "sprites" && (
+                <SpriteEditor key={current.id} spriteId={current.id} addFrames={() => chooseFile(current.id)} startTool={drawn === current.id ? "pencil" : "origin"} />
+              )}
               {current?.kind === "rooms" && (
                 <RoomEditor key={current.id} roomId={current.id} focus={roomFocus?.roomId === current.id ? roomFocus : null} />
               )}
@@ -549,6 +555,18 @@ export function EditorPage({ store, id }: { store: ProjectStore; id: string }) {
               setLibrary(true);
             }}
             onImport={() => chooseFile()}
+            onDraw={async (width, height) => {
+              setPicking(false);
+              // As an imported picture would be, from a clear one: a free name, a centred origin.
+              const { sprite, assets: made } = await spriteFromFrames(
+                { name: "drawing", width, height, frames: [await blankPicture(width, height)], fps: 8, origin: "center" },
+                (projectRef.current?.sprites ?? []).map((s) => s.name),
+              );
+              await addAssets(made);
+              mutate((d) => void d.sprites.push(sprite));
+              setDrawn(sprite.id);
+              open({ kind: "sprites", id: sprite.id });
+            }}
             onClose={() => setPicking(false)}
             onPick={async (key) => {
               setPicking(false);

@@ -9,22 +9,28 @@ import { emptyBlocks } from "../blocks/blockState";
 import { find, type ScriptResource } from "../store/project";
 import { STARTER_SPRITES } from "../store/starterArt";
 import { CodeEditor } from "./code/CodeEditor";
+import { MAX_DRAW_SIDE } from "./sprites/SpriteEditor";
 import { readSave, saveKey } from "./gameHost";
 import { blockNamesFor, BlocksEditor, confirmToPython, isBlocks, ModeTabs, projectNames, toBlocks, toPython } from "./codeMode";
 import { useProjectApi } from "./useProject";
 
 export function SpritePicker({
   onPick,
+  onDraw,
   onImport,
   onLibrary,
   onClose,
 }: {
   onPick: (key: string) => void;
+  onDraw: (width: number, height: number) => void;
   onImport: () => void;
   onLibrary: () => void;
   onClose: () => void;
 }) {
   const [thumbs, setThumbs] = useState<Record<string, string>>({});
+  const [w, setW] = useState(32);
+  const [h, setH] = useState(32);
+  const side = (v: number) => Math.max(1, Math.min(MAX_DRAW_SIDE, Math.round(v) || 1));
   useEffect(() => {
     const out: Record<string, string> = {};
     for (const s of STARTER_SPRITES) {
@@ -40,6 +46,27 @@ export function SpritePicker({
     <div className="modal-back" onPointerDown={onClose}>
       <div className="modal" role="dialog" aria-label="Add a sprite" onPointerDown={(e) => e.stopPropagation()}>
         <h3>Add a sprite</h3>
+        <div className="import-own draw-own" data-tutorial="draw-sprite">
+          <b>Draw your own</b>
+          <span className="muted small">A clear picture to draw on, this many pixels across and down. Small is easier: 16 or 32 is plenty for a character.</span>
+          <div className="row">
+            {[16, 32, 64].map((n) => (
+              <button key={n} className={`btn small ${w === n && h === n ? "on" : ""}`} onClick={() => (setW(n), setH(n))}>
+                {n} × {n}
+              </button>
+            ))}
+            <label className="num">
+              <input type="number" min={1} max={MAX_DRAW_SIDE} value={w} onChange={(e) => setW(side(Number(e.target.value)))} aria-label="Width" data-testid="draw-width" />
+            </label>
+            ×
+            <label className="num">
+              <input type="number" min={1} max={MAX_DRAW_SIDE} value={h} onChange={(e) => setH(side(Number(e.target.value)))} aria-label="Height" data-testid="draw-height" />
+            </label>
+            <button className="btn go" onClick={() => onDraw(w, h)} data-testid="draw-new">
+              Start drawing
+            </button>
+          </div>
+        </div>
         <button className="import-own" onClick={onImport} data-testid="import-picture" data-tutorial="import-picture">
           <b>Import your own picture…</b>
           <span className="muted small">PNG, JPG or GIF — one picture, a sprite sheet, or an animated GIF. You can also drop a picture anywhere in the editor, or paste one.</span>
