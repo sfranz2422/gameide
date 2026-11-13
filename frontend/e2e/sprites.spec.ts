@@ -438,3 +438,55 @@ test("a frame button pressed the moment a stroke ends keeps the stroke", async (
   await expect(page.getByText("Box: 0, 0 to 6, 1")).toBeVisible();
   await expect.poll(async () => (await litPixels(page))[2]).toBe(6);
 });
+
+test("Find the pictures: drawings on a coloured sheet become frames standing on the bottom, sparks joined, a drag joins more", async ({ page }) => {
+  const errors = watchErrors(page);
+  await fromTemplate(page, "empty");
+  // A pink sheet, as a picture generator draws one: a tall pose and a short one
+  // with a spark beside it on the first row, a squat one on the second.
+  const pink = "#c13a94", green = "#20c840";
+  await drop(page, "poses.png", {
+    width: 60,
+    height: 40,
+    rects: [
+      [0, 0, 60, 40, pink],
+      [4, 4, 8, 12, green],
+      [20, 6, 8, 8, green],
+      [29, 8, 2, 2, green], // the spark, a pixel away: part of that pose
+      [4, 28, 8, 6, green],
+    ],
+  });
+  await page.getByTestId("slice-find").click();
+  await expect(page.getByTestId("find-params")).toContainText("the corners' colour");
+  // Every frame the biggest drawing's size: 11 across (pose and spark), 12 down.
+  await expect(page.getByTestId("slice-summary")).toHaveText("3 frames, 11 × 12");
+
+  const sheet = page.getByTestId("slice-sheet");
+  const box = (await sheet.boundingBox())!;
+  const k = box.width / 60;
+  // Dragging across the first two makes them one drawing; Undo joins splits them again.
+  await page.mouse.move(box.x + 6 * k, box.y + 10 * k);
+  await page.mouse.down();
+  await page.mouse.move(box.x + 24 * k, box.y + 10 * k, { steps: 4 });
+  await page.mouse.up();
+  await expect(page.getByTestId("slice-summary")).toHaveText("2 frames, 27 × 12");
+  await page.getByRole("button", { name: "Undo joins" }).click();
+  await expect(page.getByTestId("slice-summary")).toHaveText("3 frames, 11 × 12");
+  // A click leaves one out, and another puts it back.
+  await sheet.click({ position: { x: 6 * k, y: 30 * k } });
+  await expect(page.getByTestId("slice-summary")).toHaveText("2 frames, 11 × 12");
+  await sheet.click({ position: { x: 6 * k, y: 30 * k } });
+  await expect(page.getByTestId("slice-summary")).toHaveText("3 frames, 11 × 12");
+  await expect(page.getByLabel("Origin")).toHaveValue("bottom-center");
+  await page.getByTestId("import-done").click();
+
+  await expect(page.getByTestId("sprite-frames").getByRole("button", { name: /^Frame \d$/ })).toHaveCount(3);
+  // The squat pose, frame 2: in the middle across, standing on the bottom, and the pink gone.
+  await page.getByRole("button", { name: "Frame 2" }).click();
+  const [foot, head, side, corner] = await canvasAt(page, [[1, 11], [1, 5], [0, 11], [10, 0]]);
+  expect(foot).toEqual([0x20, 0xc8, 0x40, 255]);
+  expect(head![3]).toBe(0);
+  expect(side![3]).toBe(0);
+  expect(corner![3]).toBe(0);
+  expect(errors.filter((e) => !e.includes("502"))).toEqual([]);
+});

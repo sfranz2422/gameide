@@ -83,6 +83,18 @@ engine failure in the player is shown, never a silent black screen.
 - Tests read the canvas only once `data-loaded="1"`: just after choosing a
   frame it still shows the last one's pixels.
 
+## Find the pictures
+
+- Import's fourth way to cut (`store/findPictures.ts`, pure; the importer
+  draws). Background from the corners, `keyOut` with a soft band and the
+  colour taken back out of edges (no rim), islands touching corners, joined
+  while closer than `join`, specks and leftovers dropped, `readingOrder` by
+  each row's middle line. Frames are the biggest drawing's size, placed by
+  `placeIn` (bottom or middle).
+- `defaultJoin` was tuned on the showcase games' raw Gemini sheets: 1% of
+  the picture joined two poses; a 300th found every drawing. Try any change
+  on those sheets (`showcase/*/raw/`).
+
 ## Rooms and the camera
 
 - The room editor's geometry is in `editor/rooms/roomOps.ts` (pure, tested);

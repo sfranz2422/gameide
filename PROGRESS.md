@@ -1,5 +1,14 @@
 # Progress
 
+## Find the pictures: cutting up a sheet that isn't a grid (2026-11-13, waiting for review)
+- A fourth way to cut a picture in Import, beside Whole picture, Equal frames and Grid: **Find the pictures**, for a page of drawings scattered on a background, as Gemini draws them.
+- The background is found from the corners (see-through corners mean it's already clear) and made see-through, with a soft edge and the background colour taken out of it, so outlines have no pink rim. **Background match** says how close counts as background.
+- Each drawing is found and numbered in reading order (rows from the top, left to right; a tall pose beside short ones stays in its row). Pieces closer than **Join pieces closer than** (a first guess from the picture's size) are one drawing: sparks, a sword, a shadow. Specks are noise and go.
+- Every frame is the size of the biggest drawing, each drawing in the middle across and **standing on the bottom** (or in the middle), so an animation doesn't jump; the origin is set to the feet. Big generated pictures are shrunk to about 96 px tall to start (**Size %**, every frame by the same amount, smoothly).
+- Click a drawing to leave it out; **drag across drawings to make them one**; Undo joins. Adding frames to a sprite makes them that sprite's size.
+- Tried on the showcase games' raw Gemini sheets (climber, cooking, flags, lemon, undertow): every drawing found on every sprite sheet tried, in 50 to 120 ms for a 2752 × 1536 picture. The first guess for joining (1% of the picture) joined two close poses on one sheet; it is now a 300th, which found them all.
+- Tests: 8 unit tests (background, soft edge, islands, joining, reading order, placing), 1 browser test (a pink sheet: sizes, the spark joined, a drag join and Undo joins, leaving one out, the frame standing on the bottom with the pink gone); 8 sabotage cases.
+
 ## Drawing sprites, part 2: select, copy and paste, flip and turn, shapes, onion skin, strips (2026-11-13, waiting for review)
 - **Shapes**: Line, Box and Circle, dragged; Shift makes a square or a circle; Filled for boxes and circles; lines and box edges take the brush size; the right mouse button draws them clear. Each shape is one undo step.
 - **Select**: drag a box (marching ants); drag inside it to move what's in it, or nudge it with the arrow keys; Enter puts it down, Escape puts it down and lets go, Delete clears it, Ctrl+A selects everything. A moved piece's clear pixels don't cut holes in what's under it.

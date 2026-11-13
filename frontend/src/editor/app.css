@@ -4450,3 +4450,16 @@ a.btn {
 .draw-own .num input {
   width: 64px;
 }
+
+/* "Find the pictures": the background colour found, shown as a dot. */
+.swatch-inline {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  margin: 0 3px -2px 0;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 3px;
+}
+.find-bg {
+  margin-right: 10px;
+}

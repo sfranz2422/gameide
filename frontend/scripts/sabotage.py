@@ -303,6 +303,15 @@ CASES = [
  ("strip stacked", "src/editor/sprites/paintOps.ts", "  frames.forEach((f, i) => stamp(out, f, i * w, 0, true));", "  frames.forEach((f) => stamp(out, f, 0, 0, true));", "side by side"),
  ("hollow circles filled", "src/editor/sprites/paintOps.ts", "      if (filled || !inside(x - 1, y) ||", "      if (!filled || !inside(x - 1, y) ||", "ellipse fits"),
  ("clear corners cut holes", "src/editor/sprites/paintOps.ts", "      if (replace || c[3] > 0) setPixel(dst, x + sx, y + sy, c);", "      setPixel(dst, x + sx, y + sy, c);", "clear corners hide nothing"),
+ # Find the pictures (2026-11-13)
+ ("islands only side by side", "src/store/findPictures.ts", "          const nx = x + dx, ny = y + dy;", "          const nx = x + dx, ny = y + dy;\n          if (dx && dy) continue;", "corner to corner"),
+ ("background must match exactly", "src/store/findPictures.ts", "  const inner = tolerance, outer = tolerance + 65;", "  const inner = tolerance * 0, outer = tolerance + 65;", "near the background colour is clear"),
+ ("pink rim kept", "src/store/findPictures.ts", "    out[i] = (r - (1 - a) * br) / a;", "    out[i] = r + 0 * br;", "near the background colour is clear"),
+ ("rows read by their tops", "src/store/findPictures.ts", "    const row = rows.find((r) => r.mid >= b.y && r.mid < b.y + b.h);", "    const row = rows.find((r) => r.mid === b.y + b.h / 2);", "tall pose stands among short ones"),
+ ("sparks left apart", "src/store/findPictures.ts", "        if (gapBetween(out[i]!, out[j]!) <= join) {", "        if (gapBetween(out[i]!, out[j]!) < Math.min(join, 0)) {", "sparks near a drawing"),
+ ("found frames float", "src/store/findPictures.ts", '  return { x: Math.floor((fw - b.w) / 2), y: align === "bottom" ? fh - b.h : Math.floor((fh - b.h) / 2) };', "  return { x: Math.floor((fw - b.w) / 2), y: Math.floor((fh - b.h) / 2) + 0 * align.length };", "coloured sheet become frames", E2E),
+ ("a drag joins nothing", "src/editor/sprites/SpriteImport.tsx", "      if (hit.length < 2) continue;", "      if (hit.length < 99) continue;", "coloured sheet become frames", E2E),
+ ("background never removed", "src/editor/sprites/SpriteImport.tsx", "    const data = keyOut(pixels.data, bg, tol);", '    const data = keyOut(pixels.data, { kind: "clear" }, tol);', "coloured sheet become frames", E2E),
  # Phase 5: rooms and the camera
  ("snap rounds", RO, "  return grid > 0 ? Math.floor(v / grid + 1e-6) * grid : Math.round(v);", "  return grid > 0 ? Math.round(v / grid) * grid : Math.round(v);", "snaps to grid lines"),
  ("snap noise", RO, "  return grid > 0 ? Math.floor(v / grid + 1e-6) * grid : Math.round(v);", "  return grid > 0 ? Math.floor(v / grid) * grid : Math.round(v);", "snaps to grid lines"),
