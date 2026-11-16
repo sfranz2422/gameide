@@ -330,6 +330,9 @@ def _counts_as_activity() -> bool:
     # playing isn't working, and it mustn't add up to XP's working time.
     if request.path in ("/api/net/sync", "/api/net/leave"):
         return False
+    # A game saving to the player's account (publishing.put_save) is playing too.
+    if request.path.startswith("/api/play/") and request.path.endswith("/save"):
+        return False
     return not (request.method == "GET" and request.path.startswith("/api/"))
 
 

@@ -64,6 +64,104 @@ test("a published game plays from its link for anyone, signed out too, and shows
 // Safari's engine, which every browser on an iPhone is. A published game was
 // a black screen there and nowhere else (gameWorker.ts says why), so only
 // WebKit itself can tell. `npx playwright install webkit` once to have it.
+test("a signed-in player's save follows them to another computer, and the newer copy is played", async ({ browser }) => {
+  test.setTimeout(180_000);
+  const { ctx, page } = await signedIn(browser, "sam@example.com");
+  await newGame(page);
+  const link = await publish(page, "Sam's Coins", "unlisted");
+  const py = (p: Page, code: string) => p.evaluate((c) => (window as any).__gameide.host.evalPython(c), code);
+  const id = link.split("/").pop()!;
+
+  // At school: a student plays and the game saves.
+  const { ctx: school, page: a } = await signedIn(browser, "rio@example.com");
+  await a.goto(link);
+  await playIt(a);
+  await py(a, 'save_set("best", 42)');
+  await expect.poll(async () => (await (await a.request.get(`/api/play/${id}/save`)).json()).data, { timeout: 20_000 }).toEqual({ best: 42 });
+
+  // At home: another browser, nothing saved in it, the same student: the game starts with their save.
+  const { ctx: home, page: b } = await signedIn(browser, "rio@example.com");
+  await b.goto(link);
+  await playIt(b);
+  expect(await py(b, 'save_get("best")')).toBe(42);
+  await py(b, 'save_set("best", 50)');
+  await expect.poll(async () => (await (await b.request.get(`/api/play/${id}/save`)).json()).data, { timeout: 20_000 }).toEqual({ best: 50 });
+
+  // Back at school: this browser's copy (42) is older than the account's, so the account's is played.
+  await a.reload();
+  await playIt(a);
+  expect(await py(a, 'save_get("best")')).toBe(50);
+
+  // Someone else signed in on that browser later doesn't get it from the account.
+  const { ctx: other, page: c } = await signedIn(browser, "tia@example.com");
+  await c.goto(link);
+  await playIt(c);
+  expect(await py(c, 'save_get("best", 0)')).toBe(0);
+  await other.close();
+  await home.close();
+  await school.close();
+  await ctx.close();
+});
+
+test("a game updated from a .zip and published again keeps its link, and every player's save", async ({ browser }) => {
+  test.setTimeout(180_000);
+  const version = (n: number) => {
+    const project = {
+      format: "gameide-project", schemaVersion: 8, id: `upd${n}`, name: `Valley v${n}`, created: "2026-01-01T00:00:00Z", modified: "2026-01-01T00:00:00Z",
+      settings: { stepsPerSecond: 60 }, sprites: [], tilesets: [], scripts: [], sounds: [], fonts: [],
+      objects: [{ id: "o1", name: "Keeper", sprite: null, visible: true, solid: false, persistent: false, depth: 0, parent: null,
+        events: [{ id: "e1", key: { type: "create" }, mode: "python", code: `global_vars.version = ${n}\n` }] }],
+      rooms: [{ id: "r1", name: "Room1", width: 320, height: 180, background: "#223344", gridWidth: 16, gridHeight: 16, snap: true,
+        layers: [{ id: "L", name: "Instances", kind: "instances", depth: 0, visible: true, locked: false }],
+        camera: { enabled: false, width: 320, height: 180, follow: null, smoothing: 1 },
+        instances: [{ id: "i1", object: "o1", layer: "L", x: 0, y: 0, scaleX: 1, scaleY: 1, angle: 0, code: "" }] }],
+    };
+    return Buffer.from(zipSync({ "project.json": strToU8(JSON.stringify(project)), "assets/index.json": strToU8("{}") }));
+  };
+  const py = (p: Page, code: string) => p.evaluate((c) => (window as any).__gameide.host.evalPython(c), code);
+  const started = async (p: Page, n: number) => {
+    await p.getByTestId("player-start").click({ timeout: 60_000 });
+    await expect.poll(() => py(p, "global_vars.version"), { timeout: 30_000 }).toBe(n);
+  };
+
+  const owner = await signedIn(browser, "val@example.com");
+  await owner.page.goto("/#/games");
+  await owner.page.getByTestId("import-file").setInputFiles({ name: "v1.zip", mimeType: "application/zip", buffer: version(1) });
+  await owner.page.waitForURL(/#\/p\//, { timeout: 30_000 });
+  await expect(owner.page.getByTestId("save-status")).toHaveText("Saved", { timeout: 30_000 });
+  const link = await publish(owner.page, "Valley", "unlisted");
+
+  // A player gets somewhere, and the game saves it in their account.
+  const player = await signedIn(browser, "pip@example.com");
+  await player.page.goto(link);
+  await started(player.page, 1);
+  await py(player.page, 'save_set("level", 7)');
+  const id = link.split("/").pop()!;
+  await expect.poll(async () => (await (await player.page.request.get(`/api/play/${id}/save`)).json()).data, { timeout: 20_000 }).toEqual({ level: 7 });
+
+  // Version 2, put over the same game from My Games (not imported as a new one), and published again.
+  await owner.page.goto("/#/games");
+  owner.page.once("dialog", (d) => void d.accept());
+  const card = owner.page.getByTestId("project-card").filter({ hasText: "Valley v1" });
+  await card.getByTestId("update-game").click();
+  await owner.page.getByTestId("update-file").setInputFiles({ name: "v2.zip", mimeType: "application/zip", buffer: version(2) });
+  await expect(owner.page.getByTestId("project-card").filter({ hasText: "Valley v" })).toHaveCount(1);
+  await card.getByTestId("project-link").click();
+  await expect(owner.page.getByTestId("save-status")).toHaveText("Saved", { timeout: 30_000 });
+  expect(await publish(owner.page, "Valley", "unlisted")).toBe(link);
+  // Published before: the dialog shows the link at once, so wait for the new version itself.
+  await expect
+    .poll(async () => (await (await owner.page.request.get(`/api/play/${id}`)).json()).project.objects[0].events[0].code, { timeout: 30_000 })
+    .toContain("= 2");
+
+  // The same link plays version 2, and the player's save is still theirs.
+  await player.page.reload();
+  await started(player.page, 2);
+  expect(await py(player.page, 'save_get("level")')).toBe(7);
+  await player.ctx.close();
+  await owner.ctx.close();
+});
+
 test("a published game plays on an iPhone (Safari's engine)", async ({ browser }) => {
   test.skip(!existsSync(webkit.executablePath()), "WebKit isn't installed: npx playwright install webkit");
   const { ctx, page } = await signedIn(browser, "ivy@example.com");

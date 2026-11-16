@@ -2047,6 +2047,13 @@ CASES = [
  ('assign tutorial: leftover points lost', "src/notes/points.ts", '    return Array.from({ length: n }, (_, i) => base + (i >= n - extra ? 1 : 0));', '    return Array.from({ length: n }, () => base);', "shares a total out"),
  ('assign tutorial: its starting game left behind', "src/editor/ClassPages.tsx", '      await store.remove(starter.id).catch(() => undefined);\n    }\n  };', '    }\n  };', "straight from New assignment", E2E),
 
+ ('saves: an older save wins', "../backend/publishing.py", '        elif int(at) < row.at:\n            return jsonify(kept=False, at=row.at)', '        elif False:\n            return jsonify(kept=False, at=row.at)', "an older save sent late is left out", PY),
+ ('saves: anyone gets anyone\'s', "../backend/publishing.py", '        row = db.query(GameSave).filter_by(published_id=pub.id, user_id=user.id).first()\n        if row is None:\n            return jsonify(data=None, at=0)', '        row = db.query(GameSave).filter_by(published_id=pub.id).first()\n        if row is None:\n            return jsonify(data=None, at=0)', "never to anyone else", PY),
+ ('saves: unpublishing leaves them', "../backend/publishing.py", '    for table in (PublishedAsset, Like, Report, HighScore, GameSave):', '    for table in (PublishedAsset, Like, Report, HighScore):', "unpublishing takes the link down", PY),
+ ('saves: the browser\'s copy always played', "src/player/cloudSave.ts", '  if (theirs.data && theirs.at > mine.at) {', '  if (false) {', "follows them to another computer", E2E),
+ ('saves: never sent to the account', "src/editor/gameHost.ts", '          this.events.saved?.(m.data, at);\n', '', "follows them to another computer", E2E),
+ ('update: a new game every time', "src/editor/ProjectsPage.tsx", '      const next: Project = { ...project, id: p.id,', '      const next: Project = { ...project, id: project.id,', "updated from a .zip", E2E),
+
  ('tell: the page drops them', NETS, '    if (o.tells && !this.away) this.tells.push(...o.tells);\n', '', "one player on a WebSocket and one polling", E2E),
 
 ]

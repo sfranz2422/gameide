@@ -42,6 +42,8 @@ export interface ApiOptions {
   method?: string;
   json?: unknown;
   body?: Blob;
+  /** Let it finish as the page closes (a game's save going to the player's account). */
+  keepalive?: boolean;
 }
 
 /**
@@ -57,6 +59,7 @@ export async function api<T = unknown>(path: string, opts: ApiOptions = {}): Pro
       credentials: "same-origin",
       headers: opts.json !== undefined ? { "Content-Type": "application/json" } : opts.body ? { "Content-Type": opts.body.type || "application/octet-stream" } : {},
       body: opts.json !== undefined ? packed(opts.json) : opts.body,
+      ...(opts.keepalive ? { keepalive: true } : {}),
     });
   } catch {
     throw new OfflineError();

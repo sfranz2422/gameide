@@ -240,8 +240,17 @@ engine failure in the player is shown, never a silent black screen.
   frame while running and sends a "pads" input when they change; InputState
   latches pressed/released like keys.
 - **Save data** is localStorage `gameide-save:<id>` — the project id in the
-  editor; a published game's own id later. Handed in as `def.save`, sent
-  out whole as "save" when it changes.
+  editor, `play:<slug>` for a published game. Handed in as `def.save`, sent
+  out whole as "save" when it changes, stamped with when (`gameide-save-at:`).
+- **A published game's save is kept in the player's account too** when they're
+  signed in (2026-11-16, the teacher's ask: play at home, and keep progress
+  through updates): `gamestore.GameSave`, `publishing.get_save/put_save`,
+  `player/cloudSave.ts`. Before a game starts, `settle` plays the newer of the
+  browser's copy and the account's; `CloudSaver` sends new saves up at most every
+  4 s and as the page hides. Saving isn't activity (`_counts_as_activity`).
+  Unpublishing deletes them. Publishing again keeps the slug, so an update keeps
+  every save: **update a showcase game with My Games' Update (a .zip over the same
+  game, the old one kept in History), never by importing it as a new game**.
 - **Fonts** load in the worker (`gameWorker.loadFonts`) as
   `gameide-font-<index>`; text commands carry the font index and size.
 - Uploads: `store/assetTypes.ts` and `gamestore.sniff_asset` must agree

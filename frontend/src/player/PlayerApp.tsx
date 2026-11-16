@@ -12,6 +12,7 @@ import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import type { PythonGameError } from "../engine/engine";
 import { GameHost } from "../editor/gameHost";
 import { buildGame } from "../python/codegen";
+import { CloudSaver, settle } from "./cloudSave";
 import { api } from "../store/api";
 
 /** A POST to our server, as a result rather than a throw: the header shows the sentence. */
@@ -83,6 +84,8 @@ export function PlayerApp() {
   // A one-against-one game (its rooms hold two) gets "Find me a match" in its lobby.
   const matchable = multi && pkg?.project.settings.netPlayers === 2;
   const net = useRef<NetSession | null>(null);
+  /** Sends the game's saves to the player's account (cloudSave.ts); none for an exported game. */
+  const cloud = useRef<CloudSaver | null>(null);
   const [joined, setJoined] = useState<Joined | null>(null);
   const [alone, setAlone] = useState(false);
   const [here, setHere] = useState(1);
@@ -108,13 +111,17 @@ export function PlayerApp() {
       stats: () => undefined,
       ready: setPythonReady,
       score: (n) => sendScore.current(n),
+      saved: (data, at) => cloud.current?.saved(data, at),
       net: (o) => net.current?.out(o),
       held: (on) => net.current?.hold(on),
     });
     host.current = h;
     (window as unknown as Record<string, unknown>).__gameide = { host: h };
     h.container = stage.current;
-    return () => h.dispose();
+    return () => {
+      cloud.current?.stop();
+      h.dispose();
+    };
   }, []);
 
   useEffect(() => {
@@ -129,8 +136,17 @@ export function PlayerApp() {
       .catch((e: Error) => setPhase({ kind: "failed", message: e.message, ...(e instanceof PlayError ? { status: e.status } : {}) }));
   }, [id]);
 
-  const start = () => {
+  const start = () => void begin();
+  const begin = async () => {
     if (!pkg || !host.current) return;
+    // A published game's save is kept in the player's account too, when they're
+    // signed in (cloudSave.ts): the newer copy is played, and new saves go up.
+    if (id) {
+      setPhase({ kind: "playing" });
+      await settle(id, `play:${id}`);
+      cloud.current?.stop();
+      cloud.current = new CloudSaver(id, (text) => console.warn(text));
+    }
     const { def: built } = buildGame(pkg.project, pkg.assets);
     // In a room, the game starts knowing who it is there (net_room, net_me).
     const def = net.current ? { ...built, net: net.current.forGame } : built;

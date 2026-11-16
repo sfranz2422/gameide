@@ -45,10 +45,14 @@ export interface HostEvents {
   net?: (out: NetOut) => void;
   /** The game was held for a Python check, or let go: a player is away from their room meanwhile. */
   held?: (on: boolean) => void;
+  /** save_set changed the save (already kept in this browser): only the published player listens, to keep it in the player's account. */
+  saved?: (data: Record<string, unknown>, at: number) => void;
 }
 
 /** Where a game keeps what it saves (save_set), in this browser. */
 export const saveKey = (gameId: string) => `gameide-save:${gameId}`;
+/** When this browser's copy was saved (ms): the newer of it and the account's copy is played (player/cloudSave.ts). */
+export const saveAtKey = (gameId: string) => `gameide-save-at:${gameId}`;
 
 export function readSave(gameId: string): Record<string, unknown> {
   try {
@@ -246,12 +250,16 @@ export class GameHost {
         if (m.ok) for (const w of this.okWaiters.splice(0)) w();
         break;
       case "save":
-        if (this.saveId)
+        if (this.saveId) {
+          const at = Date.now();
           try {
             localStorage.setItem(saveKey(this.saveId), JSON.stringify(m.data));
+            localStorage.setItem(saveAtKey(this.saveId), String(at));
           } catch {
             this.events.output([{ text: "This browser wouldn't keep the game's save data (it may be full, or in a private window).", kind: "warn" }]);
           }
+          this.events.saved?.(m.data, at);
+        }
         break;
     }
   }

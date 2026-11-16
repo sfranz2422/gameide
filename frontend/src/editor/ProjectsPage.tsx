@@ -91,6 +91,27 @@ export function ProjectsPage() {
       location.hash = `#/p/${project.id}`;
     });
 
+  /**
+   * A new version of a game, from a .zip, put over this one: the same game, so
+   * publishing it again keeps its link and every player's save (a showcase game's
+   * new build, imported, used to be a new game, and everyone started again). The
+   * version it replaces is kept in History. Its name stays.
+   */
+  const [updating, setUpdating] = useState<ProjectSummary | null>(null);
+  const updateInput = useRef<HTMLInputElement>(null);
+  const updateFrom = (p: ProjectSummary, file: File) =>
+    act(async () => {
+      const { project, assets } = await importZip(file, []);
+      const old = await store.load(p.id);
+      if (!old) throw new Error("That game couldn't be opened.");
+      if (!confirm(`Replace "${p.name}" with the game in ${file.name}?\n\nWhat it is now is kept in History. If it's published, publish it again to update it: everyone who plays it keeps their save.`))
+        return;
+      await store.saveVersion?.(p.id, "Before an update from a .zip");
+      const next: Project = { ...project, id: p.id, name: old.name, created: old.created, modified: new Date().toISOString() };
+      await putProject(store, next, assets);
+      await refresh();
+    });
+
   const exportGame = (p: ProjectSummary) =>
     act(async () => {
       const project = await store.load(p.id);
@@ -146,6 +167,18 @@ export function ProjectsPage() {
             {Icon.upload()} Import a game
           </button>
           <input
+            ref={updateInput}
+            type="file"
+            accept=".zip,application/zip"
+            hidden
+            data-testid="update-file"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              e.target.value = "";
+              if (f && updating) void updateFrom(updating, f);
+            }}
+          />
+          <input
             ref={fileInput}
             type="file"
             accept=".zip,application/zip"
@@ -195,7 +228,19 @@ export function ProjectsPage() {
               <span className="muted small">{list.length ? "From a template, or from nothing" : "Make your first one"}</span>
             </button>
             {shown.map((p) => (
-              <GameCard key={p.id} p={p} store={store} busy={busy} exportGame={exportGame} clone={clone} remove={remove} />
+              <GameCard
+                key={p.id}
+                p={p}
+                store={store}
+                busy={busy}
+                exportGame={exportGame}
+                clone={clone}
+                remove={remove}
+                update={(g) => {
+                  setUpdating(g);
+                  updateInput.current?.click();
+                }}
+              />
             ))}
           </div>
         )}
@@ -291,6 +336,7 @@ function GameCard({
   exportGame,
   clone,
   remove,
+  update,
 }: {
   p: ProjectSummary;
   store: ProjectStore;
@@ -298,6 +344,7 @@ function GameCard({
   exportGame: (p: ProjectSummary) => void;
   clone: (p: ProjectSummary) => void;
   remove: (p: ProjectSummary) => void;
+  update: (p: ProjectSummary) => void;
 }) {
   const icon = useIcon(store, p);
   const badge = gameBadge(p.id);
@@ -327,6 +374,9 @@ function GameCard({
       <div className="project-card-actions">
         <button className="card-act" disabled={busy} onClick={() => exportGame(p)} title="Download it as a .zip">
           {Icon.download()} Export
+        </button>
+        <button className="card-act" disabled={busy} onClick={() => update(p)} data-testid="update-game" title="Put a newer version of this game over it, from a .zip: published again, players keep their saves">
+          {Icon.upload()} Update
         </button>
         <button className="card-act" disabled={busy} onClick={() => clone(p)} data-testid="clone-game">
           {Icon.copy()} Clone

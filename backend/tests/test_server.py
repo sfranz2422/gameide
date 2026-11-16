@@ -300,6 +300,21 @@ check("players see the published version, not the one being edited", anon.get(f"
 alice.post("/api/projects/pub1/publish", json={"title": "Coin Run", "visibility": "unlisted"})
 check("…until it is published again", anon.get(f"/api/play/{SLUG}").get_json()["project"]["name"] == "Coin Run 2")
 
+# Saves in the player's account: theirs alone, the newest kept, and kept through an update.
+check("a save needs signing in", anon.get(f"/api/play/{SLUG}/save").status_code == 401)
+check("a player with no save has none", bob.get(f"/api/play/{SLUG}/save").get_json() == {"data": None, "at": 0})
+check("a save is kept in the player's account", bob.put(f"/api/play/{SLUG}/save", json={"data": {"level": 3}, "at": 2000}).get_json()["kept"])
+check("…and comes back to them", bob.get(f"/api/play/{SLUG}/save").get_json() == {"data": {"level": 3}, "at": 2000})
+check("…and never to anyone else", carol.get(f"/api/play/{SLUG}/save").get_json()["data"] is None
+      and "level" not in alice.get(f"/api/play/{SLUG}/save").get_data(as_text=True))
+check("an older save sent late is left out", not bob.put(f"/api/play/{SLUG}/save", json={"data": {"level": 1}, "at": 1000}).get_json()["kept"]
+      and bob.get(f"/api/play/{SLUG}/save").get_json()["data"] == {"level": 3})
+check("a save must be names and values", bob.put(f"/api/play/{SLUG}/save", json={"data": [1, 2], "at": 3000}).status_code == 400)
+check("…and say when it was made", bob.put(f"/api/play/{SLUG}/save", json={"data": {}, "at": "now"}).status_code == 400)
+check("…and not be huge", bob.put(f"/api/play/{SLUG}/save", json={"data": {"x": "a" * 600_000}, "at": 4000}).status_code == 413)
+alice.post("/api/projects/pub1/publish", json={"title": "Coin Run", "visibility": "unlisted"})
+check("publishing again (an update) keeps everyone's saves", bob.get(f"/api/play/{SLUG}/save").get_json()["data"] == {"level": 3})
+
 # Class games: members, its teacher and admins only.
 r = alice.post("/api/projects/pub1/publish", json={"title": "Coin Run", "visibility": "class", "classId": P4 + 1})
 check("a game can't go to a class its author isn't in", r.status_code == 400)
@@ -310,6 +325,8 @@ check("…open to a classmate", carol.get(f"/api/play/{SLUG}").status_code == 20
 check("…to its teacher", teacher.get(f"/api/play/{SLUG}").status_code == 200)
 check("…and to an admin", admin.get(f"/api/play/{SLUG}").status_code == 200)
 check("…and its files are closed the same way", bob.get(f"/api/play/{SLUG}/assets/pic1").status_code == 403)
+check("…and so are saves", bob.get(f"/api/play/{SLUG}/save").status_code == 403
+      and bob.put(f"/api/play/{SLUG}/save", json={"data": {"level": 9}, "at": 9000}).status_code == 403)
 g = carol.get(f"/api/gallery/{P4}").get_json()
 check("it is in the class's gallery", [x["id"] for x in g["games"]] == [SLUG], g)
 check("the gallery is only for its class", bob.get(f"/api/gallery/{P4}").status_code == 403)

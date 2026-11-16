@@ -36,7 +36,7 @@ from sqlalchemy.exc import IntegrityError
 import accounts
 import gamestore
 from accounts import now
-from gamestore import ClassSettings, GameAsset, GameProject, HighScore, Like, Published, PublishedAsset, Report
+from gamestore import ClassSettings, GameAsset, GameProject, GameSave, HighScore, Like, Published, PublishedAsset, Report
 
 bp = Blueprint("publishing", __name__)
 
@@ -312,7 +312,7 @@ def unpublish(slug):
 def _delete(db, pub):
     import multiplayer
     multiplayer.delete_rooms(db, pub.id)
-    for table in (PublishedAsset, Like, Report, HighScore):
+    for table in (PublishedAsset, Like, Report, HighScore, GameSave):
         db.query(table).filter_by(published_id=pub.id).delete()
     db.delete(pub)
 
@@ -541,6 +541,62 @@ def post_score(slug):
             db.rollback()
             return jsonify(kept=False)
         return jsonify(kept=True)
+    finally:
+        db.close()
+
+
+@bp.get("/api/play/<slug>/save")
+def get_save(slug):
+    """This player's own save for this game (gamestore.GameSave), or none: never anyone else's."""
+    db = _db()
+    try:
+        user = _need_user(db)
+        pub = _pub_or_404(db, slug)
+        why = _viewable(db, pub, user)
+        if why:
+            return err(*why)
+        row = db.query(GameSave).filter_by(published_id=pub.id, user_id=user.id).first()
+        if row is None:
+            return jsonify(data=None, at=0)
+        return jsonify(data=json.loads(row.data), at=row.at)
+    finally:
+        db.close()
+
+
+@bp.put("/api/play/<slug>/save")
+def put_save(slug):
+    """{data: what the game saved, at: when (ms)}. An older copy than the one kept
+    (another computer's, sent late) is left out, so the newest always wins."""
+    db = _db()
+    try:
+        user = _need_user(db)
+        pub = _pub_or_404(db, slug)
+        why = _viewable(db, pub, user)
+        if why:
+            return err(*why)
+        body = request.get_json(silent=True) or {}
+        data, at = body.get("data"), body.get("at")
+        if not isinstance(data, dict):
+            return err("A save is what the game saved: a set of names and values.", 400)
+        if isinstance(at, bool) or not isinstance(at, (int, float)) or not 0 < at < 1e14:
+            return err("When was it saved?", 400)
+        text = json.dumps(data, separators=(",", ":"))
+        if len(text.encode("utf-8")) > gamestore.MAX_SAVE_BYTES:
+            return err(f"This game's save is too big to keep in your account ({gamestore.MAX_SAVE_BYTES // 1000} KB at most). "
+                       "It's still kept in this browser.", 413)
+        row = db.query(GameSave).filter_by(published_id=pub.id, user_id=user.id).first()
+        if row is None:
+            row = GameSave(published_id=pub.id, user_id=user.id)
+            db.add(row)
+        elif int(at) < row.at:
+            return jsonify(kept=False, at=row.at)
+        row.data, row.size, row.at, row.updated_at = text, len(text), int(at), now()
+        try:
+            db.commit()
+        except IntegrityError:   # two tabs saving a first time at once: one row is enough
+            db.rollback()
+            return jsonify(kept=False)
+        return jsonify(kept=True, at=row.at)
     finally:
         db.close()
 

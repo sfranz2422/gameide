@@ -308,6 +308,27 @@ class HighScore(Base):
 
 
 
+class GameSave(Base):
+    """What a signed-in player's game saved (save_set) in one published game, so it
+    follows them to another computer, and outlives the browser (the teacher's ask,
+    2026-11-16: "they can play at home, or if we update the game they don't lose
+    their progress"). The browser keeps its own copy too; `at` is when the game
+    wrote this one (the player's clock, in ms), and the newer of the two is played.
+    Publishing again keeps the game's id, so an update keeps everyone's saves."""
+    __tablename__ = "gameide_game_saves"
+    __table_args__ = (UniqueConstraint("published_id", "user_id", name="uq_gameide_game_save"),)
+
+    id = Column(Integer, primary_key=True)
+    published_id = Column(Integer, ForeignKey("gameide_published.id"), index=True, nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True, nullable=False)
+    data = Column(Text, nullable=False, default="{}")
+    size = Column(Integer, nullable=False, default=0)
+    at = Column(BigInteger, nullable=False, default=0)
+    updated_at = Column(DateTime, nullable=False, default=now)
+
+
+MAX_SAVE_BYTES = 512_000        # one game's save for one player: a whole farm town fits many times over
+
 # ---------------------------------------------------------------- multiplayer rooms (multiplayer.py)
 # A room lives as long as someone is in it, and a while after (multiplayer.py
 # deletes the idle ones), so these tables stay small. Times are epoch seconds
