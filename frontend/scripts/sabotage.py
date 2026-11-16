@@ -56,11 +56,13 @@ SAND = "sand"      # …or Pour Decisions', rebuilt the same way
 FLAGS = "flags"    # …or Snowfort Flags', rebuilt the same way
 LEMON = "lemon"    # …or Squeeze's, rebuilt the same way
 COOK = "cooking"   # …or Order Up!'s, rebuilt the same way
+SANDW = "sandwich" # …or Stack Shack's, rebuilt the same way
 def _sd(n): return f"../showcase/sand/game/{n}.py"
 def _ut(n): return f"../showcase/undertow/game/{n}.py"
 def _fl(n): return f"../showcase/flags/game/{n}.py"
 def _lm(n): return f"../showcase/lemon/game/{n}.py"
 def _ck(n): return f"../showcase/cooking/game/{n}.py"
+def _sw(n): return f"../showcase/sandwich/game/{n}.py"
 SMR, SML, SMB = "../showcase/smash/game/_2rules.py", "../showcase/smash/game/_1levels.py", "../showcase/smash/build.py"
 def _sm(n): return f"../showcase/smash/game/{n}.py"
 def _rp(n): return f"../showcase/rpg/game/{n}.py"
@@ -2002,6 +2004,22 @@ CASES = [
  ('siege: the seed stays home', _sg("_3duel"), '            extra = [o.t, o.seed]', '            extra = [o.t, 0]', "same fireworks bursts", SIEGE),
  ('siege: dams and fireworks not sent', _sg("_3duel"), '"Cocoa", "BeaverDam", "Fireworks") for o in instances(name)]', '"Cocoa") for o in instances(name)]', "same fireworks bursts", SIEGE),
 
+ ('sandwich: piles never slide', _sw("_2stack"), '        if abs(middle - layers[i - 1]["dx"]) > margin(weight):\n            return i', '        if False:\n            return i', "slides off from where it doesn't", SANDW),
+ ('sandwich: only the top layer falls', _sw("_2stack"), '        fell = s["layers"][i:]\n        del s["layers"][i:]', '        fell = s["layers"][-1:]\n        del s["layers"][-1:]', "slides off from where it doesn't", SANDW),
+ ('sandwich: weight makes no difference', _sw("_2stack"), '    return LAYER_W / 2 * SUPPORT * HEAVY / (HEAVY + weight)', '    return LAYER_W / 2 * SUPPORT', "heavy pile holds less", SANDW),
+ ('sandwich: taps land anywhere', _sw("_2stack"), '    return top_dx(s) + rng.uniform(-JITTER, JITTER) + rng.uniform(-slip, slip)', '    return rng.uniform(-JITTER * 20, JITTER * 20)', "a tapped layer drops on", SANDW),
+ ('sandwich: quick taps lose layers', _sw("_5acts"), '    if f is not None:\n        land(f)\n        if not can_add(s):', '    if f is not None:\n        f.destroy()\n        if not can_add(s):', "a tapped layer drops on", SANDW),
+ ('sandwich: a drag lands in the middle', _sw("_5acts"), '            dx = (mouse_x - PLATE_X) / kitchen_scale(s) + random.uniform(-slip, slip)', '            dx = random.uniform(-slip, slip)', "dragged off to the side", SANDW),
+ ('sandwich: a drawn sauce is a zigzag', _sw("_5acts"), '            add_sauce(o.key, sorted(d["dots"]))', '            add_sauce(o.key, auto_squiggle())', "a sauce dragged over the top", SANDW),
+ ('sandwich: the top slice makes no meal', _sw("_5acts"), '    elif f.key == "top":', '    elif False:', "the top slice makes it a meal", SANDW),
+ ('sandwich: eaten in one bite', _sw("_2stack"), '    s["bites"] += 1\n', '    s["bites"] = BITES\n', "a bite a tap", SANDW),
+ ('sandwich: the book forgets', _sw("_2stack"), '    save_set("book", b)\n', '', "a bite a tap", SANDW),
+ ('sandwich: the board is the last sandwich', _sw("_2stack"), '    high_score(best())', '    high_score(tall)', "Stack Shack's board", SANDW),
+ ('sandwich: nothing locked', _sw("_2stack"), '    return LAYERS[key].get("unlock", 0) <= found_count()', '    return True', "stay locked", SANDW),
+ ('sandwich: a recipe nobody can make', _sw("_1rules"), 'has(s, "mozzarella", "tomato", "pesto")', 'has(s, "mozzarella", "tomato", "pesto", "olives")', "every secret recipe", SANDW),
+ ('sandwich: questions while building', _sw("Kitchen"), 'question_ok(False)', 'question_ok(True)', "one place questions may come", SANDW),
+ ('sandwich: keys never reach the plates', _sw("_4keys"), '        tap(o)\n', '        pass\n', "from the keyboard alone", SANDW),
+
  ('tell: the page drops them', NETS, '    if (o.tells && !this.away) this.tells.push(...o.tells);\n', '', "one player on a WebSocket and one polling", E2E),
 
 ]
@@ -2038,7 +2056,7 @@ for name, f, old, new, test, *extra in CASES:
             failed = any(l.startswith("FAIL") and test in l for l in out.splitlines())
             ran = "ok   " in out or "FAIL " in out
         else:
-            if runner in ([GM], [MM], [FB], [GF], [BB], [HC], [KT], [TD], [SM], [RP], [CLIMB], [UND], [SIEGE], [SAND], [FLAGS], [LEMON], [COOK]):
+            if runner in ([GM], [MM], [FB], [GF], [BB], [HC], [KT], [TD], [SM], [RP], [CLIMB], [UND], [SIEGE], [SAND], [FLAGS], [LEMON], [COOK], [SANDW]):
                 subprocess.run(["python3", str(ROOT.parent / f"showcase/{runner[0]}/build.py")], capture_output=True)
             cmd = ["npx", "playwright", "test", "-g", test] if runner == [E2E] else ["npx", "vitest", "run", "-t", test]
             r = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True)
@@ -2049,6 +2067,6 @@ for name, f, old, new, test, *extra in CASES:
         if not failed: bad.append(name)
     finally:
         p.write_text(src)
-        if runner in ([GM], [MM], [FB], [GF], [BB], [HC], [KT], [TD], [SM], [RP], [CLIMB], [UND], [SIEGE], [SAND], [FLAGS], [LEMON], [COOK]):
+        if runner in ([GM], [MM], [FB], [GF], [BB], [HC], [KT], [TD], [SM], [RP], [CLIMB], [UND], [SIEGE], [SAND], [FLAGS], [LEMON], [COOK], [SANDW]):
             subprocess.run(["python3", str(ROOT.parent / f"showcase/{runner[0]}/build.py")], capture_output=True)
 print("ALL SABOTAGES CAUGHT" if not bad else f"NOT CAUGHT: {bad}")

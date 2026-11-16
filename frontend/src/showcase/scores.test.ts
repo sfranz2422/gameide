@@ -375,3 +375,22 @@ on("cooking")("Order Up!'s board", () => {
     expect(g.scores).toEqual([7]);
   });
 });
+
+on("sandwich")("Stack Shack's board", () => {
+  it("is the tallest sandwich eaten, in layers; a shorter one later sends nothing", async () => {
+    const g = await start(builtAt("sandwich"));
+    expect(g.project.settings.scoreboard).toEqual({ unit: "layers" });
+    const eat = (fill: string[]) => {
+      g.py(`s = new_sandwich("white")\nfor k in ${JSON.stringify(fill)}:\n    add_layer(s, k, 0)\nadd_layer(s, "top", 0)\nglobal_vars.s = s\nroom_goto("Eat")`);
+      g.step(2);
+      g.py("for i in range(BITES):\n    eat_bite()");
+      g.step();
+    };
+    eat(["ham", "cheddar", "lettuce", "tomato"]);
+    expect(g.scores).toEqual([4]);
+    eat(["ham"]);
+    expect(g.scores).toEqual([4]);
+    eat(["ham", "ham", "ham", "ham", "ham", "ham", "ham"]);
+    expect(g.scores).toEqual([4, 7]);
+  });
+});

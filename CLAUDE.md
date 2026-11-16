@@ -346,7 +346,7 @@ code (the harness turns bytecode caching off for that reason), or a
 mistyped case name ran nothing and still reported success (the harness now
 refuses unknown names).
 
-**The showcase games' runners** (`GM`, `MM`, `FB`, `GF`, `BB`, `HC`, `KT`, `TD`, `SM`, `RP`, `CLIMB`, `UND`, `SIEGE`, `SAND`, `FLAGS`, `LEMON`, `COOK` — not `CL`, which is classes.py) rebuild
+**The showcase games' runners** (`GM`, `MM`, `FB`, `GF`, `BB`, `HC`, `KT`, `TD`, `SM`, `RP`, `CLIMB`, `UND`, `SIEGE`, `SAND`, `FLAGS`, `LEMON`, `COOK`, `SANDW` — not `CL`, which is classes.py) rebuild
 that game from the sabotaged source before its playtest and again after. A
 build that **refuses** (Greenside's course checks, Ridgeline Rally's stage
 checks) leaves the old `out/project.json`, and the test passes on it: a
@@ -821,3 +821,22 @@ could make. Python check questions only between days. Art: the teacher's Gemini 
 as the wrong person, so `SAME_PERSON` there stands another of theirs in. Difficulty was
 eased at the teacher's ask (2026-11-12): patience, how long food keeps, the first two
 star goals and the late crowds; the third star was kept where it was, so nothing got harder.
+
+## Stack Shack
+
+`showcase/sandwich/`: a sandwich maker (the teacher's ask, 2026-11-16, from screenshots of
+an old iPad one; an original game in that genre). No score but the board: the tallest
+sandwich eaten, in layers. Pick a bread and cut it, tap or drag layers on, draw sauces by
+dragging a bottle over the top, top it, add a side and a drink, then eat it bite by bite;
+secret recipes (`RECIPES`, each a `test` over `summary()`) go in a book, which unlocks the
+silly fillings. Every number is in `game/_1rules.py`; `_2stack.py` is the whole of the
+rules (where a layer lands, `falls_from`: every layer must have the middle of the weight on
+it over itself, with less room under a heavier pile, so tall stacks get hard). A Faller
+only shows a layer falling; `land()` applies the rules. **Python check questions only in
+the recipe book** (the teacher's choice): every other screen says `question_ok(False)`.
+Art is the teacher's Gemini sheets (`raw/`, cut by `cut_sheets.py` into `art/`). Gemini drew
+every filling and slice from above, not from the side: the build squashes each into a
+`slab` (SQUASH, with a side as deep as the layer is thick), so the pile is seen from a
+little above, and cuts a frame per bite (`bitten`), so a sandwich is eaten by drawing every
+layer at the same frame. Fillings are drawn a little wider than the bread (FILL_W) so they
+show at the sides.
