@@ -307,6 +307,58 @@ export const GEMINI_PACKS: LibraryPack[] = [
     ]
   },
   {
+    "id": "gemini-sandwich",
+    "name": "Stack Shack",
+    "author": "Google Gemini",
+    "licence": "Free for your games: please credit Gemini",
+    "credit": "Art made with Google Gemini",
+    "url": "https://gemini.google.com/",
+    "preview": "library/gemini/sandwich/preview.png",
+    "about": "Six breads (loaves and slices), thirty sandwich fillings seen from above, sauce bottles, sides, drinks, a kitchen and a recipe book.",
+    "sheets": [
+      {
+        "name": "Things",
+        "file": "library/gemini/sandwich/things.png",
+        "tileWidth": 200,
+        "tileHeight": 197,
+        "use": "sprites"
+      },
+      {
+        "name": "Big things",
+        "file": "library/gemini/sandwich/big-things.png",
+        "tileWidth": 88,
+        "tileHeight": 200,
+        "use": "sprites"
+      },
+      {
+        "name": "Backgrounds",
+        "file": "library/gemini/sandwich/backgrounds.png",
+        "tileWidth": 480,
+        "tileHeight": 270,
+        "use": "sprites"
+      }
+    ]
+  },
+  {
+    "id": "gemini-alchemy",
+    "name": "Mix Lab",
+    "author": "Google Gemini",
+    "licence": "Free for your games: please credit Gemini",
+    "credit": "Art made with Google Gemini",
+    "url": "https://gemini.google.com/",
+    "preview": "library/gemini/alchemy/preview.png",
+    "about": "162 cartoon icons: water, fire, weather, places, plants, animals, people, food, buildings and inventions, and an explorer's kit.",
+    "sheets": [
+      {
+        "name": "Things",
+        "file": "library/gemini/alchemy/things.png",
+        "tileWidth": 128,
+        "tileHeight": 128,
+        "use": "sprites"
+      }
+    ]
+  },
+  {
     "id": "gemini-undertow",
     "name": "Undertow",
     "author": "Google Gemini",

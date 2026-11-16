@@ -394,3 +394,19 @@ on("sandwich")("Stack Shack's board", () => {
     expect(g.scores).toEqual([4, 7]);
   });
 });
+
+on("alchemy")("Mix Lab's board", () => {
+  it("is how many things each player has found; a mix that finds nothing new sends nothing", async () => {
+    const g = await start(builtAt("alchemy"));
+    expect(g.project.settings.scoreboard).toEqual({ unit: "found" });
+    g.py('p = progress()\ntry_mix(p, "water", "fire")');
+    g.step();
+    expect(g.scores).toEqual([5]);
+    g.py('try_mix(p, "fire", "water")\ntry_mix(p, "fire", "fire")');
+    g.step();
+    expect(g.scores).toEqual([5]);
+    g.py('try_mix(p, "earth", "water")');
+    g.step();
+    expect(g.scores).toEqual([5, 6]);
+  });
+});

@@ -57,12 +57,14 @@ FLAGS = "flags"    # …or Snowfort Flags', rebuilt the same way
 LEMON = "lemon"    # …or Squeeze's, rebuilt the same way
 COOK = "cooking"   # …or Order Up!'s, rebuilt the same way
 SANDW = "sandwich" # …or Stack Shack's, rebuilt the same way
+MIX = "alchemy"    # …or Mix Lab's, rebuilt the same way
 def _sd(n): return f"../showcase/sand/game/{n}.py"
 def _ut(n): return f"../showcase/undertow/game/{n}.py"
 def _fl(n): return f"../showcase/flags/game/{n}.py"
 def _lm(n): return f"../showcase/lemon/game/{n}.py"
 def _ck(n): return f"../showcase/cooking/game/{n}.py"
 def _sw(n): return f"../showcase/sandwich/game/{n}.py"
+def _mx(n): return f"../showcase/alchemy/game/{n}.py"
 SMR, SML, SMB = "../showcase/smash/game/_2rules.py", "../showcase/smash/game/_1levels.py", "../showcase/smash/build.py"
 def _sm(n): return f"../showcase/smash/game/{n}.py"
 def _rp(n): return f"../showcase/rpg/game/{n}.py"
@@ -2020,6 +2022,24 @@ CASES = [
  ('sandwich: questions while building', _sw("Kitchen"), 'question_ok(False)', 'question_ok(True)', "one place questions may come", SANDW),
  ('sandwich: keys never reach the plates', _sw("_4keys"), '        tap(o)\n', '        pass\n', "from the keyboard alone", SANDW),
 
+ ('mix: a thing nobody can make', _mx("_1rules"), '("lightning", "puddle", "life")', '("lightning", "life", "life")', "everything can be made from the four", MIX),
+ ('mix: one pair, two things', _mx("_1rules"), '("plant", "night", "mushroom")', '("plant", "sun", "mushroom")', "everything can be made from the four", MIX),
+ ('mix: order matters', _mx("_2mix"), '    MIXES[(_b, _a)] = _c\n', '', "either way round", MIX),
+ ('mix: found twice is new twice', _mx("_2mix"), '    new = c not in p["found"]', '    new = True', "either way round", MIX),
+ ('mix: wrong pairs not counted', _mx("_2mix"), '        p["fails"] += 1\n', '', "a wrong pair is counted", MIX),
+ ('mix: a drag mixes nothing', _mx("_5acts"), '        other = piece_on(o)\n        if other is not None:\n            mix(o, other)', '        pass', "a piece onto another mixes them", MIX),
+ ('mix: the result appears somewhere else', _mx("_5acts"), '        x, y = b.x, b.y\n', '        x, y = bench_free_spot()\n', "a piece onto another mixes them", MIX),
+ ('mix: a wrong pair stays on top', _mx("_5acts"), "        a.x = clamp(a.x + (60 if a.x >= b.x else -60), BENCH[0], BENCH[2] - ICON)\n", '', "a piece onto another mixes them", MIX),
+ ('mix: tapping two cards mixes nothing', _mx("_5acts"), '            mix(place_piece(o.key, x, y), sel)', '            place_piece(o.key, x, y)', "a card, then another card", MIX),
+ ('mix: hints name what you have', _mx("_2mix"), '        if c not in p["found"] and a in p["found"] and b in p["found"]:', '        if c not in p["found"]:', "a hint names something", MIX),
+ ('mix: hints never wait', _mx("_5acts"), '        global_vars.hint_t = HINT_STEPS\n', '', "a hint names something", MIX),
+ ('mix: how skips a step', _mx("_2mix"), '        walk(a)\n        walk(b)\n', '        walk(a)\n', "how you made a thing", MIX),
+ ('mix: how mode still mixes', _mx("_5acts"), '            global_vars.how = o.key\n            sound_play("click", volume=0.4)\n            return', '            global_vars.how = o.key', "how you made a thing", MIX),
+ ('mix: an award never comes', _mx("_2mix"), '        "builder": {"house", "village", "city"} <= f,', '        "builder": {"house", "village", "city", "puppy"} <= f,', "earns every award", MIX),
+ ('mix: the board is never told', _mx("_2mix"), '        high_score(len(p["found"]))\n', '', "either way round", MIX),
+ ('mix: questions mid-drag', _mx("Lab"), 'question_ok(dragged() is None)', 'question_ok(True)', "except while something is being dragged", MIX),
+ ('mix: keys never reach the bench', _mx("_4keys"), '        tap(o)\n', '        pass\n', "from the keyboard alone", MIX),
+
  ('tell: the page drops them', NETS, '    if (o.tells && !this.away) this.tells.push(...o.tells);\n', '', "one player on a WebSocket and one polling", E2E),
 
 ]
@@ -2056,7 +2076,7 @@ for name, f, old, new, test, *extra in CASES:
             failed = any(l.startswith("FAIL") and test in l for l in out.splitlines())
             ran = "ok   " in out or "FAIL " in out
         else:
-            if runner in ([GM], [MM], [FB], [GF], [BB], [HC], [KT], [TD], [SM], [RP], [CLIMB], [UND], [SIEGE], [SAND], [FLAGS], [LEMON], [COOK], [SANDW]):
+            if runner in ([GM], [MM], [FB], [GF], [BB], [HC], [KT], [TD], [SM], [RP], [CLIMB], [UND], [SIEGE], [SAND], [FLAGS], [LEMON], [COOK], [SANDW], [MIX]):
                 subprocess.run(["python3", str(ROOT.parent / f"showcase/{runner[0]}/build.py")], capture_output=True)
             cmd = ["npx", "playwright", "test", "-g", test] if runner == [E2E] else ["npx", "vitest", "run", "-t", test]
             r = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True)
@@ -2067,6 +2087,6 @@ for name, f, old, new, test, *extra in CASES:
         if not failed: bad.append(name)
     finally:
         p.write_text(src)
-        if runner in ([GM], [MM], [FB], [GF], [BB], [HC], [KT], [TD], [SM], [RP], [CLIMB], [UND], [SIEGE], [SAND], [FLAGS], [LEMON], [COOK], [SANDW]):
+        if runner in ([GM], [MM], [FB], [GF], [BB], [HC], [KT], [TD], [SM], [RP], [CLIMB], [UND], [SIEGE], [SAND], [FLAGS], [LEMON], [COOK], [SANDW], [MIX]):
             subprocess.run(["python3", str(ROOT.parent / f"showcase/{runner[0]}/build.py")], capture_output=True)
 print("ALL SABOTAGES CAUGHT" if not bad else f"NOT CAUGHT: {bad}")

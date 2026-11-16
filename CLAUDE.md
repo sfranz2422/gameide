@@ -346,7 +346,7 @@ code (the harness turns bytecode caching off for that reason), or a
 mistyped case name ran nothing and still reported success (the harness now
 refuses unknown names).
 
-**The showcase games' runners** (`GM`, `MM`, `FB`, `GF`, `BB`, `HC`, `KT`, `TD`, `SM`, `RP`, `CLIMB`, `UND`, `SIEGE`, `SAND`, `FLAGS`, `LEMON`, `COOK`, `SANDW` — not `CL`, which is classes.py) rebuild
+**The showcase games' runners** (`GM`, `MM`, `FB`, `GF`, `BB`, `HC`, `KT`, `TD`, `SM`, `RP`, `CLIMB`, `UND`, `SIEGE`, `SAND`, `FLAGS`, `LEMON`, `COOK`, `SANDW`, `MIX` — not `CL`, which is classes.py) rebuild
 that game from the sabotaged source before its playtest and again after. A
 build that **refuses** (Greenside's course checks, Ridgeline Rally's stage
 checks) leaves the old `out/project.json`, and the test passes on it: a
@@ -840,3 +840,21 @@ every filling and slice from above, not from the side: the build squashes each i
 little above, and cuts a frame per bite (`bitten`), so a sandwich is eaten by drawing every
 layer at the same frame. Fillings are drawn a little wider than the bread (FILL_W) so they
 show at the sides.
+
+## Mix Lab
+
+`showcase/alchemy/`: a combining game (the teacher's ask, 2026-11-16: in the genre of
+Little Alchemy, so an ORIGINAL one: own name, own list, own look). Start with Water, Fire,
+Earth and Air; 144 things, every one and every recipe in `game/_1rules.py` (`THINGS`,
+`RECIPES`, both orders of a pair work); `_2mix.py` is the rules (mixing, hints, `steps_to`
+for How?, the 20 achievements). alchemy.test.ts checks everything can be made from the four
+and no pair makes two things, and a bot finds all 144 through `tap()` earning every award.
+What you find shows up living in the little world along the top (`WORLD`, drawn by World).
+Drag one thing onto another, or tap two in turn (cards in the collection, pieces on the
+bench) — the same `mix()`. Hints go in RECIPES' order, so list a recipe after the ones its
+ingredients come from. Questions any time except mid-drag. Board: things found.
+Art: the teacher's Gemini icon sheets, which came back inside a wooden frame (`magenta_box`)
+on magenta lighter in the middle, so `key_magenta` keys by how magenta a pixel is, only
+outside the outlines, and cuts by the 6 × 3 grid. Picture 1 came back as 18 adventure things
+instead of the workbench: cut as `extra_*` for the art library; the bench is still the
+build's. Both new games are art library packs (`make_gemini_library.py sandwich alchemy`).

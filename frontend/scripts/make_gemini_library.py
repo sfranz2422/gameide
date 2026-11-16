@@ -45,8 +45,9 @@ MAX_W = 1024
 CREDIT = "Art made with Google Gemini"
 
 # id: (folder, name, about, base scale, [group patterns]). Base scale undoes a
-# game keeping its pictures bigger than it shows them (Order Up! and Squeeze
-# keep them at twice the size).
+# game keeping its pictures bigger than it shows them (Order Up!, Squeeze and
+# Mix Lab keep them at twice the size; Stack Shack's are up to 600 px across,
+# for its build to squash and bite).
 GAMES = {
     "climber": ("climber", "Snowcap Scramble", "Climbers in eight colours (stand, run, jump, fall, throw), snowballs, ice and rock ledges, pines, clouds and snowy mountains.",
                 1.0, [r"^(climber_[a-z]+)_"]),
@@ -62,6 +63,10 @@ GAMES = {
             1.0, []),
     "siege": ("siege", "Tabletop Siege", "Snow-fort troops in red and blue (kids, snowmen, penguins, yetis, moose and more), towers, castles, cards and snowballs.",
               1.0, [r"^(card)_"]),
+    "sandwich": ("sandwich", "Stack Shack", "Six breads (loaves and slices), thirty sandwich fillings seen from above, sauce bottles, sides, drinks, a kitchen and a recipe book.",
+                 1 / 3, []),
+    "alchemy": ("alchemy", "Mix Lab", "162 cartoon icons: water, fire, weather, places, plants, animals, people, food, buildings and inventions, and an explorer's kit.",
+                0.5, []),
     "undertow": ("undertow", "Undertow", "Divers in eight colours (walking, working, frozen, ghosts), sea creatures, a submarine base's floors, walls, doors and machines.",
                  1.0, [r"^(crew_[a-z]+)_"]),
 }

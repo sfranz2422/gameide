@@ -262,7 +262,7 @@ test("the free art library: every pack opens, with its preview, and every sheet 
     else await expect(page.getByTestId("library-credit"), id).toHaveCount(0);
     await page.getByRole("button", { name: "← All packs" }).click();
   }
-  expect(packs.filter((id) => id.startsWith("library-gemini-")).length).toBeGreaterThanOrEqual(8);
+  expect(packs.filter((id) => id.startsWith("library-gemini-")).length).toBeGreaterThanOrEqual(10);
   expect(errors).toEqual([]);
 });
 
