@@ -1291,6 +1291,40 @@ put(xc, TP, game["data"], game["version"])
 check("My Games knows a game's tutorial and how far it's got", ({g["id"]: g for g in xc.get("/api/projects").get_json()["projects"]}[TP].get("tutorial") or {}).get("step") == 2)
 check("…and so do the teacher's results", {x["email"]: x for x in teacher.get(f"/api/assignments/{TA}").get_json()["rows"]}["xc@example.com"]["tutorial"] == {"step": 2, "steps": 3})
 
+# New assignment's "a tutorial": a built-in as it ships, only its points changed.
+FG = tutmod.builtin("first-game")
+before_count = len(teacher.get(f"/api/classes/{XC}").get_json()["items"])
+r = teacher.post(f"/api/classes/{XC}/assignments", json={"title": "First Game", "project": "tg1", "outOf": None,
+                                                          "tutorial": {"origin": "builtin:first-game", "body": FG}})
+FA = r.get_json().get("slug")
+check("a built-in assigned as it ships: its notes are the built-in word for word", r.status_code == 201 and teacher.get(f"/api/assignments/{FA}").get_json()["notes"] == FG)
+FG20 = FG.replace("sprite player exists\n", "sprite player exists (5 points)\n", 1)
+r = teacher.post(f"/api/classes/{XC}/assignments", json={"title": "First Game, graded", "project": "tg1", "outOf": 20,
+                                                          "tutorial": {"origin": "builtin:first-game", "body": FG20}})
+FB = r.get_json().get("slug")
+got = teacher.get(f"/api/assignments/{FB}").get_json()
+check("…or with new points: they're what the assignment counts", r.status_code == 201 and got["notes"] == FG20
+      and next(t["points"] for t in got["tests"] if t["label"] == "sprite player exists") == 5 and got["outOf"] == 20)
+rows = {i["slug"]: i for i in teacher.get("/api/library").get_json()["items"]}
+check("…in a row of its own, named for its points", "(20 points)" in rows[r.get_json()["tutorial"]]["title"])
+r2 = teacher.post(f"/api/classes/{XC}/assignments", json={"title": "First Game, class 2", "project": "tg1", "outOf": 20,
+                                                           "tutorial": {"origin": "builtin:first-game", "body": FG20}})
+check("…the same points again use the same row", r2.status_code == 201 and r2.get_json()["tutorial"] == r.get_json()["tutorial"])
+count = len(teacher.get(f"/api/classes/{XC}").get_json()["items"])
+r = teacher.post(f"/api/classes/{XC}/assignments", json={"title": "Changed", "project": "tg1",
+                                                          "tutorial": {"origin": "builtin:first-game", "body": FG.replace("Player", "Hero", 1)}})
+check("…but a tutorial changed in more than its points is refused", r.status_code == 400)
+check("…and nothing is made when it is", len(teacher.get(f"/api/classes/{XC}").get_json()["items"]) == count)
+check("…nor for a built-in that isn't there", teacher.post(f"/api/classes/{XC}/assignments", json={
+    "title": "Nope", "project": "tg1", "tutorial": {"origin": "builtin:no-such-thing", "body": FG}}).status_code == 404)
+check("…nor for another teacher's tutorial", teacher.post(f"/api/classes/{XC}/assignments", json={
+    "title": "Nope", "project": "tg1", "tutorial": {"origin": "t:" + THEIRS, "body": TUT}}).status_code == 404)
+r = teacher.post(f"/api/classes/{XC}/assignments", json={"title": "Mine, 4 points", "project": "tg1", "outOf": 4,
+                                                          "tutorial": {"origin": "t:" + TS, "body": TUT.replace("object Ball exists", "object Ball exists (4 points)")}})
+check("one of the teacher's own, with new points, is assigned from a new row and theirs is left as it was",
+      r.status_code == 201 and r.get_json()["tutorial"] != TS and teacher.get(f"/api/library/{TS}").get_json()["body"] == TUT)
+check("…and the class has every one that was made", len(teacher.get(f"/api/classes/{XC}").get_json()["items"]) == before_count + 4)
+
 # The tests' database refuses what Postgres would: a row pointing at nothing.
 db = server.SessionLocal()
 try:

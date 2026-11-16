@@ -8,10 +8,12 @@
  * so it is right offline and signed out too. Start makes the tutorial's
  * starting game and opens it; Resume opens the game it's in.
  *
- * A class gets one through the library (#/library): Try it makes its
- * starting game, New assignment on the class page uses that game, and Link
- * to… makes the tutorial its notes (strict steps, Check all on its checks,
- * marks, Classroom — unchanged).
+ * A class gets one from New assignment on the class page ("A tutorial"):
+ * its starting game is made with makeStarter, copied by the server as the
+ * starter and taken away again, and the tutorial, as it is but for the points
+ * the teacher set (notes/points.ts), becomes the notes (strict steps, Check all
+ * on its checks, marks, Classroom — unchanged). Link to… in the library
+ * (#/library) still ties a tutorial to an assignment already made.
  */
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../store/api";
@@ -73,8 +75,12 @@ export async function startTutorial(store: ProjectStore, key: string): Promise<v
   location.hash = `#/p/${p.id}`;
 }
 
-/** The tutorial's starting game, made and saved in this person's games; its id. */
-async function makeStarter(store: ProjectStore, key: string, md: string): Promise<Project> {
+/**
+ * The tutorial's starting game, made and saved in this person's games. `online`:
+ * it must reach the server, not just this browser (New assignment hands it to the
+ * server to copy, as a starter).
+ */
+export async function makeStarter(store: ProjectStore, key: string, md: string, online = false): Promise<Project> {
   const t = parseTutorial(md);
   const build = TUTORIAL_STARTERS[t.meta.starter] ?? TUTORIAL_STARTERS.empty!;
   const { project, assets } = await build();
@@ -83,6 +89,10 @@ async function makeStarter(store: ProjectStore, key: string, md: string): Promis
   await store.putAssets(project.id, assets);
   const outcome = await store.save(project);
   if (outcome.state === "error") throw new Error(outcome.message ?? "It couldn't be saved.");
+  if (online && outcome.state !== "saved") {
+    await store.remove(project.id).catch(() => undefined);
+    throw new Error(outcome.state === "offline" ? "You're offline. Try again once you're back online." : outcome.message ?? "It couldn't be saved.");
+  }
   return project;
 }
 

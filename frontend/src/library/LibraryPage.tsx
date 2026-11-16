@@ -270,8 +270,9 @@ export function LibraryPage() {
                       {/* Try it, for every row: a teacher's own tutorials aren't on the Learn
                           page (only "Everyone" ones are), and a built-in here is followed as it
                           ships, or — once theirs — as they've changed it. It makes the
-                          tutorial's starting game in their games, which is also how a class
-                          gets one: New assignment from that game, then Link to… here. Notes
+                          tutorial's starting game in their games. A class gets one from New
+                          assignment's "A tutorial" (as it is, only its points set there); Link
+                          to… here ties one to an assignment already made. Notes
                           without a tutorial's header can't be followed: the server says so. */}
                       <button className="btn small" onClick={() => void act(() => startTutorial(store, key))} data-testid="library-try"
                         title="Follow it yourself, in a game of your own, as a student would">

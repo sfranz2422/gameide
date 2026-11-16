@@ -1878,6 +1878,38 @@ legend {
   justify-content: flex-end;
 }
 
+/* New assignment from a tutorial: what its checks and questions are worth. */
+.points-share {
+  margin: 4px 0 10px;
+  padding: 8px 10px;
+  background: var(--panel-2);
+  border-radius: 6px;
+}
+.points-share p {
+  margin: 4px 0;
+}
+.points-each {
+  max-height: 240px;
+  overflow: auto;
+  margin-top: 6px;
+}
+.points-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 0;
+}
+.points-what {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.points-row input {
+  width: 64px;
+}
+
 /* ---------------------------------------------------------------- projects page */
 .projects-page {
   display: grid;

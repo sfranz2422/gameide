@@ -21,6 +21,8 @@ import { Fragment } from "react";
 import DOMPurify from "dompurify";
 import { Icon } from "./ui/icons";
 import { StudentCalendar, TeacherCalendar } from "./ClassCalendar";
+import { makeStarter, tutorialMarkdown } from "../tutorials/TutorialPages";
+import { pointItems, showPoints, spread, sumPoints, withPoints } from "../notes/points";
 
 interface ClassroomState {
   configured: boolean;
@@ -510,7 +512,7 @@ function TeacherClass({ data, reload }: { data: ClassData; reload: () => void })
             )}
           </div>
         ))}
-        {!live.length && <p className="muted">No assignments yet. Press New assignment to hand out one of your games.</p>}
+        {!live.length && <p className="muted">No assignments yet. Press New assignment to hand out one of your games or a tutorial.</p>}
       </div>
 
       {archived.length > 0 && (
@@ -640,10 +642,26 @@ function TeacherClass({ data, reload }: { data: ClassData; reload: () => void })
   );
 }
 
+/** A tutorial New assignment can hand out: one of GameIDE's own, or one of the teacher's. */
+interface TutorialChoice {
+  /** builtin:<name> or t:<library slug>. */
+  key: string;
+  title: string;
+  /** Its shelf, for a built-in; "Your tutorials" for the teacher's own. */
+  group: string;
+}
+
 function NewAssignment({ classId, onClose, onMade }: { classId: number; onClose: () => void; onMade: () => void }) {
   const { store } = useSession();
+  const [from, setFrom] = useState<"game" | "tutorial">("game");
   const [games, setGames] = useState<ProjectSummary[] | null>(null);
   const [project, setProject] = useState("");
+  const [tutorials, setTutorials] = useState<TutorialChoice[] | null>(null);
+  const [tutorial, setTutorial] = useState("");
+  /** The chosen tutorial's text as it is, and its points (one per pointItems entry). */
+  const [md, setMd] = useState<string | null>(null);
+  const [points, setPoints] = useState<number[]>([]);
+  const [eachOne, setEachOne] = useState(false);
   const [title, setTitle] = useState("");
   const [outOf, setOutOf] = useState("");
   const [due, setDue] = useState("");
@@ -653,6 +671,63 @@ function NewAssignment({ classId, onClose, onMade }: { classId: number; onClose:
     // Only games already in the account: the starter is copied on the server.
     void store.list().then((l) => setGames(l.filter((g) => !g.unsynced)));
   }, [store]);
+  useEffect(() => {
+    if (from !== "tutorial" || tutorials) return;
+    // Every built-in as it ships (by shelf, as the Learn page has them), then the teacher's own.
+    const builtins = fetch(new URL("tutorials/index.json", document.baseURI))
+      .then((r) => r.json() as Promise<{ key: string; title: string; level: string }[]>)
+      .then((l) => l.map((t) => ({ key: `builtin:${t.key}`, title: t.title, group: t.level })));
+    const mine = api<{ items: { slug: string; title: string; kind: string }[] }>("/api/library").then(
+      (r) => r.items.filter((i) => i.kind === "tutorial").map((i) => ({ key: `t:${i.slug}`, title: i.title, group: "Your tutorials" })),
+      () => [] as TutorialChoice[],
+    );
+    void Promise.all([builtins, mine]).then(
+      ([b, m]) => setTutorials([...b, ...m]),
+      () => setProblem("The tutorials couldn't be loaded."),
+    );
+  }, [from, tutorials]);
+  const items = md === null ? [] : pointItems(md);
+  const worth = sumPoints(points);
+  const checks = items.map((it, i) => ({ ...it, points: points[i] ?? it.points }));
+  const sum = (kind: "check" | "question") => sumPoints(checks.filter((c) => c.kind === kind).map((c) => c.points));
+  const count = (kind: "check" | "question") => checks.filter((c) => c.kind === kind).length;
+  const chooseTutorial = (key: string) => {
+    setTutorial(key);
+    setMd(null);
+    setPoints([]);
+    setEachOne(false);
+    const t = tutorials?.find((x) => x.key === key);
+    if (!t) return;
+    setTitle(t.title);
+    void tutorialText(key).then(
+      (text) => {
+        setMd(text);
+        const own = pointItems(text).map((i) => i.points);
+        setPoints(own);
+        setOutOf(own.length ? String(Math.round(sumPoints(own))) : "");
+      },
+      (e) => setProblem(message(e)),
+    );
+  };
+  const make = async () => {
+    if (from === "game") {
+      await api(`/api/classes/${classId}/assignments`, { json: { title, project, outOf: outOf || null, dueAt: toUtc(due) } });
+      return;
+    }
+    // A tutorial: its starting game made in the teacher's games just long enough for
+    // the server to copy it as the starter, then taken away again.
+    const graded = !!outOf && items.length > 0;
+    const body = graded ? withPoints(md!, points) : md!;
+    const starter = await makeStarter(store, tutorial, body, true);
+    try {
+      await api(`/api/classes/${classId}/assignments`, {
+        json: { title, project: starter.id, outOf: graded ? Math.round(worth) : outOf || null, dueAt: toUtc(due), tutorial: { origin: tutorial, body } },
+      });
+    } finally {
+      await store.remove(starter.id).catch(() => undefined);
+    }
+  };
+  const groups = [...new Set((tutorials ?? []).map((t) => t.group))];
   return (
     <div className="modal-back" onPointerDown={onClose}>
       <form
@@ -664,41 +739,140 @@ function NewAssignment({ classId, onClose, onMade }: { classId: number; onClose:
           e.preventDefault();
           setBusy(true);
           setProblem(null);
-          api(`/api/classes/${classId}/assignments`, { json: { title, project, outOf: outOf || null, dueAt: toUtc(due) } }).then(onMade, (e) => {
+          make().then(onMade, (e) => {
             setProblem(message(e));
             setBusy(false);
           });
         }}
       >
         <h2>New assignment</h2>
-        <p className="muted small">Students each get their own copy of the game you choose, the first time they open the assignment's link.</p>
-        <label className="field">
-          Start from
-          <select
-            value={project}
-            onChange={(e) => {
-              setProject(e.target.value);
-              if (!title) setTitle(games?.find((g) => g.id === e.target.value)?.name ?? "");
-            }}
-            data-testid="assignment-game"
-          >
-            <option value="">Choose one of your games…</option>
-            {games?.map((g) => (
-              <option key={g.id} value={g.id}>
-                {g.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        {games && !games.length && <p className="muted small">You have no games yet. Make the starter on My Games first.</p>}
+        <div className="row" role="radiogroup" aria-label="Start from">
+          <label className="check">
+            <input type="radio" checked={from === "game"} onChange={() => setFrom("game")} data-testid="assignment-from-game" /> One of your games
+          </label>
+          <label className="check">
+            <input type="radio" checked={from === "tutorial"} onChange={() => setFrom("tutorial")} data-testid="assignment-from-tutorial" /> A tutorial
+          </label>
+        </div>
+        {from === "game" ? (
+          <>
+            <p className="muted small">Students each get their own copy of the game you choose, the first time they open the assignment's link.</p>
+            <label className="field">
+              Start from
+              <select
+                value={project}
+                onChange={(e) => {
+                  setProject(e.target.value);
+                  if (!title) setTitle(games?.find((g) => g.id === e.target.value)?.name ?? "");
+                }}
+                data-testid="assignment-game"
+              >
+                <option value="">Choose one of your games…</option>
+                {games?.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {games && !games.length && <p className="muted small">You have no games yet. Make the starter on My Games first.</p>}
+          </>
+        ) : (
+          <>
+            <p className="muted small">
+              The tutorial as it is, its steps as the notes: students each get its starting game. Only its points change here; to change its words, edit it in your Library.
+            </p>
+            <label className="field">
+              Tutorial
+              <select value={tutorial} onChange={(e) => chooseTutorial(e.target.value)} data-testid="assignment-tutorial">
+                <option value="">{tutorials ? "Choose a tutorial…" : "Loading the tutorials…"}</option>
+                {groups.map((g) => (
+                  <optgroup key={g} label={g}>
+                    {tutorials!.filter((t) => t.group === g).map((t) => (
+                      <option key={t.key} value={t.key}>
+                        {t.title}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
+            </label>
+          </>
+        )}
         <label className="field">
           Title
           <input value={title} onChange={(e) => setTitle(e.target.value)} data-testid="assignment-title" />
         </label>
         <label className="field">
-          Points (empty: not graded)
-          <input type="number" min={1} max={1000} value={outOf} onChange={(e) => setOutOf(e.target.value)} data-testid="assignment-points" />
+          {from === "tutorial" && items.length ? "Worth (points; empty: not graded)" : "Points (empty: not graded)"}
+          <input
+            type="number"
+            min={1}
+            max={1000}
+            value={outOf}
+            onChange={(e) => {
+              setOutOf(e.target.value);
+              const n = parseInt(e.target.value, 10);
+              // The tutorial's steps and questions share what it's worth out evenly.
+              if (from === "tutorial" && items.length && n >= 1) setPoints(spread(n, items.length));
+            }}
+            data-testid="assignment-points"
+          />
         </label>
+        {from === "tutorial" && md !== null && (
+          <div className="points-share" data-testid="assignment-share">
+            {!items.length ? (
+              <p className="muted small">This tutorial has no checks or questions: its grade is the score you give.</p>
+            ) : !outOf ? (
+              <p className="muted small">Not graded: its checks and questions are feedback only.</p>
+            ) : (
+              <>
+                <p className="small">
+                  {count("check")} check{count("check") === 1 ? "" : "s"} on its steps: <b>{showPoints(sum("check"))}</b> points
+                  {count("question") > 0 && (
+                    <>
+                      {" "}· {count("question")} question{count("question") === 1 ? "" : "s"}: <b>{showPoints(sum("question"))}</b> points
+                    </>
+                  )}{" "}
+                  · Total: <b data-testid="assignment-total">{showPoints(worth)}</b>{" "}
+                  <button type="button" className="btn small" onClick={() => setEachOne((v) => !v)} data-testid="assignment-each">
+                    {eachOne ? "Hide" : "Adjust each one…"}
+                  </button>
+                </p>
+                {eachOne && (
+                  <div className="points-each">
+                    {checks.map((c, i) => (
+                      <label key={i} className="points-row">
+                        <span className="points-what">
+                          <span className="muted small">{c.kind === "check" ? "Check" : "Question"}</span> {c.label}
+                        </span>
+                        <input
+                          type="number"
+                          min={0}
+                          max={1000}
+                          step="any"
+                          value={c.points}
+                          onChange={(e) => {
+                            const v = Math.max(0, Math.round((parseFloat(e.target.value) || 0) * 100) / 100);
+                            const next = checks.map((x) => x.points);
+                            next[i] = v;
+                            setPoints(next);
+                            setOutOf(String(Math.round(sumPoints(next))));
+                          }}
+                          data-testid="assignment-item-points"
+                        />
+                      </label>
+                    ))}
+                    <p className="muted small">A question at 0 is practice: it isn't graded.</p>
+                  </div>
+                )}
+                {Math.abs(worth - Math.round(worth)) > 0.001 && (
+                  <p className="error-text small">These add up to {showPoints(worth)}: make them a whole number of points.</p>
+                )}
+              </>
+            )}
+          </div>
+        )}
         <label className="field">
           Due (optional)
           <input type="datetime-local" value={due} onChange={(e) => setDue(e.target.value)} data-testid="assignment-due" />
@@ -708,13 +882,27 @@ function NewAssignment({ classId, onClose, onMade }: { classId: number; onClose:
           <button type="button" className="btn" onClick={onClose}>
             Cancel
           </button>
-          <button className="btn go" disabled={busy || !project || !title.trim()} data-testid="assignment-go">
-            Make it
+          <button
+            className="btn go"
+            disabled={
+              busy ||
+              !title.trim() ||
+              (from === "game" ? !project : !tutorial || md === null || (!!outOf && items.length > 0 && Math.abs(worth - Math.round(worth)) > 0.001))
+            }
+            data-testid="assignment-go"
+          >
+            {busy ? "Making it…" : "Make it"}
           </button>
         </div>
       </form>
     </div>
   );
+}
+
+/** A tutorial's text as it is now: a built-in as it ships, or the teacher's own row's. */
+async function tutorialText(key: string): Promise<string> {
+  if (key.startsWith("t:")) return (await api<{ body: string }>(`/api/library/${encodeURIComponent(key.slice(2))}`)).body;
+  return tutorialMarkdown(key);
 }
 
 // ---------------------------------------------------------------- #/assignment/<slug>

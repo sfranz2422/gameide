@@ -2040,6 +2040,13 @@ CASES = [
  ('mix: questions mid-drag', _mx("Lab"), 'question_ok(dragged() is None)', 'question_ok(True)', "except while something is being dragged", MIX),
  ('mix: keys never reach the bench', _mx("_4keys"), '        tap(o)\n', '        pass\n', "from the keyboard alone", MIX),
 
+ ('assign tutorial: changed text accepted', "../backend/classes.py", '    if without_points(text) != without_points(original):', '    if False:', "changed in more than its points", PY),
+ ('assign tutorial: a new row every time', "../backend/classes.py", '    for row in rows.all():\n        if row.body == text:\n            return row, None', '    for row in rows.all():\n        pass', "same points again use the same row", PY),
+ ('assign tutorial: points never written', "src/notes/points.ts", '        out[i] = p === 1 ? bare : `${bare} (${showPoints(p)} point${p === 1 ? "" : "s"})`;', '        out[i] = bare;', "rewrites only the points"),
+ ('assign tutorial: a repeated check counted twice', "src/notes/points.ts", '        const key = `c:${label}`;', '        const key = `c:${label}:${i}`;', "worth exactly 20 to the server"),
+ ('assign tutorial: leftover points lost', "src/notes/points.ts", '    return Array.from({ length: n }, (_, i) => base + (i >= n - extra ? 1 : 0));', '    return Array.from({ length: n }, () => base);', "shares a total out"),
+ ('assign tutorial: its starting game left behind', "src/editor/ClassPages.tsx", '      await store.remove(starter.id).catch(() => undefined);\n    }\n  };', '    }\n  };', "straight from New assignment", E2E),
+
  ('tell: the page drops them', NETS, '    if (o.tells && !this.away) this.tells.push(...o.tells);\n', '', "one player on a WebSocket and one polling", E2E),
 
 ]

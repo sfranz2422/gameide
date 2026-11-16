@@ -132,6 +132,59 @@ test("a teacher's tutorial, given to a class from the library, done by a student
   await tctx.close();
 });
 
+test("a built-in tutorial assigned straight from New assignment, as it ships, worth what the teacher says", async ({ browser }) => {
+  test.setTimeout(180_000);
+  const { ctx: tctx, page: teacher } = await signedIn(browser, "teach@example.com");
+  await teacher.goto("/#/classes");
+  await teacher.getByTestId("new-class-name").fill("Tutorials straight in");
+  await teacher.getByTestId("new-class-go").click();
+  await teacher.waitForURL(/#\/class\/\d+$/);
+  await teacher.getByTestId("roster-emails").fill("vee@example.com");
+  await teacher.getByTestId("roster-add").click();
+  await expect(teacher.getByText("vee@example.com")).toBeVisible();
+
+  // How many games of the teacher's are called that now (an earlier test may have made one).
+  const named = async () =>
+    ((await (await teacher.request.get("/api/projects")).json()) as { projects: { name: string }[] }).projects.filter((p) => p.name === "Your First Game").length;
+  const already = await named();
+
+  // No Try it, no Link to…: New assignment, "A tutorial", the built-in, what it's worth.
+  await teacher.getByTestId("new-assignment").click();
+  await teacher.getByTestId("assignment-from-tutorial").check();
+  await teacher.getByTestId("assignment-tutorial").selectOption({ label: "Your First Game" });
+  await expect(teacher.getByTestId("assignment-title")).toHaveValue("Your First Game");
+  await expect(teacher.getByTestId("assignment-share")).toContainText("checks on its steps");
+  await teacher.getByTestId("assignment-points").fill("20");
+  await expect(teacher.getByTestId("assignment-total")).toHaveText("20");
+  // Each one can be set by hand: the total follows.
+  await teacher.getByTestId("assignment-each").click();
+  const first = teacher.getByTestId("assignment-item-points").first();
+  const was = Number(await first.inputValue());
+  await first.fill(String(was + 3));
+  await expect(teacher.getByTestId("assignment-points")).toHaveValue("23");
+  await expect(teacher.getByTestId("assignment-total")).toHaveText("23");
+  await teacher.getByTestId("assignment-go").click();
+  await teacher.getByTestId("assignment-link").filter({ hasText: "Your First Game" }).click();
+  await teacher.waitForURL(/#\/assignment\/\w+$/);
+  const slug = teacher.url().split("/").pop()!;
+  const a = await (await teacher.request.get(`/api/assignments/${slug}`)).json();
+  expect(a.outOf).toBe(23);
+  expect(a.possible).toBe(23);
+  // The tutorial as it ships: only "(N points)" added to its checks.
+  const shipped = await (await teacher.request.get("/tutorials/first-game.md")).text();
+  expect(a.notes.replace(/ \(\d+(?:\.\d+)? points?\)$/gm, "").replace(/^points: .*\n/gm, "")).toBe(shipped);
+  // Its starting game was only borrowed: it isn't left in the teacher's games.
+  expect(await named()).toBe(already);
+
+  // The student gets the tutorial's starting game with its steps.
+  const { ctx: sctx, page: vee } = await signedIn(browser, "vee@example.com");
+  await vee.goto(`/a/${slug}`);
+  await vee.waitForURL(/#\/p\//);
+  await expect(vee.getByTestId("tutorial-step")).toHaveText("Step 1 of 8");
+  await sctx.close();
+  await tctx.close();
+});
+
 const QUESTION = `
 \`\`\`quiz
 What does "lines" hold in each scene?

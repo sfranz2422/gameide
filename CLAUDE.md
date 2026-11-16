@@ -565,9 +565,16 @@ header; steps are `---` slides; ` ```check ` blocks gate Next (strict); a
 - **The Learn page (#/tutorials) is public**: built-ins (less those an admin
   hid, `HiddenBuiltin`) and tutorials set to Everyone (`site`, admins only).
   It only follows tutorials: no Assign to, copy or download. A teacher's own
-  are "Only me", in their library. **A class gets a tutorial one way, as in
-  the other editors**: Try it (its starting game, in the teacher's games),
-  New assignment from that game, then Link to… in the library. **The
+  are "Only me", in their library. **A class gets a tutorial from New
+  assignment's "A tutorial"** (the teacher's ask, 2026-11-16: the old way, Try
+  it, New assignment from that game, then Link to…, still works): any built-in
+  or their own, **as it is, only its points changed**. The page sets them
+  (`notes/points.ts`: "Worth" shares out evenly, or each one by hand), makes
+  the starting game just long enough for the server to copy it, and sends the
+  text; `classes.tutorial_row` refuses one that differs in more than points
+  (`without_points`) and links a row with exactly that text, or a new one named
+  "<title> (N points)". points.test.ts holds every built-in to coming back word
+  for word, and to being worth exactly what was asked by checks.py and quiz.py. **The
   library lists every built-in as it ships**; editing or linking one makes
   the teacher's version, a row of its own named "<title> (copy)" beside it
   (`origin` builtin:<name>; old ones renamed once by `tutorials.migrate`). An assigned

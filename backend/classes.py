@@ -57,6 +57,7 @@ import library
 import notes
 import quiz
 import rewards
+import tutorials
 from accounts import now
 from gamestore import AssignmentGame, AssignmentWork, ClassSettings, Comment, GameAsset, GameProject, GameVersion
 
@@ -588,6 +589,68 @@ def _make_assignment(db, user, course, title, starter, out_of, due_at, position=
     return a
 
 
+# Points written into a tutorial: "(2 points)" at the end of a check's line, and a
+# question's "points: 2" line (checks.py and quiz.py read them).
+_LINE_POINTS = re.compile(r"[ \t]*\(\d{1,4}(?:\.\d{1,2})?\s*points?\)[ \t]*$", re.I | re.M)
+_QUESTION_POINTS = re.compile(r"^[ \t]*points?\s*:\s*\d{1,4}(?:\.\d{1,2})?[ \t]*\n", re.I | re.M)
+
+
+def without_points(text):
+    """A tutorial with every point written in it taken out: two that are the same but
+    for their points come out the same."""
+    text = str(text or "").replace("\r\n", "\n")
+    return _LINE_POINTS.sub("", _QUESTION_POINTS.sub("", text if text.endswith("\n") else text + "\n"))
+
+
+def tutorial_row(db, user, origin, text, out_of):
+    """The library row a tutorial assigned from New assignment links to (or an error).
+
+    `origin` is "builtin:<name>" (one of GameIDE's own) or "t:<slug>" (one of the
+    teacher's own rows), and `text` must be that tutorial word for word but for its
+    points: the teacher's ask was to assign tutorials "in their original state",
+    changing only what they're worth. A row with exactly this text is used again; a
+    new one is made otherwise, named for its points, so a tutorial assigned to two
+    classes at different points keeps both. A built-in's row never takes a teacher's
+    own edits of it (library.builtin_row would hand back the first row for it,
+    whatever it now says)."""
+    text = str(text or "")
+    if len(text) > library.MAX_TUTORIAL:
+        return None, err("That tutorial is too long.", 400)
+    if origin.startswith("builtin:"):
+        name = origin[len("builtin:"):]
+        original = tutorials.builtin(name)
+        if original is None:
+            return None, err("There's no such tutorial.", 404)
+        title = tutorials.meta(original)["title"]
+        rows = db.query(accounts.LibraryItem).filter_by(teacher_id=user.id, app=APP_NAME, kind="tutorial",
+                                                          origin=origin, archived=0)
+    elif origin.startswith("t:"):
+        mine = (db.query(accounts.LibraryItem)
+                .filter_by(slug=origin[2:18], app=APP_NAME, teacher_id=user.id, kind="tutorial", archived=0).first())
+        if mine is None:
+            return None, err("That tutorial isn't in your library.", 404)
+        original, title, origin = mine.body, mine.title, mine.origin or ""
+        if text == original:
+            return mine, None
+        rows = db.query(accounts.LibraryItem).filter_by(teacher_id=user.id, app=APP_NAME, kind="tutorial", archived=0)
+    else:
+        return None, err("Choose a tutorial.", 400)
+    if without_points(text) != without_points(original):
+        return None, err("That isn't the tutorial as it is: only its points can change here.", 400)
+    for row in rows.all():
+        if row.body == text:
+            return row, None
+    if text == original:
+        named = f"{title} (copy)"           # as the library names a built-in taken in
+    else:
+        named = f"{title} ({out_of} points)" if out_of else f"{title} (new points)"
+    row = accounts.LibraryItem(slug=library._new_slug(db), app=APP_NAME, teacher_id=user.id, kind="tutorial",
+                               title=named[:200], body=text, size=len(text.encode("utf-8")), origin=origin)
+    db.add(row)
+    db.flush()
+    return row, None
+
+
 @bp.post("/api/classes/<int:class_id>/assignments")
 def new_assignment(class_id):
     """An assignment from one of the teacher's games: its starter is a copy of
@@ -607,13 +670,25 @@ def new_assignment(class_id):
         due_at, problem2 = _parse_due(body.get("dueAt"))
         if problem or problem2:
             return err(problem or problem2, 400)
+        tut = body.get("tutorial")
+        item = None
+        if isinstance(tut, dict):
+            # Chosen in New assignment, as it is but for its points (tutorial_row):
+            # checked before anything is made, so a refusal leaves nothing behind.
+            item, problem = tutorial_row(db, user, str(tut.get("origin") or ""), tut.get("body"), out_of)
+            if problem:
+                db.rollback()
+                return problem
         starter = copy_project(db, src, user, f"{title} (starter)")
         a = _make_assignment(db, user, course, title, starter, out_of, due_at)
         db.commit()
         # A tutorial assigned to the class: linked to it in the library
         # (library.py), which writes it in as the assignment's notes and keeps
         # it in step from then on — the library is the only place notes change.
-        slug = str(body.get("tutorial") or "")
+        if item is not None:
+            library.link(db, item, a)
+            return jsonify(slug=a.slug, starter=starter.slug, tutorial=item.slug), 201
+        slug = str(tut or "")
         if slug:
             item = (db.query(accounts.LibraryItem)
                     .filter_by(slug=slug[:16], app=APP_NAME, teacher_id=user.id, kind="tutorial", archived=0).first())
