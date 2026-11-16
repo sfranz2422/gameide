@@ -34,6 +34,8 @@ interface Settings {
   author: string;
   tags: string[];
   teacher: boolean;
+  /** Their other published games, any of which this one can take the place of (keeping its link, scores and saves). */
+  others?: { id: string; title: string }[];
 }
 
 /** The running game's frame, shrunk to the size Explore shows, as a PNG data URL. */
@@ -74,6 +76,8 @@ function PublishDialog({ host, close }: { host: GameHost | null; close: () => vo
   const [settings, setSettings] = useState<Settings | null>(null);
   const [form, setForm] = useState({ title: project.name, description: "", author: "", tags: [] as string[], allowRemix: true, showcase: false, visibility: "unlisted" as Published["visibility"], classId: 0 });
   const [usePicture, setUsePicture] = useState(true);
+  /** Published in place of another of theirs (a new version imported as a game of its own): its slug, or "". */
+  const [replace, setReplace] = useState("");
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const signedIn = store.kind === "cloud";
@@ -108,9 +112,10 @@ function PublishDialog({ host, close }: { host: GameHost | null; close: () => vo
       if (saved.state !== "saved") throw new Error(saved.message ?? "The game couldn't be saved to your account first, so it can't be published yet.");
       const thumbnail = usePicture ? await picture(host) : null;
       const r = await api<{ published: Published }>(`/api/projects/${project.id}/publish`, {
-        json: { ...form, classId: form.visibility === "class" ? form.classId : null, ...(thumbnail ? { thumbnail } : {}) },
+        json: { ...form, classId: form.visibility === "class" ? form.classId : null, ...(thumbnail ? { thumbnail } : {}), ...(replace ? { replace } : {}) },
       });
-      setSettings((s) => (s ? { ...s, published: r.published } : s));
+      setSettings((s) => (s ? { ...s, published: r.published, others: (s.others ?? []).filter((o) => o.id !== replace) } : s));
+      setReplace("");
     } catch (e) {
       setProblem((e as Error).message);
     } finally {
@@ -169,6 +174,32 @@ function PublishDialog({ host, close }: { host: GameHost | null; close: () => vo
                   </a>
                 </div>
               </div>
+            )}
+            {!!settings?.others?.length && (
+              <label className="field">
+                Publish as
+                <select
+                  value={replace}
+                  onChange={(e) => {
+                    setReplace(e.target.value);
+                    const was = settings.others!.find((o) => o.id === e.target.value);
+                    if (was) set("title", was.title);
+                  }}
+                  data-testid="publish-replace"
+                >
+                  <option value="">A new game, with a link of its own</option>
+                  {settings.others.map((o) => (
+                    <option key={o.id} value={o.id}>
+                      A new version of “{o.title}”: its link, high scores and saves
+                    </option>
+                  ))}
+                </select>
+                {replace && (
+                  <span className="muted small">
+                    This game takes that one's place: the same link plays this one now, and everyone keeps their high score and save. The game it was published from stops being published.
+                  </span>
+                )}
+              </label>
             )}
             <label className="field">
               Title

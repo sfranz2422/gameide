@@ -21,6 +21,13 @@ OffscreenCanvas) and the loop. The page (`editor/gameHost.ts`) only sends
 input and a canvas, and gets stats, output and errors back. The page's
 **watchdog** interrupts Python through a SharedArrayBuffer when the worker
 goes quiet for 2 s, so an endless loop is reported at its line.
+If Python doesn't answer the interrupt, the worker is busy outside Python (a
+Chromebook uploading a big game's pictures to the GPU): it gets `KILL_MS`, 15 s,
+before it's stopped — at 1.5 s, Stack Shack and Zoomtown Cup were killed on
+Chromebooks with nothing looping. A game held for a Python check question is never
+stopped (`watchdog`, pure and tested). **The renderer is WebGL only** (`preference:
+["webgl"]`): Pixi fell back to WebGPU when its WebGL check failed on a Mac, and
+GameIDE's drawing breaks there ("reading 'location'").
 SharedArrayBuffer needs **COOP `same-origin` + COEP `credentialless`** on
 every page. `vite.config.ts` sends them in dev and preview; **the Flask
 server must send them too**, or the interrupt silently degrades to killing
@@ -251,6 +258,9 @@ engine failure in the player is shown, never a silent black screen.
   Unpublishing deletes them. Publishing again keeps the slug, so an update keeps
   every save: **update a showcase game with My Games' Update (a .zip over the same
   game, the old one kept in History), never by importing it as a new game**.
+  A version already published by itself can be put in place of the old one:
+  Publish → "A new version of …" (`replace`, `publishing._merge`): it takes the
+  old link, and each player keeps their best score and newer save.
 - **Fonts** load in the worker (`gameWorker.loadFonts`) as
   `gameide-font-<index>`; text commands carry the font index and size.
 - Uploads: `store/assetTypes.ts` and `gamestore.sniff_asset` must agree

@@ -162,6 +162,63 @@ test("a game updated from a .zip and published again keeps its link, and every p
   await owner.ctx.close();
 });
 
+test("a new version published by itself, then put in place of the old one, keeps the old link's scores and saves", async ({ browser }) => {
+  test.setTimeout(180_000);
+  const version = (n: number) => {
+    const project = {
+      format: "gameide-project", schemaVersion: 8, id: `rep${n}`, name: `Racer v${n}`, created: "2026-01-01T00:00:00Z", modified: "2026-01-01T00:00:00Z",
+      settings: { stepsPerSecond: 60 }, sprites: [], tilesets: [], scripts: [], sounds: [], fonts: [],
+      objects: [{ id: "o1", name: "Keeper", sprite: null, visible: true, solid: false, persistent: false, depth: 0, parent: null,
+        events: [{ id: "e1", key: { type: "create" }, mode: "python", code: `global_vars.version = ${n}\nhigh_score(${n * 10})\n` }] }],
+      rooms: [{ id: "r1", name: "Room1", width: 320, height: 180, background: "#223344", gridWidth: 16, gridHeight: 16, snap: true,
+        layers: [{ id: "L", name: "Instances", kind: "instances", depth: 0, visible: true, locked: false }],
+        camera: { enabled: false, width: 320, height: 180, follow: null, smoothing: 1 },
+        instances: [{ id: "i1", object: "o1", layer: "L", x: 0, y: 0, scaleX: 1, scaleY: 1, angle: 0, code: "" }] }],
+    };
+    return Buffer.from(zipSync({ "project.json": strToU8(JSON.stringify(project)), "assets/index.json": strToU8("{}") }));
+  };
+  const py = (p: Page, code: string) => p.evaluate((c) => (window as any).__gameide.host.evalPython(c), code);
+  const importIt = async (page: Page, n: number) => {
+    await page.goto("/#/games");
+    await page.getByTestId("import-file").setInputFiles({ name: `v${n}.zip`, mimeType: "application/zip", buffer: version(n) });
+    await page.waitForURL(/#\/p\//, { timeout: 30_000 });
+    await expect(page.getByTestId("save-status")).toHaveText("Saved", { timeout: 30_000 });
+  };
+  const owner = await signedIn(browser, "rey@example.com");
+  await importIt(owner.page, 1);
+  const link = await publish(owner.page, "Racer", "unlisted");
+  const id = link.split("/").pop()!;
+
+  // A player plays version 1: a score of 10 and a save.
+  const player = await signedIn(browser, "kit@example.com");
+  await player.page.goto(link);
+  await player.page.getByTestId("player-start").click({ timeout: 60_000 });
+  await expect.poll(() => py(player.page, "global_vars.version"), { timeout: 30_000 }).toBe(1);
+  await py(player.page, 'save_set("laps", 3)');
+  await expect.poll(async () => (await (await player.page.request.get(`/api/play/${id}/scores`)).json()).mine?.score, { timeout: 20_000 }).toBe(10);
+  await expect.poll(async () => (await (await player.page.request.get(`/api/play/${id}/save`)).json()).data, { timeout: 20_000 }).toEqual({ laps: 3 });
+
+  // Version 2 imported as a game of its own and published by itself (what used to empty the board)…
+  await importIt(owner.page, 2);
+  const own = await publish(owner.page, "Racer 2", "unlisted");
+  expect(own).not.toBe(link);
+  // …then published again as a new version of the first: the first's link.
+  await owner.page.getByTestId("publish-replace").selectOption({ label: "A new version of “Racer”: its link, high scores and saves" });
+  await expect(owner.page.getByTestId("publish-title")).toHaveValue("Racer");
+  await owner.page.getByTestId("publish-go").click();
+  await expect(owner.page.getByTestId("publish-link")).toHaveValue(new RegExp(`${link}$`), { timeout: 30_000 });
+
+  // The old link plays version 2, with the player's score and save still theirs.
+  await player.page.reload();
+  await player.page.getByTestId("player-start").click({ timeout: 60_000 });
+  await expect.poll(() => py(player.page, "global_vars.version"), { timeout: 30_000 }).toBe(2);
+  expect(await py(player.page, 'save_get("laps")')).toBe(3);
+  await expect.poll(async () => (await (await player.page.request.get(`/api/play/${id}/scores`)).json()).mine?.score, { timeout: 20_000 }).toBe(20);
+  expect((await player.page.request.get(`/api/play/${own.split("/").pop()}`)).status()).toBe(404);
+  await player.ctx.close();
+  await owner.ctx.close();
+});
+
 test("a published game plays on an iPhone (Safari's engine)", async ({ browser }) => {
   test.skip(!existsSync(webkit.executablePath()), "WebKit isn't installed: npx playwright install webkit");
   const { ctx, page } = await signedIn(browser, "ivy@example.com");

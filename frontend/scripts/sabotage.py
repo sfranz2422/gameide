@@ -2054,6 +2054,14 @@ CASES = [
  ('saves: never sent to the account', "src/editor/gameHost.ts", '          this.events.saved?.(m.data, at);\n', '', "follows them to another computer", E2E),
  ('update: a new game every time', "src/editor/ProjectsPage.tsx", '      const next: Project = { ...project, id: p.id,', '      const next: Project = { ...project, id: project.id,', "updated from a .zip", E2E),
 
+ ('renderer: WebGPU allowed', "src/engine/render/pixiRenderer.ts", '      preference: ["webgl"],', '      preference: "webgl",', "is WebGL and nothing else"),
+ ('watchdog: a held game killed', "src/editor/gameHost.ts", '  if (held || now - lastBeat < HANG_MS) return "fine";', '  if (now - lastBeat < HANG_MS) return "fine";', "waits long for a busy worker"),
+ ('watchdog: impatient again', "src/editor/gameHost.ts", 'export const KILL_MS = 15_000;', 'export const KILL_MS = 1500;', "waits long for a busy worker"),
+ ('replace: the worse score kept', "../backend/publishing.py", '        if (h.score < d.score) if lowest else (h.score > d.score):', '        if False:', "best of the two boards", PY),
+ ('replace: the older save kept', "../backend/publishing.py", '        if g.at > d.at:\n            d.data, d.size, d.at, d.updated_at = g.data, g.size, g.at, g.updated_at', '        if False:\n            d.data, d.size, d.at, d.updated_at = g.data, g.size, g.at, g.updated_at', "and their newer save", PY),
+ ('replace: anyone\'s game', "../backend/publishing.py", '            if old is None or old.owner_id != user.id:', '            if old is None:', "never in place of someone else's game", PY),
+ ('replace: the dialog never asks', "src/editor/PublishDialog.tsx", ', ...(replace ? { replace } : {}) },', ' },', "put in place of the old one", E2E),
+
  ('tell: the page drops them', NETS, '    if (o.tells && !this.away) this.tells.push(...o.tells);\n', '', "one player on a WebSocket and one polling", E2E),
 
 ]

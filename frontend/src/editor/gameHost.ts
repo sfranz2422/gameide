@@ -13,8 +13,16 @@
  *      set Pyodide's interrupt flag. Python raises KeyboardInterrupt at the
  *      line it was on, and the student is told which line that was;
  *   2. if that doesn't free it within KILL_MS, or there is no shared
- *      memory, the worker is terminated and a new one started. The student
- *      is still told the game stopped responding, just not where.
+ *      memory and it stays quiet for NO_INTERRUPT_KILL_MS more, the worker is
+ *      terminated and a new one started. The student is still told the game
+ *      stopped responding, just not where.
+ *
+ * KILL_MS is long on purpose. Python that's stuck answers the interrupt at
+ * once; a worker that doesn't is busy outside Python — on a Chromebook, handing
+ * a big game's pictures to the graphics chip the first time a room draws them —
+ * and will answer when that's done. At 1.5 s, Stack Shack and Zoomtown Cup were
+ * killed that way on Chromebooks with "Is there a loop that never ends?", though
+ * nothing was looping (2026-11-16).
  *
  * A hidden tab throttles timers, so the watchdog only counts time while the
  * page is visible, and starts counting afresh when it becomes visible again.
@@ -30,7 +38,24 @@ import type { FromWorker, GameState, InputMessage, ToWorker, WorkerStats } from 
 export const HANG_MS = 2000;
 /** No key, click, touch or pad for this long, and the player isn't playing (GameHost.playing). */
 export const IDLE_MS = 30_000;
-export const KILL_MS = 1500;
+export const KILL_MS = 15_000;
+/** With no shared memory there's no interrupt, so a slow frame and an endless loop look alike: this long more, then it's stopped. */
+export const NO_INTERRUPT_KILL_MS = 6000;
+
+/**
+ * The watchdog's decision, every quarter second while a game runs and the page is on
+ * show: "fine" (the worker answered lately), "interrupt" (quiet HANG_MS: stop Python
+ * at its line, or start counting where there's no interrupt), "wait" (interrupted,
+ * still busy: likely not Python), "kill". Pure, for the tests.
+ */
+export function watchdog(now: number, lastBeat: number, interruptedAt: number, canInterrupt: boolean, held = false): "fine" | "interrupt" | "wait" | "kill" {
+  // Held for a Python check question, the game runs no Python, so it can't be stuck in
+  // a loop; but the question (its own Python, for "what does this print") can keep a
+  // Chromebook busy, and a held game was killed then: black, and no going back.
+  if (held || now - lastBeat < HANG_MS) return "fine";
+  if (!interruptedAt) return "interrupt";
+  return now - interruptedAt > (canInterrupt ? KILL_MS : NO_INTERRUPT_KILL_MS) ? "kill" : "wait";
+}
 
 export interface HostEvents {
   state: (s: GameState) => void;
@@ -268,19 +293,15 @@ export class GameHost {
     if (!this.isReady || (this.state !== "loading" && this.state !== "running")) return;
     if (document.visibilityState !== "visible") return;
     const now = performance.now();
-    if (now - this.lastBeat < HANG_MS) {
-      this.interruptedAt = 0;
-      return;
-    }
-    if (this.interrupt && !this.interruptedAt) {
-      this.interrupt[0] = 2; // SIGINT: Pyodide raises KeyboardInterrupt
-      this.interruptedAt = now;
-      return;
-    }
-    if (!this.interrupt || now - this.interruptedAt > KILL_MS) this.kill();
+    if (this.held) this.lastBeat = now; // let go, it counts afresh
+    const what = watchdog(now, this.lastBeat, this.interruptedAt, !!this.interrupt, this.held);
+    if (what === "fine") this.interruptedAt = 0;
+    else if (what === "interrupt") {
+      if (this.interrupt) this.interrupt[0] = 2; // SIGINT: Pyodide raises KeyboardInterrupt
+      this.interruptedAt = now;                  // with no shared memory: when the quiet began to count
+    } else if (what === "kill") this.kill();
   }
 
-  /** The last resort: the worker would not stop, so it goes, and a fresh one starts. */
   private kill() {
     this.worker.terminate();
     this.interruptedAt = 0;

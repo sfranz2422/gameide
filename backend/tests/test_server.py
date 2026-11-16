@@ -1884,10 +1884,42 @@ _sdb.commit()
 put(_amy, "hs2", project("hs2", "Class only"), 0)
 _cg = _amy.post("/api/projects/hs2/publish", json={"title": "Class only", "visibility": "class", "classId": _kc.id}).get_json()["published"]["id"]
 check("high scores: a class game's board is only for its class", _pat.get(f"/api/play/{_cg}/scores").status_code == 403 and _score(_pat, 5, _cg).status_code == 403)
-_pid = _sdb.query(server.gamestore.Published).filter_by(slug=HS).first().id
+# A new version, published again (My Games' Update, then Publish): the board stays.
+put(_amy, "hs1", project("hs1", "Scores v2"), 1)
+check("high scores: publishing a new version keeps the board", _amy.post("/api/projects/hs1/publish", json={"title": "Scores", "visibility": "unlisted"}).get_json()["published"]["id"] == HS
+      and _board(_amy)["mine"]["score"] == 500)
+# A new version imported as a game of its own and published by itself, then put in place of the old one.
+put(_amy, "hs9", project("hs9", "Scores v3"), 0)
+_new = _amy.post("/api/projects/hs9/publish", json={"title": "Scores v3", "visibility": "unlisted"}).get_json()["published"]["id"]
+_score(_amy, 600, _new)                      # better than her 500 on the old board
+_score(_ben, 10, _new)                       # worse than his 300
+_zoe = client(f"zoe@{M}")
+_score(_zoe, 77, _new)                       # only on the new one
+_ben.put(f"/api/play/{_new}/save", json={"data": {"v": "new"}, "at": 5000})
+_ben.put(f"/api/play/{HS}/save", json={"data": {"v": "old"}, "at": 4000})
+check("publish offers their other games to put it in place of", HS in [o["id"] for o in _amy.get("/api/projects/hs9/publish").get_json()["others"]])
+check("…never anyone else's", _ben.post("/api/projects/hs9/publish", json={"title": "x", "visibility": "unlisted", "replace": HS}).status_code == 403
+      and _pat.get("/api/projects/hs9/publish").status_code == 403)
+_plays_before = _sdb.query(server.gamestore.Published).filter_by(slug=HS).first().plays
+r = _amy.post("/api/projects/hs9/publish", json={"title": "Scores", "visibility": "unlisted", "replace": HS})
+check("published in place of the old one: the old link", r.status_code == 200 and r.get_json()["published"]["id"] == HS, r.get_json())
+check("…playing the new version", client().get(f"/api/play/{HS}").get_json()["project"]["name"] == "Scores v3")
+check("…and its own link is gone", client().get(f"/api/play/{_new}").status_code == 404)
+_mine = lambda c: (_board(c)["mine"] or {}).get("score")
+check("…each player keeps their best of the two boards", (_mine(_amy), _mine(_ben), _mine(_zoe)) == (600, 300, 77), (_mine(_amy), _mine(_ben), _mine(_zoe)))
+check("…and their newer save", _ben.get(f"/api/play/{HS}/save").get_json()["data"] == {"v": "new"})
+check("…from one of their own only", _amy.post("/api/projects/hs9/publish", json={"title": "x", "visibility": "unlisted", "replace": "nosuchgame"}).status_code == 404)
+put(_ben, "hsb", project("hsb", "Ben's"), 0)
+_bens = _ben.post("/api/projects/hsb/publish", json={"title": "Ben's", "visibility": "unlisted"}).get_json()["published"]["id"]
+check("…never in place of someone else's game", _amy.post("/api/projects/hs9/publish", json={"title": "x", "visibility": "unlisted", "replace": _bens}).status_code == 404
+      and client().get(f"/api/play/{_bens}").get_json()["project"]["name"] == "Ben's")
 _sdb.close()
 _sdb = server.SessionLocal()
-check("high scores: unpublishing takes the scores with it", _amy.delete("/api/projects/hs1/publish").status_code == 200 and _sdb.query(server.gamestore.HighScore).filter_by(published_id=_pid).count() == 0)
+_pid = _sdb.query(server.gamestore.Published).filter_by(slug=HS).first().id
+check("…and the game it came from no longer has it", _amy.get("/api/projects/hs1/publish").get_json()["published"] is None)
+_sdb.close()
+_sdb = server.SessionLocal()
+check("high scores: unpublishing takes the scores with it", _amy.delete("/api/projects/hs9/publish").status_code == 200 and _sdb.query(server.gamestore.HighScore).filter_by(published_id=_pid).count() == 0)
 # Lowest wins, and clock times: ranked by the published game's own settings.
 put(_amy, "hs3", project("hs3", "Golfish", settings={"stepsPerSecond": 60, "scoreboard": {"lowest": True, "unit": "strokes"}}), 0)
 LO = _amy.post("/api/projects/hs3/publish", json={"title": "Golfish", "visibility": "unlisted"}).get_json()["published"]["id"]

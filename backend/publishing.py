@@ -187,9 +187,46 @@ def publish_settings(slug):
             author=_first_name(user),
             tags=gamestore.TAGS,
             teacher=is_teacher(user) or is_admin(user),
+            # Their other published games, any of which this one can be published in
+            # place of (publish's `replace`), keeping its link, scores and saves.
+            others=[{"id": o.slug, "title": o.title} for o in db.query(Published)
+                    .filter(Published.owner_id == user.id, Published.id != (pub.id if pub else -1))
+                    .order_by(Published.updated_at.desc()).all()],
         )
     finally:
         db.close()
+
+
+def _merge(db, src, dst):
+    """Everything players have in `src` goes to `dst`, then `src` goes: a new version of a
+    game, published by itself, put in place of the old one. Each player keeps their best
+    score and their newer save; likes and plays are added together."""
+    lowest, _ = _score_rules(dst)
+    for h in db.query(HighScore).filter_by(published_id=src.id).all():
+        d = db.query(HighScore).filter_by(published_id=dst.id, user_id=h.user_id).first()
+        if d is None:
+            h.published_id = dst.id
+            continue
+        if (h.score < d.score) if lowest else (h.score > d.score):
+            d.score, d.updated_at = h.score, h.updated_at
+        db.delete(h)
+    for g in db.query(GameSave).filter_by(published_id=src.id).all():
+        d = db.query(GameSave).filter_by(published_id=dst.id, user_id=g.user_id).first()
+        if d is None:
+            g.published_id = dst.id
+            continue
+        if g.at > d.at:
+            d.data, d.size, d.at, d.updated_at = g.data, g.size, g.at, g.updated_at
+        db.delete(g)
+    for like in db.query(Like).filter_by(published_id=src.id).all():
+        if db.query(Like).filter_by(published_id=dst.id, user_id=like.user_id).first() is None:
+            like.published_id = dst.id
+        else:
+            db.delete(like)
+    dst.plays = (dst.plays or 0) + (src.plays or 0)
+    db.flush()
+    _delete(db, src)
+    db.flush()
 
 
 def _own(db, user, slug):
@@ -252,6 +289,20 @@ def publish(slug):
         if missing:
             return err(f"{len(missing)} of this game's {len(wanted)} pictures, sounds and fonts haven't reached the server yet, "
                        "so it wasn't published. Wait until it says Saved, then publish again.", 409)
+
+        # In place of another of their published games (a new version imported as a
+        # game of its own): this project takes over its link, scores and saves, and
+        # anything this one had of its own is added in (_merge).
+        replace = str(body.get("replace") or "")
+        if replace:
+            old = db.query(Published).filter_by(slug=replace[:16]).first()
+            if old is None or old.owner_id != user.id:
+                return err("That isn't one of your published games.", 404)
+            mine = db.query(Published).filter_by(project_id=p.id).first()
+            if mine is not None and mine.id != old.id:
+                _merge(db, mine, old)
+            old.project_id = p.id
+            db.flush()
 
         pub = db.query(Published).filter_by(project_id=p.id).first()
         if pub is None:

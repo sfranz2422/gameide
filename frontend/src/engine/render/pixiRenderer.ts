@@ -365,7 +365,16 @@ export class PixiRenderer {
       background: def.rooms[0]!.background ?? 0x000000,
       antialias: false,
       autoStart: false, // the game loop decides when to draw, not Pixi's ticker
-      preference: "webgl",
+      // WebGL only. Asked to prefer it, Pixi falls back to WebGPU whenever its quick
+      // WebGL test fails, which Chrome on a Mac sometimes does; GameIDE's drawing
+      // (its shaders, effects, the floor) is WebGL's, and on WebGPU a game broke at
+      // once ("Cannot read properties of undefined (reading 'location')", Mix Lab,
+      // 2026-11-16). With no WebGL at all, the page says so (gameWorker's "fatal").
+      preference: ["webgl"],
+    }).catch((e: unknown) => {
+      if (e instanceof Error && /No available renderer/.test(e.message))
+        throw new Error("This browser couldn't start the game's graphics (WebGL). Try another browser, or turn on hardware acceleration in this one's settings.");
+      throw e;
     });
     return new PixiRenderer(app, def, engine, frames, fonts);
   }
