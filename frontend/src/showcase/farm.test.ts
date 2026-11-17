@@ -3,7 +3,9 @@
  * real Pyodide: planting and growing on the real clock (moved on by the tests),
  * harvesting into the barn, tapping and dragging on the isometric map, the barn,
  * levels and what they open, the orders, buying fields, saving (and growing while
- * away), the board, and a field farmed from the keyboard alone.
+ * away), the board, and a field farmed from the keyboard alone. Phase 2: building
+ * animal homes and factories, feeding and collecting, making goods in a queue, and
+ * orders for goods.
  * Runs when the game has been built (python3 showcase/farm/build.py).
  */
 import { existsSync, readFileSync } from "node:fs";
@@ -233,7 +235,7 @@ out`);
     py(g, 'global_vars.farm["coins"] = 1000\ndo_act("shop", None)');
     step(g);
     py(g, 'do_act("buy_field", None)');
-    expect(py(g, "global_vars.placing")).toBe(true);
+    expect(py(g, "global_vars.placing")).toBe("field");
     click(g, ...onScreen(g, 8, 6));                     // a field already
     expect(py(g, 'len(global_vars.farm["fields"])')).toBe(6);
     click(g, ...onScreen(g, 6, 8));                     // the road
@@ -318,5 +320,136 @@ out`);
     step(g, 30);
     py(g, 'room_goto("Title")');
     step(g, 5);
+  });
+
+  it("phase 2: a farm saved before it comes back with no homes or factories, and plays on", async () => {
+    const g = await start({ farm: { coins: 90, xp: 12, level: 2, barn: { wheat: 4 }, orders: [], made: 3, bought: 0, seed: 5,
+      fields: [{ gx: 7, gy: 6, crop: "wheat", t: 0 }] } });
+    py(g, 'room_goto("Farm")');
+    step(g, 3);
+    expect(py(g, '[global_vars.farm["homes"], global_vars.farm["mills"], global_vars.farm["coins"]]')).toEqual([[], [], 90]);
+    expect(py(g, 'len(global_vars.farm["orders"])')).toBe(3);
+  });
+
+  it("phase 2: a building opens at its level, costs coins, is one of each, and goes where it's tapped on 2 x 2 free tiles", async () => {
+    const g = await start();
+    await farmOf(g);
+    py(g, 'f = global_vars.farm\nf["coins"] = 1000');
+    expect(py(g, 'build(f, "feed_mill", 11, 7)')).toBe("level");
+    py(g, 'f["level"] = 3');
+    py(g, 'do_act("shop", None)');
+    step(g);
+    const rows = py<[string, string, number, string][]>(g, "shop_rows(f)");
+    expect(rows.map((r) => r[0])).toEqual(["field", "feed_mill", "coop", "bakery", "cowshed", "dairy", "sugar_mill", "sheep_pen", "weaving_mill", "jam_kitchen"]);
+    expect(rows[1]![3]).toBe("");
+    expect(rows[2]![3]).toBe("Level 4");
+    py(g, 'do_act("build", "feed_mill")');
+    expect(py(g, "global_vars.placing")).toBe("feed_mill");
+    click(g, ...onScreen(g, 9, 6));                     // on the fields: no room
+    expect(py(g, 'f["mills"]')).toEqual([]);
+    expect(py(g, "global_vars.placing")).toBe("feed_mill");
+    click(g, ...onScreen(g, 11, 7));
+    expect(py(g, 'f["mills"]')).toEqual([{ kind: "feed_mill", gx: 11, gy: 7, queue: [] }]);
+    expect(py(g, 'f["coins"]')).toBe(1000 - py<number>(g, 'FACTORIES["feed_mill"]["cost"]'));
+    expect(py(g, "global_vars.placing")).toBe(false);
+    step(g, 2);
+    expect(py(g, 'len([o for o in instances("Thing") if o.kind == "feed_mill"])')).toBe(1);
+    expect(py(g, 'build(f, "feed_mill", 13, 7)')).toBe("owned");
+    // Its tiles are taken now: no field on them.
+    expect(py(g, "can_place(f, 12, 8)")).toBe(false);
+  });
+
+  it("phase 2: a factory makes one thing at a time from the barn, queues up to three, and a tap collects what's done", async () => {
+    const g = await start();
+    await farmOf(g);
+    py(g, 'f = global_vars.farm\nf["level"] = 4\nf["coins"] = 1000\nbuild(f, "feed_mill", 11, 7)\nm = f["mills"][0]\nf["barn"] = {"wheat": 9, "corn": 4}');
+    expect(py(g, 'make_in(f, m, "cow_feed")')).toBe("short");
+    expect(py(g, '[make_in(f, m, "chicken_feed") for _ in range(4)]')).toEqual(["queued", "queued", "queued", "full"]);
+    expect(py(g, 'f["barn"]')).toEqual({ wheat: 3, corn: 1 });
+    // One after another: each ends a minute after the one before.
+    expect(py(g, 'round(m["queue"][2]["end"] - m["queue"][0]["end"])')).toBe(120);
+    step(g, 2);
+    const at = onScreen(g, 11.5, 7.5);
+    later(g, 61);
+    click(g, ...at);
+    expect(py(g, 'f["barn"].get("chicken_feed")')).toBe(1);
+    expect(py(g, 'len(m["queue"])')).toBe(2);
+    expect(py(g, "global_vars.panel")).toBeNull;
+    // Nothing finished: a tap opens its window, where Make queues another.
+    click(g, ...at);
+    expect(py(g, "[global_vars.panel, global_vars.panel_of]")).toEqual(["mill", 0]);
+    later(g, 200);
+    py(g, 'do_act("collect_mill", 0)');
+    expect(py(g, 'f["barn"].get("chicken_feed")')).toBe(3);
+    py(g, 'f["barn"]["wheat"] = 2\nf["barn"]["corn"] = 1\ndo_act("make", (0, "chicken_feed"))');
+    expect(py(g, 'len(m["queue"])')).toBe(1);
+  });
+
+  it("phase 2: animals eat feed, make their good on the clock, and a tap collects it and feeds them again", async () => {
+    const g = await start();
+    await farmOf(g);
+    py(g, 'f = global_vars.farm\nf["level"] = 4\nf["coins"] = 1000\nbuild(f, "coop", 11, 7)\nh = f["homes"][0]\nf["barn"] = {"chicken_feed": 2}');
+    step(g, 2);
+    const at = onScreen(g, 11.5, 7.5);
+    click(g, ...at);                                    // fed: two of three, there being two feed
+    expect(py(g, "[animal_state(h, i) for i in range(3)]")).toEqual(["eating", "eating", "hungry"]);
+    expect(py(g, 'f["barn"]')).toEqual({});
+    click(g, ...at);                                    // nothing to do: its window
+    expect(py(g, "global_vars.panel")).toBe("home");
+    py(g, 'do_act("close", None)');
+    later(g, py<number>(g, 'HOMES["coop"]["time"]') + 1);
+    expect(py(g, "[animal_state(h, i) for i in range(3)]")).toEqual(["ready", "ready", "hungry"]);
+    const xp = py<number>(g, 'f["xp"]');
+    py(g, 'f["barn"]["chicken_feed"] = 5');
+    click(g, ...at);
+    expect(py(g, 'f["barn"]')).toEqual({ egg: 2, chicken_feed: 2 });
+    expect(py(g, 'f["xp"]')).toBe(xp + 2 * py<number>(g, 'GOODS["egg"]["xp"]'));
+    expect(py(g, "[animal_state(h, i) for i in range(3)]")).toEqual(["eating", "eating", "eating"]);
+  });
+
+  it("phase 2: orders ask for goods only once the farm can make them, and pay for them", async () => {
+    const g = await start();
+    await farmOf(g);
+    py(g, 'f = global_vars.farm\nf["level"] = 6');
+    expect(py<string[]>(g, "sorted(orderable(f))")).toEqual(["carrot", "corn", "pumpkin", "wheat"]);
+    py(g, 'f["coins"] = 2000\nbuild(f, "bakery", 11, 7)\nbuild(f, "coop", 13, 7)\nbuild(f, "feed_mill", 11, 9)');
+    expect(py<string[]>(g, "sorted(orderable(f))")).toEqual(["bread", "carrot", "cookies", "corn", "corn_bread", "egg", "pie", "pumpkin", "wheat"]);
+    const goods = py<number>(g, `sum(1 for _ in range(40) for k in make_order(f)["want"] if k in GOODS)`);
+    expect(goods).toBeGreaterThan(0);
+    const o = py<{ want: Record<string, number> }>(g, 'next(o for o in (make_order(f) for _ in range(200)) if "egg" in o["want"])');
+    expect(o.want.egg).toBeLessThanOrEqual(py<number>(g, "ORDER_GOODS_MOST"));
+  });
+
+  it("phase 2: every new window and building draws, with stand-ins where Gemini's pictures haven't come yet", async () => {
+    const g = await start();
+    await farmOf(g);
+    py(g, `f = global_vars.farm
+f["level"] = 12
+f["coins"] = 5000
+spots = [(11, 7), (13, 7), (15, 7), (13, 9), (15, 9), (8, 9), (8, 11), (11, 13), (8, 13)]
+for kind, (gx, gy) in zip(list(HOMES) + list(FACTORIES), spots):
+    assert build(f, kind, gx, gy) == "built", kind
+f["barn"] = {"wheat": 9, "corn": 9, "carrot": 3, "chicken_feed": 3, "milk": 4, "egg": 2, "sugarcane": 4, "strawberry": 6, "wool": 2}
+for m in f["mills"]:
+    for item in FACTORIES[m["kind"]]["makes"]:
+        make_in(f, m, item)
+for h in f["homes"]:
+    feed_home(f, h)`);
+    step(g, 30);
+    py(g, 'do_act("barn", None)');
+    step(g, 5);
+    for (let i = 0; i < 3; i++) {
+      py(g, `open_panel("home", ${i})`);
+      step(g, 70);
+    }
+    for (let i = 0; i < 6; i++) {
+      py(g, `open_panel("mill", ${i})`);
+      step(g, 5);
+    }
+    py(g, 'do_act("shop", None)');
+    step(g, 5);
+    later(g, 2000);
+    py(g, 'do_act("close", None)');
+    step(g, 30);
   });
 });

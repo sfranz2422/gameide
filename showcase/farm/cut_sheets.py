@@ -52,6 +52,13 @@ BUILDINGS = [("barn", (556, 444), 2), ("house", (1576, 466), 2), ("silo", (2404,
              ("board", (352, 1186), 1), ("truck", (1052, 1206), 1), ("stand", (1720, 1200), 1), ("stand_2", (2402, 1176), 1)]
 ICONS = ["wheat", "corn", "carrot", "pumpkin", "seeds", "coin", "star", "level", "lock", "clock",
          "sickle", "can", "crate", "barn", "order", "hammer", "saw", "axe", "pickaxe", "shovel"]
+# Phase 2 (pictures 6 to 10), each optional until it's come.
+HOMES = ["coop", "cowshed", "sheep_pen"]
+FACTORIES = ["feed_mill", "bakery", "dairy", "sugar_mill", "weaving_mill", "jam_kitchen"]
+ANIMALS = [("chicken", 56), ("cow", 96), ("sheep", 80)]     # each animal's height in art/ (twice the game's)
+POSES = ["stand", "walk", "eat", "ready"]
+ICONS_2 = ["chicken_feed", "cow_feed", "sheep_feed", "egg", "milk", "wool", "bread", "corn_bread", "pie", "cream",
+           "cheese", "butter", "sugarcane", "sugar", "cookies", "yarn", "sweater", "strawberry", "jam", "wheelbarrow"]
 
 
 def save(pic, name):
@@ -71,6 +78,105 @@ def nearest(boxes, at):
 def islands(im, keep):
     found = sorted(_rpg.islands(im), key=lambda b: -b[4])
     return [b[:4] for b in found[:keep]]
+
+
+def drawings(im, rows, cols):
+    """A sheet's drawings, row by row: its biggest patches if there are just the right
+    number, in `rows` rows; otherwise the sheet cut as an even grid (patches that touch,
+    as the crops did, would be one drawing)."""
+    n = rows * cols
+    found = islands(im, n + 8)
+    big = [b for b in found if (b[2] - b[0]) * (b[3] - b[1]) > im.width * im.height / (n * 12)][:n]
+    if len(big) == n:
+        big.sort(key=lambda b: (b[1] + b[3]) / 2)
+        out = []
+        for r in range(rows):
+            out += sorted(big[r * cols:(r + 1) * cols], key=lambda b: b[0])
+        return out, big
+    w, h = im.width / cols, im.height / rows
+    cells = []
+    for r in range(rows):
+        for c in range(cols):
+            cell = im.crop((int(c * w), int(r * h), int((c + 1) * w), int((r + 1) * h)))
+            bb = cell.getbbox()
+            cells.append([int(c * w) + bb[0], int(r * h) + bb[1], int(c * w) + bb[2], int(r * h) + bb[3]] if bb else [0, 0, 1, 1])
+    return cells, cells
+
+
+def apart(part, b):
+    """The sheep pen's grass touches the farm stand drawn under it, so they're one patch:
+    everything below the pen's lower-right grass edge (on the sheet, from (2192, 1095)
+    to (2677, 830)) is the stand, and goes; then just the biggest piece left is kept."""
+    px = part.load()
+    for y in range(part.height):
+        for x in range(part.width):
+            sx, sy = x + b[0], y + b[1]
+            if sy > 1095 or (sx > 2192 and sy > 1095 - (sx - 2192) * 0.546):
+                px[x, y] = (0, 0, 0, 0)
+    best = max(_rpg.islands(part), key=lambda i: i[4])
+    return part.crop(tuple(best[:4]))
+
+
+def shadow(part):
+    """Gemini drew a shadow under each animal (though asked not to), a darker magenta
+    that keying leaves on: made a soft dark shadow, so it isn't purple on the grass.
+    Red combs and pink noses aren't touched: they're not blue enough."""
+    px = part.load()
+    for y in range(part.height):
+        for x in range(part.width):
+            r, g, b, a = px[x, y]
+            if a and r > g + 50 and b > g + 30:
+                px[x, y] = (20, 30, 10, min(a, 90))
+    return part
+
+
+def phase_2():
+    if (RAW / "06.jpeg").exists():
+        # Gemini added the order board, truck and stands again as a second row: the
+        # homes are the top row's three, the drawings nearest these places.
+        im = _sw.key_out(Image.open(RAW / "06.jpeg"))
+        every = islands(im, 10)
+        # (the sheep pen sits lower than the other two: its middle is about half way down)
+        top = [b for b in every if (b[1] + b[3]) / 2 < im.height * 0.7 and b[1] < im.height * 0.4]
+        boxes = sorted(sorted(top, key=lambda b: -(b[2] - b[0]) * (b[3] - b[1]))[:3], key=lambda b: b[0])
+        for name, b in zip(HOMES, boxes):
+            part = _sw.own(im, b, every).crop(b)
+            if b[3] - b[1] > im.height * 0.6:
+                part = apart(part, b)
+            save(fitted(part, 2), name)
+    if (RAW / "07.jpeg").exists():
+        im = _sw.key_out(Image.open(RAW / "07.jpeg"))
+        boxes, every = drawings(im, 3, 4)
+        for r, (animal, tall) in enumerate(ANIMALS):
+            row = boxes[r * 4:(r + 1) * 4]
+            k = tall / max(b[3] - b[1] for b in row)       # one size for an animal's four poses
+            for pose, b in zip(POSES, row):
+                part = shadow(_sw.own(im, b, every).crop(b))
+                save(part.resize((max(1, round(part.width * k)), max(1, round(part.height * k))), Image.LANCZOS), f"animal_{animal}_{pose}")
+    if (RAW / "08.jpeg").exists():
+        im = _sw.key_out(Image.open(RAW / "08.jpeg"))
+        boxes, every = drawings(im, 2, 3)
+        for name, b in zip(FACTORIES, boxes):
+            save(fitted(_sw.own(im, b, every).crop(b), 2), name)
+    if (RAW / "09.jpeg").exists():
+        im = _sw.key_out(Image.open(RAW / "09.jpeg"))
+        boxes, every = drawings(im, 4, 5)
+        for name, b in zip(ICONS_2, boxes):
+            save(_sw.own(im, b, every).crop(b).resize((128, 128), Image.LANCZOS), f"icon_{name}")
+    if (RAW / "10.jpeg").exists():
+        im = _sw.key_out(Image.open(RAW / "10.jpeg"))
+        # Gemini drew three rows: sugarcane, then strawberries twice. The third row
+        # (flowers, then berries) is the one the prompt asked for.
+        # Rows by where the gaps between them are (fractions of the sheet's height).
+        w = im.width / 4
+        for (y0, y1), crop in (((0, 0.275), "sugarcane"), ((0.505, 0.77), "strawberry")):
+            for c in range(4):
+                cell = im.crop((int(c * w), int(y0 * im.height), int((c + 1) * w), int(y1 * im.height)))
+                # just the field: the tips of the next row's leaves reach into the cell
+                part = cell.crop(tuple(max(_rpg.islands(cell), key=lambda i: i[4])[:4]))
+                # Its ground is the soil diamond: the widest part, at the bottom.
+                k = TILE_W * 2 / part.width
+                save(part.resize((round(part.width * k), round(part.height * k)), Image.LANCZOS), f"crop_{crop}_{c}")
 
 
 def main():
@@ -109,6 +215,7 @@ def main():
     # 5: the title picture, at twice the game's size.
     view = (GAME["VIEW_W"], GAME["VIEW_H"])
     Image.open(RAW / "05.jpeg").convert("RGB").resize((view[0] * 2, view[1] * 2), Image.LANCZOS).save(ART / "title.png", optimize=True)
+    phase_2()
     print(f"{sum(1 for _ in ART.glob('*.png'))} pictures in {ART}")
 
 

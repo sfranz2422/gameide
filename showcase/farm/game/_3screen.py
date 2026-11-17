@@ -62,6 +62,16 @@ def text(x, y, words, colour=INK, size=16, align="left", width=None):
     draw_set_halign("left")
 
 
+def plain(x, y, words, colour="#5a3a1c", size=14, align="left"):
+    """Words with no shadow, for a light card: dark words with a dark shadow on cream
+    looked doubled (the seed bar's "free", 2026-11-17)."""
+    draw_set_font("Ubuntu", size)
+    draw_set_halign(align)
+    draw_set_color(colour)
+    draw_text(x, y, words)
+    draw_set_halign("left")
+
+
 def panel(x1, y1, x2, y2, alpha=0.95):
     draw_set_alpha(alpha)
     draw_set_color(PANEL)

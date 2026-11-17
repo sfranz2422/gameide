@@ -40,7 +40,15 @@ G = GAME
 VIEW_W, VIEW_H, TW, TH = G["VIEW_W"], G["VIEW_H"], G["TILE_W"], G["TILE_H"]
 ART = HERE / "art"
 ICONS = ["wheat", "corn", "carrot", "pumpkin", "seeds", "coin", "star", "level", "lock", "clock",
-         "sickle", "can", "crate", "barn", "order", "hammer", "saw", "axe", "pickaxe", "shovel"]
+         "sickle", "can", "crate", "barn", "order", "hammer", "saw", "axe", "pickaxe", "shovel",
+         # phase 2: the goods, the new crops, and a wheelbarrow
+         "chicken_feed", "cow_feed", "sheep_feed", "egg", "milk", "wool", "bread", "corn_bread", "pie", "cream",
+         "cheese", "butter", "sugarcane", "sugar", "cookies", "yarn", "sweater", "strawberry", "jam", "wheelbarrow"]
+ANIMALS = {"chicken": (250, 250, 245), "cow": (240, 240, 240), "sheep": (245, 245, 235)}
+POSES = ["stand", "walk", "eat", "ready"]
+BUILT_COLOURS = {"coop": (200, 150, 90), "cowshed": (190, 70, 60), "sheep_pen": (170, 140, 110), "feed_mill": (200, 170, 110),
+                 "bakery": (220, 120, 80), "dairy": (235, 235, 240), "sugar_mill": (150, 180, 210), "weaving_mill": (170, 120, 190),
+                 "jam_kitchen": (220, 90, 120)}
 NATURE = ["soil", "soil_wet", "grass_flowers", "path", "fence", "gate", "boulder", "bush", "oak", "pine", "stump", "pond"]
 
 
@@ -72,6 +80,75 @@ def stand_in(tiles, colour):
     im = Image.new("RGBA", (w, h + 8), (0, 0, 0, 0))
     d = ImageDraw.Draw(im)
     d.polygon([(w / 2, 0), (w, h / 2), (w / 2, h), (0, h / 2)], fill=colour, outline=(40, 30, 20))
+    return im
+
+
+def stand_in_building(kind):
+    """A block with a roof on its grass diamond, in the building's colour, for a picture
+    not cut yet."""
+    tiles = G["FOOTPRINT"][kind]
+    w, h = TW * tiles, TH * tiles
+    top = 90
+    im = Image.new("RGBA", (w, h + top), (0, 0, 0, 0))
+    d = ImageDraw.Draw(im)
+    cx, cy = w / 2, top + h / 2
+    d.polygon([(cx, top), (w, cy), (cx, top + h), (0, cy)], fill=(110, 170, 80), outline=(50, 80, 40))
+    col = BUILT_COLOURS.get(kind, (180, 140, 100))
+    dark = tuple(int(c * 0.75) for c in col)
+    bw, bh = w * 0.32, h * 0.32
+    base = cy + 4
+    d.polygon([(cx - bw, base), (cx, base + bh), (cx, base + bh - 70), (cx - bw, base - 70)], fill=col, outline=(60, 40, 20))
+    d.polygon([(cx, base + bh), (cx + bw, base), (cx + bw, base - 70), (cx, base + bh - 70)], fill=dark, outline=(60, 40, 20))
+    d.polygon([(cx - bw - 6, base - 70), (cx, base + bh - 70), (cx + bw + 6, base - 70), (cx, base - 70 - bh - 26)], fill=(150, 60, 50), outline=(60, 30, 20))
+    return im
+
+
+def stand_in_animal(animal, pose):
+    im = Image.new("RGBA", (48, 40), (0, 0, 0, 0))
+    d = ImageDraw.Draw(im)
+    col = ANIMALS[animal]
+    y = 4 if pose == "walk" else 6
+    if animal == "chicken":
+        d.ellipse((14, 14 + y - 6, 34, 34), fill=col, outline=(80, 60, 40))
+        d.ellipse((26, 8 + y - 6 + (6 if pose == "eat" else 0), 36, 18 + y - 6 + (6 if pose == "eat" else 0)), fill=col, outline=(80, 60, 40))
+        d.polygon([(30, 6 + y - 6), (34, 6 + y - 6), (32, 2 + y - 6)], fill=(220, 40, 40))
+    else:
+        d.ellipse((6, 12 + y - 6, 40, 34), fill=col, outline=(60, 50, 40))
+        hx = 34 if pose != "eat" else 36
+        d.ellipse((hx - 6, 10 + y - 6 + (8 if pose == "eat" else 0), hx + 8, 24 + y - 6 + (8 if pose == "eat" else 0)), fill=col, outline=(60, 50, 40))
+        if animal == "cow":
+            d.ellipse((14, 16, 24, 26), fill=(40, 40, 40))
+    if pose == "ready":
+        d.ellipse((2, 26, 14, 38), fill=(255, 220, 120), outline=(120, 80, 20))
+    return im
+
+
+def stand_in_icon(name):
+    from PIL import ImageFont
+    im = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
+    d = ImageDraw.Draw(im)
+    d.rounded_rectangle((2, 2, 62, 62), radius=12, fill=(250, 240, 215), outline=(90, 60, 40), width=2)
+    rng = random.Random(name)
+    d.ellipse((14, 10, 50, 46), fill=(rng.randint(120, 230), rng.randint(90, 200), rng.randint(60, 160)))
+    font = ImageFont.load_default(size=13)
+    words = name.replace("_", " ")[:9]
+    d.text((32 - d.textlength(words, font=font) / 2, 46), words, font=font, fill=(70, 40, 20))
+    return im
+
+
+def stand_in_crop(crop, stage):
+    im = Image.new("RGBA", (TW, TH + 30), (0, 0, 0, 0))
+    d = ImageDraw.Draw(im)
+    cx, cy = TW / 2, 30 + TH / 2
+    d.polygon([(cx, 30), (TW, cy), (cx, 30 + TH), (0, cy)], fill=(110, 70, 40), outline=(60, 40, 20))
+    rng = random.Random(f"{crop}{stage}")
+    for _ in range(9):
+        x, y = cx + rng.uniform(-36, 36), cy + rng.uniform(-14, 14)
+        h = 6 + stage * 9
+        d.line([(x, y), (x, y - h)], fill=(80, 170, 60), width=3)
+        if stage == 3:
+            col = (220, 40, 40) if crop == "strawberry" else (120, 200, 90)
+            d.ellipse((x - 4, y - h - 4, x + 4, y - h + 4), fill=col)
     return im
 
 
@@ -145,16 +222,29 @@ def build(out):
 
     for crop in G["CROPS"]:
         for s in range(G["STAGES"]):
-            im, origin = standing(f"crop_{crop}_{s}")
+            if (ART / f"crop_{crop}_{s}.png").exists():
+                im, origin = standing(f"crop_{crop}_{s}")
+            else:
+                im = stand_in_crop(crop, s)
+                origin = (im.width // 2, im.height - TH // 2)
             P.sprite(f"crop_{crop}_{s}", [im], origin)
     for name in NATURE:
         im, origin = standing(name, 1, (110, 160, 80))
         P.sprite(name, [im], origin)
     for kind, tiles in G["FOOTPRINT"].items():
-        im, origin = standing(kind, tiles, (170, 60, 50))
+        if (ART / f"{kind}.png").exists():
+            im, origin = standing(kind, tiles)
+        else:
+            im = stand_in_building(kind)
+            origin = (im.width // 2, im.height - TH * tiles // 2)
         P.sprite(kind, [im], origin)
+    for animal in ANIMALS:
+        for pose in POSES:
+            name = f"animal_{animal}_{pose}"
+            im = half(name) if (ART / f"{name}.png").exists() else stand_in_animal(animal, pose)
+            P.sprite(name, [im], (im.width // 2, im.height - 4))     # standing on its feet
     for name in ICONS:
-        pic = half(f"icon_{name}") if (ART / f"icon_{name}.png").exists() else stand_in(1, (240, 220, 180)).resize((64, 64))
+        pic = half(f"icon_{name}") if (ART / f"icon_{name}.png").exists() else stand_in_icon(name)
         P.sprite(f"icon_{name}", [pic], (32, 32))
     title = half("title") if (ART / "title.png").exists() else Image.new("RGBA", (VIEW_W, VIEW_H), (120, 190, 240, 255))
     P.sprite("title", [title], (0, 0))

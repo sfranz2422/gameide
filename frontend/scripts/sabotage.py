@@ -2084,6 +2084,15 @@ CASES = [
  ('farm: Space does nothing on the map', _fm("_5acts"), '    if act("ok"):\n        if global_vars.placing:', '    if False:\n        if global_vars.placing:', "farmed from the keyboard alone", FARM),
  ('farm: questions mid-drag', _fm("Farm"), 'question_ok(dragged() is None)', 'question_ok(True)', "questions may come any time but mid-drag", FARM),
 
+ ('farm: a factory makes everything at once', _fm("_2farm"), '    start = max([now()] + [job["end"] for job in m["queue"]])', '    start = now()', "a factory makes one thing at a time", FARM),
+ ('farm: a queue with no end', _fm("_2farm"), '    if len(m["queue"]) >= FACTORY_QUEUE:\n        return "full"', '    if False:\n        return "full"', "a factory makes one thing at a time", FARM),
+ ('farm: animals eat for free', _fm("_2farm"), '            f["barn"][feed] -= 1\n', '', "animals eat feed", FARM),
+ ('farm: collected, never hungry again', _fm("_2farm"), '            home["animals"][i] = None\n            got += 1', '            got += 1', "animals eat feed", FARM),
+ ('farm: orders want what can\'t be made', _fm("_2farm"), '    return out\n\n\ndef make_order', '    return out + list(GOODS)\n\n\ndef make_order', "orders ask for goods only once", FARM),
+ ('farm: an old save breaks', _fm("_2farm"), '    f.setdefault("homes", [])\n', '', "saved before it comes back", FARM),
+ ('farm: buildings on anything', _fm("_2farm"), '    if not can_place_area(f, kind, gx, gy):\n        return "taken"', '    if False:\n        return "taken"', "a building opens at its level", FARM),
+ ('farm: two of everything', _fm("_2farm"), '    if owned(f, kind):\n        return "owned"', '    if False:\n        return "owned"', "a building opens at its level", FARM),
+
  ('tell: the page drops them', NETS, '    if (o.tells && !this.away) this.tells.push(...o.tells);\n', '', "one player on a WebSocket and one polling", E2E),
 
 ]

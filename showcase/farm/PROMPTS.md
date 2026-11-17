@@ -80,11 +80,58 @@ they can't be lost.
 > village with colourful houses in the distance, green hills, a few fluffy clouds, a
 > clear blue sky in the top third with nothing in it (the game writes its name there).
 
+## Phase 2: animals and factories
+
+**Gemini drew Phase 1 isometric** (fields and buildings on diamond tiles), and the game is
+built to match, so these must be isometric too, at the same angle. Use the same Gemini
+chat as Phase 1, attach picture 2 (the farm buildings) to every prompt, and add:
+*"Isometric, at exactly the same angle, scale, style, outlines and lighting as the attached
+picture. Each one standing on its own diamond of grass, like the attached buildings."*
+
+**6. Animal homes.** MAGENTA.
+> [the style] Isometric. A sheet of three farm animal homes in one row, each standing on its
+> own grass diamond the same size as the barn's in the attached picture, with clear space
+> between them: a wooden chicken coop with a little ramp and a fenced run in front; a cow
+> shed with an open side and a fenced grassy yard in front; a sheep pen with a small
+> shelter and a fenced grassy yard. The yards are empty: no animals. Flat magenta background.
+
+**7. The animals.** MAGENTA.
+> [the style] Isometric, small and cute, seen from the same angle. A sheet of farm animals,
+> three rows of four, each on its own, all the right size to stand in the yards of the
+> animal homes: Row 1: a white chicken standing, the chicken walking, the chicken pecking
+> at the ground, a chicken sitting on a nest with an egg. Row 2: a black and white cow
+> standing, the cow walking, the cow eating grass, the cow with a full milk bucket beside
+> it. Row 3: a fluffy white sheep standing, the sheep walking, the sheep eating grass, the
+> sheep with a ball of wool beside it. No grass under them. Flat magenta background.
+
+**8. Factories.** MAGENTA.
+> [the style] Isometric. A sheet of six small farm workshops, two rows of three, each
+> standing on its own grass diamond the same size as the barn's in the attached picture:
+> Row 1: a feed mill with a small wooden windmill and sacks by the door; a bakery with a
+> brick oven chimney and a striped awning; a dairy, a white building with milk churns
+> outside. Row 2: a sugar mill with a waterwheel; a weaving mill with a big loom seen
+> through the window and yarn outside; a little jam kitchen with jars in the window.
+> Flat magenta background.
+
+**9. More goods.** MAGENTA. (Attach picture 4, the icons, as well.)
+> [the style] A sheet of small round-cornered game icons in exactly the style of the
+> attached icons (the same cream tiles), each one a single object on its own, all the same
+> size, four rows of five. Row 1: a sack of yellow chicken feed, a sack of green cow feed,
+> a sack of blue sheep feed, a brown egg, a glass bottle of milk. Row 2: a ball of white
+> wool, a loaf of bread, a square of golden corn bread, a pumpkin pie, a jar of cream.
+> Row 3: a wedge of cheese, a block of butter, a bundle of sugarcane, a bag of sugar, a
+> plate of cookies. Row 4: a spool of colourful yarn, a knitted sweater, a basket of
+> strawberries, a jar of strawberry jam, a wooden wheelbarrow. Flat magenta background.
+
+**10. More crops.** MAGENTA. (Attach picture 1, the crops, as well.)
+> [the style] Isometric, exactly like the attached crops: square fields of dark plowed
+> soil on diamonds, the same size, two rows of four, the crop growing from left to right:
+> tiny sprouts, young plants, nearly grown, ready to harvest. Row 1: sugarcane (tall green
+> canes at the end). Row 2: strawberries (low plants with white flowers, then bright red
+> strawberries at the end). Clear space between fields. Flat magenta background.
+
 ## Later phases (not yet)
 
-- **Phase 2: animals and factories.** Chickens, cows, sheep, pigs and bees, each with
-  their pen; a feed mill, bakery, dairy, sugar mill, jam kitchen, weaving mill; more
-  crops (strawberries, cotton, sunflowers, potatoes, sugarcane); their goods as icons.
 - **Phase 3: the town.** Houses of several sizes, a school, a park, a fountain, a town
   hall, shops; townspeople walking (several, each facing four ways); roads.
 - **Phase 4: expansion.** Land to clear (thick woods, rocks), a train and station, an

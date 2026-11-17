@@ -11,6 +11,8 @@
 #   orders      [{"want": {item: n}, "coins", "xp"} or {"wait": when it fills}]
 #   made        orders made so far (with `seed`, picks the next one)
 #   bought      fields bought so far (the next costs more)
+#   homes       [{"kind", "gx", "gy", "animals": [None, or when it was fed]}]     (phase 2)
+#   mills       [{"kind", "gx", "gy", "queue": [{"item", "end"}]}]               (phase 2)
 import math
 import random
 import time
@@ -25,14 +27,26 @@ def now():
 def new_farm(seed=None):
     f = {"coins": START_COINS, "xp": 0, "level": 1, "barn": {}, "orders": [], "made": 0, "bought": 0,
          "seed": seed if seed is not None else random.randrange(1 << 30),
-         "fields": [{"gx": gx, "gy": gy, "crop": None, "t": 0} for gx, gy in START_FIELDS]}
+         "fields": [{"gx": gx, "gy": gy, "crop": None, "t": 0} for gx, gy in START_FIELDS],
+         "homes": [], "mills": []}
     fill_orders(f)
     return f
 
 
 def load_farm():
+    """The saved farm, brought up to date: a farm saved before a phase added something
+    gets it empty (a phase-1 farm has no animal homes or factories yet)."""
     f = save_get("farm", None)
-    return f if f is not None else new_farm()
+    if f is None:
+        return new_farm()
+    f.setdefault("homes", [])
+    f.setdefault("mills", [])
+    return f
+
+
+def item_info(k):
+    """A crop's or a made good's name, sell price and XP."""
+    return CROPS[k] if k in CROPS else GOODS[k]
 
 
 def keep(f):
@@ -69,8 +83,8 @@ def add_xp(f, n):
 
 
 def opened_at(level):
-    """What a level opens, in words, for the level-up note."""
-    return [c["name"] for c in CROPS.values() if c["level"] == level]
+    """What a level opens, in words, for the level-up note: crops, animal homes, factories."""
+    return [c["name"] for c in list(CROPS.values()) + list(HOMES.values()) + list(FACTORIES.values()) if c["level"] == level]
 
 
 def crops_open(f):
@@ -148,7 +162,7 @@ def sell(f, item, n=1):
     f["barn"][item] -= n
     if not f["barn"][item]:
         del f["barn"][item]
-    f["coins"] += CROPS[item]["sell"] * n
+    f["coins"] += item_info(item)["sell"] * n
     return n
 
 
@@ -166,6 +180,8 @@ def taken(f):
         used.update(footprint_tiles(kind, gx, gy))
     used.update((gx, gy) for _, gx, gy in DECOR)
     used.update((fl["gx"], fl["gy"]) for fl in f["fields"])
+    for b in f["homes"] + f["mills"]:
+        used.update(footprint_tiles(b["kind"], b["gx"], b["gy"]))
     return used
 
 
@@ -199,21 +215,160 @@ def buy_field(f, gx, gy):
     return "bought"
 
 
+# ---- building: animal homes and factories, one of each, where the player puts them
+
+def building_info(kind):
+    return HOMES[kind] if kind in HOMES else FACTORIES[kind]
+
+
+def owned(f, kind):
+    return any(b["kind"] == kind for b in f["homes"] + f["mills"])
+
+
+def can_place_area(f, kind, gx, gy):
+    """Every tile a building would cover is on the map and free."""
+    used = taken(f)
+    return all(on_map(*t) and t not in used for t in footprint_tiles(kind, gx, gy))
+
+
+def build(f, kind, gx, gy):
+    """'built', or why not: 'level', 'owned' (one of each), 'coins', 'taken'."""
+    info = building_info(kind)
+    if f["level"] < info["level"]:
+        return "level"
+    if owned(f, kind):
+        return "owned"
+    if f["coins"] < info["cost"]:
+        return "coins"
+    if not can_place_area(f, kind, gx, gy):
+        return "taken"
+    f["coins"] -= info["cost"]
+    if kind in HOMES:
+        f["homes"].append({"kind": kind, "gx": gx, "gy": gy, "animals": [None] * ANIMALS_EACH})
+    else:
+        f["mills"].append({"kind": kind, "gx": gx, "gy": gy, "queue": []})
+    return "built"
+
+
+def home_of(f, gx, gy):
+    return next((b for b in f["homes"] if (gx, gy) in footprint_tiles(b["kind"], b["gx"], b["gy"])), None)
+
+
+def mill_of(f, gx, gy):
+    return next((b for b in f["mills"] if (gx, gy) in footprint_tiles(b["kind"], b["gx"], b["gy"])), None)
+
+
+# ---- animals
+
+def animal_state(home, i):
+    """'hungry', 'eating' (making its good) or 'ready'."""
+    t = home["animals"][i]
+    if t is None:
+        return "hungry"
+    return "ready" if now() >= t + HOMES[home["kind"]]["time"] else "eating"
+
+
+def animal_left(home, i):
+    t = home["animals"][i]
+    return 0 if t is None else max(0, t + HOMES[home["kind"]]["time"] - now())
+
+
+def feed_home(f, home):
+    """Feeds every hungry animal there's feed for in the barn. How many were fed."""
+    feed = HOMES[home["kind"]]["feed"]
+    fed = 0
+    for i in range(len(home["animals"])):
+        if animal_state(home, i) == "hungry" and f["barn"].get(feed, 0) > 0:
+            f["barn"][feed] -= 1
+            if not f["barn"][feed]:
+                del f["barn"][feed]
+            home["animals"][i] = now()
+            fed += 1
+    return fed
+
+
+def collect_home(f, home):
+    """Collects what every ready animal made, while the barn has room: they're hungry
+    again. How many, and the levels they brought."""
+    makes = HOMES[home["kind"]]["makes"]
+    got, gained = 0, []
+    for i in range(len(home["animals"])):
+        if animal_state(home, i) == "ready" and barn_free(f) > 0:
+            f["barn"][makes] = f["barn"].get(makes, 0) + 1
+            home["animals"][i] = None
+            got += 1
+            gained += add_xp(f, GOODS[makes]["xp"])
+    return got, gained
+
+
+# ---- factories
+
+def mill_done(m):
+    """How many at the front of the queue are finished."""
+    n = 0
+    for job in m["queue"]:
+        if now() < job["end"]:
+            break
+        n += 1
+    return n
+
+
+def make_in(f, m, item):
+    """Starts making something: 'queued', or why not: 'full' (the queue), 'short' (the
+    barn hasn't what it needs). It starts when the one before it finishes."""
+    recipe = FACTORIES[m["kind"]]["makes"][item]
+    if len(m["queue"]) >= FACTORY_QUEUE:
+        return "full"
+    if any(f["barn"].get(k, 0) < n for k, n in recipe["needs"].items()):
+        return "short"
+    for k, n in recipe["needs"].items():
+        f["barn"][k] -= n
+        if not f["barn"][k]:
+            del f["barn"][k]
+    start = max([now()] + [job["end"] for job in m["queue"]])
+    m["queue"].append({"item": item, "end": start + recipe["time"]})
+    return "queued"
+
+
+def collect_mill(f, m):
+    """Takes what's finished into the barn, front first, while it has room. How many,
+    and the levels they brought."""
+    got, gained = 0, []
+    while m["queue"] and now() >= m["queue"][0]["end"] and barn_free(f) > 0:
+        item = m["queue"].pop(0)["item"]
+        f["barn"][item] = f["barn"].get(item, 0) + 1
+        got += 1
+        gained += add_xp(f, GOODS[item]["xp"])
+    return got, gained
+
+
 # ---- orders
 
 def order_slots(f):
     return min(ORDER_SLOTS_MOST, ORDER_SLOTS + (f["level"] - 1) // ORDER_SLOT_LEVELS)
 
 
+def orderable(f):
+    """What an order may want: crops that can be grown now, and goods the farm can make
+    (from an animal home or a factory it has)."""
+    out = list(crops_open(f))
+    for b in f["homes"]:
+        out.append(HOMES[b["kind"]]["makes"])
+    for b in f["mills"]:
+        out += [k for k in FACTORIES[b["kind"]]["makes"] if not k.endswith("_feed")]
+    return out
+
+
 def make_order(f):
-    """The next order: a few of what can be grown now, more as the farm grows, paying
-    ORDER_PAY times what it would sell for (and XP for what it took to grow)."""
+    """The next order: a few of what can be grown or made now, more as the farm grows,
+    paying ORDER_PAY times what it would sell for (and XP for what it took)."""
     rng = random.Random(f["seed"] * 7919 + f["made"])
     f["made"] += 1
-    kinds = rng.sample(crops_open(f), rng.randint(1, min(3, len(crops_open(f)))))
-    want = {k: rng.randint(2, min(10, 2 + f["level"])) for k in kinds}
-    worth = sum(CROPS[k]["sell"] * n for k, n in want.items())
-    grew = sum(CROPS[k]["xp"] * math.ceil(n / CROPS[k]["yield"]) for k, n in want.items())
+    can = orderable(f)
+    kinds = rng.sample(can, rng.randint(1, min(3, len(can))))
+    want = {k: (rng.randint(2, min(10, 2 + f["level"])) if k in CROPS else rng.randint(1, ORDER_GOODS_MOST)) for k in kinds}
+    worth = sum(item_info(k)["sell"] * n for k, n in want.items())
+    grew = sum((CROPS[k]["xp"] * math.ceil(n / CROPS[k]["yield"])) if k in CROPS else GOODS[k]["xp"] * n for k, n in want.items())
     return {"want": want, "coins": round(worth * ORDER_PAY) + ORDER_TIP, "xp": max(1, round(grew * ORDER_XP))}
 
 

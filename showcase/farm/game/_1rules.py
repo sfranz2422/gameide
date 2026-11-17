@@ -27,6 +27,8 @@ CROPS = {
     "corn":    {"name": "Corn",     "grow": 180, "seed": 2, "yield": 2, "xp": 2, "sell": 3,  "level": 2},
     "carrot":  {"name": "Carrots",  "grow": 420, "seed": 4, "yield": 2, "xp": 3, "sell": 5,  "level": 3},
     "pumpkin": {"name": "Pumpkins", "grow": 900, "seed": 8, "yield": 2, "xp": 5, "sell": 12, "level": 5},
+    "sugarcane": {"name": "Sugarcane", "grow": 1200, "seed": 6, "yield": 2, "xp": 4, "sell": 8, "level": 8},
+    "strawberry": {"name": "Strawberries", "grow": 600, "seed": 5, "yield": 3, "xp": 4, "sell": 7, "level": 11},
 }
 STAGES = 4                                  # pictures of a growing crop: sprouts, young, nearly, ready
 
@@ -45,7 +47,64 @@ FIELD_COST_STEP = 15
 FIELDS_PER_LEVEL = 2                        # most fields: len(START_FIELDS) + this × level
 
 # ---- the barn
-BARN_SPACE = 50                             # how many things it holds
+BARN_SPACE = 80                             # how many things it holds (50 in phase 1; goods need room too)
+
+# ---- phase 2: animals, and the goods made from what's grown.
+# Everything made that isn't a crop: what it's called, what it sells for, and the XP
+# for collecting one.
+GOODS = {
+    "chicken_feed": {"name": "Chicken feed", "sell": 3,   "xp": 1},
+    "cow_feed":     {"name": "Cow feed",     "sell": 6,   "xp": 2},
+    "sheep_feed":   {"name": "Sheep feed",   "sell": 6,   "xp": 2},
+    "egg":          {"name": "Eggs",         "sell": 8,   "xp": 3},
+    "milk":         {"name": "Milk",         "sell": 14,  "xp": 4},
+    "wool":         {"name": "Wool",         "sell": 20,  "xp": 5},
+    "bread":        {"name": "Bread",        "sell": 6,   "xp": 2},
+    "corn_bread":   {"name": "Corn bread",   "sell": 18,  "xp": 4},
+    "pie":          {"name": "Pumpkin pie",  "sell": 30,  "xp": 7},
+    "cookies":      {"name": "Cookies",      "sell": 26,  "xp": 6},
+    "cream":        {"name": "Cream",        "sell": 20,  "xp": 4},
+    "cheese":       {"name": "Cheese",       "sell": 32,  "xp": 6},
+    "butter":       {"name": "Butter",       "sell": 50,  "xp": 8},
+    "sugar":        {"name": "Sugar",        "sell": 20,  "xp": 4},
+    "yarn":         {"name": "Yarn",         "sell": 46,  "xp": 7},
+    "sweater":      {"name": "Sweater",      "sell": 100, "xp": 12},
+    "jam":          {"name": "Jam",          "sell": 52,  "xp": 8},
+}
+# Animal homes: each holds ANIMALS_EACH animals. Feed one (a feed from the barn) and it
+# makes its good after `time` seconds; collect it, and it's hungry again.
+ANIMALS_EACH = 3
+HOMES = {
+    "coop":      {"name": "Chicken coop", "animal": "chicken", "feed": "chicken_feed", "makes": "egg",  "time": 240, "level": 4, "cost": 100},
+    "cowshed":   {"name": "Cow shed",     "animal": "cow",     "feed": "cow_feed",     "makes": "milk", "time": 480, "level": 6, "cost": 220},
+    "sheep_pen": {"name": "Sheep pen",    "animal": "sheep",   "feed": "sheep_feed",   "makes": "wool", "time": 720, "level": 9, "cost": 360},
+}
+# Factories: each makes things from what's in the barn, one at a time, with a queue of
+# FACTORY_QUEUE (finished ones wait in it until collected).
+FACTORY_QUEUE = 3
+FACTORIES = {
+    "feed_mill":    {"name": "Feed mill",    "level": 3,  "cost": 80,  "makes": {
+        "chicken_feed": {"needs": {"wheat": 2, "corn": 1}, "time": 60},
+        "cow_feed":     {"needs": {"corn": 2, "carrot": 1}, "time": 120},
+        "sheep_feed":   {"needs": {"wheat": 2, "carrot": 1}, "time": 120}}},
+    "bakery":       {"name": "Bakery",       "level": 4,  "cost": 140, "makes": {
+        "bread":      {"needs": {"wheat": 3}, "time": 180},
+        "corn_bread": {"needs": {"corn": 2, "egg": 1}, "time": 300},
+        "pie":        {"needs": {"pumpkin": 1, "wheat": 2, "egg": 1}, "time": 600},
+        "cookies":    {"needs": {"wheat": 2, "sugar": 1, "egg": 1}, "time": 480}}},
+    "dairy":        {"name": "Dairy",        "level": 7,  "cost": 260, "makes": {
+        "cream":  {"needs": {"milk": 1}, "time": 180},
+        "cheese": {"needs": {"milk": 2}, "time": 360},
+        "butter": {"needs": {"milk": 2, "cream": 1}, "time": 480}}},
+    "sugar_mill":   {"name": "Sugar mill",   "level": 8,  "cost": 300, "makes": {
+        "sugar": {"needs": {"sugarcane": 2}, "time": 300}}},
+    "weaving_mill": {"name": "Weaving mill", "level": 10, "cost": 420, "makes": {
+        "yarn":    {"needs": {"wool": 2}, "time": 360},
+        "sweater": {"needs": {"yarn": 2}, "time": 720}}},
+    "jam_kitchen":  {"name": "Jam kitchen",  "level": 11, "cost": 480, "makes": {
+        "jam": {"needs": {"strawberry": 3, "sugar": 1}, "time": 480}}},
+}
+ORDER_GOODS_MOST = 3                        # an order wants at most this many of a made good
 
 # ---- orders on the board: each wants a few things, and pays coins and XP
 ORDER_SLOTS = 3                             # at level 1; one more every ORDER_SLOT_LEVELS levels…
@@ -58,7 +117,9 @@ ORDER_XP = 1.0                              # XP: this × what harvesting them g
 
 # ---- the farm as it starts: (kind, gx, gy). Buildings stand with their top corner
 # at (gx, gy) and cover FOOTPRINT tiles each way. Fields are in START_FIELDS.
-FOOTPRINT = {"barn": 2, "house": 2, "silo": 1, "board": 1, "truck": 1, "stand": 1}
+FOOTPRINT = {"barn": 2, "house": 2, "silo": 1, "board": 1, "truck": 1, "stand": 1,
+             "coop": 2, "cowshed": 2, "sheep_pen": 2, "feed_mill": 2, "bakery": 2, "dairy": 2,
+             "sugar_mill": 2, "weaving_mill": 2, "jam_kitchen": 2}
 START_FARM = [
     ("house", 3, 3), ("barn", 3, 7), ("silo", 2, 10), ("board", 7, 3), ("truck", 8, 3), ("stand", 10, 4),
 ]

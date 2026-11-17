@@ -7,9 +7,12 @@
 #   Tap a ripe field     it's harvested; drag from it and every ripe field crossed is
 #   Tap a growing field  how long it has left
 #   Tap the barn         what's in it, to sell; the board: the orders
+#   Tap an animal home   collect what's ready and feed the hungry; nothing to do: its window
+#   Tap a factory        collect what's finished; nothing finished: its window, to make more
 #   Drag anywhere else   the map moves
 import random
 
+SHOP_ROW = 44               # the Build window's rows: ten of them fit the screen
 DRAG_START = 10             # pixels a press must move before it's a drag, not a tap
 HUD_H = 52                  # the bar along the top
 PAN_KEYS = 12               # pixels a step the arrows move the view when it follows the cursor
@@ -72,6 +75,13 @@ def tap_tile(t):
     if t is None:
         global_vars.sel = None
         return
+    home, mill = home_of(f, *t), mill_of(f, *t)
+    if home is not None:
+        tap_home(home)
+        return
+    if mill is not None:
+        tap_mill(mill)
+        return
     kind = building_at(*t)
     if kind == "barn":
         open_panel("barn")
@@ -94,6 +104,50 @@ def tap_tile(t):
     sound_play("click", volume=0.3)
 
 
+def pop(item, b, n=1):
+    """A good rising off the building it came from: n of it."""
+    x, y = building_xy(b["kind"], b["gx"], b["gy"])
+    global_vars.pops.append([item, x, y - 60, 0, n])
+
+
+def tap_home(home):
+    """Collect what's ready, feed who's hungry; if there was nothing to do, its window."""
+    f = farm()
+    info = HOMES[home["kind"]]
+    got, gained = collect_home(f, home)
+    fed = feed_home(f, home)
+    if got:
+        sound_play("harvest", volume=0.6)
+        pop(info["makes"], home, got)
+        level_up(gained)
+    if fed:
+        sound_play("plant", volume=0.5)
+    if got or fed:
+        keep(f)
+        if any(animal_state(home, i) == "ready" for i in range(ANIMALS_EACH)) and barn_free(f) == 0:
+            say("The barn is full! Sell something, or fill an order.", RED)
+        return
+    open_panel("home", f["homes"].index(home))
+
+
+def tap_mill(mill):
+    """Collect what's finished; if nothing was, its window, to make more."""
+    f = farm()
+    item = mill["queue"][0]["item"] if mill["queue"] else None
+    got, gained = collect_mill(f, mill)
+    if got:
+        sound_play("harvest", volume=0.6)
+        pop(item, mill, got)
+        level_up(gained)
+        keep(f)
+        return
+    if mill_done(mill) and barn_free(f) == 0:
+        sound_play("nope", volume=0.5)
+        say("The barn is full! Sell something, or fill an order.", RED)
+        return
+    open_panel("mill", f["mills"].index(mill))
+
+
 def harvest_field(fl):
     f = farm()
     crop = fl["crop"]
@@ -102,7 +156,7 @@ def harvest_field(fl):
         sound_play("harvest", volume=0.6)
         x, y = tile_xy(fl["gx"], fl["gy"])
         particles(x, y - 20, 10, ["#ffd23f", "#9ff0a0", "#ffffff"], speed=3, size=4, life=30, gravity=0.2, spread=120, direction=90, shape="circle")
-        global_vars.pops.append([crop, x, y - 30, 0])
+        global_vars.pops.append([crop, x, y - 30, 0, CROPS[crop]["yield"]])
         level_up(gained)
         keep(f)
     elif res == "full":
@@ -237,7 +291,7 @@ def pointer():
             if fl is not None:
                 plant_field(fl, d["crop"])
         elif d["mode"] == "place":
-            place_field(d["tile"])
+            place_at(d["tile"])
 
 
 # ---- the keys on the map
@@ -261,7 +315,7 @@ def keys_on_map():
         look_at(*c)
     if act("ok"):
         if global_vars.placing:
-            place_field(c)
+            place_at(c)
         else:
             fl = field_at(farm(), *c)
             if seed_bar_open() and fl is not None and fl["crop"] is None and tuple(global_vars.sel) == c and global_vars.last_crop:
@@ -282,7 +336,15 @@ def keys_on_map():
         global_vars.placing = False
 
 
-# ---- buying a field: the shop's button, then a tap where it goes
+# ---- building: the Build window's choice, then a tap where it goes (the tapped tile
+# is a building's top corner)
+
+def place_at(t):
+    if global_vars.placing == "field":
+        place_field(t)
+    elif global_vars.placing:
+        place_building(global_vars.placing, t)
+
 
 def place_field(t):
     f = farm()
@@ -307,6 +369,26 @@ def place_field(t):
         global_vars.placing = False
 
 
+def place_building(kind, t):
+    f = farm()
+    if t is None:
+        return
+    res = build(f, kind, *t)
+    if res == "built":
+        sound_play("levelup", volume=0.5)
+        x, y = building_xy(kind, *t)
+        effect("dust", x, y, None, 1.5)
+        global_vars.placing = False
+        keep(f)
+        say(f"Your {building_info(kind)['name'].lower()} is built! Tap it to use it.", MINT)
+    elif res == "taken":
+        sound_play("nope", volume=0.5)
+        say("There isn't room there: it needs 2 × 2 free tiles.", RED)
+    else:
+        sound_play("nope", volume=0.5)
+        global_vars.placing = False
+
+
 # ---- windows: the barn, the orders, the shop
 
 def close_panel():
@@ -318,22 +400,29 @@ def close_panel():
     global_vars.focus = None
 
 
-def open_panel(kind):
-    """Opens (or redraws) a window, with its buttons."""
+def open_panel(kind, of=None):
+    """Opens (or redraws) a window, with its buttons. `of`: which home or factory.
+    Redrawn (the clocks), the keys stay on the same button."""
+    was = global_vars.focus
+    was = (was.act, was.arg) if was is not None and global_vars.panel == kind else None
     close_panel()
     global_vars.sel = None
     global_vars.placing = False
     global_vars.panel = kind
+    global_vars.panel_of = of
     f = farm()
     if kind == "barn":
-        items = [k for k in CROPS if f["barn"].get(k)]
-        h = 150 + max(1, len(items)) * 64
-        x1, y1 = VIEW_W / 2 - 260, max(HUD_H + 10, VIEW_H / 2 - h / 2)
-        global_vars.panel_box = (x1, y1, x1 + 520, y1 + h)
+        items = barn_items(f)
+        cols = 2 if len(items) > 5 else 1
+        rows = max(1, (len(items) + cols - 1) // cols)
+        w = 520 if cols == 1 else 920
+        h = 120 + rows * 58
+        x1, y1 = VIEW_W / 2 - w / 2, max(HUD_H + 8, VIEW_H / 2 - h / 2)
+        global_vars.panel_box = (x1, y1, x1 + w, y1 + h)
         for i, k in enumerate(items):
-            y = y1 + 92 + i * 64
-            make_button(x1 + 250, y, 120, 40, f"Sell 1 (+{CROPS[k]['sell']})", "sell", (k, 1), 14, True)
-            make_button(x1 + 380, y, 120, 40, "Sell all", "sell", (k, f["barn"][k]), 14, True)
+            x, y = barn_slot(i, cols, x1, y1)
+            make_button(x + 236, y, 92, 38, f"Sell 1 (+{item_info(k)['sell']})", "sell", (k, 1), 12, True)
+            make_button(x + 334, y, 92, 38, "Sell all", "sell", (k, f["barn"][k]), 12, True)
     elif kind == "orders":
         slots = f["orders"]
         rows = (len(slots) + 2) // 3
@@ -347,13 +436,63 @@ def open_panel(kind):
                 b.hot = not b.off
                 make_button(cx + 214, cy + 160, 70, 40, "Skip", "discard", i, 13, True)
     elif kind == "shop":
-        x1, y1 = VIEW_W / 2 - 250, VIEW_H / 2 - 130
-        global_vars.panel_box = (x1, y1, x1 + 500, y1 + 230)
-        b = make_button(x1 + 30, y1 + 90, 440, 56, f"A field: {field_cost(f)} coins", "buy_field", None, 18, True)
-        b.off = len(f["fields"]) >= most_fields(f) or f["coins"] < field_cost(f)
+        rows = shop_rows(f)
+        x1, y1 = VIEW_W / 2 - 330, HUD_H + 12
+        global_vars.panel_box = (x1, y1, x1 + 660, y1 + 64 + len(rows) * SHOP_ROW)
+        for i, (k, name, cost, why) in enumerate(rows):
+            b = make_button(x1 + 450, y1 + 56 + i * SHOP_ROW, 180, SHOP_ROW - 8, why or f"{cost} coins", "build", k, 14, True)
+            b.off = bool(why) or f["coins"] < cost
+            b.hot = not b.off
+    elif kind == "home":
+        home = f["homes"][of]
+        x1, y1 = VIEW_W / 2 - 300, VIEW_H / 2 - 160
+        global_vars.panel_box = (x1, y1, x1 + 600, y1 + 320)
+        info = HOMES[home["kind"]]
+        b = make_button(x1 + 30, y1 + 250, 250, 46, f"Feed them ({f['barn'].get(info['feed'], 0)} feed)", "feed", of, 16, True)
+        b.off = not any(animal_state(home, i) == "hungry" for i in range(ANIMALS_EACH)) or not f["barn"].get(info["feed"])
+        b.hot = not b.off
+        b = make_button(x1 + 310, y1 + 250, 260, 46, f"Collect the {GOODS[info['makes']]['name'].lower()}", "collect_home", of, 16, True)
+        b.off = not any(animal_state(home, i) == "ready" for i in range(ANIMALS_EACH))
+        b.hot = not b.off
+    elif kind == "mill":
+        mill = f["mills"][of]
+        makes = list(FACTORIES[mill["kind"]]["makes"])
+        x1, y1 = VIEW_W / 2 - 360, HUD_H + 12
+        global_vars.panel_box = (x1, y1, x1 + 720, y1 + 190 + len(makes) * 70)
+        for i, item in enumerate(makes):
+            recipe = FACTORIES[mill["kind"]]["makes"][item]
+            b = make_button(x1 + 560, y1 + 176 + i * 70, 130, 44, "Make", "make", (of, item), 16, True)
+            b.off = len(mill["queue"]) >= FACTORY_QUEUE or any(f["barn"].get(k, 0) < n for k, n in recipe["needs"].items())
+            b.hot = not b.off
+        b = make_button(x1 + 540, y1 + 64, 150, 44, "Collect", "collect_mill", of, 16, True)
+        b.off = mill_done(mill) == 0
         b.hot = not b.off
     box = global_vars.panel_box
     make_button(box[2] - 46, box[1] + 8, 38, 34, "X", "close", None, 16, True)
+    if was is not None:
+        global_vars.focus = next((b for b in instances("Button") if b.in_panel and (b.act, b.arg) == was), None)
+
+
+def barn_items(f):
+    return [k for k in list(CROPS) + list(GOODS) if f["barn"].get(k)]
+
+
+def barn_slot(i, cols, x1, y1):
+    """Where the barn window's i-th thing goes: down the first column, then the second."""
+    rows = (len(barn_items(farm())) + cols - 1) // cols
+    return x1 + 20 + (i // rows) * 450, y1 + 84 + (i % rows) * 58
+
+
+def shop_rows(f):
+    """The Build window: a field, then every animal home and factory, by the level that
+    opens it: (key, name, cost, why it can't be bought now, or "")."""
+    rows = [("field", "A field", field_cost(f),
+             "" if len(f["fields"]) < most_fields(f) else f"{most_fields(f)} at most now")]
+    for k in sorted(list(HOMES) + list(FACTORIES), key=lambda k: building_info(k)["level"]):
+        info = building_info(k)
+        why = "Built" if owned(f, k) else (f"Level {info['level']}" if f["level"] < info["level"] else "")
+        rows.append((k, info["name"], info["cost"], why))
+    return rows
 
 
 def do_act(what, arg):
@@ -385,10 +524,43 @@ def do_act(what, arg):
         discard(f, arg)
         keep(f)
         open_panel("orders")
-    elif what == "buy_field":
+    elif what == "buy_field" or (what == "build" and arg == "field"):
         close_panel()
-        global_vars.placing = True
+        global_vars.placing = "field"
         say("Tap an empty spot of grass for the new field.", MINT)
+    elif what == "build":
+        close_panel()
+        global_vars.placing = arg
+        say(f"Tap where the {building_info(arg)['name'].lower()} goes: it needs 2 × 2 free tiles.", MINT)
+    elif what == "feed":
+        if feed_home(f, f["homes"][arg]):
+            sound_play("plant", volume=0.5)
+            keep(f)
+        open_panel("home", arg)
+    elif what == "collect_home":
+        got, gained = collect_home(f, f["homes"][arg])
+        if got:
+            sound_play("harvest", volume=0.6)
+            level_up(gained)
+            keep(f)
+        elif barn_free(f) == 0:
+            say("The barn is full! Sell something, or fill an order.", RED)
+        open_panel("home", arg)
+    elif what == "make":
+        i, item = arg
+        if make_in(f, f["mills"][i], item) == "queued":
+            sound_play("plant", volume=0.5)
+            keep(f)
+        open_panel("mill", i)
+    elif what == "collect_mill":
+        got, gained = collect_mill(f, f["mills"][arg])
+        if got:
+            sound_play("harvest", volume=0.6)
+            level_up(gained)
+            keep(f)
+        elif barn_free(f) == 0:
+            say("The barn is full! Sell something, or fill an order.", RED)
+        open_panel("mill", arg)
     elif what == "stop_placing":
         global_vars.placing = False
     elif what == "title":

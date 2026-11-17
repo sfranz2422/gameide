@@ -896,7 +896,8 @@ build's. Both new games are art library packs (`make_gemini_library.py sandwich 
 
 `showcase/farm/`: a farm that grows into a town (the teacher's ask, 2026-11-16: in the genre
 of Township, an ORIGINAL one; "a big game with a lot of expansion"), built in phases, each
-stopped for review: 1 the farm (done 2026-11-17), 2 animals and factories, 3 the town,
+stopped for review: 1 the farm (done 2026-11-17), 2 animals and factories (done 2026-11-17,
+with Gemini's pictures 6-10), 3 the town,
 4 expansion, 5 achievements and events. **Time is real** (the teacher's choice): crops grow
 on the real clock (`now()` = `time.time()` + `global_vars.time_shift`, which the tests move
 on), so the save keeps when each field was planted and things grow while the game's closed.
@@ -907,5 +908,14 @@ middle of the ground diamond it stands on (`standing` in the build). The grass a
 one baked picture (`make_ground`), not a sprite per tile. Every number is `_1rules.py`; the
 farm's rules are `_2farm.py` (one dict, `global_vars.farm`, saved whole). Buttons draw at
 -1000000, in front of the Farm's own bar and windows (-100000): behind them they were hidden.
-Board: the player's level. Art: the teacher's Gemini sheets (`raw/`, dull magenta keyed by
-distance; the crops sheet cut by rows because the ripe wheat touches the corn).
+Phase 2: animal homes (`HOMES`, three animals each: feed one, it makes its good on the clock)
+and factories (`FACTORIES`, one job at a time, a queue of `FACTORY_QUEUE`, finished jobs wait in
+it to be collected), one of each, bought in the Build window and placed 2 × 2 (`placing` names
+what's being placed). `load_farm` brings an older save up to date (`setdefault`): a new phase's
+fields must start empty there too. Orders ask for goods only once the farm can make them
+(`orderable`). A home's or factory's window redraws each second (its clocks), keeping the keys'
+place. Board: the player's level. Art: the teacher's Gemini sheets (`raw/`, dull magenta keyed by
+distance; the crops sheet cut by rows because the ripe wheat touches the corn). Phase 2's sheets came back
+with surprises `cut_sheets.phase_2` handles: picture 6 repeated sheet 3's board, truck and stands
+under the homes (the sheep pen touches a stand: `apart`), picture 10 drew strawberries twice (the
+third row is used), and the animals have magenta shadows (`shadow` makes them dark).
