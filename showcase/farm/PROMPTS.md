@@ -5,8 +5,8 @@ fill orders, build houses and watch townspeople move in, and clear new land as t
 valley opens up. Everything is seen from above at a slight angle (top-down 3/4, like
 a classic farming game), on a square grid.
 
-The game is built in phases, and so are its pictures: **only Phase 1's are needed
-now.** Every picture has a stand-in drawn by the build, so the game plays without any
+The game is built in phases, and so are its pictures: **each phase's are needed
+when that phase is built.** Every picture has a stand-in drawn by the build, so the game plays without any
 of these. Do them in order and stop whenever you like.
 
 **Saving them:** leave them in `~/Downloads` under whatever name Gemini gives them,
@@ -130,9 +130,48 @@ picture. Each one standing on its own diamond of grass, like the attached buildi
 > canes at the end). Row 2: strawberries (low plants with white flowers, then bright red
 > strawberries at the end). Clear space between fields. Flat magenta background.
 
+## Phase 3: the town
+
+Isometric again, in the same Gemini chat. Attach **picture 3** (the farm buildings) to
+every prompt, and add: *"Isometric, at exactly the same angle, scale, style, outlines and
+lighting as the attached picture. Each one standing on its own diamond of grass, like the
+attached buildings."* Ask for **only what the prompt lists**: picture 6 came back with the
+order board, truck and stands drawn again underneath.
+
+**11. Houses.** MAGENTA.
+> [the style] Isometric. A sheet of four houses for a little farming town, in ONE row,
+> each standing on its own grass diamond the same size as the barn's in the attached
+> picture, with clear space between them, from smallest to biggest: a tiny cosy cottage
+> with a thatched roof and a flower box; a family house with a blue roof and a little
+> front garden; a narrow two-storey brick townhouse with a chimney; a big white manor
+> house with a porch and tall windows. Nothing else on the sheet. Flat magenta background.
+
+**12. Town buildings.** MAGENTA.
+> [the style] Isometric. A sheet of six town buildings, two rows of three, each standing
+> on its own grass diamond the same size as the barn's in the attached picture, with clear
+> space between them. Row 1: a stone fountain in a little round paved square with flower
+> beds; a small park with two trees, a bench and a winding path; a red brick school with a
+> bell on the roof. Row 2: a café with a striped awning and little tables outside; a town
+> hall with a clock tower (the clock has no numbers); a library with steps and columns.
+> Nothing else on the sheet. Flat magenta background.
+
+**13. Townspeople.** MAGENTA. (Attach picture 7, the animals, as well, for their size.)
+> [the style] Small cute townspeople, seen from the same angle, full body, four rows of
+> four, each on its own: Row 1: a girl with pigtails. Row 2: a boy in a cap. Row 3: a
+> woman in a dress. Row 4: an old man with a walking stick. In every row, the same person
+> four times: walking towards you and to the left (two drawings, one with the left foot
+> forward, one with the right), then walking away from you and to the left, seen from
+> behind (two drawings, the same two steps). No shadows, no ground under them. Flat
+> magenta background.
+
+**14. Town icons.** MAGENTA. (Attach picture 4, the icons, as well.)
+> [the style] A sheet of small round-cornered game icons in exactly the style of the
+> attached icons (the same cream tiles), each one a single object on its own, all the same
+> size, ONE row of five: three smiling townspeople's heads together; a little house; a
+> short piece of cobblestone road; four arrows pointing out (to move something); a cloth
+> bag of gold coins. Flat magenta background.
+
 ## Later phases (not yet)
 
-- **Phase 3: the town.** Houses of several sizes, a school, a park, a fountain, a town
-  hall, shops; townspeople walking (several, each facing four ways); roads.
 - **Phase 4: expansion.** Land to clear (thick woods, rocks), a train and station, an
   orchard, a lake with a fishing dock, a mine.

@@ -106,6 +106,43 @@ FACTORIES = {
 }
 ORDER_GOODS_MOST = 3                        # an order wants at most this many of a made good
 
+# ---- phase 3: the town. Houses bring people; people need room in the town, which
+# community buildings make (BASE_ROOM to start). A house whose people have no room
+# stands empty, and only a lived-in house pays rent (every `every` seconds, real
+# time, collected by tapping it). As many houses as you like, each of a kind dearer
+# than the last; one of each community building.
+BASE_ROOM = 20
+HOUSES = {
+    "cottage":    {"name": "Cottage",     "level": 5,  "cost": 120, "step": 40,  "people": 6,  "rent": 12, "every": 600,  "xp": 6},
+    "family_house": {"name": "Family house", "level": 7, "cost": 260, "step": 80,  "people": 12, "rent": 26, "every": 900,  "xp": 10},
+    "townhouse":  {"name": "Townhouse",   "level": 10, "cost": 480, "step": 140, "people": 20, "rent": 46, "every": 1200, "xp": 16},
+    "manor":      {"name": "Manor",       "level": 13, "cost": 800, "step": 220, "people": 32, "rent": 80, "every": 1800, "xp": 24},
+}
+RENT_XP = 1                                 # XP for each rent collected
+COMMUNITY = {
+    "fountain":  {"name": "Fountain",  "level": 5,  "cost": 150,  "room": 20,  "xp": 10},
+    "park":      {"name": "Park",      "level": 6,  "cost": 220,  "room": 30,  "xp": 14},
+    "school":    {"name": "School",    "level": 8,  "cost": 400,  "room": 50,  "xp": 20},
+    "cafe":      {"name": "Café",      "level": 10, "cost": 600,  "room": 60,  "xp": 26},
+    "town_hall": {"name": "Town hall", "level": 12, "cost": 900,  "room": 80,  "xp": 34},
+    "library":   {"name": "Library",   "level": 14, "cost": 1200, "room": 100, "xp": 40},
+}
+# Roads: a tile at a time, anywhere free; townspeople walk along them (the farm's dirt
+# road too). One townsperson out walking for every WALKER_PEOPLE people, up to WALKERS_MOST.
+ROAD_COST = 2
+ROAD_LEVEL = 5
+WALKER_PEOPLE = 6
+WALKERS_MOST = 10
+WALK_STEPS = 40                             # steps of the game to walk one tile
+PEOPLE = ["girl", "boy", "woman", "grandpa"]    # the townspeople's pictures
+# Visitors: townspeople come to the farm stand wanting one thing, and pay well for it.
+# One may wait for every VISITOR_PEOPLE people (one at least, once anyone lives in town).
+VISITOR_PEOPLE = 20
+VISITORS_MOST = 4
+VISITOR_WAIT = 90                           # seconds before the next one comes
+VISITOR_PAY = 2.0                           # coins: this × what the things sell for, plus ORDER_TIP
+VISITOR_XP = 2                              # XP for each thing they take
+
 # ---- orders on the board: each wants a few things, and pays coins and XP
 ORDER_SLOTS = 3                             # at level 1; one more every ORDER_SLOT_LEVELS levels…
 ORDER_SLOT_LEVELS = 2
@@ -119,7 +156,9 @@ ORDER_XP = 1.0                              # XP: this × what harvesting them g
 # at (gx, gy) and cover FOOTPRINT tiles each way. Fields are in START_FIELDS.
 FOOTPRINT = {"barn": 2, "house": 2, "silo": 1, "board": 1, "truck": 1, "stand": 1,
              "coop": 2, "cowshed": 2, "sheep_pen": 2, "feed_mill": 2, "bakery": 2, "dairy": 2,
-             "sugar_mill": 2, "weaving_mill": 2, "jam_kitchen": 2}
+             "sugar_mill": 2, "weaving_mill": 2, "jam_kitchen": 2,
+             "cottage": 2, "family_house": 2, "townhouse": 2, "manor": 2,
+             "fountain": 2, "park": 2, "school": 2, "cafe": 2, "town_hall": 2, "library": 2}
 START_FARM = [
     ("house", 3, 3), ("barn", 3, 7), ("silo", 2, 10), ("board", 7, 3), ("truck", 8, 3), ("stand", 10, 4),
 ]

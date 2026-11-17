@@ -7,10 +7,19 @@
 self.kind = ""
 self.gx = 0
 self.gy = 0
+self.of = None          # something built: ("homes", 0) and so on; where it is is the farm's
+
+# === step
+if self.of is not None:
+    # Read from the farm each step, so a moved building moves (and stands at its new depth).
+    b = farm()[self.of[0]][self.of[1]]
+    self.gx, self.gy = b["gx"], b["gy"]
+self.depth = -(building_xy(self.kind, self.gx, self.gy)[1] if self.kind in FOOTPRINT else tile_xy(self.gx, self.gy)[1])
 
 # === draw
 pic_x, pic_y = building_xy(self.kind, self.gx, self.gy) if self.kind in FOOTPRINT else tile_xy(self.gx, self.gy)
-draw_sprite(self.kind, 0, pic_x, pic_y)
+held = global_vars.moving is not None and tuple(global_vars.moving) == self.of
+draw_sprite_ext(self.kind, 0, pic_x, pic_y, 1, 1, 0, "white", 0.35 if held else 1)
 # An animal home: its animals in the yard, and what's ready over it. A factory: what's
 # finished over it, or a little clock while it's making something.
 f = farm()
@@ -31,6 +40,15 @@ if self.kind in HOMES:
             bubble_y = pic_y - 110 + math.sin(global_vars.t * 0.08) * 4
             diamond(pic_x, bubble_y, "#fff4dc", 0.95, 0.5)
             icon(info["makes"], pic_x, bubble_y, 34)
+elif self.kind in HOUSES and self.of is not None:
+    i = self.of[1]
+    bubble_y = pic_y - 120 + math.sin(global_vars.t * 0.08) * 4
+    if rent_ready(f, i):
+        diamond(pic_x, bubble_y, "#fff4dc", 0.95, 0.5)
+        icon("rent", pic_x, bubble_y, 34)
+    elif i not in lived_in(f):
+        # Empty: no room in town for its people yet.
+        icon("people", pic_x, bubble_y, 30, 0.45 + 0.25 * math.sin(global_vars.t * 0.06))
 elif self.kind in FACTORIES:
     mill = mill_of(f, self.gx, self.gy)
     if mill is not None and mill["queue"]:

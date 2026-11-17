@@ -902,7 +902,7 @@ build's. Both new games are art library packs (`make_gemini_library.py sandwich 
 `showcase/farm/`: a farm that grows into a town (the teacher's ask, 2026-11-16: in the genre
 of Township, an ORIGINAL one; "a big game with a lot of expansion"), built in phases, each
 stopped for review: 1 the farm (done 2026-11-17), 2 animals and factories (done 2026-11-17,
-with Gemini's pictures 6-10), 3 the town,
+with Gemini's pictures 6-10), 3 the town (done 2026-11-17, Gemini's 11-14),
 4 expansion, 5 achievements and events. **Time is real** (the teacher's choice): crops grow
 on the real clock (`now()` = `time.time()` + `global_vars.time_shift`, which the tests move
 on), so the save keeps when each field was planted and things grow while the game's closed.
@@ -924,3 +924,13 @@ distance; the crops sheet cut by rows because the ripe wheat touches the corn). 
 with surprises `cut_sheets.phase_2` handles: picture 6 repeated sheet 3's board, truck and stands
 under the homes (the sheep pen touches a stand: `apart`), picture 10 drew strawberries twice (the
 third row is used), and the animals have magenta shadows (`shadow` makes them dark).
+Phase 3, the town (`_2town.py`): houses (`HOUSES`, as many as you like, each of a kind dearer)
+bring people only while the town has room (`BASE_ROOM` + each community building's, `lived_in`:
+a whole house fits or stands empty), and only a lived-in house's rent clock runs (`town_tick`).
+Roads are the player's (`roads`) plus the rules' `ROAD`; townspeople (`Person`) walk them and wait
+at the farm stand as visitors (orders of one thing, `serve`). **Move things** picks up anything
+the player built or bought (`thing_at`: a `(list, index)` ref) and puts it down keeping the tile it
+was held by; Things and Fields read where they are from the farm each step, so a move moves them.
+The Build window has tabs (`SHOP_TABS`). The keys' cursor zigzags left and right
+(`cursor_step`): diagonal steps only reached half the tiles. Picture 13 drew each townsperson facing both ways:
+`PEOPLE_FRAMES` in cut_sheets.py picks a column for each frame and flips the right-facing ones.

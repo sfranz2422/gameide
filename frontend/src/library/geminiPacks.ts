@@ -399,8 +399,8 @@ export const GEMINI_PACKS: LibraryPack[] = [
       {
         "name": "Big things",
         "file": "library/gemini/farm/big-things.png",
-        "tileWidth": 200,
-        "tileHeight": 185,
+        "tileWidth": 197,
+        "tileHeight": 200,
         "use": "sprites"
       }
     ]

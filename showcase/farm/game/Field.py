@@ -6,8 +6,14 @@
 # === create
 self.i = 0
 
+# === step
+fl = farm()["fields"][self.i]
+self.depth = -tile_xy(fl["gx"], fl["gy"])[1]      # a moved field stands at its new depth
+
 # === draw
 fl = farm()["fields"][self.i]
+if global_vars.moving is not None and tuple(global_vars.moving) == ("fields", self.i):
+    draw_set_alpha(0.35)
 x, y = tile_xy(fl["gx"], fl["gy"])
 st = stage(fl)
 if st is None:
@@ -21,6 +27,7 @@ else:
             draw_set_color("#fff6b0")
             draw_circle(x + 26, y - 30 - (global_vars.t + self.i * 17) % 90, 3)
             draw_set_alpha(1)
+draw_set_alpha(1)
 sel = global_vars.sel
 if sel is not None and tuple(sel) == (fl["gx"], fl["gy"]):
     diamond(x, y, GOLD, 1, 1, True)

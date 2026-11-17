@@ -13,6 +13,7 @@
 #   bought      fields bought so far (the next costs more)
 #   homes       [{"kind", "gx", "gy", "animals": [None, or when it was fed]}]     (phase 2)
 #   mills       [{"kind", "gx", "gy", "queue": [{"item", "end"}]}]               (phase 2)
+#   town, roads, visitors, met                         (phase 3: see the town script)
 import math
 import random
 import time
@@ -28,7 +29,7 @@ def new_farm(seed=None):
     f = {"coins": START_COINS, "xp": 0, "level": 1, "barn": {}, "orders": [], "made": 0, "bought": 0,
          "seed": seed if seed is not None else random.randrange(1 << 30),
          "fields": [{"gx": gx, "gy": gy, "crop": None, "t": 0} for gx, gy in START_FIELDS],
-         "homes": [], "mills": []}
+         "homes": [], "mills": [], "town": [], "roads": [], "visitors": [], "met": 0}
     fill_orders(f)
     return f
 
@@ -39,8 +40,9 @@ def load_farm():
     f = save_get("farm", None)
     if f is None:
         return new_farm()
-    f.setdefault("homes", [])
-    f.setdefault("mills", [])
+    for k in ("homes", "mills", "town", "roads", "visitors"):
+        f.setdefault(k, [])
+    f.setdefault("met", 0)
     return f
 
 
@@ -83,8 +85,10 @@ def add_xp(f, n):
 
 
 def opened_at(level):
-    """What a level opens, in words, for the level-up note: crops, animal homes, factories."""
-    return [c["name"] for c in list(CROPS.values()) + list(HOMES.values()) + list(FACTORIES.values()) if c["level"] == level]
+    """What a level opens, in words, for the level-up note: crops, animal homes, factories,
+    houses and the town's buildings (and roads, with the town)."""
+    every = list(CROPS.values()) + list(HOMES.values()) + list(FACTORIES.values()) + list(HOUSES.values()) + list(COMMUNITY.values())
+    return [c["name"] for c in every if c["level"] == level] + (["roads"] if level == ROAD_LEVEL else [])
 
 
 def crops_open(f):
@@ -173,15 +177,19 @@ def footprint_tiles(kind, gx, gy):
     return [(gx + i, gy + j) for i in range(n) for j in range(n)]
 
 
-def taken(f):
-    """Every tile with something on it: buildings, trees and rocks, the road, fields."""
+def taken(f, skip=None):
+    """Every tile with something on it: buildings, trees and rocks, roads, fields.
+    `skip` (a moved thing's ("homes", 2) and so on) leaves that one out."""
     used = set(ROAD)
     for kind, gx, gy in START_FARM:
         used.update(footprint_tiles(kind, gx, gy))
     used.update((gx, gy) for _, gx, gy in DECOR)
-    used.update((fl["gx"], fl["gy"]) for fl in f["fields"])
-    for b in f["homes"] + f["mills"]:
-        used.update(footprint_tiles(b["kind"], b["gx"], b["gy"]))
+    used.update((fl["gx"], fl["gy"]) for i, fl in enumerate(f["fields"]) if skip != ("fields", i))
+    used.update((r[0], r[1]) for i, r in enumerate(f["roads"]) if skip != ("roads", i))
+    for name in ("homes", "mills", "town"):
+        for i, b in enumerate(f[name]):
+            if skip != (name, i):
+                used.update(footprint_tiles(b["kind"], b["gx"], b["gy"]))
     return used
 
 
@@ -218,6 +226,8 @@ def buy_field(f, gx, gy):
 # ---- building: animal homes and factories, one of each, where the player puts them
 
 def building_info(kind):
+    if kind in HOUSES or kind in COMMUNITY:
+        return town_info(kind)
     return HOMES[kind] if kind in HOMES else FACTORIES[kind]
 
 

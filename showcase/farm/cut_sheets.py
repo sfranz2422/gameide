@@ -179,6 +179,73 @@ def phase_2():
                 save(part.resize((round(part.width * k), round(part.height * k)), Image.LANCZOS), f"crop_{crop}_{c}")
 
 
+# Phase 3 (pictures 11 to 14), each optional until it's come.
+HOUSES = ["cottage", "family_house", "townhouse", "manor"]
+COMMUNITY = ["fountain", "park", "school", "cafe", "town_hall", "library"]
+PEOPLE = [("girl", 88), ("boy", 88), ("woman", 112), ("grandpa", 108)]     # height in art/ (twice the game's)
+# Picture 13's columns (1-4) for each frame: front step 1 and 2, back step 1 and 2.
+PEOPLE_FRAMES = {"girl": ["2", "1~", "4", "3~"], "boy": ["2", "1~", "3", "3^"],
+                 "woman": ["2", "1~", "4", "3~"], "grandpa": ["2", "1~", "4", "3~"]}
+ICONS_3 = ["people", "house", "road", "move", "rent"]
+
+
+def same_size(parts):
+    """Pictures padded to one size, standing on the same bottom middle: a sprite's frames."""
+    w, h = max(p.width for p in parts), max(p.height for p in parts)
+    out = []
+    for p in parts:
+        im = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+        im.paste(p, ((w - p.width) // 2, h - p.height))
+        out.append(im)
+    return out
+
+
+def phase_3():
+    if (RAW / "11.jpeg").exists():
+        im = _sw.key_out(Image.open(RAW / "11.jpeg"))
+        boxes, every = drawings(im, 1, 4)
+        for name, b in zip(HOUSES, boxes):
+            save(fitted(_sw.own(im, b, every).crop(b), 2), name)
+    if (RAW / "12.jpeg").exists():
+        im = _sw.key_out(Image.open(RAW / "12.jpeg"))
+        boxes, every = drawings(im, 2, 3)
+        for name, b in zip(COMMUNITY, boxes):
+            save(fitted(_sw.own(im, b, every).crop(b), 2), name)
+    if (RAW / "13.jpeg").exists():
+        # Each row a townsperson. Gemini drew them facing both ways, not four facing left,
+        # so each frame is a column, flipped ("~") where it faces right: towards you (the
+        # left-facing one, then the right-facing one turned: the other foot forward), then
+        # away. The boy's fourth is a front view by mistake, so his walk away is his one
+        # back view twice, the second a little higher ("^": a bob).
+        im = _sw.key_out(Image.open(RAW / "13.jpeg"))
+        boxes, every = drawings(im, 4, 4)
+        for r, (who, tall) in enumerate(PEOPLE):
+            row = boxes[r * 4:(r + 1) * 4]
+            k = tall / max(b[3] - b[1] for b in row)
+            cols = []
+            for b in row:
+                part = shadow(_sw.own(im, b, every).crop(b))
+                cols.append(part.resize((max(1, round(part.width * k)), max(1, round(part.height * k))), Image.LANCZOS))
+            parts = []
+            for c in PEOPLE_FRAMES[who]:
+                part = cols[int(c[0]) - 1]
+                if "~" in c:
+                    part = part.transpose(Image.FLIP_LEFT_RIGHT)
+                if "^" in c:
+                    bob = Image.new("RGBA", (part.width, part.height + 4), (0, 0, 0, 0))
+                    bob.paste(part, (0, 0))
+                    part = bob
+                parts.append(part)
+            parts = same_size(parts)
+            for j, (pose, step) in enumerate((("front", 0), ("front", 1), ("back", 0), ("back", 1))):
+                save(parts[j], f"person_{who}_{pose}_{step}")
+    if (RAW / "14.jpeg").exists():
+        im = _sw.key_out(Image.open(RAW / "14.jpeg"))
+        boxes, every = drawings(im, 1, 5)
+        for name, b in zip(ICONS_3, boxes):
+            save(_sw.own(im, b, every).crop(b).resize((128, 128), Image.LANCZOS), f"icon_{name}")
+
+
 def main():
     ART.mkdir(exist_ok=True)
     # 1: crops, cut by rows (the ripe wheat touches the corn below it).
@@ -216,6 +283,7 @@ def main():
     view = (GAME["VIEW_W"], GAME["VIEW_H"])
     Image.open(RAW / "05.jpeg").convert("RGB").resize((view[0] * 2, view[1] * 2), Image.LANCZOS).save(ART / "title.png", optimize=True)
     phase_2()
+    phase_3()
     print(f"{sum(1 for _ in ART.glob('*.png'))} pictures in {ART}")
 
 

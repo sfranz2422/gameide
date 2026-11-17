@@ -43,12 +43,18 @@ ICONS = ["wheat", "corn", "carrot", "pumpkin", "seeds", "coin", "star", "level",
          "sickle", "can", "crate", "barn", "order", "hammer", "saw", "axe", "pickaxe", "shovel",
          # phase 2: the goods, the new crops, and a wheelbarrow
          "chicken_feed", "cow_feed", "sheep_feed", "egg", "milk", "wool", "bread", "corn_bread", "pie", "cream",
-         "cheese", "butter", "sugarcane", "sugar", "cookies", "yarn", "sweater", "strawberry", "jam", "wheelbarrow"]
+         "cheese", "butter", "sugarcane", "sugar", "cookies", "yarn", "sweater", "strawberry", "jam", "wheelbarrow",
+         # phase 3: the town
+         "people", "house", "road", "move", "rent"]
 ANIMALS = {"chicken": (250, 250, 245), "cow": (240, 240, 240), "sheep": (245, 245, 235)}
 POSES = ["stand", "walk", "eat", "ready"]
 BUILT_COLOURS = {"coop": (200, 150, 90), "cowshed": (190, 70, 60), "sheep_pen": (170, 140, 110), "feed_mill": (200, 170, 110),
                  "bakery": (220, 120, 80), "dairy": (235, 235, 240), "sugar_mill": (150, 180, 210), "weaving_mill": (170, 120, 190),
-                 "jam_kitchen": (220, 90, 120)}
+                 "jam_kitchen": (220, 90, 120),
+                 "cottage": (240, 210, 160), "family_house": (150, 190, 230), "townhouse": (230, 160, 140), "manor": (235, 225, 200),
+                 "fountain": (170, 200, 220), "park": (90, 170, 90), "school": (210, 80, 70), "cafe": (240, 180, 90),
+                 "town_hall": (220, 220, 230), "library": (160, 110, 80)}
+PEOPLE_COLOURS = {"girl": (230, 90, 140), "boy": (70, 130, 220), "woman": (120, 180, 90), "grandpa": (150, 120, 90)}
 NATURE = ["soil", "soil_wet", "grass_flowers", "path", "fence", "gate", "boulder", "bush", "oak", "pine", "stump", "pond"]
 
 
@@ -120,6 +126,23 @@ def stand_in_animal(animal, pose):
             d.ellipse((14, 16, 24, 26), fill=(40, 40, 40))
     if pose == "ready":
         d.ellipse((2, 26, 14, 38), fill=(255, 220, 120), outline=(120, 80, 20))
+    return im
+
+
+def stand_in_person(who, pose, frame):
+    """A little figure facing left, for a townsperson not drawn yet: front or back, two steps."""
+    im = Image.new("RGBA", (32, 56), (0, 0, 0, 0))
+    d = ImageDraw.Draw(im)
+    shirt = PEOPLE_COLOURS[who]
+    small = who in ("girl", "boy")
+    top = 14 if small else 4
+    step = 3 if frame else -3
+    d.line([(14, 44), (14 - step, 54)], fill=(60, 50, 70), width=4)
+    d.line([(19, 44), (19 + step, 54)], fill=(60, 50, 70), width=4)
+    d.rounded_rectangle((8, top + 14, 25, 46), radius=5, fill=shirt, outline=(50, 30, 20))
+    d.ellipse((8, top, 24, top + 16), fill=(240, 200, 160) if pose == "front" else (110, 70, 40), outline=(50, 30, 20))
+    if pose == "front":
+        d.ellipse((11, top + 6, 13, top + 8), fill=(30, 20, 10))
     return im
 
 
@@ -243,6 +266,11 @@ def build(out):
             name = f"animal_{animal}_{pose}"
             im = half(name) if (ART / f"{name}.png").exists() else stand_in_animal(animal, pose)
             P.sprite(name, [im], (im.width // 2, im.height - 4))     # standing on its feet
+    for who in G["PEOPLE"]:
+        for pose in ("front", "back"):
+            name = f"person_{who}_{pose}"
+            frames = [half(f"{name}_{k}") if (ART / f"{name}_{k}.png").exists() else stand_in_person(who, pose, k) for k in range(2)]
+            P.sprite(name, frames, (frames[0].width // 2, frames[0].height - 3))     # on their feet
     for name in ICONS:
         pic = half(f"icon_{name}") if (ART / f"icon_{name}.png").exists() else stand_in_icon(name)
         P.sprite(f"icon_{name}", [pic], (32, 32))

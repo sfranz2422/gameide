@@ -195,7 +195,7 @@ out`);
     expect(py(g, 'add_xp(global_vars.farm, 26)')).toEqual([2, 3]);
     expect(py(g, 'global_vars.farm["coins"]')).toBe(coins + 2 * py<number>(g, "LEVEL_COINS"));
     expect(py(g, "crops_open(global_vars.farm)")).toEqual(["wheat", "corn", "carrot"]);
-    expect(py(g, "opened_at(5)")).toEqual(["Pumpkins"]);
+    expect(py(g, "opened_at(5)")).toEqual(["Pumpkins", "Cottage", "Fountain", "roads"]);
     step(g);
     expect(g.scores.at(-1)).toBe(3);
     expect(g.project.settings.scoreboard).toEqual({ unit: "level" });
@@ -451,5 +451,241 @@ for h in f["homes"]:
     later(g, 2000);
     py(g, 'do_act("close", None)');
     step(g, 30);
+  });
+
+  it("phase 3: a farm saved before the town comes back with an empty town, and plays on", async () => {
+    const old = { coins: 300, xp: 200, level: 6, barn: { wheat: 4 }, orders: [], made: 2, bought: 0, seed: 3,
+      fields: [{ gx: 7, gy: 6, crop: null, t: 0 }], homes: [], mills: [] };
+    const g = await start({ farm: old });
+    py(g, 'room_goto("Farm")');
+    step(g, 5);
+    expect(py(g, '[global_vars.farm[k] for k in ("town", "roads", "visitors", "met")]')).toEqual([[], [], [], 0]);
+    expect(py(g, "population(global_vars.farm)")).toBe(0);
+    step(g, 70);
+    expect(py(g, 'global_vars.farm["coins"]')).toBe(300);
+  });
+
+  it("phase 3: houses bring people as far as there's room in town; a community building makes room; a house that doesn't fit stands empty", async () => {
+    const g = await start();
+    await farmOf(g);
+    py(g, 'f = global_vars.farm\nf["level"] = 4\nf["coins"] = 3000');
+    // The Houses tab: the cottage waits for level 5.
+    py(g, 'do_act("shop", None)\ndo_act("shop_tab", "houses")');
+    step(g);
+    expect(py(g, 'shop_rows(f, "houses")[1][3]')).toBe("Level 5");
+    py(g, 'f["level"] = 5\ndo_act("shop_tab", "houses")');
+    step(g);
+    py(g, 'do_act("build", "cottage")');
+    expect(py(g, "global_vars.placing")).toBe("cottage");
+    click(g, ...onScreen(g, 11, 7));
+    expect(py(g, '[(b["kind"], b["gx"], b["gy"]) for b in f["town"]]')).toEqual([["cottage", 11, 7]]);
+    expect(py(g, 'f["coins"]')).toBe(3000 - 120);
+    expect(py(g, "population(f)")).toBe(6);
+    // Each cottage costs more than the last; three fit in the 20 the town starts with (18), a fourth doesn't.
+    expect(py(g, 'town_cost(f, "cottage")')).toBe(160);
+    py(g, 'for gx, gy in ((13, 7), (15, 7), (13, 9)):\n    assert build_town(f, "cottage", gx, gy)[0] == "built"');
+    expect(py(g, "population(f)")).toBe(18);
+    expect(py(g, "sorted(lived_in(f))")).toEqual([0, 1, 2]);
+    expect(py(g, "housing(f)")).toBe(24);
+    // A fountain makes room for 20 more: the fourth moves in. One of each, though.
+    expect(py(g, 'build_town(f, "fountain", 15, 9)[0]')).toBe("built");
+    expect(py(g, "room_in_town(f)")).toBe(40);
+    expect(py(g, "population(f)")).toBe(24);
+    expect(py(g, 'build_town(f, "fountain", 8, 9)[0]')).toBe("owned");
+    py(g, 'f["level"] = 6');
+    expect(py(g, 'build_town(f, "park", 8, 9)[0]')).toBe("built");
+    expect(py(g, 'build_town(f, "school", 8, 11)[0]')).toBe("level");
+    expect(py(g, 'build_town(f, "cottage", 15, 9)[0]')).toBe("taken");
+    // The town shows in the bar, and building gave XP.
+    expect(py<number>(g, 'f["xp"]')).toBeGreaterThan(0);
+    step(g, 5);
+  });
+
+  it("phase 3: rent: only a lived-in house pays, on the clock, and a tap collects it", async () => {
+    const g = await start();
+    await farmOf(g);
+    py(g, `f = global_vars.farm
+f["level"] = 13
+f["coins"] = 5000
+assert build_town(f, "manor", 11, 7)[0] == "built"
+assert build_town(f, "cottage", 13, 7)[0] == "built"`);
+    // The manor's 32 don't fit in 20: it stands empty, and its rent doesn't count.
+    expect(py(g, "sorted(lived_in(f))")).toEqual([1]);
+    // Longer than even the manor's rent takes: the cottage's is ready, the empty manor's isn't.
+    later(g, py<number>(g, 'HOUSES["manor"]["every"]') + 5);
+    expect(py(g, "rent_ready(f, 1)")).toBe(true);
+    expect(py(g, "rent_ready(f, 0)")).toBe(false);
+    step(g, 62);
+    const coins = py<number>(g, 'f["coins"]');
+    click(g, ...onScreen(g, 13.5, 7.5));
+    expect(py(g, 'f["coins"]')).toBe(coins + py<number>(g, 'HOUSES["cottage"]["rent"]'));
+    expect(py(g, "rent_ready(f, 1)")).toBe(false);
+    // Tapped again, not ready: its window, with its clock.
+    click(g, ...onScreen(g, 13.5, 7.5));
+    expect(py(g, "global_vars.panel")).toBe("house");
+    py(g, 'do_act("close", None)');
+    // A school makes room: the manor's people move in, and its rent starts counting from then.
+    py(g, 'f["town"].append({"kind": "school", "gx": 15, "gy": 7, "t": now()})');
+    step(g, 62);
+    expect(py(g, "sorted(lived_in(f))")).toEqual([0, 1]);
+    expect(py(g, "rent_ready(f, 0)")).toBe(false);
+    later(g, py<number>(g, 'HOUSES["manor"]["every"]'));
+    expect(py(g, "rent_ready(f, 0)")).toBe(true);
+  });
+
+  it("phase 3: roads are laid by a drag, cost coins, and townspeople walk along them", async () => {
+    const g = await start();
+    await farmOf(g);
+    py(g, 'f = global_vars.farm\nf["level"] = 5\nf["coins"] = 5000');
+    py(g, 'do_act("build", "road")');
+    expect(py(g, "global_vars.placing")).toBe("road");
+    drag(g, onScreen(g, 11, 8), [onScreen(g, 12, 8), onScreen(g, 13, 8), onScreen(g, 14, 8)]);
+    expect(py(g, 'sorted(tuple(r) for r in f["roads"])')).toEqual([[11, 8], [12, 8], [13, 8], [14, 8]]);
+    expect(py(g, 'f["coins"]')).toBe(5000 - 4 * py<number>(g, "ROAD_COST"));
+    // Not on something else: a tap on a field lays nothing.
+    click(g, ...onScreen(g, 7, 6));
+    expect(py<number>(g, 'len(f["roads"])')).toBe(4);
+    py(g, 'do_act("stop_placing", None)');
+    // People in town: some go walking, always on a road, a tile at a time.
+    py(g, 'f["level"] = 7\nfor gx, gy in ((11, 10), (13, 10), (9, 12)):\n    assert build_town(f, "family_house", gx, gy)[0] == "built"\nassert build_town(f, "fountain", 8, 9)[0] == "built"');
+    expect(py(g, "population(f)")).toBe(36);
+    step(g, 5);
+    expect(py(g, 'len([o for o in instances("Person") if o.visitor is None])')).toBe(py<number>(g, "walkers(f)"));
+    expect(py<number>(g, "walkers(f)")).toBe(6);
+    const off: string[] = [];
+    for (let i = 0; i < 12; i++) {
+      step(g, 20);
+      off.push(...py<string[]>(g, `[f"{o.at}->{o.to}" for o in instances("Person") if o.visitor is None and
+          (o.at not in all_roads(f) or o.to not in all_roads(f) or abs(o.at[0] - o.to[0]) + abs(o.at[1] - o.to[1]) > 1)]`));
+    }
+    expect(off).toEqual([]);
+    const moved = py<number>(g, 'len({o.at for o in instances("Person") if o.visitor is None})');
+    expect(moved).toBeGreaterThan(1);
+  });
+
+  it("phase 3: visitors come to the farm stand once people live in town, buy from the barn, and pay well", async () => {
+    const g = await start();
+    await farmOf(g);
+    py(g, 'f = global_vars.farm\nf["level"] = 5\nf["coins"] = 1000');
+    step(g, 62);
+    expect(py(g, 'f["visitors"]')).toEqual([]);
+    py(g, 'assert build_town(f, "cottage", 11, 7)[0] == "built"');
+    step(g, 62);
+    expect(py<number>(g, 'len(f["visitors"])')).toBe(1);
+    later(g, py<number>(g, "VISITOR_WAIT") + 1);
+    step(g, 62);
+    const v = py<{ want: Record<string, number>; coins: number; xp: number }>(g, 'f["visitors"][0]');
+    const [item, n] = Object.entries(v.want)[0]!;
+    expect(py<number>(g, `item_info("${item}")["sell"] * ${n} * VISITOR_PAY`)).toBeLessThanOrEqual(v.coins);
+    // The stand opens their window; short, it can't be given.
+    click(g, ...onScreen(g, 10, 4));
+    expect(py(g, "global_vars.panel")).toBe("visitors");
+    expect(py(g, 'serve(f, 0)[0]')).toBe("short");
+    py(g, `f["barn"] = {"${item}": ${n}}`);
+    const coins = py<number>(g, 'f["coins"]');
+    py(g, 'do_act("serve", 0)');
+    expect(py(g, 'f["coins"]')).toBe(coins + v.coins);
+    expect(py(g, 'f["barn"]')).toEqual({});
+    expect(py(g, '"wait" in f["visitors"][0]')).toBe(true);
+    // More people, more places at the stand.
+    py(g, 'f["level"] = 10\nf["coins"] = 9000\nfor kind, gx, gy in (("park", 13, 7), ("school", 15, 7), ("townhouse", 13, 9), ("townhouse", 15, 9), ("townhouse", 8, 9)):\n    assert build_town(f, kind, gx, gy)[0] == "built", kind');
+    step(g, 62);
+    expect(py<number>(g, 'len(f["visitors"])')).toBe(py<number>(g, "visitor_slots(f)"));
+    expect(py<number>(g, "visitor_slots(f)")).toBeGreaterThan(1);
+  });
+
+  it("the keys' cursor reaches every tile, the farm stand among them", async () => {
+    const g = await start();
+    await farmOf(g);
+    const missed = py<number>(g, `
+seen, todo = {(8, 5)}, [(8, 5)]
+while todo:
+    c = todo.pop()
+    for name in ("left", "right", "up", "down"):
+        n = cursor_step(c, name)
+        if n not in seen:
+            seen.add(n)
+            todo.append(n)
+MAP_W * MAP_H - len(seen)`);
+    expect(missed).toBe(0);
+    // Left undoes right, and up undoes down, away from the edges.
+    expect(py(g, 'all(cursor_step(cursor_step((x, y), "right"), "left") == (x, y) for x in range(2, 17) for y in range(2, 17))')).toBe(true);
+    // From the start, to the farm stand and Space: its window (once anyone has visited).
+    py(g, 'f = global_vars.farm\nf["visitors"] = [{"wait": now() + 60}]\nglobal_vars.cursor = (8, 5)');
+    for (const k of ["right", "right", "right", "down"]) press(g, k);
+    expect(py(g, "global_vars.cursor")).toEqual([10, 4]);
+    press(g, "space");
+    expect(py(g, "global_vars.panel")).toBe("visitors");
+  });
+
+  it("phase 3: Move things: a field (its crop growing on), a factory and a road go where they're put, never onto something", async () => {
+    const g = await start();
+    await farmOf(g);
+    py(g, `f = global_vars.farm
+f["level"] = 6
+f["coins"] = 2000
+assert build(f, "bakery", 11, 7) == "built"
+assert buy_road(f, 11, 9) == "built"
+plant(f, f["fields"][0], "wheat")`);
+    step(g, 3);
+    py(g, 'do_act("move", None)');
+    expect(py(g, "global_vars.placing")).toBe("move");
+    // The field at (7, 6): picked up, put on grass at (12, 12).
+    click(g, ...onScreen(g, 7, 6));
+    expect(py(g, "global_vars.moving")).toEqual(["fields", 0]);
+    click(g, ...onScreen(g, 12, 12));
+    expect(py(g, '(f["fields"][0]["gx"], f["fields"][0]["gy"], f["fields"][0]["crop"])')).toEqual([12, 12, "wheat"]);
+    expect(py(g, "global_vars.moving is None")).toBe(true);
+    // The bakery, picked up by its lower tile, keeps that grip: put down so that tile is where it's tapped.
+    click(g, ...onScreen(g, 12, 8));
+    expect(py(g, "global_vars.moving")).toEqual(["mills", 0]);
+    click(g, ...onScreen(g, 7, 6));        // onto the fields: it stays where it was
+    expect(py(g, '(f["mills"][0]["gx"], f["mills"][0]["gy"])')).toEqual([11, 7]);
+    click(g, ...onScreen(g, 17, 15));
+    expect(py(g, '(f["mills"][0]["gx"], f["mills"][0]["gy"])')).toEqual([16, 14]);
+    step(g, 2);
+    expect(py(g, 'next(o.gx for o in instances("Thing") if o.of == ("mills", 0))')).toBe(16);
+    // A road.
+    click(g, ...onScreen(g, 11, 9));
+    click(g, ...onScreen(g, 10, 9));
+    expect(py(g, 'f["roads"]')).toEqual([[10, 9]]);
+    // The farmhouse stays put: nothing is picked up.
+    click(g, ...onScreen(g, 4, 4));
+    expect(py(g, "global_vars.moving is None")).toBe(true);
+    py(g, 'do_act("stop_placing", None)');
+    expect(py(g, "taken(f) >= {(12, 12), (16, 14), (17, 15), (10, 9)}")).toBe(true);
+  });
+
+  it("phase 3: every town window and ghost draws, with stand-ins where Gemini's pictures haven't come yet", async () => {
+    const g = await start();
+    await farmOf(g);
+    py(g, `f = global_vars.farm
+f["level"] = 14
+f["coins"] = 9000
+spots = [(11, 7), (13, 7), (15, 7), (13, 9), (15, 9), (8, 9), (8, 11), (11, 13), (8, 13), (13, 15), (15, 11)]
+for kind, (gx, gy) in zip(list(HOUSES) + list(COMMUNITY), spots[:10]):
+    assert build_town(f, kind, gx, gy)[0] == "built", kind
+for gx in range(11, 17):
+    buy_road(f, gx, 12) if can_place(f, gx, 12) else None`);
+    step(g, 70);
+    later(g, 4000);
+    step(g, 62);
+    for (const tab of ["farm", "houses", "town"]) {
+      py(g, `do_act("shop", None) if global_vars.panel != "shop" else None\ndo_act("shop_tab", "${tab}")`);
+      step(g, 3);
+    }
+    py(g, 'open_panel("house", 0)');
+    step(g, 62);
+    py(g, 'f["town"].append({"kind": "manor", "gx": 1, "gy": 17, "t": now()})\nopen_panel("house", len(f["town"]) - 1)');
+    step(g, 3);
+    py(g, 'open_panel("visitors")');
+    step(g, 3);
+    py(g, 'do_act("move", None)\nplace_move((11, 7))');
+    step(g, 3);
+    py(g, 'do_act("build", "road")');
+    step(g, 3);
+    py(g, 'do_act("stop_placing", None)');
+    step(g, 30);
+    expect(py<number>(g, 'len(instances("Person"))')).toBeGreaterThan(3);
   });
 });

@@ -9,7 +9,10 @@
 #   Tap the barn         what's in it, to sell; the board: the orders
 #   Tap an animal home   collect what's ready and feed the hungry; nothing to do: its window
 #   Tap a factory        collect what's finished; nothing finished: its window, to make more
-#   Drag anywhere else   the map moves
+#   Tap a house          collect its rent; not ready: its window. The farm stand: its visitors
+#   Build window         Farm, Houses and Town tabs; Move picks up something built and puts it down
+#   Drag anywhere else   the map moves (laying roads, the drag lays them)
+import math
 import random
 
 SHOP_ROW = 44               # the Build window's rows: ten of them fit the screen
@@ -34,6 +37,44 @@ def make_button(x, y, wide, high, words, act, arg=None, size=16, in_panel=False)
 
 def say(words, colour=INK):
     global_vars.said = [words, colour, 150]
+
+
+# ---- townspeople walking the roads (each a Person)
+
+# Where visitors wait by the farm stand (fractions of tiles: a little queue beside it).
+VISITOR_SPOTS = [(11.1, 4.3), (11.55, 3.75), (12.0, 3.2), (12.45, 2.65)]
+
+
+def start_walk(o, f):
+    """A walker starts on a road tile (the town's own if there are any), going nowhere yet."""
+    roads = sorted(all_roads(f))
+    mine = [tuple(r) for r in f["roads"]]
+    o.at = o.to = random.choice(mine or roads)
+    o.came = None
+    o.k = WALK_STEPS
+    o.wx, o.wy = tile_xy(*o.at)
+
+
+def walk_step(o, f):
+    """One step of the game along the way; at a tile, the next one: any road next to it
+    but the one it came from (back only at a dead end). A road taken away from under
+    it, it starts again somewhere else."""
+    o.k += 1
+    if o.k >= WALK_STEPS:
+        roads = all_roads(f)
+        o.came, o.at = o.at, o.to
+        if o.at not in roads:
+            start_walk(o, f)
+            return
+        ways = [(o.at[0] + a, o.at[1] + b) for a, b in ((1, 0), (-1, 0), (0, 1), (0, -1))]
+        ways = [w for w in ways if w in roads]
+        onward = [w for w in ways if w != o.came]
+        o.to = random.choice(onward or ways or [o.at])
+        o.k = 0
+    a = o.k / WALK_STEPS
+    x0, y0 = tile_xy(*o.at)
+    x1, y1 = tile_xy(*o.to)
+    o.wx, o.wy = x0 + (x1 - x0) * a, y0 + (y1 - y0) * a
 
 
 # ---- the camera
@@ -65,8 +106,8 @@ BUILDING_WORDS = {
     "house": "Your farmhouse.",
     "silo": "The silo. Animals and their feed are coming to the farm soon.",
     "truck": "The delivery truck. Big deliveries are coming soon.",
-    "stand": "The farm stand. Selling is done from the barn for now.",
 }
+COMMUNITY_WORDS = "The {name}: room in town for {room} more people."
 
 
 def tap_tile(t):
@@ -82,7 +123,17 @@ def tap_tile(t):
     if mill is not None:
         tap_mill(mill)
         return
+    i = town_of(f, *t)
+    if i is not None:
+        tap_town(i)
+        return
     kind = building_at(*t)
+    if kind == "stand":
+        if not f["visitors"]:
+            say("The farm stand. Visitors come here once people live in your town.", DIM)
+        else:
+            open_panel("visitors")
+        return
     if kind == "barn":
         open_panel("barn")
         return
@@ -146,6 +197,25 @@ def tap_mill(mill):
         say("The barn is full! Sell something, or fill an order.", RED)
         return
     open_panel("mill", f["mills"].index(mill))
+
+
+def tap_town(i):
+    """A house: its rent if it's ready, its window if not. A community building: what it does."""
+    f = farm()
+    b = f["town"][i]
+    if b["kind"] in COMMUNITY:
+        info = COMMUNITY[b["kind"]]
+        say(COMMUNITY_WORDS.format(name=info["name"].lower(), room=info["room"]), DIM)
+        return
+    coins, gained = collect_rent(f, i)
+    if coins:
+        sound_play("coin", volume=0.7)
+        x, y = building_xy(b["kind"], b["gx"], b["gy"])
+        global_vars.pops.append(["coin", x, y - 60, 0, coins])
+        level_up(gained)
+        keep(f)
+        return
+    open_panel("house", i)
 
 
 def harvest_field(fl):
@@ -252,7 +322,9 @@ def pointer():
         else:
             t = tile_at(mouse_x, mouse_y)
             fl = field_at(farm(), *t) if t else None
-            if global_vars.placing:
+            if global_vars.placing == "road":
+                d = {"mode": "road", "done": set()}
+            elif global_vars.placing:
                 d = {"mode": "place", "tile": t}
             elif fl is not None and ready(fl):
                 d = {"mode": "harvest", "done": set()}
@@ -275,6 +347,11 @@ def pointer():
         if fl is not None and ready(fl):
             if harvest_field(fl) == "full":
                 d["mode"] = "stopped"
+    elif d["mode"] == "road" and t is not None and t not in d["done"]:
+        # Laying roads: every free tile the pointer crosses (a tap lays one).
+        d["done"].add(t)
+        if can_place(farm(), *t) and place_road(t) != "built":
+            d["mode"] = "stopped"
     elif d["mode"] == "plant" and d["moved"] and t is not None:
         fl = field_at(farm(), *t)
         if fl is not None and fl["crop"] is None:
@@ -296,20 +373,28 @@ def pointer():
 
 # ---- the keys on the map
 
+def cursor_step(c, name):
+    """Where an arrow moves the keys' cursor from tile c. Up and down go a whole row up or
+    down the screen; left and right half a tile across, zigzagging between two rows:
+    whole steps across, (1, -1), only ever reached half the tiles (gx + gy kept its
+    evenness), the farm stand among them (2026-11-17). At the map's edge it goes along
+    the edge, one axis alone."""
+    odd = (c[0] + c[1]) % 2
+    dx, dy = {"left": (-1, 0) if odd else (0, 1), "right": (0, -1) if odd else (1, 0),
+              "up": (-1, -1), "down": (1, 1)}[name]
+    for nx, ny in ((c[0] + dx, c[1] + dy), (c[0] + dx, c[1]), (c[0], c[1] + dy)):
+        if on_map(nx, ny):
+            return (nx, ny)
+    return c
+
+
 def keys_on_map():
     """Arrows move the cursor tile; Space taps it; 1-4 plant the chosen soil; B, O, F
     open the barn, the orders and the shop; Escape lets go of what's chosen."""
     c = global_vars.cursor
-    for name, (dx, dy) in (("left", (-1, 1)), ("right", (1, -1)), ("up", (-1, -1)), ("down", (1, 1))):
+    for name in ("left", "right", "up", "down"):
         if act(name):
-            nx, ny = c[0] + dx, c[1] + dy
-            # A step left or right on the screen is a step on both axes; it stays on the map.
-            if on_map(nx, ny):
-                c = (nx, ny)
-            elif on_map(c[0] + dx, c[1]):
-                c = (c[0] + dx, c[1])
-            elif on_map(c[0], c[1] + dy):
-                c = (c[0], c[1] + dy)
+            c = cursor_step(c, name)
     if c != global_vars.cursor:
         global_vars.cursor = c
         look_at(*c)
@@ -334,6 +419,7 @@ def keys_on_map():
     if act("back"):
         global_vars.sel = None
         global_vars.placing = False
+        global_vars.moving = None
 
 
 # ---- building: the Build window's choice, then a tap where it goes (the tapped tile
@@ -342,8 +428,89 @@ def keys_on_map():
 def place_at(t):
     if global_vars.placing == "field":
         place_field(t)
+    elif global_vars.placing == "road":
+        if t is not None and can_place(farm(), *t):
+            place_road(t)
+    elif global_vars.placing == "move":
+        place_move(t)
+    elif global_vars.placing in HOUSES or global_vars.placing in COMMUNITY:
+        place_town(global_vars.placing, t)
     elif global_vars.placing:
         place_building(global_vars.placing, t)
+
+
+def place_road(t):
+    f = farm()
+    res = buy_road(f, *t)
+    if res == "built":
+        sound_play("plant", volume=0.4)
+        keep(f)
+    elif res == "coins":
+        sound_play("nope", volume=0.5)
+        say(f"A piece of road costs {ROAD_COST} coins.", RED)
+        global_vars.placing = False
+    elif res == "taken":
+        sound_play("nope", volume=0.5)
+        say("Something's already there.", RED)
+    return res
+
+
+def place_town(kind, t):
+    f = farm()
+    if t is None:
+        return
+    res, gained = build_town(f, kind, *t)
+    if res == "built":
+        sound_play("levelup", volume=0.5)
+        x, y = building_xy(kind, *t)
+        effect("dust", x, y, None, 1.5)
+        global_vars.placing = False
+        keep(f)
+        level_up(gained)
+        if kind in HOUSES and len(f["town"]) - 1 not in lived_in(f):
+            say("Built, but there's no room in town for its people yet: build a fountain, a park…", GOLD)
+        else:
+            say(f"Your {town_info(kind)['name'].lower()} is built!", MINT)
+    elif res == "taken":
+        sound_play("nope", volume=0.5)
+        say("There isn't room there: it needs 2 × 2 free tiles.", RED)
+    else:
+        sound_play("nope", volume=0.5)
+        global_vars.placing = False
+
+
+def place_move(t):
+    """Moving: the first tap picks up what's there, the next puts it down."""
+    f = farm()
+    if t is None:
+        return
+    held = global_vars.moving
+    if held is None:
+        ref = thing_at(f, *t)
+        if ref is None:
+            sound_play("nope", volume=0.4)
+            say("Tap something you've built or bought to move it.", DIM)
+            return
+        global_vars.moving = ref
+        global_vars.move_from = t
+        sound_play("click", volume=0.4)
+        return
+    # The tapped tile is where it goes, with the same corner held as when it was picked up.
+    gx, gy = thing_place(f, held)
+    dx, dy = global_vars.move_from[0] - gx, global_vars.move_from[1] - gy
+    if move(f, held, t[0] - dx, t[1] - dy) == "moved":
+        sound_play("plant", volume=0.5)
+        global_vars.moving = None
+        keep(f)
+    else:
+        sound_play("nope", volume=0.5)
+        say("There isn't room there.", RED)
+
+
+def move_spot(t):
+    """Where the held thing would go if put down at tile t (its top corner)."""
+    gx, gy = thing_place(farm(), global_vars.moving)
+    return t[0] - (global_vars.move_from[0] - gx), t[1] - (global_vars.move_from[1] - gy)
 
 
 def place_field(t):
@@ -408,6 +575,7 @@ def open_panel(kind, of=None):
     close_panel()
     global_vars.sel = None
     global_vars.placing = False
+    global_vars.moving = None
     global_vars.panel = kind
     global_vars.panel_of = of
     f = farm()
@@ -436,13 +604,37 @@ def open_panel(kind, of=None):
                 b.hot = not b.off
                 make_button(cx + 214, cy + 160, 70, 40, "Skip", "discard", i, 13, True)
     elif kind == "shop":
-        rows = shop_rows(f)
+        tab = global_vars.shop_tab
+        rows = shop_rows(f, tab)
         x1, y1 = VIEW_W / 2 - 330, HUD_H + 12
-        global_vars.panel_box = (x1, y1, x1 + 660, y1 + 64 + len(rows) * SHOP_ROW)
+        global_vars.panel_box = (x1, y1, x1 + 660, y1 + 64 + max(len(rows), 3) * SHOP_ROW)
+        for j, (t, words) in enumerate(SHOP_TABS):
+            b = make_button(x1 + 112 + j * 100, y1 + 10, 94, 36, words, "shop_tab", t, 14, True)
+            b.picked = t == tab
+        b = make_button(x1 + 420, y1 + 10, 150, 36, "Move things", "move", None, 14, True)
+        b.icon = "move"
         for i, (k, name, cost, why) in enumerate(rows):
             b = make_button(x1 + 450, y1 + 56 + i * SHOP_ROW, 180, SHOP_ROW - 8, why or f"{cost} coins", "build", k, 14, True)
             b.off = bool(why) or f["coins"] < cost
             b.hot = not b.off
+    elif kind == "house":
+        x1, y1 = VIEW_W / 2 - 280, VIEW_H / 2 - 130
+        global_vars.panel_box = (x1, y1, x1 + 560, y1 + 260)
+        b = make_button(x1 + 30, y1 + 190, 260, 46, f"Collect the rent", "collect_rent", of, 16, True)
+        b.off = not rent_ready(f, of)
+        b.hot = not b.off
+    elif kind == "visitors":
+        n = len(f["visitors"])
+        w = 40 + n * 232
+        x1, y1 = VIEW_W / 2 - w / 2, HUD_H + 40
+        global_vars.panel_box = (x1, y1, x1 + max(w, 420), y1 + 330)
+        for i, v in enumerate(f["visitors"]):
+            cx = x1 + 20 + i * 232
+            if "want" in v:
+                b = make_button(cx + 12, y1 + 266, 120, 40, "Give it", "serve", i, 15, True)
+                b.off = not can_deliver(f, v)
+                b.hot = not b.off
+                make_button(cx + 140, y1 + 266, 72, 40, "No", "send_away", i, 13, True)
     elif kind == "home":
         home = f["homes"][of]
         x1, y1 = VIEW_W / 2 - 300, VIEW_H / 2 - 160
@@ -483,9 +675,24 @@ def barn_slot(i, cols, x1, y1):
     return x1 + 20 + (i // rows) * 450, y1 + 84 + (i % rows) * 58
 
 
-def shop_rows(f):
-    """The Build window: a field, then every animal home and factory, by the level that
-    opens it: (key, name, cost, why it can't be bought now, or "")."""
+SHOP_TABS = [("farm", "Farm"), ("houses", "Houses"), ("town", "Town")]
+
+
+def shop_rows(f, tab="farm"):
+    """A tab of the Build window, by the level that opens each: (key, name, cost, why it
+    can't be bought now, or ""). Farm: a field, the animal homes and factories. Houses:
+    roads and houses (as many as you like). Town: the community buildings."""
+    if tab == "houses":
+        rows = [("road", "Road", ROAD_COST, f"Level {ROAD_LEVEL}" if f["level"] < ROAD_LEVEL else "")]
+        for k, info in HOUSES.items():
+            rows.append((k, info["name"], town_cost(f, k), f"Level {info['level']}" if f["level"] < info["level"] else ""))
+        return rows
+    if tab == "town":
+        rows = []
+        for k, info in COMMUNITY.items():
+            why = "Built" if any(b["kind"] == k for b in f["town"]) else (f"Level {info['level']}" if f["level"] < info["level"] else "")
+            rows.append((k, info["name"], info["cost"], why))
+        return rows
     rows = [("field", "A field", field_cost(f),
              "" if len(f["fields"]) < most_fields(f) else f"{most_fields(f)} at most now")]
     for k in sorted(list(HOMES) + list(FACTORIES), key=lambda k: building_info(k)["level"]):
@@ -528,10 +735,40 @@ def do_act(what, arg):
         close_panel()
         global_vars.placing = "field"
         say("Tap an empty spot of grass for the new field.", MINT)
+    elif what == "build" and arg == "road":
+        close_panel()
+        global_vars.placing = "road"
+        say(f"Tap or drag across grass to lay road ({ROAD_COST} coins a piece). Done when you're finished.", MINT)
     elif what == "build":
         close_panel()
         global_vars.placing = arg
         say(f"Tap where the {building_info(arg)['name'].lower()} goes: it needs 2 × 2 free tiles.", MINT)
+    elif what == "shop_tab":
+        global_vars.shop_tab = arg
+        open_panel("shop")
+    elif what == "move":
+        close_panel()
+        global_vars.placing = "move"
+        global_vars.moving = None
+        say("Tap something you've built to pick it up, then tap where it goes.", MINT)
+    elif what == "collect_rent":
+        coins, gained = collect_rent(f, arg)
+        if coins:
+            sound_play("coin", volume=0.7)
+            level_up(gained)
+            keep(f)
+        open_panel("house", arg)
+    elif what == "serve":
+        res, gained = serve(f, arg)
+        if res == "served":
+            sound_play("coin", volume=0.7)
+            level_up(gained)
+            keep(f)
+        open_panel("visitors")
+    elif what == "send_away":
+        send_away(f, arg)
+        keep(f)
+        open_panel("visitors")
     elif what == "feed":
         if feed_home(f, f["homes"][arg]):
             sound_play("plant", volume=0.5)
@@ -563,5 +800,6 @@ def do_act(what, arg):
         open_panel("mill", arg)
     elif what == "stop_placing":
         global_vars.placing = False
+        global_vars.moving = None
     elif what == "title":
         room_goto("Title")
