@@ -1692,6 +1692,40 @@ check("the bank opens as the teacher wrote it", got["source"] == WROTE and got["
 check("what the teacher wrote isn't sent to students", "print(1)" in json.dumps(got) and "source" not in json.dumps(cs.post(f"{base}/start", json={}).get_json()))
 ct.post("/api/check/bank", json={"markdown": BANK, "name": "Week 3", "save": True})
 
+# Question sets: a set for each class, and a dropdown to choose which one students get.
+week = ct.get("/api/check/bank").get_json()
+check("saving without naming a set goes into the set in use", len(week["sets"]) == 1 and week["bank"]["name"] == "Week 3" and week["active"] == week["sets"][0]["set"])
+P2 = "```quiz\nPeriod two only?\n- [x] yes\n- [ ] no\n```"
+r = ct.post("/api/check/bank", json={"markdown": P2, "name": "Period 2", "save": True, "newSet": True}).get_json()
+P2KEY = r["bank"]["set"]
+check("a new set is made, and isn't the one students get yet", len(r["sets"]) == 2 and r["active"] == week["active"] and r["bank"]["name"] == "Period 2")
+set_state(pending="", play_left=0, recent="[]")
+_q = cs.post(f"{base}/next", json={}).get_json()
+check("…so students still get the set in use", _q.get("block") and "Period two" not in _q["block"], _q)
+r = ct.post("/api/check/sets", json={"set": P2KEY, "use": True}).get_json()
+check("one choice makes it the set students get", r["active"] == P2KEY)
+set_state(pending="", play_left=0, recent="[]")
+check("…from their next question", "Period two" in cs.post(f"{base}/next", json={}).get_json().get("block", ""))
+cs.post(f"{base}/answer", json={"response": "yes"})
+ct.post("/api/check/bank", json={"markdown": P2 + "\n```quiz\nAnd another?\nanswer: yes\n```", "name": "Period 2", "save": True})
+r = ct.get("/api/check/bank").get_json()
+check("saving the set in use again changes it, and makes no new set", len(r["sets"]) == 2 and r["bank"]["count"] == 2 and r["bank"]["set"] == P2KEY)
+check("each set's answers are its own", len(ct.get(f"/api/check/report?set={P2KEY}").get_json()["students"]) == 1
+      and ct.get(f"/api/check/report?set={P2KEY}").get_json()["students"][0]["answered"] == 1)
+check("any set can be opened to see and edit", ct.get(f"/api/check/bank?set={week['active']}").get_json()["bank"]["name"] == "Week 3")
+r = ct.post("/api/check/sets", json={"set": P2KEY, "name": "Period 2: strings"}).get_json()
+check("a set can be renamed", "Period 2: strings" in [x["name"] for x in r["sets"]])
+check("the set in use can't be removed", ct.post("/api/check/sets", json={"set": P2KEY, "remove": True}).status_code == 409)
+_other_t = client("teacher2@example.com")
+_r1 = _other_t.post("/api/check/sets", json={"set": P2KEY, "use": True})
+_r2 = _other_t.post("/api/check/bank", json={"markdown": P2, "set": P2KEY, "save": True})
+check("another teacher can't use, edit or save into it", (_r1.status_code, _r2.status_code) == (404, 404), (_r1.status_code, _r1.data[:100], _r2.status_code))
+check("nor can a student", cs.post("/api/check/sets", json={"set": P2KEY, "use": True}).status_code == 403)
+ct.post("/api/check/sets", json={"set": week["active"], "use": True})
+r = ct.post("/api/check/sets", json={"set": P2KEY, "remove": True}).get_json()
+check("one not in use can be removed", [x["set"] for x in r["sets"]] == [week["active"]] and r["active"] == week["active"])
+check("…and is gone", ct.get(f"/api/check/bank?set={P2KEY}").get_json()["bank"] is None)
+
 # Timing and penalty: each teacher's own, and their students follow them.
 check("a student can't change the timing", cs.post("/api/check/settings", json={"everyMinutes": 60}).status_code == 403)
 defaults = ct.get("/api/check/bank").get_json()["settings"]

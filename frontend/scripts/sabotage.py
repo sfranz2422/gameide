@@ -2062,6 +2062,13 @@ CASES = [
  ('replace: anyone\'s game', "../backend/publishing.py", '            if old is None or old.owner_id != user.id:', '            if old is None:', "never in place of someone else's game", PY),
  ('replace: the dialog never asks', "src/editor/PublishDialog.tsx", ', ...(replace ? { replace } : {}) },', ' },', "put in place of the old one", E2E),
 
+ ('sets: the choice ignored', "../backend/pycheck.py", '    if row is not None and row.active_set is not None:\n        chosen = newest_of(db, teacher_id, row.active_set)', '    if False:\n        chosen = newest_of(db, teacher_id, row.active_set)', "so students still get the set in use", PY),
+ ('sets: every save a new set', "../backend/pycheck.py", '        elif key is None:\n            key = active.set_key', '        elif key is None:\n            key = secrets.token_urlsafe(9)[:12]', "saving the set in use again changes it", PY),
+ ('sets: the set in use removed', "../backend/pycheck.py", '            if active is not None and active.set_key == key:', '            if False:', "the set in use can't be removed", PY),
+ ('sets: anyone\'s set', "../backend/pycheck.py", '    return (db.query(CheckBank).filter_by(teacher_id=teacher_id, set_key=key, removed=0)', '    return (db.query(CheckBank).filter_by(set_key=key, removed=0)', "another teacher can't use, edit or save into it", PY),
+ ('sets: one report for all', "../backend/pycheck.py", '        versions = [b.id for b in db.query(CheckBank.id).filter_by(teacher_id=user.id, set_key=latest.set_key)]', '        versions = [b.id for b in db.query(CheckBank.id).filter_by(teacher_id=user.id)]', "each set's answers are its own", PY),
+ ('sets: the page saves over the set in use', "src/pycheck/BankPage.tsx", '      const into = shown === NEW || shown === null ? { newSet: true } : { set: shown };', '      const into = {};', "several question sets", E2E),
+
  ('tell: the page drops them', NETS, '    if (o.tells && !this.away) this.tells.push(...o.tells);\n', '', "one player on a WebSocket and one polling", E2E),
 
 ]

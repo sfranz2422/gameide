@@ -626,6 +626,13 @@ games are untouched.
   whether it's right, whether they may play. The key never leaves (`quiz.redact`).
   A student with browser tools could still unfreeze their own page; the report
   shows who played without answering. Say so if asked whether it's cheat-proof.
+- **Question sets** (the teacher's ask, 2026-11-17: a set for each class): every
+  save of a set is a new `CheckBank` row with its `set_key`; the newest row is the
+  set. `CheckSettings.active_set` is the one students get (`active_bank`; never
+  chosen: the one saved last). A save with no set goes into the set in use, as a
+  save always did; a new set only with `newSet`. The page's dropdown shows any set
+  to edit; "Give my students this set" switches. A removed set's rows stay
+  (`removed`), as answers point at them; the set in use can't be removed.
 - A bank is what the teacher wrote (`source`, what the edit box shows, so predict
   answers are worked out afresh) and what it became (`markdown`, `questions`).
   Any problem refuses the whole file. `explain:` is taken out here, not in

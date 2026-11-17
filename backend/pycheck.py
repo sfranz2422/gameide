@@ -27,6 +27,7 @@ import math
 import os
 import random
 import re
+import secrets
 from datetime import datetime, timedelta
 from types import SimpleNamespace
 
@@ -149,15 +150,52 @@ def practising(user):
     return user is not None and (is_teacher(user) or is_admin(user))
 
 
+# ---- question sets: a teacher keeps several (a set for each class) and chooses which
+# one their students get. Each save of a set is a new CheckBank row with its key.
+
+def set_rows(db, teacher_id):
+    """The teacher's sets: the newest row of each, by name."""
+    newest = (db.query(func.max(CheckBank.id)).filter(CheckBank.teacher_id == teacher_id, CheckBank.removed == 0)
+              .group_by(CheckBank.set_key).all())
+    rows = db.query(CheckBank).filter(CheckBank.id.in_([n for (n,) in newest] or [-1])).all()
+    return sorted(rows, key=lambda b: (b.name.lower(), b.id))
+
+
+def newest_of(db, teacher_id, key):
+    return (db.query(CheckBank).filter_by(teacher_id=teacher_id, set_key=key, removed=0)
+            .order_by(CheckBank.id.desc()).first())
+
+
+def active_bank(db, teacher_id):
+    """The set this teacher's students get: the one they chose, or, if they never
+    chose (or it's gone), the one they saved last."""
+    row = db.query(CheckSettings).get(teacher_id) if teacher_id else None
+    if row is not None and row.active_set is not None:
+        chosen = newest_of(db, teacher_id, row.active_set)
+        if chosen is not None:
+            return chosen
+    return (db.query(CheckBank).filter_by(teacher_id=teacher_id, removed=0)
+            .order_by(CheckBank.id.desc()).first())
+
+
+def _newest_anyones(db):
+    last = db.query(CheckBank).filter_by(removed=0).order_by(CheckBank.id.desc()).first()
+    return active_bank(db, last.teacher_id) if last else None
+
+
 def bank_for(db, user, pub=None):
-    """The questions this person gets: their own if they're a teacher with some;
-    else their class's teacher's; else the newest anyone has uploaded. A guest
-    (not signed in) gets the bank of the teacher who published the game."""
-    q = db.query(CheckBank).order_by(CheckBank.id.desc())
+    """The questions this person gets: a teacher's own set in use, if they have one;
+    else the set in use of whichever of their classes' teachers changed theirs
+    last; else that of whoever uploaded last. A guest (not signed in) gets the set
+    in use of the teacher who published the game."""
     if user is None:
-        return (q.filter(CheckBank.teacher_id == pub.owner_id).first() if pub else None) or q.first()
-    teachers = {user.id} | {c.teacher_id for c in classes_of(db, user)}
-    return q.filter(CheckBank.teacher_id.in_(teachers)).first() or q.first()
+        return (active_bank(db, pub.owner_id) if pub else None) or _newest_anyones(db)
+    if practising(user):
+        own = active_bank(db, user.id)
+        if own is not None:
+            return own
+    found = [b for b in (active_bank(db, t) for t in {c.teacher_id for c in classes_of(db, user)}) if b is not None]
+    return max(found, key=lambda b: b.id) if found else _newest_anyones(db)
 
 
 class GuestState:
@@ -405,7 +443,7 @@ def _bank_summary(bank):
     kinds = {}
     for q in questions:
         kinds[q["kind"]] = kinds.get(q["kind"], 0) + 1
-    return {"name": bank.name, "uploaded": bank.created_at.isoformat() + "Z", "count": len(questions), "kinds": kinds, "source": bank.source,
+    return {"set": bank.set_key, "name": bank.name, "uploaded": bank.created_at.isoformat() + "Z", "count": len(questions), "kinds": kinds, "source": bank.source,
             "questions": [{"kind": q["kind"], "prompt": q["prompt"], "answer": answer_text(q), "explain": q["explain"]} for q in questions]}
 
 
@@ -446,20 +484,40 @@ def post_settings():
         db.close()
 
 
+SET_KEY = re.compile(r"^[A-Za-z0-9_-]{0,16}$")
+
+
+def _sets_reply(db, user, shown=None):
+    """The teacher's sets for the page's dropdown, which one students get, and one
+    set's questions (`shown`, or the one in use)."""
+    active = active_bank(db, user.id)
+    rows = set_rows(db, user.id)
+    bank = newest_of(db, user.id, shown) if shown is not None else active
+    return {"sets": [{"set": b.set_key, "name": b.name, "count": len(json.loads(b.questions)), "uploaded": b.created_at.isoformat() + "Z"} for b in rows],
+            "active": active.set_key if active else None,
+            "bank": _bank_summary(bank), "settings": _settings_reply(db, user)}
+
+
 @bp.get("/api/check/bank")
 def get_bank():
+    """?set=<key>: that set's questions; without, the set students get."""
     db = publishing._db()
     try:
         user = _teacher(db)
-        mine = db.query(CheckBank).filter_by(teacher_id=user.id).order_by(CheckBank.id.desc()).first()
-        return jsonify(bank=_bank_summary(mine), settings=_settings_reply(db, user))
+        shown = request.args.get("set")
+        if shown is not None and not SET_KEY.match(shown):
+            return err("No such question set.", 404)
+        return jsonify(_sets_reply(db, user, shown))
     finally:
         db.close()
 
 
 @bp.post("/api/check/bank")
 def post_bank():
-    """Reads a new bank. With `save`, and nothing wrong with it, it's the bank from now on."""
+    """Reads a set's questions. With `save`, and nothing wrong with them, they're that
+    set's from now on: `set` names one of the teacher's sets (left out: the set in
+    use), or `newSet` makes a new one. A teacher's first set is the one their
+    students get."""
     db = publishing._db()
     try:
         user = _teacher(db)
@@ -474,27 +532,88 @@ def post_bank():
         source = str(body.get("source") or md)
         if len(source) > MAX_BANK:
             return err("That file is too long for a week's questions.", 413)
-        bank = CheckBank(teacher_id=user.id, name=str(body.get("name") or "This week's questions")[:120], source=source, markdown=md,
-                         questions=json.dumps(questions), created_at=now())
+        # Into the named set; without one, the set students get (saving was always
+        # "these are the questions from now on"); a new set only when asked for.
+        active = active_bank(db, user.id)
+        key = body.get("set")
+        if body.get("newSet") or (key is None and active is None):
+            key = secrets.token_urlsafe(9)[:12].replace("-", "a").replace("_", "b")
+        elif key is None:
+            key = active.set_key
+        elif not isinstance(key, str) or not SET_KEY.match(key) or newest_of(db, user.id, key) is None:
+            return err("That isn't one of your question sets.", 404)
+        first = active is None
+        bank = CheckBank(teacher_id=user.id, name=str(body.get("name") or "This week's questions").strip()[:120] or "Questions",
+                         source=source, markdown=md, questions=json.dumps(questions), created_at=now(), set_key=key)
         db.add(bank)
+        db.flush()
+        if first:
+            _choose(db, user.id, key)
         db.commit()
-        out["bank"] = _bank_summary(bank)
+        out.update(_sets_reply(db, user, key))
         return jsonify(out)
+    finally:
+        db.close()
+
+
+def _choose(db, teacher_id, key):
+    """Makes a set the one this teacher's students get (their timing stays as it is)."""
+    row = db.query(CheckSettings).get(teacher_id)
+    if row is None:
+        cfg = settings_for(db, None)
+        row = CheckSettings(teacher_id=teacher_id, every_seconds=cfg["every"], strikes_out=cfg["strikes"], lock_seconds=cfg["lock"])
+        db.add(row)
+    row.active_set = key
+
+
+@bp.post("/api/check/sets")
+def change_set():
+    """{set, use: true}: students get this set from their next question.
+    {set, name}: renames it. {set, remove: true}: takes it off the list (not the set
+    in use: another must be chosen first); what was answered stays in the record."""
+    db = publishing._db()
+    try:
+        user = _teacher(db)
+        body = request.get_json(silent=True) or {}
+        key = body.get("set")
+        if not isinstance(key, str) or not SET_KEY.match(key) or newest_of(db, user.id, key) is None:
+            return err("That isn't one of your question sets.", 404)
+        if body.get("use"):
+            _choose(db, user.id, key)
+        if "name" in body:
+            name = str(body.get("name") or "").strip()[:120]
+            if not name:
+                return err("Give the set a name.", 400)
+            db.query(CheckBank).filter_by(teacher_id=user.id, set_key=key).update({"name": name})
+        if body.get("remove"):
+            active = active_bank(db, user.id)
+            if active is not None and active.set_key == key:
+                return err("Your students get this set now. Choose another one for them first.", 409)
+            db.query(CheckBank).filter_by(teacher_id=user.id, set_key=key).update({"removed": 1})
+            db.commit()
+            return jsonify(_sets_reply(db, user))
+        db.commit()
+        return jsonify(_sets_reply(db, user, key))
     finally:
         db.close()
 
 
 @bp.get("/api/check/report")
 def report():
-    """Each student's answers to this teacher's current bank."""
+    """Each student's answers to one of this teacher's sets (?set=<key>; without, the set in use)."""
     db = publishing._db()
     try:
         user = _teacher(db)
-        bank = db.query(CheckBank).filter_by(teacher_id=user.id).order_by(CheckBank.id.desc()).first()
-        if bank is None:
+        shown = request.args.get("set")
+        if shown is not None and not SET_KEY.match(shown):
+            return err("No such question set.", 404)
+        # One set's answers (its every version: a set changed mid-week is still one set).
+        latest = newest_of(db, user.id, shown) if shown is not None else active_bank(db, user.id)
+        if latest is None:
             return jsonify(students=[])
+        versions = [b.id for b in db.query(CheckBank.id).filter_by(teacher_id=user.id, set_key=latest.set_key)]
         rows = (db.query(CheckAnswer.user_id, func.count(CheckAnswer.id), func.sum(CheckAnswer.correct), func.max(CheckAnswer.created_at))
-                .filter_by(bank_id=bank.id).group_by(CheckAnswer.user_id).all())
+                .filter(CheckAnswer.bank_id.in_(versions)).group_by(CheckAnswer.user_id).all())
         people = {u.id: u for u in db.query(accounts.User).filter(accounts.User.id.in_([r[0] for r in rows] or [-1]))}
         students = [{"name": people[r[0]].name, "answered": r[1], "right": int(r[2] or 0), "last": r[3].isoformat() + "Z"} for r in rows if r[0] in people]
         return jsonify(students=sorted(students, key=lambda s: s["name"]))

@@ -229,6 +229,13 @@ class CheckBank(Base):
     #: The questions as read at upload, keys included.
     questions = Column(Text, nullable=False, default="[]")
     created_at = Column(DateTime, nullable=False)
+    #: Which of the teacher's question sets this is a version of (the teacher's ask,
+    #: 2026-11-17: a set for each class, switched with a dropdown). Saving a set adds
+    #: a row with the same key; its newest row is the set. "" is the set every bank
+    #: made before sets belongs to.
+    set_key = Column(String(16), nullable=False, default="")
+    #: A set the teacher removed: its rows stay, as answers point at them.
+    removed = Column(Integer, nullable=False, default=0)
 
 
 class CheckSettings(Base):
@@ -239,6 +246,8 @@ class CheckSettings(Base):
     every_seconds = Column(Integer, nullable=False)
     strikes_out = Column(Integer, nullable=False)
     lock_seconds = Column(Integer, nullable=False)
+    #: The question set their students get (CheckBank.set_key).
+    active_set = Column(String(16), nullable=False, default="")
 
 
 class CheckState(Base):
@@ -551,6 +560,15 @@ def create_all(engine):
             conn.execute(text("ALTER TABLE gameide_check_state ADD COLUMN play_left FLOAT"))
         if "ticked_at" not in have:
             conn.execute(text("ALTER TABLE gameide_check_state ADD COLUMN ticked_at TIMESTAMP"))
+    have = {c["name"] for c in inspect(engine).get_columns("gameide_check_banks")}
+    with engine.begin() as conn:
+        if "set_key" not in have:
+            conn.execute(text("ALTER TABLE gameide_check_banks ADD COLUMN set_key VARCHAR(16) NOT NULL DEFAULT ''"))
+        if "removed" not in have:
+            conn.execute(text("ALTER TABLE gameide_check_banks ADD COLUMN removed INTEGER NOT NULL DEFAULT 0"))
+    if "active_set" not in {c["name"] for c in inspect(engine).get_columns("gameide_check_settings")}:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE gameide_check_settings ADD COLUMN active_set VARCHAR(16) NOT NULL DEFAULT ''"))
     if "to_number" not in {c["name"] for c in inspect(engine).get_columns("gameide_net_messages")}:
         with engine.begin() as conn:
             conn.execute(text("ALTER TABLE gameide_net_messages ADD COLUMN to_number INTEGER"))

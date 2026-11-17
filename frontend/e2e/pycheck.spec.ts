@@ -295,3 +295,47 @@ test("a question waits for the game to say it's a fair moment, but not for ever"
   await sctx.close();
   await tctx.close();
 });
+
+test("several question sets: a new one made, given to the students with one choice, and another removed", async ({ browser }) => {
+  test.setTimeout(120_000);
+  const { ctx, page } = await signedIn(browser, "teach5@example.com");
+  await page.goto("/#/python-check");
+  await expect(page.getByTestId("bank-none")).toBeVisible();
+  // The first set: the one students get.
+  await page.getByTestId("set-name").fill("Period 1: loops");
+  await page.getByTestId("bank-text").fill("```quiz\nWhat is 2 + 2?\n- [ ] 3\n- [x] 4\n```\n");
+  await page.getByTestId("bank-use").click();
+  await expect(page.getByTestId("bank-saved")).toContainText("questions from now on", { timeout: 60_000 });
+  await expect(page.getByTestId("set-in-use")).toBeVisible();
+
+  // A second, for another class: made, but students keep the first until it's chosen.
+  await page.getByTestId("set-choose").selectOption({ label: "+ A new set…" });
+  await expect(page.getByTestId("bank-text")).toHaveValue("");
+  await page.getByTestId("set-name").fill("Period 2: strings");
+  await page.getByTestId("bank-text").fill("```quiz\nWhat does \"hi\".upper() give?\n- [x] HI\n- [ ] hi\n```\n```quiz\nName the method that takes the spaces off both ends.\nanswer: strip\n```\n");
+  await page.getByTestId("bank-use").click();
+  await expect(page.getByTestId("bank-saved")).toContainText("when you give them this set", { timeout: 60_000 });
+  await expect(page.getByTestId("set-in-use")).toHaveCount(0);
+  await expect(page.getByTestId("set-choose").locator("option")).toHaveText([
+    "Period 1: loops (1 question) — your students get this one",
+    "Period 2: strings (2 questions)",
+    "+ A new set…",
+  ]);
+
+  // One choice gives it to the students.
+  await page.getByTestId("set-use").click();
+  await expect(page.getByTestId("set-in-use")).toBeVisible();
+  await page.reload();
+  await expect(page.getByTestId("set-choose").locator("option:checked")).toHaveText("Period 2: strings (2 questions) — your students get this one");
+  await expect(page.getByTestId("bank-text")).toHaveValue(/upper/);
+
+  // The other opens to look at and edit, and can be removed; the one in use can't.
+  await page.getByTestId("set-choose").selectOption({ label: "Period 1: loops (1 question)" });
+  await expect(page.getByTestId("bank-text")).toHaveValue(/2 \+ 2/);
+  await expect(page.getByTestId("bank-summary")).toContainText("Period 1: loops");
+  page.once("dialog", (d) => void d.accept());
+  await page.getByTestId("set-remove").click();
+  await expect(page.getByTestId("set-note")).toHaveText("Removed.");
+  await expect(page.getByTestId("set-choose").locator("option")).toHaveText(["Period 2: strings (2 questions) — your students get this one", "+ A new set…"]);
+  await ctx.close();
+});
