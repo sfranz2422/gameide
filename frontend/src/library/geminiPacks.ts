@@ -359,6 +359,53 @@ export const GEMINI_PACKS: LibraryPack[] = [
     ]
   },
   {
+    "id": "gemini-farm",
+    "name": "Cloverbrook",
+    "author": "Google Gemini",
+    "licence": "Free for your games: please credit Gemini",
+    "credit": "Art made with Google Gemini",
+    "url": "https://gemini.google.com/",
+    "preview": "library/gemini/farm/preview.png",
+    "about": "An isometric farm: crops growing in four stages, fields, fences, trees and rocks, a barn, farmhouse, silo and truck, farm icons and a valley.",
+    "sheets": [
+      {
+        "name": "Characters",
+        "file": "library/gemini/farm/characters.png",
+        "tileWidth": 128,
+        "tileHeight": 84,
+        "use": "sprites"
+      },
+      {
+        "name": "Big characters",
+        "file": "library/gemini/farm/big-characters.png",
+        "tileWidth": 123,
+        "tileHeight": 128,
+        "use": "sprites"
+      },
+      {
+        "name": "Things",
+        "file": "library/gemini/farm/things.png",
+        "tileWidth": 128,
+        "tileHeight": 158,
+        "use": "sprites"
+      },
+      {
+        "name": "Small things",
+        "file": "library/gemini/farm/small-things.png",
+        "tileWidth": 64,
+        "tileHeight": 64,
+        "use": "sprites"
+      },
+      {
+        "name": "Big things",
+        "file": "library/gemini/farm/big-things.png",
+        "tileWidth": 200,
+        "tileHeight": 162,
+        "use": "sprites"
+      }
+    ]
+  },
+  {
     "id": "gemini-undertow",
     "name": "Undertow",
     "author": "Google Gemini",

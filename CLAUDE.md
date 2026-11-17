@@ -365,7 +365,7 @@ code (the harness turns bytecode caching off for that reason), or a
 mistyped case name ran nothing and still reported success (the harness now
 refuses unknown names).
 
-**The showcase games' runners** (`GM`, `MM`, `FB`, `GF`, `BB`, `HC`, `KT`, `TD`, `SM`, `RP`, `CLIMB`, `UND`, `SIEGE`, `SAND`, `FLAGS`, `LEMON`, `COOK`, `SANDW`, `MIX` — not `CL`, which is classes.py) rebuild
+**The showcase games' runners** (`GM`, `MM`, `FB`, `GF`, `BB`, `HC`, `KT`, `TD`, `SM`, `RP`, `CLIMB`, `UND`, `SIEGE`, `SAND`, `FLAGS`, `LEMON`, `COOK`, `SANDW`, `MIX`, `FARM` — not `CL`, which is classes.py) rebuild
 that game from the sabotaged source before its playtest and again after. A
 build that **refuses** (Greenside's course checks, Ridgeline Rally's stage
 checks) leaves the old `out/project.json`, and the test passes on it: a
@@ -891,3 +891,21 @@ on magenta lighter in the middle, so `key_magenta` keys by how magenta a pixel i
 outside the outlines, and cuts by the 6 × 3 grid. Picture 1 came back as 18 adventure things
 instead of the workbench: cut as `extra_*` for the art library; the bench is still the
 build's. Both new games are art library packs (`make_gemini_library.py sandwich alchemy`).
+
+## Cloverbrook
+
+`showcase/farm/`: a farm that grows into a town (the teacher's ask, 2026-11-16: in the genre
+of Township, an ORIGINAL one; "a big game with a lot of expansion"), built in phases, each
+stopped for review: 1 the farm (done 2026-11-17), 2 animals and factories, 3 the town,
+4 expansion, 5 achievements and events. **Time is real** (the teacher's choice): crops grow
+on the real clock (`now()` = `time.time()` + `global_vars.time_shift`, which the tests move
+on), so the save keeps when each field was planted and things grow while the game's closed.
+**Isometric**: Gemini drew diamonds though asked for top-down, and the teacher chose to match
+(2026-11-17). `_3screen.tile_xy`/`tile_at` are the map's arithmetic (farm.test.ts checks every
+tile round trips); a thing's depth is minus its screen y, and every picture's origin is the
+middle of the ground diamond it stands on (`standing` in the build). The grass and road are
+one baked picture (`make_ground`), not a sprite per tile. Every number is `_1rules.py`; the
+farm's rules are `_2farm.py` (one dict, `global_vars.farm`, saved whole). Buttons draw at
+-1000000, in front of the Farm's own bar and windows (-100000): behind them they were hidden.
+Board: the player's level. Art: the teacher's Gemini sheets (`raw/`, dull magenta keyed by
+distance; the crops sheet cut by rows because the ripe wheat touches the corn).

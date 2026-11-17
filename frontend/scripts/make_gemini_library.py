@@ -67,6 +67,8 @@ GAMES = {
                  1 / 3, []),
     "alchemy": ("alchemy", "Mix Lab", "162 cartoon icons: water, fire, weather, places, plants, animals, people, food, buildings and inventions, and an explorer's kit.",
                 0.5, []),
+    "farm": ("farm", "Cloverbrook", "An isometric farm: crops growing in four stages, fields, fences, trees and rocks, a barn, farmhouse, silo and truck, farm icons and a valley.",
+             0.5, [r"^(crop_[a-z]+)_"]),
     "undertow": ("undertow", "Undertow", "Divers in eight colours (walking, working, frozen, ghosts), sea creatures, a submarine base's floors, walls, doors and machines.",
                  1.0, [r"^(crew_[a-z]+)_"]),
 }

@@ -58,6 +58,7 @@ LEMON = "lemon"    # …or Squeeze's, rebuilt the same way
 COOK = "cooking"   # …or Order Up!'s, rebuilt the same way
 SANDW = "sandwich" # …or Stack Shack's, rebuilt the same way
 MIX = "alchemy"    # …or Mix Lab's, rebuilt the same way
+FARM = "farm"      # …or Cloverbrook's, rebuilt the same way
 def _sd(n): return f"../showcase/sand/game/{n}.py"
 def _ut(n): return f"../showcase/undertow/game/{n}.py"
 def _fl(n): return f"../showcase/flags/game/{n}.py"
@@ -65,6 +66,7 @@ def _lm(n): return f"../showcase/lemon/game/{n}.py"
 def _ck(n): return f"../showcase/cooking/game/{n}.py"
 def _sw(n): return f"../showcase/sandwich/game/{n}.py"
 def _mx(n): return f"../showcase/alchemy/game/{n}.py"
+def _fm(n): return f"../showcase/farm/game/{n}.py"
 SMR, SML, SMB = "../showcase/smash/game/_2rules.py", "../showcase/smash/game/_1levels.py", "../showcase/smash/build.py"
 def _sm(n): return f"../showcase/smash/game/{n}.py"
 def _rp(n): return f"../showcase/rpg/game/{n}.py"
@@ -2069,6 +2071,19 @@ CASES = [
  ('sets: one report for all', "../backend/pycheck.py", '        versions = [b.id for b in db.query(CheckBank.id).filter_by(teacher_id=user.id, set_key=latest.set_key)]', '        versions = [b.id for b in db.query(CheckBank.id).filter_by(teacher_id=user.id)]', "each set's answers are its own", PY),
  ('sets: the page saves over the set in use', "src/pycheck/BankPage.tsx", '      const into = shown === NEW || shown === null ? { newSet: true } : { set: shown };', '      const into = {};', "several question sets", E2E),
 
+ ('farm: ripe at once', _fm("_2farm"), '    done = (now() - fl["t"]) / CROPS[fl["crop"]]["grow"]', '    done = 1', "tap bare soil, tap a seed", FARM),
+ ('farm: a barn with no walls', _fm("_2farm"), '    if barn_free(f) < c["yield"]:', '    if False:', "the barn holds so much", FARM),
+ ('farm: free seeds', _fm("_2farm"), '    f["coins"] -= CROPS[crop]["seed"]\n', '', "seeds cost coins", FARM),
+ ('farm: levels bring nothing', _fm("_2farm"), '        f["coins"] += LEVEL_COINS\n', '', "XP makes levels", FARM),
+ ('farm: orders pay nothing', _fm("_2farm"), '    f["coins"] += o["coins"]\n', '', "orders: delivered", FARM),
+ ('farm: orders come straight back', _fm("_2farm"), '        if "wait" in o and now() >= o["wait"]:', '        if "wait" in o:', "orders: delivered", FARM),
+ ('farm: fields on anything', _fm("_2farm"), '    if not can_place(f, gx, gy):\n        return "taken"', '    if False:\n        return "taken"', "a field bought goes where", FARM),
+ ('farm: the wrong tile', _fm("_3screen"), '    gx, gy = math.floor((a + b) / 2 + 0.5), math.floor((b - a) / 2 + 0.5)', '    gx, gy = math.floor((a + b) / 2), math.floor((b - a) / 2)', "every tile is found again", FARM),
+ ('farm: a drag harvests one', _fm("_5acts"), '    elif d["mode"] == "harvest" and t is not None and t not in d["done"]:', '    elif False:', "drag a seed across bare fields", FARM),
+ ('farm: never saved', _fm("_2farm"), '    save_set("farm", f)\n', '    pass\n', "it's saved, and comes back", FARM),
+ ('farm: Space does nothing on the map', _fm("_5acts"), '    if act("ok"):\n        if global_vars.placing:', '    if False:\n        if global_vars.placing:', "farmed from the keyboard alone", FARM),
+ ('farm: questions mid-drag', _fm("Farm"), 'question_ok(dragged() is None)', 'question_ok(True)', "questions may come any time but mid-drag", FARM),
+
  ('tell: the page drops them', NETS, '    if (o.tells && !this.away) this.tells.push(...o.tells);\n', '', "one player on a WebSocket and one polling", E2E),
 
 ]
@@ -2105,7 +2120,7 @@ for name, f, old, new, test, *extra in CASES:
             failed = any(l.startswith("FAIL") and test in l for l in out.splitlines())
             ran = "ok   " in out or "FAIL " in out
         else:
-            if runner in ([GM], [MM], [FB], [GF], [BB], [HC], [KT], [TD], [SM], [RP], [CLIMB], [UND], [SIEGE], [SAND], [FLAGS], [LEMON], [COOK], [SANDW], [MIX]):
+            if runner in ([GM], [MM], [FB], [GF], [BB], [HC], [KT], [TD], [SM], [RP], [CLIMB], [UND], [SIEGE], [SAND], [FLAGS], [LEMON], [COOK], [SANDW], [MIX], [FARM]):
                 subprocess.run(["python3", str(ROOT.parent / f"showcase/{runner[0]}/build.py")], capture_output=True)
             cmd = ["npx", "playwright", "test", "-g", test] if runner == [E2E] else ["npx", "vitest", "run", "-t", test]
             r = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True)
@@ -2116,6 +2131,6 @@ for name, f, old, new, test, *extra in CASES:
         if not failed: bad.append(name)
     finally:
         p.write_text(src)
-        if runner in ([GM], [MM], [FB], [GF], [BB], [HC], [KT], [TD], [SM], [RP], [CLIMB], [UND], [SIEGE], [SAND], [FLAGS], [LEMON], [COOK], [SANDW], [MIX]):
+        if runner in ([GM], [MM], [FB], [GF], [BB], [HC], [KT], [TD], [SM], [RP], [CLIMB], [UND], [SIEGE], [SAND], [FLAGS], [LEMON], [COOK], [SANDW], [MIX], [FARM]):
             subprocess.run(["python3", str(ROOT.parent / f"showcase/{runner[0]}/build.py")], capture_output=True)
 print("ALL SABOTAGES CAUGHT" if not bad else f"NOT CAUGHT: {bad}")

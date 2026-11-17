@@ -410,3 +410,16 @@ on("alchemy")("Mix Lab's board", () => {
     expect(g.scores).toEqual([5, 6]);
   });
 });
+
+on("farm")("Cloverbrook's board", () => {
+  it("is each player's level, sent as it goes up", async () => {
+    const g = await start(builtAt("farm"));
+    expect(g.project.settings.scoreboard).toEqual({ unit: "level" });
+    g.py('global_vars.farm = new_farm(1)\nroom_goto("Farm")');
+    g.step(3);
+    expect(g.scores.at(-1)).toBe(1);
+    g.py("add_xp(global_vars.farm, 30)");
+    g.step();
+    expect(g.scores.at(-1)).toBe(3);
+  });
+});
