@@ -292,6 +292,14 @@ check("an unlisted game plays for anyone with the link, signed out too", r.statu
 check("…and its page holds no email address", "@example.com" not in r.get_data(as_text=True))
 check("its files come with it", anon.get(f"/api/play/{SLUG}/assets/pic1").data == PNG)
 check("…and only its own", anon.get(f"/api/play/{SLUG}/assets/nope").status_code == 404)
+# A cached picture tied to the cookie was downloaded again each time a student's cookie
+# changed (every game opened, every minute of activity): the school ran out of bandwidth.
+r = alice.get(f"/api/play/{SLUG}/assets/pic1")
+check("a game's pictures don't vary by cookie, so the browser reuses them",
+      "cookie" not in r.headers.get("Vary", "").lower() and "immutable" in r.headers["Cache-Control"], r.headers.get("Vary"))
+check("…nor do a student's own", "cookie" not in alice.get("/api/projects/aaa1/assets/pic1").headers.get("Vary", "").lower())
+check("…but the game itself still does (it's checked each time)",
+      "cookie" in alice.get(f"/api/play/{SLUG}").headers.get("Vary", "").lower())
 check("someone else can't publish your project", bob.post("/api/projects/pub1/publish", json={"title": "x", "visibility": "unlisted"}).status_code == 403)
 
 # A snapshot: the student keeps working; players see the published version until it's published again.

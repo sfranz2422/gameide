@@ -235,6 +235,7 @@ CASES = [
  # Phase 3: the server (backend/tests/test_server.py)
  ("anyone reads any project", APP, "    if not classes.can_read(db, user, p):", "    if False:", "someone else's project can't be read", PY),
  ("id hijack", APP, "            if p.owner_id != user.id:\n                # The id is someone else's", "            if False:\n                # The id is someone else's", "its id is taken", PY),
+ ("pictures vary by cookie", APP, "app.session_interface = CachedFilesSession()\n", "", "don't vary by cookie, so the browser reuses them", PY),
  ("replaced not kept", APP, '                _snapshot(db, p, "replaced", "Replaced by a save from another tab or computer")\n', "", "what it replaced is kept", PY),
  ("not unpacked", APP, '        if isinstance(data, dict) and set(data) == {"_packed"}:', "        if False:", "a packed body", PY),
  ("any file is a picture", "../backend/gamestore.py", "    return (kind, MAX_SOUND_BYTES) if kind else (None, 0)", '    return (kind, MAX_SOUND_BYTES) if kind else ("image/png", MAX_ASSET_BYTES)', "isn't a picture is refused", PY),

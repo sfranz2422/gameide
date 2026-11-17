@@ -20,6 +20,7 @@ from html import escape
 from datetime import timedelta
 from pathlib import Path
 
+from flask.sessions import SecureCookieSessionInterface
 from flask import Flask, Response, abort, jsonify, make_response, redirect, request, send_from_directory, session, url_for
 from sqlalchemy import create_engine, func
 from sqlalchemy.orm import sessionmaker
@@ -105,8 +106,31 @@ class PackedRequest(Flask.request_class):
         return data
 
 
+class CachedFilesSession(SecureCookieSessionInterface):
+    """Flask marks every response that read the session `Vary: Cookie`, and every
+    request reads it (_sign_out_idle_student). The browser then keeps a cached
+    file only while the cookie stays the same, and a student's cookie changes as
+    they play (each game opened, activity each minute, a guest's question clock):
+    so game A, game B, back to A downloaded all of A's pictures again, and the
+    school went over its bandwidth (2026-11-17). A file the same for everyone
+    (public) or under a name that never changes (immutable) doesn't depend on the
+    cookie, so its Vary is dropped; access is still checked when it's fetched."""
+
+    def save_session(self, app, session, response):
+        super().save_session(app, session, response)
+        cache = response.headers.get("Cache-Control", "")
+        if "immutable" in cache or "public" in cache:
+            vary = [v.strip() for v in response.headers.get("Vary", "").split(",")
+                    if v.strip() and v.strip().lower() != "cookie"]
+            if vary:
+                response.headers["Vary"] = ", ".join(vary)
+            else:
+                response.headers.pop("Vary", None)
+
+
 app = Flask(__name__, static_folder=None)
 app.request_class = PackedRequest
+app.session_interface = CachedFilesSession()
 # Signed session cookies. Generated if unset so the app still boots locally,
 # but then every restart signs everyone out — set it on the server.
 app.secret_key = os.environ.get("SECRET_KEY") or secrets.token_hex(32)

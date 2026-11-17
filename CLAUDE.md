@@ -421,6 +421,11 @@ also serves the built editor (`frontend/dist`). Deployed by `render.yaml`
   can't order deletes between tables it has no relationship() for.
 - **The isolation headers go on every response** (`_headers`); without them
   the endless-loop interrupt silently loses its line numbers.
+- **Cached files must not `Vary: Cookie`** (`CachedFilesSession`, 2026-11-17). Flask adds
+  it to everything that reads the session, i.e. every request, and a student's cookie
+  changes as they play, so the browser downloaded a game's pictures again on every
+  return: the school went over its Render bandwidth. Responses marked `public` or
+  `immutable` lose it; give a new cacheable route one of those or it won't be reused.
 
 ## Classes
 
