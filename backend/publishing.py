@@ -28,6 +28,8 @@ from datetime import timedelta
 import os
 import re
 import secrets
+import threading
+from collections import OrderedDict
 
 from flask import Blueprint, Response, abort, jsonify, make_response, request, session
 from sqlalchemy import func, or_
@@ -405,9 +407,49 @@ def play_info(slug):
         why = pycheck.play_refusal(db, pub, user)
         if why:
             return err(*why)
-        return jsonify(info=_info(db, pub, user), project=json.loads(pub.data))
+        # The project as it's stored (it's JSON already): decoding it and encoding it again
+        # for every player was a big game's worth of work each, a class at once.
+        body = '{"info":' + json.dumps(_info(db, pub, user)) + ',"project":' + pub.data + "}"
+        return Response(body, mimetype="application/json")
     finally:
         db.close()
+
+
+class _SharedFiles:
+    """Published games' files, kept in memory once and shared by every player (2026-11-18:
+    a class opening a game at once had each request read its own copy from the database,
+    thirty copies of the same pictures at the busiest moment). At most `budget` bytes;
+    the least recently used go first. Keyed by the publication and when it was published,
+    so publishing again never serves an old file. Who may see a file is still checked on
+    every request, before this is asked."""
+
+    def __init__(self, budget):
+        self.budget = budget
+        self.used = 0
+        self.files = OrderedDict()
+        self.lock = threading.Lock()
+
+    def get(self, key):
+        with self.lock:
+            hit = self.files.get(key)
+            if hit is not None:
+                self.files.move_to_end(key)
+            return hit
+
+    def put(self, key, content_type, data):
+        if len(data) > self.budget // 8:
+            return              # one huge file doesn't push everything else out
+        with self.lock:
+            if key in self.files:
+                return
+            self.files[key] = (content_type, data)
+            self.used += len(data)
+            while self.used > self.budget:
+                _, (_, old) = self.files.popitem(last=False)
+                self.used -= len(old)
+
+
+SHARED_FILES = _SharedFiles(64 * 1024 * 1024)
 
 
 @bp.get("/api/play/<slug>/assets/<asset_id>")
@@ -419,10 +461,15 @@ def play_asset(slug, asset_id):
         why = _viewable(db, pub, user)
         if why:
             return err(*why)
-        a = db.query(PublishedAsset).filter_by(published_id=pub.id, asset_id=asset_id).first()
-        if a is None:
-            return err("That file isn't part of this game.", 404)
-        r = Response(a.data, mimetype=a.content_type)
+        key = (pub.id, pub.updated_at, asset_id)
+        hit = SHARED_FILES.get(key)
+        if hit is None:
+            a = db.query(PublishedAsset).filter_by(published_id=pub.id, asset_id=asset_id).first()
+            if a is None:
+                return err("That file isn't part of this game.", 404)
+            hit = (a.content_type, bytes(a.data))
+            SHARED_FILES.put(key, *hit)
+        r = Response(hit[1], mimetype=hit[0])
         # Publishing again replaces the copies, but never under an id with
         # different bytes (asset ids never change meaning), so a long cache
         # is safe; private, since a class game is not for everyone.

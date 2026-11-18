@@ -346,10 +346,10 @@ on("lemon")("Squeeze's board", () => {
     for (let k = 0; k < 3000 && (g.py("room_name()") as string) === "Street"; k++) g.step();
     // The first evening: on the board already, with the money tonight.
     expect(g.scores).toEqual([g.py('global_vars.s["money"] // 100')]);
-    // The last day: the money, in dollars.
+    // A later day (summers have no last day now): the money, in dollars.
     g.py('do_act("next", None)');
     g.step(2);
-    g.py('s = global_vars.s\ns["day"] = DAYS - 1\ns["money"] = 15099\ns["plan"]["buy"] = {"lemons": 0, "sugar": 0, "ice": 0, "cups": 0}\ndo_act("open", None)');
+    g.py('s = global_vars.s\ns["day"] = 40\ns["money"] = 15099\ns["plan"]["buy"] = {"lemons": 0, "sugar": 0, "ice": 0, "cups": 0}\ndo_act("open", None)');
     g.step(2);
     g.py("global_vars.speed = 4");
     for (let k = 0; k < 3000 && (g.py("room_name()") as string) === "Street"; k++) g.step();

@@ -20,6 +20,7 @@ row is backed up with everything else.
 import json
 
 from sqlalchemy import BigInteger, Column, DateTime, Float, ForeignKey, Integer, LargeBinary, String, Text, UniqueConstraint
+from sqlalchemy.orm import deferred
 
 import accounts
 from accounts import Base, now
@@ -205,8 +206,11 @@ class Published(Base):
     takedown_note = Column(String(300), nullable=False, default="")
     plays = Column(Integer, nullable=False, default=0)
     likes = Column(Integer, nullable=False, default=0)
-    data = Column(Text, nullable=False)
-    thumbnail = Column(LargeBinary, nullable=True)
+    # Deferred: read only when used. Every one of a game's pictures looks its Published
+    # row up (who may play it), and loading the whole project and thumbnail with each
+    # one was ~190 KB a picture for Cloverbrook, 170 pictures a player, a class at once.
+    data = deferred(Column(Text, nullable=False))
+    thumbnail = deferred(Column(LargeBinary, nullable=True))
     #: The published game this was remixed from (its slug, title and author, kept even if it goes).
     remix_of = Column(Text, nullable=False, default="")
     created_at = Column(DateTime, nullable=False, default=now)

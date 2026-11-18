@@ -292,6 +292,12 @@ check("an unlisted game plays for anyone with the link, signed out too", r.statu
 check("…and its page holds no email address", "@example.com" not in r.get_data(as_text=True))
 check("its files come with it", anon.get(f"/api/play/{SLUG}/assets/pic1").data == PNG)
 check("…and only its own", anon.get(f"/api/play/{SLUG}/assets/nope").status_code == 404)
+# Files are kept in memory once for every player (a class opening a game at once): the same
+# bytes the second time, and still only for those who may play it.
+import publishing as _pubmod
+check("a game's file the second time is the same, from memory", anon.get(f"/api/play/{SLUG}/assets/pic1").data == PNG
+      and any(k[0] for k in _pubmod.SHARED_FILES.files))
+check("the game comes as its project, as published", anon.get(f"/api/play/{SLUG}").get_json().get("info", {}).get("id") == SLUG)
 # A cached picture tied to the cookie was downloaded again each time a student's cookie
 # changed (every game opened, every minute of activity): the school ran out of bandwidth.
 r = alice.get(f"/api/play/{SLUG}/assets/pic1")
@@ -307,6 +313,15 @@ put(alice, "pub1", project("pub1", "Coin Run 2", sprites=[{"frames": ["pic1"]}])
 check("players see the published version, not the one being edited", anon.get(f"/api/play/{SLUG}").get_json()["project"]["name"] == "Coin Run")
 alice.post("/api/projects/pub1/publish", json={"title": "Coin Run", "visibility": "unlisted"})
 check("…until it is published again", anon.get(f"/api/play/{SLUG}").get_json()["project"]["name"] == "Coin Run 2")
+# A file taken out of the game and published again: gone for players, even once it was in memory.
+alice.put("/api/projects/pub1/assets/pic9", data=PNG)
+put(alice, "pub1", project("pub1", "Coin Run 3", sprites=[{"frames": ["pic1", "pic9"]}]), 2)
+alice.post("/api/projects/pub1/publish", json={"title": "Coin Run", "visibility": "unlisted"})
+had = anon.get(f"/api/play/{SLUG}/assets/pic9").data == PNG
+put(alice, "pub1", project("pub1", "Coin Run 2", sprites=[{"frames": ["pic1"]}]), 3)
+alice.post("/api/projects/pub1/publish", json={"title": "Coin Run", "visibility": "unlisted"})
+check("a file taken out of a game, published again, is gone for players (memory too)",
+      had and anon.get(f"/api/play/{SLUG}/assets/pic9").status_code == 404)
 
 # Saves in the player's account: theirs alone, the newest kept, and kept through an update.
 check("a save needs signing in", anon.get(f"/api/play/{SLUG}/save").status_code == 401)
@@ -332,7 +347,8 @@ check("…is closed to someone outside the class", bob.get(f"/api/play/{SLUG}").
 check("…open to a classmate", carol.get(f"/api/play/{SLUG}").status_code == 200)
 check("…to its teacher", teacher.get(f"/api/play/{SLUG}").status_code == 200)
 check("…and to an admin", admin.get(f"/api/play/{SLUG}").status_code == 200)
-check("…and its files are closed the same way", bob.get(f"/api/play/{SLUG}/assets/pic1").status_code == 403)
+check("…and its files are closed the same way, in memory or not",
+      carol.get(f"/api/play/{SLUG}/assets/pic1").data == PNG and bob.get(f"/api/play/{SLUG}/assets/pic1").status_code == 403)
 check("…and so are saves", bob.get(f"/api/play/{SLUG}/save").status_code == 403
       and bob.put(f"/api/play/{SLUG}/save", json={"data": {"level": 9}, "at": 9000}).status_code == 403)
 g = carol.get(f"/api/gallery/{P4}").get_json()

@@ -37,9 +37,23 @@ interface SyncMeta {
 }
 
 const NO_META: SyncMeta = { base: 0, dirty: false, pending: [] };
-/** Pictures sent at once by a save: enough to be quick, few enough not to swamp a free server. */
-const UPLOADS_AT_ONCE = 6;
+/**
+ * Pictures sent at once by a save. It was 6: on 2026-11-18 a teacher uploading a new game
+ * (69 pictures) during class was followed by the server restarting, and every retry after
+ * hit it again while it was still struggling. Two is still quick, and gentler.
+ */
+export const UPLOADS_AT_ONCE = 2;
 const RETRY_MS = 30_000;
+const RETRY_MOST_MS = 5 * 60_000;
+
+/**
+ * How long the background retries wait after `failures` failed syncs in a row: 30 s, then
+ * twice as long each time, up to 5 minutes. A struggling server gets room to recover
+ * instead of the same burst every 30 s. A save the student makes still goes at once.
+ */
+export function retryWait(failures: number): number {
+  return failures <= 0 ? 0 : Math.min(RETRY_MOST_MS, RETRY_MS * 2 ** (failures - 1));
+}
 
 export function cacheName(userId: number) {
   return `gameide-user-${userId}`;
@@ -56,11 +70,16 @@ export class CloudStore implements ProjectStore {
   private queued = new Map<string, Promise<SaveOutcome>>();
   private readonly timer: ReturnType<typeof setInterval>;
   private readonly onOnline = () => void this.syncAll();
+  /** Failed syncs in a row (reset by one that works), and when the background may try again. */
+  private failures = 0;
+  private nextTry = 0;
 
   constructor(readonly userId: number) {
     this.cache = new LocalStore(cacheName(userId));
     window.addEventListener("online", this.onOnline);
-    this.timer = setInterval(() => void this.syncAll(), RETRY_MS);
+    this.timer = setInterval(() => {
+      if (Date.now() >= this.nextTry) void this.syncAll();
+    }, RETRY_MS);
   }
 
   dispose() {
@@ -224,7 +243,17 @@ export class CloudStore implements ProjectStore {
       }
       return next;
     }
-    const run = this.push(id).finally(() => {
+    const run = this.push(id).then((o) => {
+      // The server's trouble (an error, or not reachable) makes the background wait longer.
+      if (o.state === "error" || o.state === "offline") {
+        this.failures++;
+        this.nextTry = Date.now() + retryWait(this.failures);
+      } else if (o.state === "saved") {
+        this.failures = 0;
+        this.nextTry = 0;
+      }
+      return o;
+    }).finally(() => {
       this.running.delete(id);
     });
     this.running.set(id, run);

@@ -426,6 +426,14 @@ also serves the built editor (`frontend/dist`). Deployed by `render.yaml`
   changes as they play, so the browser downloaded a game's pictures again on every
   return: the school went over its Render bandwidth. Responses marked `public` or
   `immutable` lose it; give a new cacheable route one of those or it won't be reused.
+- **A class opening a game at once** (2026-11-18: the site went down with 502s while classes
+  played and a teacher uploaded a game): a published game's files are kept in memory once and
+  shared by every player (`publishing.SHARED_FILES`, 64 MB, least recently used out first,
+  keyed by the publication and when it was published), after the usual who-may-play check;
+  `Published.data` and `thumbnail` are deferred (every file request looks the row up); the
+  game is sent as it's stored, not decoded and encoded again per player. The editor uploads
+  2 files at a time (`UPLOADS_AT_ONCE`) and its background retries back off after a failure
+  (`retryWait`, 30 s doubling to 5 min). `backend/tools/class_load.py` times a class.
 
 ## Classes
 
