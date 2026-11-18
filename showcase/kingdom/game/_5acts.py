@@ -9,6 +9,7 @@
 #   Move                 in a building's window: tap where it goes
 #   Drag anywhere else   the map moves
 import math
+import random
 
 DRAG_START = 10             # pixels a press must move before it's a drag, not a tap
 HUD_H = 56                  # the bar along the top
@@ -229,6 +230,74 @@ def keys_on_map():
         global_vars.moving = None
 
 
+# ---- battles: the pointer and the keys on the battlefield
+
+HOLD_SEND = 18              # steps the pointer is held still before troops keep coming
+HOLD_EVERY = 5              # …one every this many steps
+
+
+def send_troop(field, at, quiet=False):
+    """Puts the chosen troop down at `at` (tiles, fractions): 'sent', or why not (said,
+    unless `quiet`: while held, a step too close says nothing)."""
+    b = global_vars.battle
+    if at is None or field.chosen is None:
+        return None
+    res = deploy(b, field.chosen, at[0], at[1])
+    if res == "sent":
+        sound_play("click", volume=0.3)
+    elif not quiet:
+        sound_play("nope", volume=0.4)
+        say(res, RED)
+    return res
+
+
+def battle_pointer(field):
+    """Tap to put a troop down, hold still to keep putting them down, drag to look round,
+    the wheel to zoom."""
+    d = global_vars.drag
+    sx, sy = gui_mouse()
+    if mouse_check_pressed("left"):
+        d = None
+        if not over_gui(sx, sy):
+            d = {"sx": sx, "sy": sy, "cam": list(global_vars.cam), "moved": False, "held": 0}
+        global_vars.drag = d
+    turned = mouse_wheel()
+    if turned and not over_gui(sx, sy):
+        zoom_by(1 if turned > 0 else -1, (sx, sy))
+    if d is None:
+        return
+    if abs(sx - d["sx"]) + abs(sy - d["sy"]) > DRAG_START:
+        d["moved"] = True
+    if d["moved"]:
+        move_camera(d["cam"][0] - (sx - d["sx"]) / zoom(), d["cam"][1] - (sy - d["sy"]) / zoom())
+    else:
+        d["held"] += 1
+        if d["held"] > HOLD_SEND and d["held"] % HOLD_EVERY == 0:
+            gx, gy = tile_frac(mouse_x, mouse_y)
+            send_troop(field, (gx + random.uniform(-0.3, 0.3), gy + random.uniform(-0.3, 0.3)), quiet=True)
+    if mouse_check_released("left") or not mouse_check("left"):
+        global_vars.drag = None
+        if not d["moved"] and d["held"] <= HOLD_SEND:
+            send_troop(field, tile_frac(mouse_x, mouse_y))
+
+
+def battle_keys(field):
+    """Arrows move the cursor round the field, Space sends the chosen troop there, Q and E zoom."""
+    c = global_vars.cursor
+    for name in ("left", "right", "up", "down"):
+        if act(name):
+            c = cursor_step(c, name)
+    if c != global_vars.cursor:
+        global_vars.cursor = c
+        look_at(*c)
+    if act("ok") and keyed():
+        send_troop(field, c)
+    if keyboard_check_pressed("q"):
+        zoom_by(-1)
+    if keyboard_check_pressed("e"):
+        zoom_by(1)
+
+
 # ---- placing: a new building, walls, or one being moved (the tapped tile is its top corner)
 
 def place_at(t):
@@ -349,6 +418,28 @@ def open_panel(kind, of=None):
         if maker(b) and waiting(b) > 0:
             make_button(x1 + 30, by - 58, 220, 44, f"Collect {big_number(waiting(b))}", "collect", of, 15, True)
         make_button(x2 - 120, by, 96, 48, "Move", "move", of, 15, True)
+        if b["kind"] in ("barracks", "army_camp") and b["level"] > 0:
+            make_button(x2 - 300, by, 170, 48, "Train troops", "army", None, 15, True)
+    elif kind == "army":
+        x1, y1 = VIEW_W / 2 - 400, HUD_H + 6
+        global_vars.panel_box = (x1, y1, x1 + 800, y1 + 108 + len(TROOPS) * ARMY_ROW)
+        for i, k in enumerate(TROOPS):
+            y = y1 + 92 + i * ARMY_ROW
+            why = can_train(r, k)
+            t = make_button(x1 + 610, y, 130, ARMY_ROW - 8, f"Train: {TROOPS[k]['cost']} food" if not why or why.startswith("That needs")
+                            else ("Locked" if why.startswith("Upgrade") else "No room"), "train", k, 13, True)
+            t.off = why is not None
+            t.hot = not t.off
+            u = make_button(x1 + 746, y, 40, ARMY_ROW - 8, "-", "untrain", k, 18, True)
+            u.off = k not in r["training"]
+    elif kind == "campaign":
+        x1, y1 = VIEW_W / 2 - 490, HUD_H + 4
+        global_vars.panel_box = (x1, y1, x1 + 980, y1 + 66 + 4 * CAMP_ROW)
+        for i, v in enumerate(CAMPAIGN):
+            cx, cy = x1 + 16 + (i % 4) * 240, y1 + 58 + (i // 4) * CAMP_ROW
+            a = make_button(cx + 140, cy + CAMP_ROW - 48, 84, 36, "Attack", "attack", i, 14, True)
+            a.off = not village_open(r, i) or army_size(r) == 0
+            a.hot = not a.off
     elif kind == "obstacle":
         o = r["obstacles"][of]
         x1, y1 = VIEW_W / 2 - 240, VIEW_H / 2 - 110
@@ -374,6 +465,10 @@ def open_panel(kind, of=None):
     make_button(box[2] - 46, box[1] + 8, 38, 34, "X", "close", None, 16, True)
     if was is not None:
         global_vars.focus = next((b for b in instances("Button") if b.in_panel and (b.act, b.arg) == was), None)
+
+
+ARMY_ROW = 52              # the Army window's rows, a troop each
+CAMP_ROW = 112             # the Attack window's cards, four to a row
 
 
 def shop_rows(r, tab):
@@ -406,11 +501,41 @@ def do_act(what, arg):
         room_goto("Realm")
     elif what == "close":
         close_panel()
-    elif what == "shop":
-        if global_vars.panel == "shop":
+    elif what in ("shop", "army", "campaign"):
+        if global_vars.panel == what:
             close_panel()
         else:
-            open_panel("shop")
+            open_panel(what)
+    elif what == "train":
+        res = train(r, arg)
+        if res == "queued":
+            sound_play("click", volume=0.4)
+            keep_save(r)
+        else:
+            sound_play("nope", volume=0.5)
+            say(res, RED)
+        open_panel("army")
+    elif what == "untrain":
+        if untrain(r, arg):
+            keep_save(r)
+        open_panel("army")
+    elif what == "attack":
+        b = start_raid(r, arg)
+        if isinstance(b, str):
+            sound_play("nope", volume=0.5)
+            say(b, RED)
+        else:
+            close_panel()
+            global_vars.battle = b
+            global_vars.raid = {"village": arg, "name": CAMPAIGN[arg]["name"]}
+            room_goto("Battle")
+    elif what == "troop":
+        for f in instances("Battlefield"):
+            f.chosen = arg
+    elif what == "end_battle":
+        end_battle(global_vars.battle)
+    elif what == "go_home":
+        room_goto("Realm")
     elif what == "shop_tab":
         global_vars.shop_tab = arg
         open_panel("shop")

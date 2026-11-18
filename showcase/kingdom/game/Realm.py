@@ -19,14 +19,14 @@ global_vars.said = None
 global_vars.levelup = None
 global_vars.pops = []                # gold and food rising off where they were collected
 global_vars.focus = None
-global_vars.cursor = (20, 20)
+global_vars.cursor = (MID, MID)
 global_vars.shop_tab = "economy"
 r = global_vars.realm
 if getattr(global_vars, "zoom", None) is None:
     global_vars.zoom = ZOOM_START
 camera_zoom(global_vars.zoom)
 if getattr(global_vars, "cam", None) is None:
-    x, y = tile_xy(20, 20)
+    x, y = tile_xy(MID, MID)
     w, h = shown(global_vars.zoom)      # the engine's view takes the zoom from the next step
     move_camera(x - w / 2, y - h / 2)
 high_score(r["level"])
@@ -35,6 +35,11 @@ self.shown = {}                      # id(building dict) -> its Building, or its
 self.trees = {}                      # (gx, gy) -> the Prop of the tree or rock there
 self.shop_b = make_button(VIEW_W - 130, 9, 120, 38, "Build", "shop", None, 16)
 self.shop_b.icon = "hammer"
+self.army_b = make_button(VIEW_W - 256, 9, 118, 38, "Army", "army", None, 16)
+self.army_b.icon = "shield"
+self.attack_b = make_button(14, VIEW_H - 74, 150, 60, "Attack!", "campaign", None, 22)
+self.attack_b.icon = "sword"
+self.attack_b.hot = True
 self.stop = make_button(VIEW_W / 2 - 80, VIEW_H - 58, 160, 42, "Done", "stop_placing", None, 16)
 self.zoom_out = make_button(VIEW_W - 108, VIEW_H - 56, 46, 44, "-", "zoom", -1, 24)
 self.zoom_in = make_button(VIEW_W - 56, VIEW_H - 56, 46, 44, "+", "zoom", 1, 24)
@@ -57,8 +62,10 @@ if global_vars.t % 30 == 0:
     if len(busy(r)) < jobs or grew:
         level_up(gained)
         keep_save(r)
-    if global_vars.panel == "building":
-        open_panel("building", global_vars.panel_of)
+    if train_tick(r):
+        keep_save(r)
+    if global_vars.panel in ("building", "army"):
+        open_panel(global_vars.panel, global_vars.panel_of)
 # What's on the map, kept in step with the kingdom: a Building each, a Prop for a wall.
 now_ids = {}
 walls = {(b["gx"], b["gy"]) for b in r["buildings"] if b["kind"] == "wall"}
@@ -101,6 +108,10 @@ else:
     keys_on_map()
 self.stop.shown = bool(global_vars.placing)
 self.shop_b.picked = global_vars.panel == "shop"
+self.army_b.picked = global_vars.panel == "army"
+self.attack_b.picked = global_vars.panel == "campaign"
+# With a window open, the corner buttons step aside (the Attack window reaches the bottom).
+self.attack_b.shown = self.zoom_out.shown = self.zoom_in.shown = global_vars.panel is None
 self.zoom_out.off = global_vars.zoom <= ZOOMS[0]
 self.zoom_in.off = global_vars.zoom >= ZOOMS[-1]
 camera_set(*global_vars.cam)
@@ -170,9 +181,8 @@ for i, res in enumerate(RESOURCES):
     draw_set_color(GOLD if res == "gold" else FOOD)
     draw_rect(x + 40, 18, x + 40 + 170 * min(1, r[res] / max(1, cap)), 38)
     text(x + 125, 19, f"{big_number(r[res])} / {big_number(cap)}", SHADOW if r[res] / max(1, cap) > 0.55 else INK, 13, "center")
-icon("builder", 678, 28, 38)
-text(700, 17, f"{free_builders(r)} / {builders(r)}", INK if free_builders(r) else RED, 18)
-text(760, 22, "builders free", DIM, 12)
+icon("builder", 660, 28, 38)
+text(682, 17, f"{free_builders(r)} / {builders(r)}", INK if free_builders(r) else RED, 18)
 # Something being placed: what to do.
 if global_vars.placing:
     p = global_vars.placing
@@ -232,6 +242,46 @@ if global_vars.panel and box:
                 text(x1 + 345, y2 - 42, why, RED, 13)
         if maker(b) and b["level"] and b["job"] is None:
             text(x1 + 270, y2 - 124, f"Waiting: {big_number(waiting(b))} of {big_number(stat(kind, 'hold', lv))}", GOLD if makes(b) == "gold" else FOOD, 14)
+    elif global_vars.panel == "army":
+        text(x1 + 20, y1 + 12, "Your army", GOLD, 26)
+        text(x1 + 230, y1 + 20, f"Camps: {army_used(r)} of {army_room(r)} room", INK if army_used(r) < army_room(r) else GOLD, 16)
+        if r["training"]:
+            k = r["training"][0]
+            text(x1 + 230, y1 + 46, f"Training a {TROOPS[k]['name'].lower()}: {clock_words(train_left(r))}  ·  {len(r['training'])} in the queue", MINT, 13)
+        else:
+            text(x1 + 230, y1 + 46, f"Barracks level {barracks_level(r)}: each level trains a new kind of troop.", DIM, 13)
+        for i, (k, t) in enumerate(TROOPS.items()):
+            y = y1 + 92 + i * ARMY_ROW
+            locked = barracks_level(r) < t["barracks"]
+            draw_sprite_ext(f"troop_{k}_front", 0, x1 + 40, y + 40, 0.7, 0.7, 0, "white", 0.35 if locked else 1)
+            text(x1 + 76, y + 2, t["name"] + (f"  (barracks {t['barracks']})" if locked else ""), DIM if locked else INK, 15)
+            text(x1 + 76, y + 22, t["about"], DIM, 11, "left", 330)
+            text(x1 + 420, y + 4, f"{t['space']} room · {clock_words(t['time'])}", DIM, 12)
+            ready = r["army"].get(k, 0)
+            queued = r["training"].count(k)
+            text(x1 + 420, y + 24, f"{ready} ready" + (f", {queued} coming" if queued else ""), GOLD if ready else DIM, 13)
+    elif global_vars.panel == "campaign":
+        text(x1 + 20, y1 + 12, "Attack!", GOLD, 26)
+        text(x1 + 170, y1 + 22, f"Villages round about. Your army: {army_size(r)} troops.", DIM, 14)
+        for i, v in enumerate(CAMPAIGN):
+            cx, cy = x1 + 16 + (i % 4) * 240, y1 + 58 + (i // 4) * CAMP_ROW
+            open_ = village_open(r, i)
+            draw_set_alpha(0.35 if open_ else 0.18)
+            draw_set_color("#000000")
+            draw_rect(cx, cy, cx + 232, cy + CAMP_ROW - 8)
+            draw_set_alpha(1)
+            text(cx + 10, cy + 6, f"{i + 1}. {v['name']}", GOLD if open_ else DIM, 16)
+            text(cx + 10, cy + 28, f"Keep level {v['keep']}", DIM, 12)
+            got = r["campaign"].get(str(i), 0)
+            for k in range(3):
+                icon("star", cx + 170 + k * 20, cy + 16, 18, 1 if k < got else 0.2)
+            left = village_loot(r, i)
+            icon("gold", cx + 18, cy + 64, 20)
+            text(cx + 30, cy + 56, big_number(left[0]), GOLD if open_ else DIM, 12)
+            icon("food", cx + 18, cy + 86, 20)
+            text(cx + 30, cy + 78, big_number(left[1]), FOOD if open_ else DIM, 12)
+            if not open_:
+                text(cx + 182, cy + 70, "Locked", DIM, 13, "center")
     elif global_vars.panel == "obstacle":
         o = r["obstacles"][global_vars.panel_of]
         oi = OBSTACLES[o[0]]

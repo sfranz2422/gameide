@@ -17,6 +17,13 @@ def tile_xy(gx, gy):
     return ORIGIN_X + (gx - gy) * TILE_W / 2, ORIGIN_Y + (gx + gy) * TILE_H / 2
 
 
+def tile_frac(x, y):
+    """The tile a world point is on, in fractions (a troop can stand anywhere on one)."""
+    a = (x - ORIGIN_X) / (TILE_W / 2)
+    b = (y - ORIGIN_Y) / (TILE_H / 2)
+    return (a + b) / 2, (b - a) / 2
+
+
 def tile_at(x, y):
     """The tile a world point is on, or None off the map."""
     a = (x - ORIGIN_X) / (TILE_W / 2)

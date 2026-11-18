@@ -18,6 +18,8 @@ self.hot = False        # the button to press, drawn green
 self.picked = False     # a window that's open, drawn lighter
 self.in_panel = False   # part of a window: goes when it closes
 self.icon = None        # an icon drawn at its left
+self.pic = None         # a sprite drawn in it, above its words (a battle's troops), and
+self.count = None       # a number in its corner: drawn here, as the Battlefield's draw_gui is behind the buttons
 
 # === step
 if self.shown and mouse_check_pressed("left"):
@@ -50,5 +52,11 @@ if self.shown:
     if self.icon:
         icon(self.icon, self.x + self.high / 2 + 2, self.y + self.high / 2, self.high - 10)
         tx += self.high / 2 - 4
-    text(tx, self.y + self.high / 2 - self.size * 0.62, self.words, "#ece6da" if self.off else INK, self.size, "center")
+    if self.pic:
+        draw_sprite_ext(self.pic, 0, self.x + self.wide / 2, self.y + self.high - 22, 0.8, 0.8, 0, "white", 0.4 if self.off else 1)
+        text(tx, self.y + self.high - 20, self.words, "#ece6da" if self.off else INK, self.size, "center")
+    else:
+        text(tx, self.y + self.high / 2 - self.size * 0.62, self.words, "#ece6da" if self.off else INK, self.size, "center")
+    if self.count is not None:
+        text(self.x + self.wide - 8, self.y + 4, str(self.count), DIM if self.off else GOLD, 16, "right")
     draw_focus(self)

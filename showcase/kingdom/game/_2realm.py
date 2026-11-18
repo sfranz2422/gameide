@@ -39,7 +39,7 @@ def stat(kind, name, level):
 # ---- a new kingdom, and an old one brought up to date
 
 def new_realm(seed=None):
-    r = {"gold": START_GOLD, "food": START_FOOD, "xp": 0, "level": 1,
+    r = {"gold": START_GOLD, "food": START_FOOD, "xp": 0, "level": 1, "map": MAP_W,
          "seed": seed if seed is not None else random.randrange(1 << 30),
          "buildings": [], "obstacles": [], "grown": 0, "grow_t": now()}
     for kind, gx, gy in START_BUILDINGS:
@@ -52,7 +52,7 @@ def new_realm(seed=None):
         gx, gy = rng.randrange(MAP_W), rng.randrange(MAP_H)
         if (gx, gy) not in taken(r):
             r["obstacles"].append([rng.choice(kinds), gx, gy])
-    return r
+    return load_army(r)
 
 
 def new_building(kind, gx, gy, level=0):
@@ -61,7 +61,20 @@ def new_building(kind, gx, gy, level=0):
 
 def load_realm():
     r = save_get("realm", None)
-    return new_realm() if r is None else r
+    if r is None:
+        return new_realm()
+    # A kingdom from a smaller map (40 × 40 before 2026-11-18): moved to the middle of this one.
+    old = r.get("map", 40)
+    if old != MAP_W:
+        d = (MAP_W - old) // 2
+        for b in r["buildings"]:
+            b["gx"] += d
+            b["gy"] += d
+        for o in r["obstacles"]:
+            o[1] += d
+            o[2] += d
+        r["map"] = MAP_W
+    return load_army(r)
 
 
 def keep_save(r):

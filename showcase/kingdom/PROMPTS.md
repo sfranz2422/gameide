@@ -89,8 +89,37 @@ same building, growing grander, on the same size of ground.
 > valley and distant mountains, banners in the wind. Leave the top third calm sky for
 > the game's name.
 
+## Phase 2: the army
+
+Same chat, same style line. Each troop is drawn in **eight small frames in one row**, the
+same figure every time, full body, no ground under them: four walking towards you and to
+the LEFT (two steps, then two swings of its weapon), then four walking AWAY from you and
+to the LEFT (two steps, two swings). The game turns them round to face right.
+
+**10. Troops, part one.** MAGENTA.
+> [the style, but not isometric] A sheet of small full-body medieval soldiers seen from a
+> little above, four rows of eight frames, every frame the same size with space between:
+> each row one soldier, frames 1-2 walking towards the viewer and to the left, frames 3-4
+> swinging their weapon towards the viewer and the left, frames 5-6 walking away from the
+> viewer and to the left, frames 7-8 swinging away and to the left. Row 1: a footman in a
+> red tunic with a sword, round shield and iron helmet. Row 2: an archer in green with a
+> longbow. Row 3: a big man-at-arms in full grey plate armour with a mace. Row 4: a raider
+> in a brown hooded leather jerkin with a dagger and a sack. Flat magenta background.
+
+**11. Troops, part two.** MAGENTA.
+> [the same as 10] Three rows of eight frames. Row 1: a sapper in a leather cap carrying
+> a small black-powder keg with a lit fuse (frames 3-4 and 7-8: lifting the keg to throw
+> it). Row 2: a knight in shining armour on a brown warhorse with a lance. Row 3: a
+> battering ram: a heavy log with an iron head under a small wooden roof on four wheels,
+> pushed by two soldiers (frames 3-4 and 7-8: the log swinging forward). Flat magenta
+> background.
+
+**12. Rubble and the battle's icons.** MAGENTA.
+> [the style] Row 1: rubble of a knocked-down building, broken stone, charred timber and
+> dust, on bare earth, in four sizes: 1 × 1, 2 × 2, 3 × 3 and 4 × 4 ground diamonds. Row 2,
+> in the style of the icons (picture 8: a small rounded square of dark stone with a brass
+> edge): a gold star; a crossed sword and axe; a soldier's iron helmet. Flat magenta background.
+
 ## Later phases
 
-- **Phase 2:** soldiers (each from the side, walking and fighting, in the same style),
-  defenses firing, and the computer villages' banners.
 - **Phase 3 on:** champions, alliances' banners and league badges.

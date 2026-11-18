@@ -93,13 +93,13 @@ describe.runIf(have)("Highmoor", () => {
     await realmOf(g);
     expect(py(g, `r = global_vars.realm
 [keep_level(r), builders(r), free_builders(r), how_many(r, "gold_mine"), how_many(r, "farm"), len(r["obstacles"]), r["gold"], r["food"]]`))
-      .toEqual([1, 2, 2, 1, 1, 34, 1000, 1000]);
+      .toEqual([1, 2, 2, 1, 1, py<number>(g, "START_OBSTACLES"), 1000, 1000]);
     // Nothing overlaps, and everything's on the map.
     expect(py(g, `tiles = [t for b in r["buildings"] for t in footprint(b["kind"], b["gx"], b["gy"])] + [(o[1], o[2]) for o in r["obstacles"]]
 len(tiles) == len(set(tiles)) and all(on_map(*t) for t in tiles)`)).toBe(true);
     step(g, 62);
     expect(py<number>(g, 'len(instances("Building"))')).toBe(5);
-    expect(py<number>(g, 'len(instances("Prop"))')).toBe(34);
+    expect(py<number>(g, 'len(instances("Prop"))')).toBe(py<number>(g, "START_OBSTACLES"));
   });
   it("building: the keep allows it, a builder builds it on the real clock, renown when it's done; nothing overlaps", async () => {
     const g = await start();
@@ -108,10 +108,10 @@ len(tiles) == len(set(tiles)) and all(on_map(*t) for t in tiles)`)).toBe(true);
     py(g, 'r = global_vars.realm\nr["gold"] = r["food"] = 2000');
     // A treasury from the Build window: picked, then a tap on the map where it goes.
     py(g, 'do_act("buy", "treasury")');
-    expect(py(g, 'place_building("treasury", (30, 30))')).toBe("built");
+    expect(py(g, 'spot = next((x, y) for x in range(MAP_W) for y in range(MAP_H) if fits(r, "treasury", x, y))\nplace_building("treasury", spot)')).toBe("built");
     expect(py(g, 'b = r["buildings"][-1]\n[b["kind"], b["level"], b["job"]["to"], r["food"], free_builders(r)]')).toEqual(["treasury", 0, 1, 1700, 1]);
     // Not on top of something.
-    expect(py(g, 'build(r, "granary", 31, 31)[0]')).toBe("taken");
+    expect(py(g, 'build(r, "granary", spot[0] + 1, spot[1] + 1)[0]')).toBe("taken");
     // The keep allows one treasury now: a second must wait for keep level 3.
     expect(py(g, 'can_build(r, "treasury")')).toBe("Upgrade your keep to level 3 for another.");
     // A trebuchet needs keep level 3 before the first.
@@ -216,10 +216,10 @@ len(tiles) == len(set(tiles)) and all(on_map(*t) for t in tiles)`)).toBe(true);
     await realmOf(g);
     py(g, 'r = global_vars.realm\no = r["obstacles"][0]\nprice = OBSTACLES[o[0]]["cost"]\npays = OBSTACLES[o[0]]["pays"]\nbefore = r[pays]');
     py(g, 'open_panel("obstacle", 0)\npress(next(b for b in instances("Button") if b.act == "clear"))');
-    expect(py(g, '[len(r["obstacles"]), before - r[pays] == price, r["xp"] > 0]')).toEqual([33, true, true]);
+    expect(py(g, '[len(r["obstacles"]) == START_OBSTACLES - 1, before - r[pays] == price, r["xp"] > 0]')).toEqual([true, true, true]);
     later(g, py<number>(g, "OBSTACLE_EVERY * 3 + 5"));
     py(g, 'grow_obstacles(r)');
-    expect(py<number>(g, 'len(r["obstacles"])')).toBe(36);
+    expect(py<number>(g, 'len(r["obstacles"])')).toBe(py<number>(g, "START_OBSTACLES") + 2);
     later(g, py<number>(g, "OBSTACLE_EVERY * 20"));
     py(g, 'grow_obstacles(r)');
     expect(py(g, 'len(r["obstacles"])')).toBe(py(g, "OBSTACLES_MOST"));
@@ -245,6 +245,26 @@ a["obstacles"] == b["obstacles"]`)).toBe(true);
     expect(g.scores.at(-1)).toBe(py(g, 'r["level"]'));
   });
 
+  it("a kingdom saved on the old 40-tile map comes back in the middle of the bigger one, as it was laid out", async () => {
+    const g = await start();
+    await realmOf(g);
+    // As text, as a save is kept (an empty job, None, would be lost on the way to JavaScript).
+    const old = JSON.parse(py<string>(g, `import json
+o = new_realm(3)
+del o["map"]
+for b in o["buildings"]:
+    b["gx"] -= 15
+    b["gy"] -= 15
+o["obstacles"] = [[k, x - 15, y - 15] for k, x, y in o["obstacles"] if 15 <= x < 55 and 15 <= y < 55]
+json.dumps(o)`)) as Record<string, unknown>;
+    const h = await start({ realm: old });
+    py(h, 'room_goto("Realm")');
+    step(h, 3);
+    expect(py(h, `r = global_vars.realm
+k = next(b for b in r["buildings"] if b["kind"] == "keep")
+[r["map"], (k["gx"], k["gy"]) == (MID - 2, MID - 2), all(on_map(o[1], o[2]) for o in r["obstacles"])]`)).toEqual([py(h, "MAP_W"), true, true]);
+  });
+
   it("saved: a job keeps going while the game's closed, and is done when it's opened again", async () => {
     const g = await start();
     await realmOf(g);
@@ -262,7 +282,7 @@ a["obstacles"] == b["obstacles"]`)).toBe(true);
     await realmOf(g);
     py(g, 'global_vars.realm["gold"] = 5000');
     press(g, "right");
-    py(g, 'global_vars.cursor = (19, 19)');
+    py(g, 'k = next(b for b in global_vars.realm["buildings"] if b["kind"] == "keep")\nglobal_vars.cursor = (k["gx"] + 1, k["gy"] + 1)');
     press(g, "space");
     expect(py(g, "global_vars.panel")).toBe("building");
     expect(py(g, 'global_vars.realm["buildings"][global_vars.panel_of]["kind"]')).toBe("keep");
@@ -295,16 +315,17 @@ a["obstacles"] == b["obstacles"]`)).toBe(true);
     py(g, 'global_vars.levelup = [4, 100]\nsay("Hello")');
     step(g, 3);
   });
-  it("zoom: a little out to start; the - and + buttons (and Q and E) step out and in, about the middle, and a tap still lands on its tile", async () => {
+  it("zoom: as far out as it goes to start; the - and + buttons (and Q and E) step out and in, about the middle, and a tap still lands on its tile", async () => {
     const g = await start();
     await realmOf(g);
     step(g, 2);
     expect(py(g, "zoom()")).toBeCloseTo(py<number>(g, "ZOOM_START"), 2);     // (the engine shows whole pixels)
     const mid = () => py<number[]>(g, "w, h = shown()\n[global_vars.cam[0] + w / 2, global_vars.cam[1] + h / 2]");
     const before = mid();
-    py(g, 'press(next(b for b in instances("Button") if b.act == "zoom" and b.arg == -1))');
+    expect([py(g, "ZOOM_START == ZOOMS[0]"), py(g, 'next(b for b in instances("Button") if b.act == "zoom" and b.arg == -1).off')]).toEqual([true, true]);
+    py(g, 'press(next(b for b in instances("Button") if b.act == "zoom" and b.arg == 1))');
     step(g, 2);
-    expect(py(g, "zoom()")).toBeCloseTo(py<number>(g, "ZOOMS[ZOOMS.index(ZOOM_START) - 1]"), 2);     // (the engine shows whole pixels)
+    expect(py(g, "zoom()")).toBeCloseTo(py<number>(g, "ZOOMS[1]"), 2);     // (the engine shows whole pixels)
     const after = mid();
     expect(Math.abs(after[0]! - before[0]!) + Math.abs(after[1]! - before[1]!)).toBeLessThan(2);
     press(g, "q");
@@ -338,6 +359,178 @@ a["obstacles"] == b["obstacles"]`)).toBe(true);
     step(g, 3);
     g.engine.input.wheel(-1);
     step(g, 3);
-    expect(py<number>(g, "global_vars.zoom")).toBeLessThan(z);
+    expect(py<number>(g, "global_vars.zoom")).toBe(z);         // back out, and no further than the furthest
+  });
+
+  // ---- phase 2: the army and the campaign
+
+  it("phase 2: troops open with the barracks level, train on the real clock (two barracks, twice as fast), wait in the camps; off the queue, food back", async () => {
+    const g = await start();
+    await realmOf(g);
+    py(g, `r = global_vars.realm
+r["obstacles"] = []
+r["food"] = r["gold"] = 2500
+def place(kind, level):
+    spot = next((x, y) for x in range(MAP_W) for y in range(MAP_H) if fits(r, kind, x, y))
+    b = new_building(kind, *spot, level)
+    r["buildings"].append(b)
+    return b
+camp = place("army_camp", 1)
+bar = place("barracks", 1)`);
+    expect(py(g, '[army_room(r), can_train(r, "archer"), train(r, "footman"), r["food"]]'))
+      .toEqual([20, "Upgrade a barracks to level 2 first.", "queued", 2475]);
+    later(g, 21);
+    expect(py(g, '[train_tick(r), r["army"], r["training"]]')).toEqual([1, { footman: 1 }, []]);
+    // Two barracks: twice as fast (a footman in 10 s, not 20).
+    py(g, 'place("barracks", 1)\ntrain(r, "footman")\ntrain(r, "footman")');
+    later(g, 21);
+    expect(py(g, '[train_tick(r), r["army"]["footman"]]')).toEqual([2, 3]);
+    // No more than the camps' room, queue and all.
+    py(g, 'r["food"] = 10000\nfor _ in range(30):\n    train(r, "footman")');
+    expect(py(g, '[army_used(r), can_train(r, "footman")]')).toEqual([20, "No room in the army camps: build or upgrade one."]);
+    // Taken off the queue: its food back.
+    const food = py<number>(g, 'r["food"]');
+    expect(py(g, 'untrain(r, "footman")')).toBe(true);
+    expect(py<number>(g, 'r["food"]')).toBe(food + 25);
+  });
+
+  it("phase 2: every village's layout is the same each time, on the map, nothing overlapping; each opens once the one before has a star", async () => {
+    const g = await start();
+    await realmOf(g);
+    expect(py(g, `ok = []
+for i in range(len(CAMPAIGN)):
+    a, b = village_layout(i), village_layout(i)
+    cells = [t for d in a for t in footprint(d["kind"], d["gx"], d["gy"])]
+    keep_ = [d for d in a if d["kind"] == "keep"]
+    defenses = sum(1 for d in a if d["kind"] in DEFENSES)
+    want = CAMPAIGN[i]["towers"] + CAMPAIGN[i]["ballistas"] + CAMPAIGN[i]["trebuchets"]
+    ok.append(a == b and len(cells) == len(set(cells)) and all(on_map(*t) for t in cells) and len(keep_) == 1 and defenses == want)
+ok`)).toEqual(py<boolean[]>(g, "[True] * len(CAMPAIGN)"));
+    py(g, 'r = global_vars.realm');
+    expect(py(g, '[village_open(r, 0), village_open(r, 1)]')).toEqual([true, false]);
+    py(g, 'r["campaign"]["0"] = 1');
+    expect(py(g, 'village_open(r, 1)')).toBe(true);
+  });
+
+  it("phase 2: a battle: troops go for what they want, defenses shoot back, walls are broken through; stars for half, the keep and everything", async () => {
+    const g = await start();
+    await realmOf(g);
+    py(g, `def fight(i, army, at):
+    b = new_battle(village_layout(i), army, village_loot(global_vars.realm, i))
+    n = 0
+    for k, c in army.items():
+        for j in range(c):
+            deploy(b, k, *at(n))
+            n += 1
+    while not b["over"]:
+        tick(b)
+    return b`);
+    // Twenty footmen take the first village: all three stars, and all its loot.
+    expect(py(g, 'b = fight(0, {"footman": 20}, lambda n: (MID - 14 + n % 5, MID - 14))\n[b["stars"], destroyed_pct(b), b["loot"]]'))
+      .toEqual([3, 100, [500, 500]]);
+    expect(py<number>(g, 'sum(1 for u in b["units"] if u["dead"])')).toBeGreaterThan(0);      // the tower fought back
+    // Three can't take a walled village: no stars.
+    expect(py(g, 'fight(6, {"footman": 3}, lambda n: (MID - 26, MID))["stars"]')).toBe(0);
+    // A man-at-arms walks past the rest to a defense first; a raider to the gold and food.
+    py(g, `def first_hit(kind):
+    b = new_battle(village_layout(2), {kind: 1}, [0, 0])
+    deploy(b, kind, MID - 16, MID)
+    for _ in range(3000):
+        tick(b)
+        u = b["units"][0]
+        if u["hit"] is not None and b["bs"][u["hit"]]["kind"] != "wall":
+            return b["bs"][u["hit"]]["kind"]
+        if u["dead"]:
+            return None`);
+    expect(py(g, 'first_hit("brute") in DEFENSES')).toBe(true);
+    expect(py(g, 'first_hit("raider") in LOOT_KINDS')).toBe(true);
+    // A sapper bursts a wall open.
+    expect(py(g, `b = new_battle(village_layout(2), {"sapper": 1}, [0, 0])
+deploy(b, "sapper", MID - 16, MID)
+for _ in range(3000):
+    tick(b)
+sum(1 for x in b["bs"] if x["kind"] == "wall" and x["dead"]) > 0 and b["units"][0]["dead"]`)).toBe(true);
+    // The stars: half the buildings down is one, the keep another, everything the third.
+    expect(py(g, `b = new_battle(village_layout(3), {}, [0, 0])
+live = [x for x in b["bs"] if x["kind"] != "wall"]
+for x in live[1:len(live) // 2 + 1]:
+    x["dead"] = True
+a = stars_now(b)
+live[0]["dead"] = True
+[live[0]["kind"], a, stars_now(b)]`)).toEqual(["keep", 1, 2]);
+  });
+
+  it("phase 2: troops go down only outside the village, and only the troops you brought", async () => {
+    const g = await start();
+    await realmOf(g);
+    py(g, 'b = new_battle(village_layout(0), {"footman": 1}, [0, 0])');
+    expect(py(g, 'deploy(b, "footman", MID, MID)')).toBe("Too close: put troops down outside the village.");
+    expect(py(g, 'deploy(b, "archer", MID - 15, MID - 15)')).toBe("No more archers to send.");
+    expect(py(g, '[deploy(b, "footman", MID - 15, MID - 15), deploy(b, "footman", MID - 15, MID - 15)]')).toEqual(["sent", "No more footmans to send."]);
+  });
+
+  it("phase 2: after a battle the troops sent are gone, the loot goes into storage as far as it fits, the village keeps the rest; stars kept, renown for new ones", async () => {
+    const g = await start();
+    await realmOf(g);
+    py(g, `r = global_vars.realm
+r["army"] = {"footman": 25, "archer": 3}
+r["gold"], r["food"] = 0, capacity(r, "food") - 100
+b = start_raid(r, 0)
+for n in range(20):
+    deploy(b, "footman", MID - 14 + n % 5, MID - 14)
+while not b["over"]:
+    tick(b)
+xp = r["xp"]
+res = finish_raid(r, 0, b)`);
+    expect(py(g, '[r["army"], res["stars"], res["new_stars"], res["gold"], res["food"], res["lost"], r["campaign"]["0"], village_loot(r, 0)]'))
+      .toEqual([{ footman: 5, archer: 3 }, 3, 3, 500, 100, 400, 3, [0, 0]]);
+    expect(py<number>(g, 'r["xp"] - xp')).toBe(py<number>(g, "3 * CAMPAIGN_XP * 1"));
+    // Again: no new stars, no renown, nothing left to take.
+    py(g, 'r["army"] = {"footman": 20}\nb = start_raid(r, 0)\nfor n in range(20):\n    deploy(b, "footman", MID - 14 + n % 5, MID - 14)\nwhile not b["over"]:\n    tick(b)\nxp = r["xp"]\nres = finish_raid(r, 0, b)');
+    expect(py(g, '[res["new_stars"], r["xp"] - xp, res["gold"] + res["food"]]')).toEqual([0, 0, 0]);
+    // No army, no battle.
+    py(g, 'r["army"] = {}');
+    expect(py(g, 'start_raid(r, 0)')).toBe("Train an army first: tap a barracks, or the Army button.");
+  });
+
+  it("phase 2: on screen: the Attack window, into a battle, taps put troops down, it plays out, and back home with the loot", async () => {
+    const g = await start();
+    await realmOf(g);
+    py(g, 'r = global_vars.realm\nr["army"] = {"footman": 20, "archer": 5}');
+    py(g, 'do_act("campaign", None)');
+    step(g, 2);
+    expect(py<string[]>(g, '[str(b.arg) for b in instances("Button") if b.act == "attack" and not b.off]')).toEqual(["0"]);
+    py(g, 'press(next(b for b in instances("Button") if b.act == "attack" and b.arg == 0))');
+    step(g, 3);
+    expect(room(g)).toBe("Battle");
+    // Too close: a tap on the keep says so, and sends nobody.
+    py(g, 'x, y = to_screen(*tile_xy(MID, MID))');
+    click(g, ...py<[number, number]>(g, "[x, y]"));
+    expect(py(g, '[len(global_vars.battle["units"]), global_vars.said[0]]')).toEqual([0, "Too close: put troops down outside the village."]);
+    // Taps on the grass outside: a footman each (the view on them, clear of the buttons along the bottom).
+    py(g, 'x, y = tile_xy(MID - 12, MID - 14)\nw, h = shown()\nmove_camera(x - w / 2, y - h / 2)');
+    step(g, 2);
+    for (let k = 0; k < 20; k++) {
+      click(g, ...py<[number, number]>(g, `list(to_screen(*tile_xy(MID - 14 + ${k % 5}, MID - 14)))`));
+    }
+    expect(py<number>(g, 'len(global_vars.battle["units"])')).toBe(20);
+    expect(py(g, 'len(instances("Prop")) > len(global_vars.battle["bs"])')).toBe(true);      // a Prop each
+    for (let k = 0; k < 12000 && !py<boolean>(g, 'global_vars.battle["over"]'); k++) step(g);
+    step(g, 2);
+    expect(py(g, '[global_vars.battle["stars"], r["campaign"]["0"], r["gold"] > 1000]')).toEqual([3, 3, true]);
+    py(g, 'press(next(b for b in instances("Button") if b.act == "go_home"))');
+    step(g, 3);
+    expect([room(g), py(g, 'r["army"]')]).toEqual(["Realm", { archer: 5 }]);
+  }, 120_000);
+
+  it("phase 2: the Army and Attack windows draw, and fit the screen", async () => {
+    const g = await start();
+    await realmOf(g);
+    py(g, 'r = global_vars.realm\nr["food"] = 99999\nfor b in r["buildings"]:\n    b["level"] = levels(b["kind"]) if b["kind"] != "builder_hut" else 1\nr["buildings"].append(new_building("barracks", 2, 2, 10))\nr["buildings"].append(new_building("army_camp", 8, 2, 8))\ntrain(r, "knight")');
+    for (const w of ["army", "campaign"]) {
+      py(g, `open_panel("${w}")`);
+      step(g, 3);
+      expect(py<number>(g, "global_vars.panel_box[3]")).toBeLessThanOrEqual(py<number>(g, "VIEW_H"));
+    }
   });
 });

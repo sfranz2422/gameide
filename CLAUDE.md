@@ -1011,4 +1011,13 @@ every word (Lilita runs small). The mouse wheel zooms about the pointer (`set_zo
 **The sea** round the island is the Water object: two seamless 512-pixel tiles (the build's
 `water_tiles`) drifting different ways, and foam lines lapping along the shore; the first, dark
 with dotted glints, "looked like floating in space".
+**Phase 2, the army** (`_2army.py`, `_2campaign.py`, `_2battle.py`): troops queue in the
+barracks and train on the real clock (each barracks built works at the queue), waiting in the
+camps' room. **A battle is pure rules** (`_2battle.py`, no drawing): a layout of buildings, as
+a kingdom keeps them, so a computer village (`village_layout`, made from its number) and in
+phase 3 a classmate's kingdom fight the same way. Troops follow a flow field to their goal
+(`flow`: Dijkstra over the tiles, walls costing `WALL_DETOUR` more, kept until a wall falls);
+defenses shoot shots that fly. The Battlefield only shows it: buildings and troops are Props
+(no events), moved each step from the battle; `tick` runs every other step. Loot comes out of a
+building as it's damaged. `finish_raid` applies a battle to the kingdom once.
 

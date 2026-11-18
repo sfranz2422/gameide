@@ -40,7 +40,8 @@ G = {}
 exec((HERE / "game" / "_1rules.py").read_text(), G)
 VIEW_W, VIEW_H, TW, TH = G["VIEW_W"], G["VIEW_H"], G["TILE_W"], G["TILE_H"]
 ART = HERE / "art"
-ICONS = ["gold", "food", "renown", "builder", "hammer", "clock", "shield", "sword", "up", "keep"]
+ICONS = ["gold", "food", "renown", "builder", "hammer", "clock", "shield", "sword", "up", "keep",
+         "star"]                       # phase 2: a battle's stars (a stand-in until Gemini's)
 # Stand-ins' colours: stone grey, timber brown, thatch… a plain block each, taller with each tier.
 COLOURS = {"keep": (150, 146, 138), "gold_mine": (120, 104, 84), "farm": (176, 150, 92), "treasury": (160, 150, 120),
            "granary": (170, 130, 80), "builder_hut": (140, 110, 80), "archer_tower": (140, 136, 128),
@@ -104,6 +105,68 @@ def stand_in_scaffold(n):
     return im
 
 
+TROOP_LOOK = {   # a stand-in troop: its tunic, what it carries, how big
+    "footman": ((150, 40, 40), "sword", 1.0), "archer": ((60, 110, 50), "bow", 0.95), "brute": ((110, 110, 120), "mace", 1.35),
+    "raider": ((120, 80, 40), "dagger", 0.9), "sapper": ((90, 70, 50), "keg", 0.95), "knight": ((200, 200, 210), "lance", 1.4),
+    "ram": ((110, 80, 50), "ram", 1.6)}
+
+
+def stand_in_troop(kind, view, frame):
+    """A troop facing left, from the front (towards you) or the back, for a picture not
+    drawn yet: frames 0 and 1 walking, 2 and 3 swinging."""
+    coat, holds, size = TROOP_LOOK[kind]
+    w, h = int(48 * size), int(64 * size)
+    im = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    d = ImageDraw.Draw(im)
+    cx = w / 2
+    if kind == "ram":
+        d.rectangle((4, h * 0.45, w - 4, h * 0.8), fill=(110, 80, 50), outline=(50, 35, 20))
+        d.ellipse((4, h * 0.38, 18, h * 0.9), fill=(70, 70, 75))
+        d.polygon([(8, h * 0.45), (cx, h * 0.15), (w - 8, h * 0.45)], fill=(140, 100, 60), outline=(60, 40, 20))
+        for k in (0.3, 0.7):
+            d.ellipse((w * k - 7, h * 0.75, w * k + 7, h * 0.97), fill=(40, 30, 20))
+        if frame >= 2:
+            d.rectangle((0, h * 0.55 - (frame - 2) * 3, 14, h * 0.65), fill=(80, 80, 85))
+        return im
+    s = size
+    step = (3 if frame in (0, 2) else -3) * s
+    d.line([(cx - 4 * s, h * 0.72), (cx - 4 * s - step, h - 2)], fill=(50, 40, 30), width=int(4 * s))
+    d.line([(cx + 4 * s, h * 0.72), (cx + 4 * s + step, h - 2)], fill=(50, 40, 30), width=int(4 * s))
+    if kind == "knight":
+        d.ellipse((cx - 18 * s, h * 0.55, cx + 18 * s, h * 0.85), fill=(120, 90, 60), outline=(60, 40, 20))
+    d.rounded_rectangle((cx - 9 * s, h * 0.32, cx + 9 * s, h * 0.74), radius=int(4 * s), fill=coat, outline=(40, 30, 20))
+    face = (225, 190, 160) if view == "front" else (90, 60, 40)
+    d.ellipse((cx - 7 * s, h * 0.1, cx + 7 * s, h * 0.33), fill=face, outline=(40, 30, 20))
+    if kind in ("footman", "brute", "knight"):
+        d.chord((cx - 8 * s, h * 0.06, cx + 8 * s, h * 0.26), 180, 360, fill=(150, 150, 160))
+    swing = frame >= 2
+    hx = cx - 12 * s
+    if holds == "keg":
+        d.ellipse((hx - 8 * s, h * 0.42, hx + 6 * s, h * 0.62), fill=(120, 80, 40), outline=(40, 30, 20))
+    elif holds == "bow":
+        d.arc((hx - 10 * s, h * 0.25, hx + 4 * s, h * 0.7), 90, 270, fill=(110, 70, 30), width=int(3 * s))
+    else:
+        length = {"sword": 16, "mace": 18, "dagger": 9, "lance": 30}[holds] * s
+        a = (hx, h * 0.5)
+        b = (hx - (length if swing else 4), h * 0.5 - (4 if swing else length))
+        d.line([a, b], fill=(180, 180, 190), width=int(3 * s))
+    return im
+
+
+def stand_in_rubble(n):
+    w, h = TW * n, TH * n
+    im = Image.new("RGBA", (w, h + 20), (0, 0, 0, 0))
+    d = ImageDraw.Draw(im)
+    cx, cy = w / 2, 20 + h / 2
+    d.polygon([(cx, 20), (w, cy), (cx, 20 + h), (0, cy)], fill=(96, 86, 70), outline=(60, 50, 40))
+    rng = random.Random(n)
+    for _ in range(10 * n):
+        x, y = cx + rng.uniform(-w * 0.3, w * 0.3), cy + rng.uniform(-h * 0.25, h * 0.25)
+        r = rng.uniform(3, 7)
+        d.ellipse((x - r, y - r, x + r * 1.3, y + r * 0.8), fill=(130, 124, 116), outline=(70, 66, 60))
+    return im
+
+
 def stand_in_obstacle(kind):
     im = Image.new("RGBA", (TW, TH + 70), (0, 0, 0, 0))
     d = ImageDraw.Draw(im)
@@ -124,6 +187,7 @@ def stand_in_obstacle(kind):
 
 
 WATER_TILE = 512
+GROUND_STRIP = G["GROUND_STRIP"]
 
 
 def water_tiles():
@@ -212,6 +276,14 @@ def build(out):
     for n in (2, 3, 4):
         im = half(f"scaffold_{n}") if (ART / f"scaffold_{n}.png").exists() else stand_in_scaffold(n)
         P.sprite(f"scaffold_{n}", [im], (im.width // 2, im.height - TH * n // 2))
+    for kind in G["TROOPS"]:
+        for view in ("front", "back"):
+            name = f"troop_{kind}_{view}"
+            frames = [half(f"{name}_{k}") if (ART / f"{name}_{k}.png").exists() else stand_in_troop(kind, view, k) for k in range(4)]
+            P.sprite(name, frames, (frames[0].width // 2, frames[0].height - 4))     # on its feet
+    for n in (1, 2, 3, 4):
+        im = half(f"rubble_{n}") if (ART / f"rubble_{n}.png").exists() else stand_in_rubble(n)
+        P.sprite(f"rubble_{n}", [im], (im.width // 2, im.height - TH * n // 2))
     for kind in G["OBSTACLES"]:
         im = half(kind) if (ART / f"{kind}.png").exists() else stand_in_obstacle(kind)
         P.sprite(kind, [im], (im.width // 2, im.height - TH // 2))
@@ -220,7 +292,11 @@ def build(out):
         P.sprite(f"icon_{name}", [pic], (32, 32))
     title = half("title") if (ART / "title.png").exists() else Image.new("RGBA", (VIEW_W, VIEW_H), (70, 86, 100, 255))
     P.sprite("title", [title], (0, 0))
-    P.sprite("ground", [ground()], (0, 0))
+    # The ground in strips no wider than GROUND_STRIP: some Chromebooks' graphics can't hold
+    # a picture over 4096 pixels across, and the 70-tile map's is 4480.
+    land = ground()
+    for k in range(0, land.width, GROUND_STRIP):
+        P.sprite(f"ground_{k // GROUND_STRIP}", [land.crop((k, 0, min(land.width, k + GROUND_STRIP), land.height))], (0, 0))
     deep, glint = water_tiles()
     P.sprite("water", [deep], (0, 0))
     P.sprite("water_glint", [glint], (0, 0))
@@ -255,6 +331,7 @@ def build(out):
 
     room("Title", VIEW_W, VIEW_H, [("Title", 0, 0)], "#465664")
     room("Realm", G["WORLD_W"], G["WORLD_H"], [("Realm", 0, 0), ("Water", 0, 0)])
+    room("Battle", G["WORLD_W"], G["WORLD_H"], [("Battlefield", 0, 0), ("Water", 0, 0)])
 
     out.parent.mkdir(parents=True, exist_ok=True)
     P.write(out)
