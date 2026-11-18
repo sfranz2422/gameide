@@ -138,6 +138,8 @@ export const API: ApiEntry[] = [
     "Was this mouse button pressed this step?"),
   fn("Input", "mouse_check_released", [p("button", "button", '"left"')], "True or False",
     "Was this mouse button let go this step?"),
+  fn("Input", "mouse_wheel", [], "a whole number",
+    "How far the mouse wheel turned this step, in notches: up (away from you) is positive, down negative, 0 if it didn't turn. A trackpad's scroll counts too."),
   fn("Input", "gamepad_check", [p("button", "padbutton"), p("pad", "number", "0")], "True or False",
     'Is this button held on a gamepad? "a", "b", "x", "y", "lb", "rb", "lt", "rt", "start", "select", "up", "down", "left", "right"… pad 0 is the first one plugged in.'),
   fn("Input", "gamepad_check_pressed", [p("button", "padbutton"), p("pad", "number", "0")], "True or False",

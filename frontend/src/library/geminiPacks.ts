@@ -406,6 +406,46 @@ export const GEMINI_PACKS: LibraryPack[] = [
     ]
   },
   {
+    "id": "gemini-kingdom",
+    "name": "Highmoor",
+    "author": "Google Gemini",
+    "licence": "Free for your games: please credit Gemini",
+    "credit": "Art made with Google Gemini",
+    "url": "https://gemini.google.com/",
+    "preview": "library/gemini/kingdom/preview.png",
+    "about": "A realistic isometric medieval kingdom: a keep, mines, farms, treasuries, granaries, towers, ballistas, trebuchets, barracks and camps in three ages each, walls, trees, rocks and icons.",
+    "sheets": [
+      {
+        "name": "Characters",
+        "file": "library/gemini/kingdom/characters.png",
+        "tileWidth": 67,
+        "tileHeight": 56,
+        "use": "sprites"
+      },
+      {
+        "name": "Big characters",
+        "file": "library/gemini/kingdom/big-characters.png",
+        "tileWidth": 99,
+        "tileHeight": 128,
+        "use": "sprites"
+      },
+      {
+        "name": "Things",
+        "file": "library/gemini/kingdom/things.png",
+        "tileWidth": 129,
+        "tileHeight": 102,
+        "use": "sprites"
+      },
+      {
+        "name": "Small things",
+        "file": "library/gemini/kingdom/small-things.png",
+        "tileWidth": 64,
+        "tileHeight": 64,
+        "use": "sprites"
+      }
+    ]
+  },
+  {
     "id": "gemini-undertow",
     "name": "Undertow",
     "author": "Google Gemini",

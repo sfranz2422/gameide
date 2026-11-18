@@ -102,7 +102,7 @@ __all__ = [
     "physics_gravity", "physics_join", "physics_unjoin",
     # input
     "keyboard_check", "keyboard_check_pressed", "keyboard_check_released", "touch_controls",
-    "mouse_check", "mouse_check_pressed", "mouse_check_released", "mouse_x", "mouse_y",
+    "mouse_check", "mouse_check_pressed", "mouse_check_released", "mouse_wheel", "mouse_x", "mouse_y",
     "gamepad_check", "gamepad_check_pressed", "gamepad_check_released", "gamepad_axis", "gamepad_connected",
     # movement
     "move_towards", "point_direction", "point_distance", "move_and_collide",
@@ -878,6 +878,12 @@ def mouse_check_pressed(button="left"):
 
 def mouse_check_released(button="left"):
     return _g[_L.G.MOUSE_RELEASED + _button(button)] == 1
+
+
+def mouse_wheel():
+    """How far the mouse wheel turned this step, in notches: up (away from you) is
+    positive, down negative, 0 if it didn't turn. A trackpad's scroll counts too."""
+    return int(_g[_L.G.WHEEL])
 
 
 def _check_draw(fn):

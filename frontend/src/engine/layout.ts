@@ -135,8 +135,9 @@ export const G = {
   PAD_RELEASED: 176, // 176–243
   PAUSED: 244, // game_pause(): 1 while the game is paused
   ZOOM: 245, // camera_zoom(): how far in the view is zoomed (1 = as drawn)
+  WHEEL: 246, // mouse_wheel(): notches the wheel turned this step, up positive
 } as const;
-export const G_SIZE = 246;
+export const G_SIZE = 247;
 
 /**
  * Gamepad buttons Python can name, in the order of the browser's "standard"

@@ -59,6 +59,7 @@ COOK = "cooking"   # …or Order Up!'s, rebuilt the same way
 SANDW = "sandwich" # …or Stack Shack's, rebuilt the same way
 MIX = "alchemy"    # …or Mix Lab's, rebuilt the same way
 FARM = "farm"      # …or Cloverbrook's, rebuilt the same way
+KING = "kingdom"   # …or Highmoor's, rebuilt the same way
 def _sd(n): return f"../showcase/sand/game/{n}.py"
 def _ut(n): return f"../showcase/undertow/game/{n}.py"
 def _fl(n): return f"../showcase/flags/game/{n}.py"
@@ -67,6 +68,7 @@ def _ck(n): return f"../showcase/cooking/game/{n}.py"
 def _sw(n): return f"../showcase/sandwich/game/{n}.py"
 def _mx(n): return f"../showcase/alchemy/game/{n}.py"
 def _fm(n): return f"../showcase/farm/game/{n}.py"
+def _kg(n): return f"../showcase/kingdom/game/{n}.py"
 SMR, SML, SMB = "../showcase/smash/game/_2rules.py", "../showcase/smash/game/_1levels.py", "../showcase/smash/build.py"
 def _sm(n): return f"../showcase/smash/game/{n}.py"
 def _rp(n): return f"../showcase/rpg/game/{n}.py"
@@ -255,6 +257,10 @@ CASES = [
  ("a file in memory skips who may play", PCP, "        why = _viewable(db, pub, user)\n        if why:\n            return err(*why)\n        key = (pub.id, pub.updated_at, asset_id)", "        key = (pub.id, pub.updated_at, asset_id)", "in memory or not", PY),
  ("memory keeps a file taken out of the game", PCP, "        key = (pub.id, pub.updated_at, asset_id)", "        key = (pub.id, asset_id)", "taken out of a game", PY),
  ("the game sent without its page's details", PCP, "        body = '{\"info\":' + json.dumps(_info(db, pub, user)) + ',\"project\":' + pub.data + \"}\"", "        body = '{\"info\":{},\"project\":' + pub.data + \"}\"", "the game comes as its project", PY),
+ ("the wheel never stops turning", "src/engine/input.ts", "    g[G.WHEEL] = this.wheelTurned;\n    this.wheelTurned = 0;", "    g[G.WHEEL] = this.wheelTurned;", "the wheel's notches are counted for one step"),
+ ("the wheel turned backwards", "src/engine/input.ts", "      notches -= s;               // scrolling up (deltaY below 0) is a notch up", "      notches += s;", "adds scrolling up into notches"),
+ ("the page scrolls under the game", "src/engine/input.ts", "    e.preventDefault();\n    scrolled +=", "    scrolled +=", "adds scrolling up into notches"),
+ ("mouse_wheel always 0", "src/python/runtime.py", "    return int(_g[_L.G.WHEEL])", "    return 0", "the mouse wheel: notches turned"),
  ("every picture at once", "src/store/cloudStore.ts", "Array.from({ length: Math.min(UPLOADS_AT_ONCE, total) }, upload)", "Array.from({ length: total }, upload)", "pictures go up two at a time"),
  ("retries hammer a struggling server", "src/store/cloudStore.ts", "        this.nextTry = Date.now() + retryWait(this.failures);", "        this.nextTry = 0;", "after a failed save the background waits"),
  ("the wait never resets", "src/store/cloudStore.ts", "        this.failures = 0;\n        this.nextTry = 0;", "        this.nextTry = 0;", "after a failed save the background waits"),
@@ -2183,6 +2189,32 @@ CASES = [
  ('seasons: a month out', _fm('_2awards'), '    month = time.gmtime(now()).tm_mon\n', '    month = time.gmtime(now()).tm_mon % 12 + 1\n', 'the seasons follow the calendar', FARM),
  ('seasons: no snow', _fm('Farm'), '        weather(w if w in ("rain", "snow") else None, 1)\n        self.weather = w', '        weather(None, 1)\n        self.weather = None', 'the seasons follow the calendar', FARM),
  ('seasons: spring rains all the time', _fm('_2awards'), '    if kind == "rain" and now() % SHOWER_EVERY >= SHOWER_LONG:', '    if False:', 'the seasons follow the calendar', FARM),
+ ('kingdom: building costs nothing', _kg('_2realm'), '    r[info(kind)["pays"]] -= price\n', '', 'building: the keep allows it', KING),
+ ('kingdom: jobs never finish', _kg('_2realm'), '        if job is not None and now() >= job["end"]:', '        if job is not None and False:', 'building: the keep allows it', KING),
+ ('kingdom: no renown for building', _kg('_2realm'), '            gained += add_xp(r, build_xp(info(b["kind"])["time"][job["to"] - 1]))\n', '', 'building: the keep allows it', KING),
+ ('kingdom: buildings on top of each other', _kg('_2realm'), '    if not fits(r, kind, gx, gy):\n        return "taken", []', '    if False:\n        return "taken", []', 'building: the keep allows it', KING),
+ ('kingdom: as many as you like', _kg('_2realm'), '    if how_many(r, kind) >= allowed(r, kind):', '    if False:', 'building: the keep allows it', KING),
+ ('kingdom: the keep allows any level', _kg('_2realm'), '    if need > keep_level(r):', '    if False:', 'upgrading: paid for', KING),
+ ('kingdom: builders without end', _kg('_2realm'), '    if kind != "wall" and free_builders(r) < 1:\n        return "Every builder is busy."\n    price = info(kind)["cost"][to - 1]', '    price = info(kind)["cost"][to - 1]', 'upgrading: paid for', KING),
+ ('kingdom: cancelled for nothing back', _kg('_2realm'), '    add(r, info(b["kind"])["pays"], int(job["paid"] * CANCEL_BACK))\n', '', 'upgrading: paid for', KING),
+ ('kingdom: mines make while upgrading', _kg('_2realm'), '    if not maker(b) or b["level"] == 0 or b["job"] is not None:', '    if not maker(b) or b["level"] == 0:', 'mines and farms fill', KING),
+ ('kingdom: mines overflow', _kg('_2realm'), '    return int(min(hold, rate * max(0, now() - b["t"]) / 3600))', '    return int(rate * max(0, now() - b["t"]) / 3600)', 'mines and farms fill', KING),
+ ('kingdom: storage without end', _kg('_2realm'), '    room = max(0, capacity(r, res) - r[res])', '    room = n', 'mines and farms fill', KING),
+ ("kingdom: a full mine refills when part's taken", _kg('_2realm'), '    b["t"] = now() - (n - got) / stat(b["kind"], "rate", b["level"]) * 3600', '    b["t"] = now()', 'mines and farms fill', KING),
+ ('kingdom: walls one at a time', _kg('_2realm'), '            upgrade(r, b)\n            n += 1', '            upgrade(r, b)\n            n += 1\n            break', 'walls: laid by a drag', KING),
+ ('kingdom: a drag lays one wall', _kg('_5acts'), '    elif d["mode"] == "wall" and t is not None and t not in d["done"]:', '    elif d["mode"] == "wall" and t is not None and not d["done"]:', 'walls: laid by a drag', KING),
+ ('kingdom: clearing is free', _kg('_2realm'), '    r[info_["pays"]] -= info_["cost"]\n', '', 'trees and rocks', KING),
+ ('kingdom: trees grow without end', _kg('_2realm'), '        if len(r["obstacles"]) >= OBSTACLES_MOST:', '        if False:', 'trees and rocks', KING),
+ ('kingdom: a reload chooses where trees grow', _kg('_2realm'), '        rng = random.Random(r["seed"] * 7 + r["grown"])', '        rng = random.Random()', 'trees and rocks', KING),
+ ("kingdom: builders' huts free", _kg('_2realm'), '        r["gold"] -= builder_cost(r)\n', '', 'builders: two to start', KING),
+ ('kingdom: a sixth builder', _kg('_2realm'), '    return BUILDER_COSTS[n] if n < len(BUILDER_COSTS) else None', '    return BUILDER_COSTS[min(n, 4)]', 'builders: two to start', KING),
+ ('kingdom: renown off the board', _kg('_2realm'), '    if gained:\n        high_score(r["level"])\n', '', 'builders: two to start', KING),
+ ("kingdom: nothing finishes while it's closed", _kg('Realm'), 'gained = finish_jobs(r)\ngrow_obstacles(r)\n', 'grow_obstacles(r)\n', 'saved: a job keeps going', KING),
+ ("kingdom: the keys can't open a building", _kg('_5acts'), '        else:\n            tap_tile(c)', '        else:\n            pass', 'from the keys alone', KING),
+ ('kingdom: the pointer ignores the zoom', _kg('_3screen'), '    return (x - view_x) * zoom(), (y - view_y) * zoom()', '    return x - view_x, y - view_y', 'a tap still lands on its tile', KING),
+ ("kingdom: the title scaled by the Realm's zoom", _kg('_3screen'), '    return VIEW_W / view_width if view_width else 1', "    return getattr(global_vars, 'zoom', ZOOM_START)", 'a click on Play goes in', KING),
+ ("kingdom: the wheel doesn't zoom", _kg('_5acts'), '    if turned and not over_gui(*gui_mouse()):', '    if False:', 'the mouse wheel zooms in', KING),
+ ('kingdom: the wheel zooms about the middle', _kg('_5acts'), '        zoom_by(1 if turned > 0 else -1, gui_mouse())', '        zoom_by(1 if turned > 0 else -1)', 'the mouse wheel zooms in', KING),
 
  ('tell: the page drops them', NETS, '    if (o.tells && !this.away) this.tells.push(...o.tells);\n', '', "one player on a WebSocket and one polling", E2E),
 
@@ -2220,7 +2252,7 @@ for name, f, old, new, test, *extra in CASES:
             failed = any(l.startswith("FAIL") and test in l for l in out.splitlines())
             ran = "ok   " in out or "FAIL " in out
         else:
-            if runner in ([GM], [MM], [FB], [GF], [BB], [HC], [KT], [TD], [SM], [RP], [CLIMB], [UND], [SIEGE], [SAND], [FLAGS], [LEMON], [COOK], [SANDW], [MIX], [FARM]):
+            if runner in ([GM], [MM], [FB], [GF], [BB], [HC], [KT], [TD], [SM], [RP], [CLIMB], [UND], [SIEGE], [SAND], [FLAGS], [LEMON], [COOK], [SANDW], [MIX], [FARM], [KING]):
                 subprocess.run(["python3", str(ROOT.parent / f"showcase/{runner[0]}/build.py")], capture_output=True)
             cmd = ["npx", "playwright", "test", "-g", test] if runner == [E2E] else ["npx", "vitest", "run", "-t", test]
             r = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True)
@@ -2231,6 +2263,6 @@ for name, f, old, new, test, *extra in CASES:
         if not failed: bad.append(name)
     finally:
         p.write_text(src)
-        if runner in ([GM], [MM], [FB], [GF], [BB], [HC], [KT], [TD], [SM], [RP], [CLIMB], [UND], [SIEGE], [SAND], [FLAGS], [LEMON], [COOK], [SANDW], [MIX], [FARM]):
+        if runner in ([GM], [MM], [FB], [GF], [BB], [HC], [KT], [TD], [SM], [RP], [CLIMB], [UND], [SIEGE], [SAND], [FLAGS], [LEMON], [COOK], [SANDW], [MIX], [FARM], [KING]):
             subprocess.run(["python3", str(ROOT.parent / f"showcase/{runner[0]}/build.py")], capture_output=True)
 print("ALL SABOTAGES CAUGHT" if not bad else f"NOT CAUGHT: {bad}")

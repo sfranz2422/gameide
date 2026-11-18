@@ -77,7 +77,8 @@ class Farm(_tw.Project):
             for i, (data, ext) in self.assets.items():
                 z.writestr(index[i], data)
             z.writestr("README.txt", f"{self.p['name']}\n\nA GameIDE project. To open it, go to GameIDE's front page and use Import.\n"
-                       "Pictures made with Google Gemini. Type: Ubuntu (Ubuntu Font Licence).\n")
+                       f"Pictures made with Google Gemini. Type: {getattr(self, 'type_credit', 'Ubuntu (Ubuntu Font Licence)')}.\n"
+                       + getattr(self, "type_licence", ""))
 
 
 def half(name):

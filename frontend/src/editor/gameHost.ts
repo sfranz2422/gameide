@@ -667,6 +667,7 @@ export class GameHost {
       mouseDown: (button) => push({ k: "mdown", button }),
       mouseUp: (button) => push({ k: "mup", button }),
       mouseMove: (x, y) => push({ k: "move", x, y }),
+      wheel: (n) => push({ k: "wheel", n }),
       releaseAll: () => push({ k: "blur" }),
       pads: (pads) => push({ k: "pads", pads }),
     };

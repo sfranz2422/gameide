@@ -411,6 +411,19 @@ on("alchemy")("Mix Lab's board", () => {
   });
 });
 
+on("kingdom")("Highmoor's board", () => {
+  it("is each player's renown level, sent as it goes up", async () => {
+    const g = await start(builtAt("kingdom"));
+    expect(g.project.settings.scoreboard).toEqual({ unit: "level" });
+    g.py('global_vars.realm = new_realm(1)\nroom_goto("Realm")');
+    g.step(3);
+    expect(g.scores.at(-1)).toBe(1);
+    g.py("add_xp(global_vars.realm, 90)");
+    g.step();
+    expect(g.scores.at(-1)).toBe(3);
+  });
+});
+
 on("farm")("Cloverbrook's board", () => {
   it("is each player's level, sent as it goes up", async () => {
     const g = await start(builtAt("farm"));

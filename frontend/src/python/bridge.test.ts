@@ -211,6 +211,25 @@ describe("events", () => {
     expect(py(game, "instances('K')[0].seen")).toEqual([[false, true, true], [false, false, false]]);
   });
 
+  it("the mouse wheel: notches turned since the last step, up positive, for that step only", async () => {
+    const { game } = await load({
+      code: {
+        W: one("W", `    def on_create(self):
+        self.seen = []
+    def on_step(self):
+        self.seen.append(mouse_wheel())
+`),
+      },
+      instances: [{ object: "W", x: 0, y: 0 }],
+    });
+    game.engine.input.wheel(1);
+    game.engine.input.wheel(1);
+    run(game, 2);
+    game.engine.input.wheel(-1);
+    run(game, 1);
+    expect(py(game, "instances('W')[0].seen")).toEqual([2, 0, -1]);
+  });
+
   it("clicking an instance runs its mouse event; clicking elsewhere does not", async () => {
     const { game } = await load({
       code: {

@@ -242,6 +242,10 @@ engine failure in the player is shown, never a silent black screen.
   the frame's commands and reach `GameHost` as a "sounds" message. The host
   decodes every sound before the game starts and hands Python names and
   lengths only; `sound_playing` is computed in Python from those.
+- **The mouse wheel** (2026-11-18, for Highmoor's zoom): the page adds up the canvas's wheel
+  scrolling into notches (`WHEEL_STEP` pixels each, so a trackpad's stream counts too; the page
+  doesn't scroll under the game), sends them as a "wheel" input, and the step hands Python the
+  notches since the last one in `G.WHEEL`: `mouse_wheel()`, up positive, cleared each step.
 - **Gamepads** live in `G` (PAD_* in layout.ts, read by Python by those
   indices). `GameHost` polls `navigator.getGamepads()` every animation
   frame while running and sends a "pads" input when they change; InputState
@@ -258,6 +262,10 @@ engine failure in the player is shown, never a silent black screen.
   Unpublishing deletes them. Publishing again keeps the slug, so an update keeps
   every save: **update a showcase game with My Games' Update (a .zip over the same
   game, the old one kept in History), never by importing it as a new game**.
+  A showcase build names each file by a fingerprint of its bytes (`Project.asset` in
+  showcase/build.py, 2026-11-18), so an unchanged picture keeps its id and an Update sends only
+  what's new. The ids used to come from a seeded sequence that any picture added early in a
+  build shifted: an id could come back meaning a different picture, which the server refuses.
   A version already published by itself can be put in place of the old one:
   Publish → "A new version of …" (`replace`, `publishing._merge`): it takes the
   old link, and each player keeps their best score and newer save.
@@ -365,7 +373,7 @@ code (the harness turns bytecode caching off for that reason), or a
 mistyped case name ran nothing and still reported success (the harness now
 refuses unknown names).
 
-**The showcase games' runners** (`GM`, `MM`, `FB`, `GF`, `BB`, `HC`, `KT`, `TD`, `SM`, `RP`, `CLIMB`, `UND`, `SIEGE`, `SAND`, `FLAGS`, `LEMON`, `COOK`, `SANDW`, `MIX`, `FARM` — not `CL`, which is classes.py) rebuild
+**The showcase games' runners** (`GM`, `MM`, `FB`, `GF`, `BB`, `HC`, `KT`, `TD`, `SM`, `RP`, `CLIMB`, `UND`, `SIEGE`, `SAND`, `FLAGS`, `LEMON`, `COOK`, `SANDW`, `MIX`, `FARM`, `KING` — not `CL`, which is classes.py) rebuild
 that game from the sabotaged source before its playtest and again after. A
 build that **refuses** (Greenside's course checks, Ridgeline Rally's stage
 checks) leaves the old `out/project.json`, and the test passes on it: a
@@ -976,3 +984,31 @@ The season is the real calendar's (`season_now`): orders for what's in season pa
 leaves are particles from the Farm, now and then. The barn window is up to four columns (`barn_grid`): every
 kind of thing at once ran off the bottom of the screen, and so did the Build window with the
 factories on the Farm tab.
+
+## Highmoor
+
+`showcase/kingdom/`: a medieval kingdom to build and raid from (the teacher's ask, 2026-11-18: in
+the genre of the base-building raid games, an ORIGINAL one; "bigger than Cloverbrook", "many
+buildings and levels and upgrades"; art "less cartoony, more realistic", PROMPTS.md). Seven
+phases, each stopped for review: 1 the kingdom, 2 the army and a campaign against computer
+villages, 3 raiding classmates (same school, first names; a defender loses a share of stored
+gold and food, never buildings, then has a shield), 4 champions and spells, 5 traps and deeper
+upgrades, 6 alliances, 7 leagues, events and achievements. Time is real, as in Cloverbrook.
+Every number is `_1rules.py`: each building's levels are lists (`cost`, `time`, `keep`, `hp`
+and what it does), all one length; `count` is how many each keep level allows. `_2realm.py`
+is the rules (builders' jobs on the clock, `finish_jobs`; mines filling, `waiting`/`collect`;
+storage, `capacity`; walls; trees and rocks growing back from the seed). Isometric with
+Cloverbrook's arithmetic on smaller tiles (64 × 32; the keep is 4 × 4, a wall 1 × 1). **Walls,
+trees and rocks are Props** (no events), kept in step by the Realm: a kingdom has hundreds.
+A building's picture is one of three a kind (`tier`: levels 1-3, 4-6, 7 on). Board: renown level.
+**Zoom** (the teacher's ask): `ZOOMS`, starting a little out; - and + buttons, Q and E. The bar and
+windows don't zoom, so a world point on the screen is `to_screen` (× the zoom), and `zoom()` is
+read from the engine (`view_width`), never the Realm's setting: scaled by that on the title, the
+pointer missed the Play button. **Type is Lilita One** (SIL OFL, `fonts/`, its licence in the zip's
+README): the teacher asked for You Blockhead, then for a Clash-of-Clans-like font, but those are
+paid or free for personal use only, which a published game can't carry. `TEXT_SCALE` enlarges
+every word (Lilita runs small). The mouse wheel zooms about the pointer (`set_zoom(z, at)`).
+**The sea** round the island is the Water object: two seamless 512-pixel tiles (the build's
+`water_tiles`) drifting different ways, and foam lines lapping along the shore; the first, dark
+with dotted glints, "looked like floating in space".
+

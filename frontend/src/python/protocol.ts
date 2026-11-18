@@ -20,6 +20,7 @@ export type InputMessage =
   | { k: "mdown"; button: number }
   | { k: "mup"; button: number }
   | { k: "move"; x: number; y: number }
+  | { k: "wheel"; n: number }
   | { k: "blur" }
   | { k: "pads"; pads: PadState[] };
 

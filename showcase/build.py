@@ -70,7 +70,14 @@ class Project:
         }
 
     def asset(self, data, ext):
-        i = new_id()
+        """A file's id is a fingerprint of its bytes (2026-11-18): the same picture keeps its
+        id from build to build, so My Games' Update sends only what's new and players' browsers
+        keep the rest. The ids used to come from the seeded sequence, which a picture added
+        early in a build shifted: unchanged pictures came back under new ids, and an id could
+        come back meaning a DIFFERENT picture, which the server refuses (an asset id never
+        changes meaning), leaving an update's uploads failing."""
+        import hashlib
+        i = hashlib.sha256(data).hexdigest()[:10]
         self.assets[i] = (data, ext)
         return i
 

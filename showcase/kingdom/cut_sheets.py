@@ -1,0 +1,168 @@
+#!/usr/bin/env python3
+"""
+Cuts the teacher's Gemini pictures for Highmoor (PROMPTS.md, in order, copied into raw/
+as 01.jpeg, 02.jpeg …) into the named pictures in art/, which build.py reads. Both raw/
+and art/ are committed, so the art can't be lost.
+
+    python3 showcase/kingdom/cut_sheets.py
+
+As in Cloverbrook, art/ keeps each picture at twice the game's size, fitted so its
+ground diamond is `footprint × TILE_W × 2` across. Two things differ here, both from
+the realistic style: Gemini drew soft shadows on the magenta (made dark shadows by
+`shadow`), and a tree's crown can be wider than the grass under it, so a picture is
+fitted by the width of its GROUND (`ground_width`: the widest solid row near its
+bottom), never its outline.
+"""
+import importlib.util
+from pathlib import Path
+
+from PIL import Image
+
+HERE = Path(__file__).resolve().parent
+RAW, ART = HERE / "raw", HERE / "art"
+
+
+def _load(name, path):
+    spec = importlib.util.spec_from_file_location(name, path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+_farm = _load("farm_cut", HERE.parent / "farm" / "cut_sheets.py")
+_sw = _farm._sw
+G = {}
+exec((HERE / "game" / "_1rules.py").read_text(), G)
+TILE_W = G["TILE_W"]
+
+ROWS = {
+    # sheet: rows, each a list of (name, footprint)
+    "01": [[("keep_1", 4), ("keep_2", 4), ("keep_3", 4)]],
+    "02": [[("gold_mine_1", 3), ("gold_mine_2", 3), ("gold_mine_3", 3)], [("farm_1", 3), ("farm_2", 3), ("farm_3", 3)]],
+    "03": [[("treasury_1", 3), ("treasury_2", 3), ("treasury_3", 3)], [("granary_1", 3), ("granary_2", 3), ("granary_3", 3)]],
+    "04": [[("archer_tower_1", 3), ("archer_tower_2", 3), ("archer_tower_3", 3)], [("ballista_1", 3), ("ballista_2", 3), ("ballista_3", 3)]],
+    "05": [[("trebuchet_1", 3), ("trebuchet_2", 3), ("trebuchet_3", 3)], [("barracks_1", 3), ("barracks_2", 3), ("barracks_3", 3)]],
+    "06": [[("army_camp_1", 4), ("army_camp_2", 4), ("army_camp_3", 4)],
+           [("builder_hut_1", 2), ("wall_1", 1), ("wall_2", 1), ("wall_3", 1)]],
+    "07": [[("oak", 1), ("pine", 1), ("bush", 1), ("boulder", 1), ("stump", 1)],
+           [("scaffold_2", 2), ("scaffold_3", 3), ("scaffold_4", 4)]],
+}
+ICONS = ["gold", "food", "renown", "builder", "hammer", "clock", "shield", "sword", "up", "keep"]
+
+
+def save(pic, name):
+    pic.save(ART / f"{name}.png", optimize=True)
+
+
+def ground_span(part):
+    """Where the drawing's ground is, left to right: the widest row of solid pixels in its
+    lower part (the diamond's left and right corners), not counting a crown or a shadow."""
+    a = part.getchannel("A")
+    w, h = part.size
+    px = a.load()
+    best = (0, 1)
+    for y in range(max(0, h - int(w * 0.6)), h):
+        xs = [x for x in range(0, w, 2) if px[x, y] > 200]
+        if xs and xs[-1] - xs[0] > best[1] - best[0]:
+            best = (xs[0], xs[-1])
+    return best
+
+
+def fitted(part, tiles):
+    """Sized so its ground is `tiles` diamonds across, and padded so the ground is in the
+    middle (the build stands a picture on its middle): a tree's shadow hangs off to the
+    left, and without this the tree stood half a tile to the right of its tile."""
+    x0, x1 = ground_span(part)
+    mid = (x0 + x1) / 2
+    half = max(mid, part.width - mid)
+    padded = Image.new("RGBA", (int(2 * half) + 1, part.height), (0, 0, 0, 0))
+    padded.paste(part, (int(half - mid), 0))
+    k = tiles * TILE_W * 2 / max(1, x1 - x0)
+    return padded.resize((max(1, round(padded.width * k)), max(1, round(padded.height * k))), Image.LANCZOS)
+
+
+def rows_of(boxes, n_rows):
+    """The drawings' boxes in reading order: by rows (their middles), then left to right."""
+    boxes = sorted(boxes, key=lambda b: (b[1] + b[3]) / 2)
+    out, i = [], 0
+    for n in n_rows:
+        out.append(sorted(boxes[i:i + n], key=lambda b: b[0]))
+        i += n
+    return out
+
+
+def split_widest(im, found):
+    """Two drawings joined by a shadow (the oak's touches the pine's) are one patch: the
+    widest box is split at its emptiest column, away from its ends."""
+    import numpy as np
+    b = max(found, key=lambda b: b[2] - b[0])
+    a = np.asarray(im.getchannel("A"))[b[1]:b[3], b[0]:b[2]] > 200
+    cols = a.sum(axis=0)
+    lo, hi = int(len(cols) * 0.3), int(len(cols) * 0.8)
+    cut = b[0] + lo + int(np.argmin(cols[lo:hi]))
+    rest = [x for x in found if x is not b]
+    # Marked split: `own` keeps a whole patch for the box its middle is in, which would
+    # give both halves to one box, so a split box is cropped as it is.
+    return rest + [[b[0], b[1], cut, b[3], "split"], [cut, b[1], b[2], b[3], "split"]]
+
+
+def no_shadow(part):
+    """An icon's shadow (dark magenta, joining the row's icons into one patch) taken out
+    altogether: an icon sits in the middle of its square with nothing beside it."""
+    px = part.load()
+    for y in range(part.height):
+        for x in range(part.width):
+            r, g, b, a = px[x, y]
+            if a and r > g + 40 and b > g + 20:
+                px[x, y] = (0, 0, 0, 0)
+    bb = part.getbbox()
+    return part.crop(bb) if bb else part
+
+
+def de_rim(part):
+    """The last of the magenta: a pinkish, part see-through rim along the bottom edges of
+    the ground, which keying and `shadow` leave (a purple line under a farm), taken out."""
+    px = part.load()
+    for y in range(part.height):
+        for x in range(part.width):
+            r, g, b, a = px[x, y]
+            if 0 < a < 250 and r > g + 25 and b > g + 15:
+                px[x, y] = (0, 0, 0, 0)
+    return part
+
+
+def main():
+    ART.mkdir(exist_ok=True)
+    for sheet, rows in ROWS.items():
+        if not (RAW / f"{sheet}.jpeg").exists():
+            continue
+        im = _sw.key_out(Image.open(RAW / f"{sheet}.jpeg"))
+        want = sum(len(r) for r in rows)
+        found = [b for b in _farm.islands(im, want + 12) if (b[2] - b[0]) * (b[3] - b[1]) > im.width * im.height / 400][:want]
+        while len(found) < want:
+            found = split_widest(im, found)
+        assert len(found) == want, (sheet, len(found), want)
+        for row, boxes in zip(rows, rows_of(found, [len(r) for r in rows])):
+            for (name, tiles), b in zip(row, boxes):
+                box = tuple(b[:4])
+                part = im.crop(box) if len(b) > 4 else _sw.own(im, b, [x[:4] for x in found]).crop(box)
+                save(fitted(_farm.shadow(de_rim(part)), tiles), name)
+    if (RAW / "08.jpeg").exists():
+        im = _sw.key_out(Image.open(RAW / "08.jpeg"))
+        # By the grid: their shadows join each row into one patch.
+        w, h = im.width / 5, im.height / 2
+        for i, name in enumerate(ICONS):
+            c, r_ = i % 5, i // 5
+            part = no_shadow(im.crop((int(c * w), int(r_ * h), int((c + 1) * w), int((r_ + 1) * h))))
+            side = max(part.size)
+            sq = Image.new("RGBA", (side, side), (0, 0, 0, 0))
+            sq.paste(part, ((side - part.width) // 2, (side - part.height) // 2))
+            save(sq.resize((128, 128), Image.LANCZOS), f"icon_{name}")
+    if (RAW / "09.jpeg").exists():
+        view = (G["VIEW_W"], G["VIEW_H"])
+        Image.open(RAW / "09.jpeg").convert("RGB").resize((view[0] * 2, view[1] * 2), Image.LANCZOS).save(ART / "title.png", optimize=True)
+    print(f"{sum(1 for _ in ART.glob('*.png'))} pictures in {ART}")
+
+
+if __name__ == "__main__":
+    main()

@@ -73,6 +73,8 @@ export interface InputSink {
   mouseDown(button: number): void;
   mouseUp(button: number): void;
   mouseMove(x: number, y: number): void;
+  /** The mouse wheel turned: notches, up (away from you) positive. */
+  wheel(notches: number): void;
   releaseAll(): void;
   /** The gamepads, sent whenever they change. */
   pads(state: PadState[]): void;
@@ -95,6 +97,8 @@ export class InputState implements InputSink {
   private mouseReleased = [0, 0, 0];
   mouseX = 0;
   mouseY = 0;
+  /** Wheel notches since the last step, up positive (latched like a press). */
+  private wheelTurned = 0;
   /** Presses and releases this step, for the engine's instance mouse events. */
   readonly mouseEdges: { button: number; released: boolean }[] = [];
   private pendingEdges: { button: number; released: boolean }[] = [];
@@ -122,6 +126,10 @@ export class InputState implements InputSink {
   mouseMove(x: number, y: number) {
     this.mouseX = x;
     this.mouseY = y;
+  }
+
+  wheel(notches: number) {
+    this.wheelTurned += notches;
   }
 
   keyDown(code: number) {
@@ -178,6 +186,8 @@ export class InputState implements InputSink {
 
     g[G.MOUSE_X] = this.mouseX;
     g[G.MOUSE_Y] = this.mouseY;
+    g[G.WHEEL] = this.wheelTurned;
+    this.wheelTurned = 0;
     for (let b = 0; b < 3; b++) {
       g[G.MOUSE_DOWN + b] = this.mouseHeld[b]!;
       g[G.MOUSE_PRESSED + b] = this.mousePressed[b]!;
@@ -200,6 +210,9 @@ export class InputState implements InputSink {
     for (let p = 0; p < PAD_COUNT; p++) g[G.PAD_CONNECTED + p] = this.padConnected[p]!;
   }
 }
+
+/** Pixels of scrolling that make one notch of the mouse wheel. */
+export const WHEEL_STEP = 50;
 
 /**
  * Wires an InputState to the page. Keys are listened for on the window, but
@@ -242,6 +255,21 @@ export function attachInput(
     move(e);
     input.mouseUp(e.button === 2 ? 1 : e.button === 1 ? 2 : 0);
   };
+  // The wheel: a notch for each WHEEL_STEP pixels scrolled, so a trackpad's stream of
+  // little scrolls adds up to notches as a mouse wheel's clicks do. Over the game, the
+  // page itself doesn't scroll.
+  let scrolled = 0;
+  const wheel = (e: WheelEvent) => {
+    e.preventDefault();
+    scrolled += e.deltaY * (e.deltaMode === 1 ? 33 : e.deltaMode === 2 ? 600 : 1);
+    let notches = 0;
+    while (Math.abs(scrolled) >= WHEEL_STEP) {
+      const s = Math.sign(scrolled);
+      notches -= s;               // scrolling up (deltaY below 0) is a notch up
+      scrolled -= s * WHEEL_STEP;
+    }
+    if (notches) input.wheel(notches);
+  };
   const blur = () => input.releaseAll();
   const menu = (e: Event) => e.preventDefault(); // right-click is a game button
 
@@ -252,7 +280,9 @@ export function attachInput(
   canvas.addEventListener("pointerdown", press);
   window.addEventListener("pointerup", release);
   canvas.addEventListener("contextmenu", menu);
+  canvas.addEventListener("wheel", wheel, { passive: false });
   return () => {
+    canvas.removeEventListener("wheel", wheel);
     window.removeEventListener("keydown", down);
     window.removeEventListener("keyup", up);
     window.removeEventListener("blur", blur);

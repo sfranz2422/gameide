@@ -195,6 +195,7 @@ function input(events: InputMessage[]) {
     else if (e.k === "mdown") inp.mouseDown(e.button);
     else if (e.k === "mup") inp.mouseUp(e.button);
     else if (e.k === "move") inp.mouseMove(e.x, e.y);
+    else if (e.k === "wheel") inp.wheel(e.n);
     else if (e.k === "pads") inp.pads(e.pads);
     else inp.releaseAll();
   }
