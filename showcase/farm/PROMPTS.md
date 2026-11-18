@@ -171,7 +171,47 @@ order board, truck and stands drawn again underneath.
 > short piece of cobblestone road; four arrows pointing out (to move something); a cloth
 > bag of gold coins. Flat magenta background.
 
+## Phase 4: the valley
+
+Isometric again, in the same Gemini chat. Attach **picture 3** (the farm buildings) to
+every prompt, and add: *"Isometric, at exactly the same angle, scale, style, outlines and
+lighting as the attached picture."* Ask for **only what the prompt lists**. The wild trees
+and rocks are the ones from picture 2, and the lake is drawn by the game, so neither is needed.
+
+**15. The railway.** MAGENTA.
+> [the style] Isometric. ONE row of five things, with clear space between them: a small
+> country railway station with a platform, a little roof and a bench, standing on its own
+> grass diamond the same size as the barn's in the attached picture; then a little red steam
+> engine, an empty wooden flat wagon, and the same wagon loaded with wooden crates, each one
+> as long as one small grass diamond, all three travelling the same way, towards the BOTTOM
+> RIGHT of the picture (along the lower-right edge of a diamond), with no ground under them;
+> then a short straight piece of railway track on one small grass diamond, the rails running
+> from the top left to the bottom right. Flat magenta background.
+
+**16. Places in the valley.** MAGENTA.
+> [the style] Isometric. ONE row of four, with clear space between them. The first three each
+> stand on their own grass diamond the same size as the barn's in the attached picture: a
+> wooden fishing dock with a little fisherman's hut and a fishing rod, the front of its
+> diamond a sandy lake shore; an old mine entrance in a rocky little hill, with wooden beams
+> and a mine cart on rails; a small juice press workshop with a big wooden fruit press and
+> baskets of apples. Fourth, on its own with no ground: a wooden sign on a post, a gold coin
+> painted on its board (no words). Flat magenta background.
+
+**17. Fruit trees.** MAGENTA. (Attach picture 1, the crops, as well, for the size of a tile.)
+> [the style] Isometric. Two rows of two, each a small round fruit tree standing on its own
+> small grass diamond the same size as one field in the attached crops picture, with clear
+> space between them. Row 1: an apple tree with only green leaves; the same apple tree full of
+> shiny red apples. Row 2: a cherry tree with only green leaves; the same cherry tree full of
+> dark red cherries. Flat magenta background.
+
+**18. Valley icons.** MAGENTA. (Attach picture 4, the icons, as well.)
+> [the style] A sheet of small round-cornered game icons in exactly the style of the
+> attached icons (the same cream tiles), each one a single object on its own, all the same
+> size, two rows of six. Row 1: a handful of iron nails; a stack of wooden planks; a pot of
+> paint with a brush; a blue fish; a gold nugget; a red apple. Row 2: a pair of cherries; a
+> glass of apple juice; a glass of cherry juice; a little steam train; a wooden signpost; a
+> green arrow pointing up. Flat magenta background.
+
 ## Later phases (not yet)
 
-- **Phase 4: expansion.** Land to clear (thick woods, rocks), a train and station, an
-  orchard, a lake with a fishing dock, a mine.
+- **Phase 5: achievements, events and seasons.**

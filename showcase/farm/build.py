@@ -45,7 +45,9 @@ ICONS = ["wheat", "corn", "carrot", "pumpkin", "seeds", "coin", "star", "level",
          "chicken_feed", "cow_feed", "sheep_feed", "egg", "milk", "wool", "bread", "corn_bread", "pie", "cream",
          "cheese", "butter", "sugarcane", "sugar", "cookies", "yarn", "sweater", "strawberry", "jam", "wheelbarrow",
          # phase 3: the town
-         "people", "house", "road", "move", "rent"]
+         "people", "house", "road", "move", "rent",
+         # phase 4: the valley
+         "nails", "planks", "paint", "fish", "gold", "apple", "cherry", "apple_juice", "cherry_juice", "train", "land", "up"]
 ANIMALS = {"chicken": (250, 250, 245), "cow": (240, 240, 240), "sheep": (245, 245, 235)}
 POSES = ["stand", "walk", "eat", "ready"]
 BUILT_COLOURS = {"coop": (200, 150, 90), "cowshed": (190, 70, 60), "sheep_pen": (170, 140, 110), "feed_mill": (200, 170, 110),
@@ -53,7 +55,9 @@ BUILT_COLOURS = {"coop": (200, 150, 90), "cowshed": (190, 70, 60), "sheep_pen": 
                  "jam_kitchen": (220, 90, 120),
                  "cottage": (240, 210, 160), "family_house": (150, 190, 230), "townhouse": (230, 160, 140), "manor": (235, 225, 200),
                  "fountain": (170, 200, 220), "park": (90, 170, 90), "school": (210, 80, 70), "cafe": (240, 180, 90),
-                 "town_hall": (220, 220, 230), "library": (160, 110, 80)}
+                 "town_hall": (220, 220, 230), "library": (160, 110, 80),
+                 "station": (200, 90, 70), "dock": (170, 130, 90), "mine": (120, 110, 100), "juice_press": (240, 170, 60)}
+TREE_FRUIT = {"apple_tree": (220, 40, 40), "cherry_tree": (150, 20, 50)}
 PEOPLE_COLOURS = {"girl": (230, 90, 140), "boy": (70, 130, 220), "woman": (120, 180, 90), "grandpa": (150, 120, 90)}
 NATURE = ["soil", "soil_wet", "grass_flowers", "path", "fence", "gate", "boulder", "bush", "oak", "pine", "stump", "pond"]
 
@@ -146,6 +150,52 @@ def stand_in_person(who, pose, frame):
     return im
 
 
+def stand_in_tree(kind, fruit):
+    """A round fruit tree on its grass diamond, its fruit on or not, for a picture not cut yet."""
+    im = Image.new("RGBA", (TW, TH + 110), (0, 0, 0, 0))
+    d = ImageDraw.Draw(im)
+    cx, cy = TW / 2, 110 + TH / 2
+    d.polygon([(cx, 110), (TW, cy), (cx, 110 + TH), (0, cy)], fill=(110, 170, 80), outline=(50, 80, 40))
+    d.rectangle((cx - 6, cy - 50, cx + 6, cy + 4), fill=(110, 70, 40), outline=(60, 40, 20))
+    d.ellipse((cx - 44, cy - 120, cx + 44, cy - 34), fill=(70, 150, 60), outline=(40, 80, 30))
+    if fruit:
+        rng = random.Random(kind)
+        for _ in range(9):
+            x, y = cx + rng.uniform(-30, 30), cy + rng.uniform(-104, -50)
+            d.ellipse((x - 6, y - 6, x + 6, y + 6), fill=TREE_FRUIT[kind], outline=(70, 20, 20))
+    return im
+
+
+def stand_in_sign():
+    im = Image.new("RGBA", (64, 90), (0, 0, 0, 0))
+    d = ImageDraw.Draw(im)
+    d.rectangle((29, 30, 35, 86), fill=(120, 80, 40), outline=(60, 40, 20))
+    d.rectangle((8, 10, 56, 44), fill=(240, 220, 170), outline=(90, 60, 30), width=3)
+    d.ellipse((24, 18, 40, 36), fill=(240, 190, 40), outline=(120, 80, 10))
+    return im
+
+
+def stand_in_car(engine, loaded):
+    """A train car on the railway, going down-right along gx, for a picture not cut yet."""
+    im = Image.new("RGBA", (130, 110), (0, 0, 0, 0))
+    d = ImageDraw.Draw(im)
+    body = (60, 70, 90) if engine else (150, 90, 50)
+    # A box drawn along the diamond's down-right edge.
+    pts = [(10, 50), (100, 95), (120, 85), (30, 40)]
+    d.polygon([(x, y - 30) for x, y in pts], fill=tuple(min(255, c + 40) for c in body), outline=(30, 20, 10))
+    d.polygon([(10, 50 - 30), (100, 95 - 30), (100, 95), (10, 50)], fill=body, outline=(30, 20, 10))
+    d.polygon([(100, 95 - 30), (120, 85 - 30), (120, 85), (100, 95)], fill=tuple(int(c * 0.7) for c in body), outline=(30, 20, 10))
+    for x in (28, 82):
+        d.ellipse((x - 9, 50 + (x - 10) / 2 - 2, x + 9, 50 + (x - 10) / 2 + 16), fill=(40, 40, 40))
+    if engine:
+        d.rectangle((84, 20, 96, 48), fill=(40, 40, 50), outline=(20, 20, 20))
+        d.rectangle((20, 0, 50, 34), fill=(200, 60, 50), outline=(30, 20, 10))
+    elif loaded:
+        for k, (x, y) in enumerate(((36, 18), (60, 30), (84, 42))):
+            d.rectangle((x - 10, y - 12, x + 10, y + 8), fill=(220, 170, 90), outline=(90, 60, 20))
+    return im
+
+
 def stand_in_icon(name):
     from PIL import ImageFont
     im = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
@@ -209,6 +259,49 @@ def make_ground():
                 tx, ty = x + rng.uniform(-TW / 4, TW / 4), y + rng.uniform(-TH / 5, TH / 5)
                 d.line([(tx, ty), (tx - 2, ty - 5)], fill=(70, 140, 50), width=2)
                 d.line([(tx, ty), (tx + 2, ty - 5)], fill=(120, 190, 80), width=2)
+    # The lake: a band of sand outside every edge where water meets grass, then the water
+    # (whole diamonds, so neighbouring tiles join with no seam), and ripples.
+    lake = set(G["LAKE"])
+    sand = 12
+    for gx, gy in lake:
+        x, y = tile_xy(gx, gy)
+        top, right, bottom, left = (x, y - TH / 2), (x + TW / 2, y), (x, y + TH / 2), (x - TW / 2, y)
+        # Each side of the diamond, and the neighbour beyond it.
+        for (dx, dy), (u, v) in (((0, -1), (top, right)), ((1, 0), (right, bottom)), ((0, 1), (bottom, left)), ((-1, 0), (left, top))):
+            if (gx + dx, gy + dy) in lake:
+                continue
+            mx, my = (u[0] + v[0]) / 2 - x, (u[1] + v[1]) / 2 - y          # outwards from the middle
+            ln = (mx * mx + my * my) ** 0.5
+            ox, oy = mx / ln * sand, my / ln * sand
+            d.polygon([u, v, (v[0] + ox, v[1] + oy), (u[0] + ox, u[1] + oy)], fill=(214, 196, 140))
+            for w in (u, v):
+                d.ellipse((w[0] - sand, w[1] - sand / 2, w[0] + sand, w[1] + sand / 2), fill=(214, 196, 140))
+    for gx, gy in lake:
+        x, y = tile_xy(gx, gy)
+        d.polygon([(x, y - TH / 2), (x + TW / 2, y), (x, y + TH / 2), (x - TW / 2, y)], fill=(70, 150, 200))
+    for gx, gy in sorted(lake):
+        x, y = tile_xy(gx, gy)
+        for _ in range(2):
+            rx, ry = x + rng.uniform(-30, 30), y + rng.uniform(-10, 10)
+            d.arc((rx - 12, ry - 4, rx + 12, ry + 4), 200, 340, fill=(190, 230, 250), width=2)
+    # The railway: sleepers across, two rails along gx.
+    if (ART / "rail.png").exists():
+        rail = half("rail")
+        for gx, gy in G["RAIL"]:
+            x, y = tile_xy(gx, gy)
+            im.alpha_composite(rail, (int(x - rail.width / 2), int(y - TH / 2)))
+    else:
+        for gx, gy in G["RAIL"]:
+            x, y = tile_xy(gx, gy)
+            d.polygon([(x, y - TH / 2), (x + TW / 2, y), (x, y + TH / 2), (x - TW / 2, y)], fill=(150, 130, 100))
+            for k in range(4):
+                a = -0.5 + (k + 0.5) / 4
+                sx, sy = x + a * TW / 2, y + a * TH / 2
+                d.line([(sx + 22, sy - 11), (sx - 22, sy + 11)], fill=(110, 70, 40), width=6)
+        for off in (-12, 12):
+            a = tile_xy(G["RAIL"][0][0] - 0.5, G["RAIL_GY"])
+            b = tile_xy(G["RAIL"][-1][0] + 0.5, G["RAIL_GY"])
+            d.line([(a[0] + off, a[1] - off / 2), (b[0] + off, b[1] - off / 2)], fill=(90, 90, 100), width=4)
     # The road: its tiles back to front, so each covers the edge of the one behind.
     road = set(G["ROAD"])
     if (ART / "path.png").exists():
@@ -255,12 +348,22 @@ def build(out):
         im, origin = standing(name, 1, (110, 160, 80))
         P.sprite(name, [im], origin)
     for kind, tiles in G["FOOTPRINT"].items():
+        if kind in G["TREES"]:
+            frames = [half(f"{kind}_{k}") if (ART / f"{kind}_{k}.png").exists() else stand_in_tree(kind, k) for k in range(2)]
+            P.sprite(kind, frames, (frames[0].width // 2, frames[0].height - TH // 2))
+            continue
         if (ART / f"{kind}.png").exists():
             im, origin = standing(kind, tiles)
         else:
             im = stand_in_building(kind)
             origin = (im.width // 2, im.height - TH * tiles // 2)
         P.sprite(kind, [im], origin)
+    sign = half("sign") if (ART / "sign.png").exists() else stand_in_sign()
+    P.sprite("sign", [sign], (sign.width // 2, sign.height - 6))
+    for name, frames in (("train_engine", ["train_engine"]), ("train_wagon", ["train_wagon", "train_wagon_full"])):
+        pics = [half(k) if (ART / f"{k}.png").exists() else stand_in_car(name == "train_engine", j == 1) for j, k in enumerate(frames)]
+        # Standing on the middle of its rail tile, as everything stands on its tile.
+        P.sprite(name, pics, (pics[0].width // 2, pics[0].height - TH // 2))
     for animal in ANIMALS:
         for pose in POSES:
             name = f"animal_{animal}_{pose}"

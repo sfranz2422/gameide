@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Cuts the teacher's 5 Gemini pictures (PROMPTS.md, in order, copied into raw/ as
-01.jpeg … 05.jpeg) into the named pictures in art/, which build.py reads. Both raw/
+Cuts the teacher's Gemini pictures (PROMPTS.md, in order, copied into raw/ as
+01.jpeg, 02.jpeg …) into the named pictures in art/, which build.py reads. Both raw/
 and art/ are committed, so the art can't be lost.
 
     python3 showcase/farm/cut_sheets.py
@@ -187,6 +187,11 @@ PEOPLE = [("girl", 88), ("boy", 88), ("woman", 112), ("grandpa", 108)]     # hei
 PEOPLE_FRAMES = {"girl": ["2", "1~", "4", "3~"], "boy": ["2", "1~", "3", "3^"],
                  "woman": ["2", "1~", "4", "3~"], "grandpa": ["2", "1~", "4", "3~"]}
 ICONS_3 = ["people", "house", "road", "move", "rent"]
+# Phase 4 (pictures 15 to 18).
+PLACES = [("dock", 2), ("mine", 2), ("juice_press", 2)]
+TREE_KINDS = ["apple_tree", "cherry_tree"]
+ICONS_4 = ["nails", "planks", "paint", "fish", "gold", "apple", "cherry", "apple_juice", "cherry_juice", "train", "land", "up"]
+SIGN_TALL = 180                     # the sign's height in art/ (twice the game's)
 
 
 def same_size(parts):
@@ -246,6 +251,47 @@ def phase_3():
             save(_sw.own(im, b, every).crop(b).resize((128, 128), Image.LANCZOS), f"icon_{name}")
 
 
+def phase_4():
+    if (RAW / "15.jpeg").exists():
+        # Gemini drew the train going down-LEFT (asked for down-right), and the station's
+        # and the track piece's rails the same way, so all of it is flipped: the railway
+        # runs along gx, down-right on screen. Flipped, the station's track is along its
+        # front row, which is why RAIL is that row. The cars are scaled as the track piece
+        # is, so they're the size Gemini drew them beside it.
+        im = _sw.key_out(Image.open(RAW / "15.jpeg"))
+        boxes, every = drawings(im, 1, 5)
+        flip = [_sw.own(im, b, every).crop(b).transpose(Image.FLIP_LEFT_RIGHT) for b in boxes]
+        station, engine, wagon, full, rail = flip
+        save(fitted(station, 2), "station")
+        k = TILE_W * 2 / rail.width
+        save(fitted(rail, 1), "rail")
+        cars = same_size([c.resize((round(c.width * k), round(c.height * k)), Image.LANCZOS) for c in (wagon, full)])
+        save(engine.resize((round(engine.width * k), round(engine.height * k)), Image.LANCZOS), "train_engine")
+        save(cars[0], "train_wagon")
+        save(cars[1], "train_wagon_full")
+    if (RAW / "16.jpeg").exists():
+        im = _sw.key_out(Image.open(RAW / "16.jpeg"))
+        boxes, every = drawings(im, 1, 4)
+        for (name, tiles), b in zip(PLACES, boxes):
+            save(fitted(_sw.own(im, b, every).crop(b), tiles), name)
+        sign = _sw.own(im, boxes[3], every).crop(boxes[3])
+        k = SIGN_TALL / sign.height
+        save(sign.resize((round(sign.width * k), SIGN_TALL), Image.LANCZOS), "sign")
+    if (RAW / "17.jpeg").exists():
+        # Two rows: each tree bare, then fruiting; one size for both frames.
+        im = _sw.key_out(Image.open(RAW / "17.jpeg"))
+        boxes, every = drawings(im, 2, 2)
+        for r, kind in enumerate(TREE_KINDS):
+            frames = same_size([fitted(_sw.own(im, b, every).crop(b), 1) for b in boxes[r * 2:r * 2 + 2]])
+            for j, pic in enumerate(frames):
+                save(pic, f"{kind}_{j}")
+    if (RAW / "18.jpeg").exists():
+        im = _sw.key_out(Image.open(RAW / "18.jpeg"))
+        boxes, every = drawings(im, 2, 6)
+        for name, b in zip(ICONS_4, boxes):
+            save(_sw.own(im, b, every).crop(b).resize((128, 128), Image.LANCZOS), f"icon_{name}")
+
+
 def main():
     ART.mkdir(exist_ok=True)
     # 1: crops, cut by rows (the ripe wheat touches the corn below it).
@@ -284,6 +330,7 @@ def main():
     Image.open(RAW / "05.jpeg").convert("RGB").resize((view[0] * 2, view[1] * 2), Image.LANCZOS).save(ART / "title.png", optimize=True)
     phase_2()
     phase_3()
+    phase_4()
     print(f"{sum(1 for _ in ART.glob('*.png'))} pictures in {ART}")
 
 

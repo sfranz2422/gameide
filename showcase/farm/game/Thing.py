@@ -1,7 +1,7 @@
 # object: Thing
-# A building, a tree or a rock on the map: a picture standing on its tile (or, for
-# a building, the middle of its footprint), drawn in front of what's behind it:
-# its depth is minus how far down the screen it stands.
+# A building or a fruit tree on the map: a picture standing on its tile (or, for a
+# building, the middle of its footprint), drawn in front of what's behind it: its depth
+# is minus how far down the screen it stands. (Wild trees and rocks are Props.)
 
 # === create
 self.kind = ""
@@ -19,11 +19,25 @@ self.depth = -(building_xy(self.kind, self.gx, self.gy)[1] if self.kind in FOOTP
 # === draw
 pic_x, pic_y = building_xy(self.kind, self.gx, self.gy) if self.kind in FOOTPRINT else tile_xy(self.gx, self.gy)
 held = global_vars.moving is not None and tuple(global_vars.moving) == self.of
-draw_sprite_ext(self.kind, 0, pic_x, pic_y, 1, 1, 0, "white", 0.35 if held else 1)
-# An animal home: its animals in the yard, and what's ready over it. A factory: what's
-# finished over it, or a little clock while it's making something.
 f = farm()
-if self.kind in HOMES:
+# A fruit tree is drawn with its fruit on (frame 1) once it's ready to pick.
+frame = 1 if self.kind in TREES and self.of is not None and fruit_ready(f["trees"][self.of[1]]) else 0
+draw_sprite_ext(self.kind, frame, pic_x, pic_y, 1, 1, 0, "white", 0.35 if held else 1)
+# An animal home: its animals in the yard, and what's ready over it. A factory: what's
+# finished over it, or a little clock while it's making something. The fishing dock and
+# the mine: the same, with no animals.
+if self.kind == "station":
+    if train_here(f) and any(not w["loaded"] and can_deliver(f, w) for w in f["train"]["wagons"]):
+        bubble_y = pic_y - 120 + math.sin(global_vars.t * 0.08) * 4
+        diamond(pic_x, bubble_y, "#fff4dc", 0.95, 0.5)
+        icon("train", pic_x, bubble_y, 34)
+elif self.kind == "dock":
+    home = home_of(f, self.gx, self.gy)
+    if home is not None and any(animal_state(home, i) == "ready" for i in range(ANIMALS_EACH)):
+        bubble_y = pic_y - 100 + math.sin(global_vars.t * 0.08) * 4
+        diamond(pic_x, bubble_y, "#fff4dc", 0.95, 0.5)
+        icon("fish", pic_x, bubble_y, 34)
+elif self.kind in HOMES:
     home = home_of(f, self.gx, self.gy)
     if home is not None:
         info = HOMES[self.kind]
@@ -49,7 +63,7 @@ elif self.kind in HOUSES and self.of is not None:
     elif i not in lived_in(f):
         # Empty: no room in town for its people yet.
         icon("people", pic_x, bubble_y, 30, 0.45 + 0.25 * math.sin(global_vars.t * 0.06))
-elif self.kind in FACTORIES:
+elif self.kind in FACTORIES or self.kind == "mine":
     mill = mill_of(f, self.gx, self.gy)
     if mill is not None and mill["queue"]:
         bubble_y = pic_y - 110 + math.sin(global_vars.t * 0.08) * 4

@@ -14,6 +14,7 @@
 #   homes       [{"kind", "gx", "gy", "animals": [None, or when it was fed]}]     (phase 2)
 #   mills       [{"kind", "gx", "gy", "queue": [{"item", "end"}]}]               (phase 2)
 #   town, roads, visitors, met                         (phase 3: see the town script)
+#   land, cleared, kit, barn_level, drops, trees, train (phase 4: see the land and train scripts)
 import math
 import random
 import time
@@ -29,7 +30,9 @@ def new_farm(seed=None):
     f = {"coins": START_COINS, "xp": 0, "level": 1, "barn": {}, "orders": [], "made": 0, "bought": 0,
          "seed": seed if seed is not None else random.randrange(1 << 30),
          "fields": [{"gx": gx, "gy": gy, "crop": None, "t": 0} for gx, gy in START_FIELDS],
-         "homes": [], "mills": [], "town": [], "roads": [], "visitors": [], "met": 0}
+         "homes": [], "mills": [], "town": [], "roads": [], "visitors": [], "met": 0,
+         "land": [], "cleared": [], "kit": dict(START_KIT), "barn_level": 0, "drops": 0, "trees": [],
+         "train": {"wagons": [], "back": 0, "left": 0, "trips": 0}}
     fill_orders(f)
     return f
 
@@ -43,12 +46,19 @@ def load_farm():
     for k in ("homes", "mills", "town", "roads", "visitors"):
         f.setdefault(k, [])
     f.setdefault("met", 0)
+    # Phase 4: a farm from before it gets the starting tools, as a new one does.
+    for k in ("land", "cleared", "trees"):
+        f.setdefault(k, [])
+    f.setdefault("kit", dict(START_KIT))
+    f.setdefault("barn_level", 0)
+    f.setdefault("drops", 0)
+    f.setdefault("train", {"wagons": [], "back": 0, "left": 0, "trips": 0})
     return f
 
 
 def item_info(k):
-    """A crop's or a made good's name, sell price and XP."""
-    return CROPS[k] if k in CROPS else GOODS[k]
+    """A crop's or a made good's name, sell price and XP; a tool's or material's name."""
+    return CROPS[k] if k in CROPS else (GOODS[k] if k in GOODS else KIT[k])
 
 
 def keep(f):
@@ -87,8 +97,11 @@ def add_xp(f, n):
 def opened_at(level):
     """What a level opens, in words, for the level-up note: crops, animal homes, factories,
     houses and the town's buildings (and roads, with the town)."""
-    every = list(CROPS.values()) + list(HOMES.values()) + list(FACTORIES.values()) + list(HOUSES.values()) + list(COMMUNITY.values())
-    return [c["name"] for c in every if c["level"] == level] + (["roads"] if level == ROAD_LEVEL else [])
+    every = (list(CROPS.values()) + list(HOMES.values()) + list(FACTORIES.values()) + list(HOUSES.values())
+             + list(COMMUNITY.values()) + list(TREES.values()))
+    return ([c["name"] for c in every if c["level"] == level] + (["roads"] if level == ROAD_LEVEL else [])
+            + (["the train"] if level == TRAIN_LEVEL else [])
+            + [f"land: {p['name']}" for p in LAND if p["level"] == level])
 
 
 def crops_open(f):
@@ -154,8 +167,13 @@ def barn_used(f):
     return sum(f["barn"].values())
 
 
+def barn_space(f):
+    """How much the barn holds: BARN_SPACE, and BARN_STEP more each time it's been made bigger."""
+    return BARN_SPACE + BARN_STEP * f["barn_level"]
+
+
 def barn_free(f):
-    return BARN_SPACE - barn_used(f)
+    return barn_space(f) - barn_used(f)
 
 
 def sell(f, item, n=1):
@@ -180,11 +198,12 @@ def footprint_tiles(kind, gx, gy):
 def taken(f, skip=None):
     """Every tile with something on it: buildings, trees and rocks, roads, fields.
     `skip` (a moved thing's ("homes", 2) and so on) leaves that one out."""
-    used = set(ROAD)
+    used = set(ROAD) | set(RAIL) | set(LAKE) | locked_tiles(f)
     for kind, gx, gy in START_FARM:
         used.update(footprint_tiles(kind, gx, gy))
-    used.update((gx, gy) for _, gx, gy in DECOR)
+    used.update(wild_left(f))
     used.update((fl["gx"], fl["gy"]) for i, fl in enumerate(f["fields"]) if skip != ("fields", i))
+    used.update((t["gx"], t["gy"]) for i, t in enumerate(f["trees"]) if skip != ("trees", i))
     used.update((r[0], r[1]) for i, r in enumerate(f["roads"]) if skip != ("roads", i))
     for name in ("homes", "mills", "town"):
         for i, b in enumerate(f[name]):
@@ -228,7 +247,19 @@ def buy_field(f, gx, gy):
 def building_info(kind):
     if kind in HOUSES or kind in COMMUNITY:
         return town_info(kind)
-    return HOMES[kind] if kind in HOMES else FACTORIES[kind]
+    if kind in TREES:
+        return TREES[kind]
+    return HOMES[kind] if kind in HOMES else (FACTORIES[kind] if kind in FACTORIES else SITES[kind])
+
+
+def home_info(kind):
+    """An animal home's numbers, or the fishing dock's (a home that came with its land)."""
+    return HOMES[kind] if kind in HOMES else SITES[kind]
+
+
+def mill_info(kind):
+    """A factory's numbers, or the mine's."""
+    return FACTORIES[kind] if kind in FACTORIES else SITES[kind]
 
 
 def owned(f, kind):
@@ -275,17 +306,17 @@ def animal_state(home, i):
     t = home["animals"][i]
     if t is None:
         return "hungry"
-    return "ready" if now() >= t + HOMES[home["kind"]]["time"] else "eating"
+    return "ready" if now() >= t + home_info(home["kind"])["time"] else "eating"
 
 
 def animal_left(home, i):
     t = home["animals"][i]
-    return 0 if t is None else max(0, t + HOMES[home["kind"]]["time"] - now())
+    return 0 if t is None else max(0, t + home_info(home["kind"])["time"] - now())
 
 
 def feed_home(f, home):
     """Feeds every hungry animal there's feed for in the barn. How many were fed."""
-    feed = HOMES[home["kind"]]["feed"]
+    feed = home_info(home["kind"])["feed"]
     fed = 0
     for i in range(len(home["animals"])):
         if animal_state(home, i) == "hungry" and f["barn"].get(feed, 0) > 0:
@@ -300,7 +331,7 @@ def feed_home(f, home):
 def collect_home(f, home):
     """Collects what every ready animal made, while the barn has room: they're hungry
     again. How many, and the levels they brought."""
-    makes = HOMES[home["kind"]]["makes"]
+    makes = home_info(home["kind"])["makes"]
     got, gained = 0, []
     for i in range(len(home["animals"])):
         if animal_state(home, i) == "ready" and barn_free(f) > 0:
@@ -326,7 +357,7 @@ def mill_done(m):
 def make_in(f, m, item):
     """Starts making something: 'queued', or why not: 'full' (the queue), 'short' (the
     barn hasn't what it needs). It starts when the one before it finishes."""
-    recipe = FACTORIES[m["kind"]]["makes"][item]
+    recipe = mill_info(m["kind"])["makes"][item]
     if len(m["queue"]) >= FACTORY_QUEUE:
         return "full"
     if any(f["barn"].get(k, 0) < n for k, n in recipe["needs"].items()):
@@ -344,11 +375,16 @@ def collect_mill(f, m):
     """Takes what's finished into the barn, front first, while it has room. How many,
     and the levels they brought."""
     got, gained = 0, []
-    while m["queue"] and now() >= m["queue"][0]["end"] and barn_free(f) > 0:
+    while m["queue"] and now() >= m["queue"][0]["end"] and (m["queue"][0]["item"] in KIT or barn_free(f) > 0):
         item = m["queue"].pop(0)["item"]
-        f["barn"][item] = f["barn"].get(item, 0) + 1
+        if item in KIT:
+            # The mine's nails and pickaxes go in the kit, which takes no room.
+            f["kit"][item] = f["kit"].get(item, 0) + 1
+            gained += add_xp(f, MINE_XP)
+        else:
+            f["barn"][item] = f["barn"].get(item, 0) + 1
+            gained += add_xp(f, GOODS[item]["xp"])
         got += 1
-        gained += add_xp(f, GOODS[item]["xp"])
     return got, gained
 
 
@@ -363,9 +399,13 @@ def orderable(f):
     (from an animal home or a factory it has)."""
     out = list(crops_open(f))
     for b in f["homes"]:
-        out.append(HOMES[b["kind"]]["makes"])
+        out.append(home_info(b["kind"])["makes"])
     for b in f["mills"]:
-        out += [k for k in FACTORIES[b["kind"]]["makes"] if not k.endswith("_feed")]
+        if b["kind"] in FACTORIES:          # never the mine's: nails, pickaxes and gold aren't wanted
+            out += [k for k in FACTORIES[b["kind"]]["makes"] if not k.endswith("_feed")]
+    for k, info in TREES.items():
+        if any(t["kind"] == k for t in f["trees"]):
+            out.append(info["fruit"])
     return out
 
 

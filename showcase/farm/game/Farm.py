@@ -29,13 +29,32 @@ f = global_vars.farm
 fill_orders(f)
 high_score(f["level"])
 instance_create(0, 0, "Ground")
-for kind, gx, gy in START_FARM + DECOR:
+for kind, gx, gy in START_FARM:
     o = instance_create(0, 0, "Thing")
     o.kind, o.gx, o.gy = kind, gx, gy
-    o.depth = -(building_xy(kind, gx, gy)[1] if kind in FOOTPRINT else tile_xy(gx, gy)[1])
+    o.depth = -building_xy(kind, gx, gy)[1]
+# Trees, rocks and signs: Props, drawn by the engine alone (see Prop).
+self.props = {}                     # (gx, gy): the Prop standing there
+for kind, gx, gy in DECOR:
+    if kind not in CLEAR:
+        make_prop(self, kind, gx, gy)
+for (gx, gy), kind in wilds().items():
+    if wild_at(f, gx, gy):
+        make_prop(self, kind, gx, gy)
+self.signs = {}                     # a locked plot's index: its sign
+for i in range(len(LAND)):
+    if locked(f, i):
+        self.signs[i] = make_prop(self, "sign", *sign_tile(i))
+self.cleared = len(f["cleared"])
+self.land = len(f["land"])
+shade_props(self)
 instance_create(0, 0, "Roads")
+instance_create(0, 0, "Land")
+for k in range(TRAIN_WAGONS + 1):
+    o = instance_create(0, 0, "Car")
+    o.k = k
 self.fields = 0
-self.made = {"homes": 0, "mills": 0, "town": 0}     # how many of each have a Thing on the map
+self.made = {"homes": 0, "mills": 0, "town": 0, "trees": 0}     # how many of each have a Thing on the map
 self.walkers = []                   # townspeople out walking (Person objects)
 self.queue = []                     # townspeople at the farm stand, one a visitor's place
 self.orders_b = make_button(VIEW_W - 330, 8, 104, 36, "Orders", "orders", None, 15)
@@ -57,9 +76,9 @@ while self.fields < len(f["fields"]):
     o.i = self.fields
     o.depth = -tile_xy(fl["gx"], fl["gy"])[1]
     self.fields += 1
-# Animal homes, factories and the town's buildings built since: a Thing each, which
-# reads where it is from the farm (so moving one moves its Thing).
-for name in ("homes", "mills", "town"):
+# Animal homes, factories, the town's buildings and fruit trees built since: a Thing
+# each, which reads where it is from the farm (so moving one moves its Thing).
+for name in ("homes", "mills", "town", "trees"):
     while self.made[name] < len(f[name]):
         o = instance_create(0, 0, "Thing")
         o.of = (name, self.made[name])
@@ -74,21 +93,35 @@ while len(self.walkers) < walkers(f):
     start_walk(o, f)
 while len(self.walkers) > walkers(f):
     self.walkers.pop().destroy()
+# Cleared away: their Props go. Land bought: its sign goes, and what's on it brightens.
+if len(f["cleared"]) != self.cleared:
+    for c in f["cleared"][self.cleared:]:
+        o = self.props.pop((c[0], c[1]), None)
+        if o is not None:
+            o.destroy()
+    self.cleared = len(f["cleared"])
+if len(f["land"]) != self.land:
+    for i in f["land"]:
+        if i in self.signs:
+            self.signs.pop(i).destroy()
+    self.land = len(f["land"])
+    shade_props(self)
 while len(self.queue) < len(f["visitors"]):
     o = instance_create(0, 0, "Person")
     o.visitor = len(self.queue)
     self.queue.append(o)
 if global_vars.t % FPS == 0:
-    before = [dict(o) for o in f["orders"]] + [dict(v) for v in f["visitors"]]
+    before = [dict(o) for o in f["orders"]] + [dict(v) for v in f["visitors"]] + [len(f["train"]["wagons"])]
     fill_orders(f)
     fill_visitors(f)
     town_tick(f)
-    if [dict(o) for o in f["orders"]] + [dict(v) for v in f["visitors"]] != before:
+    fill_train(f)
+    if [dict(o) for o in f["orders"]] + [dict(v) for v in f["visitors"]] + [len(f["train"]["wagons"])] != before:
         keep(f)
-        if global_vars.panel in ("orders", "visitors"):
+        if global_vars.panel in ("orders", "visitors", "train"):
             open_panel(global_vars.panel)
     # An open home's, factory's or house's window keeps up with its clocks (its buttons too).
-    if global_vars.panel in ("home", "mill", "house"):
+    if global_vars.panel in ("home", "mill", "house") or (global_vars.panel == "train" and not train_here(f)):
         open_panel(global_vars.panel, global_vars.panel_of)
 track_mouse()
 pointer()
@@ -168,7 +201,7 @@ text(136, 18, f"{f['xp'] - lo} / {hi - lo} XP", INK, 12, "center")
 icon("coin", 250, 26, 36)
 text(272, 14, str(f["coins"]), GOLD, 20)
 icon("crate", 360, 26, 36)
-text(382, 14, f"{barn_used(f)} / {BARN_SPACE}", INK if barn_free(f) > 4 else RED, 18)
+text(382, 14, f"{barn_used(f)} / {barn_space(f)}", INK if barn_free(f) > 4 else RED, 18)
 if f["level"] >= ROAD_LEVEL or f["town"]:
     # The town: people living here, of the room there is.
     icon("people", 500, 26, 36)
@@ -213,15 +246,31 @@ if global_vars.panel and box:
     panel(x1, y1, x2, y2)
     if global_vars.panel == "barn":
         text(x1 + 20, y1 + 14, "The barn", GOLD, 26)
-        text(x1 + 20, y1 + 50, f"{barn_used(f)} of {BARN_SPACE} spaces used", DIM, 14)
+        text(x1 + 20, y1 + 50, f"{barn_used(f)} of {barn_space(f)} spaces used", DIM, 14)
+        # The kit: tools, and the materials a bigger barn needs (have / need).
+        draw_set_alpha(0.35)
+        draw_set_color("#1e1208")
+        draw_rect(x1 + 12, y1 + 78, x2 - 12, y1 + 132)
+        draw_set_alpha(1)
+        needs = barn_needs(f)
+        for j, k in enumerate(KIT):
+            kx = x1 + 40 + j * 54
+            icon(k, kx, y1 + 96, 34)
+            n = f["kit"].get(k, 0)
+            words, colour = (f"{n}/{needs[k]}", MINT if n >= needs[k] else INK) if k in needs else (str(n), INK if n else RED)
+            text(kx, y1 + 113, words, colour, 12, "center")
         items = barn_items(f)
         if not items:
-            text(x1 + 20, y1 + 90, "Empty. Harvest a field and it comes here.", INK, 16)
-        cols = 2 if len(items) > 5 else 1
+            text(x1 + 20, y1 + BARN_TOP + 4, "Empty. Harvest a field and it comes here.", INK, 16)
+        cols, rows, w, h, cell = barn_grid(f)
         for i, k in enumerate(items):
-            x, y = barn_slot(i, cols, x1, y1)
-            icon(k, x + 22, y + 19, 42)
-            text(x + 50, y + 9, f"{item_info(k)['name']} × {f['barn'][k]}", INK, 15)
+            x, y = barn_slot(i, x1, y1)
+            icon(k, x + 18, y + 18, 36)
+            if cols <= 2:
+                text(x + 42, y + 9, f"{item_info(k)['name']} × {f['barn'][k]}", INK, 15)
+            else:
+                text(x + 40, y + 1, item_info(k)["name"], DIM, 12)
+                text(x + 40, y + 17, f"× {f['barn'][k]}", INK, 14)
     elif global_vars.panel == "orders":
         text(x1 + 20, y1 + 14, "Orders", GOLD, 26)
         text(x1 + 140, y1 + 22, "Fill one from the barn for coins and XP. A new one comes after.", DIM, 13)
@@ -248,7 +297,7 @@ if global_vars.panel and box:
         text(x1 + 20, y1 + 14, "Build", GOLD, 26)
         for i, (k, name, cost, why) in enumerate(shop_rows(f, global_vars.shop_tab)):
             y = y1 + 56 + i * SHOP_ROW
-            pic = {"field": "shovel", "road": "road"}.get(k, "barn" if k in HOMES else ("house" if k in HOUSES else ("people" if k in COMMUNITY else "hammer")))
+            pic = {"field": "shovel", "road": "road"}.get(k, "barn" if k in HOMES else ("house" if k in HOUSES else ("people" if k in COMMUNITY else (TREES[k]["fruit"] if k in TREES else "hammer"))))
             icon(pic, x1 + 40, y + 18, 34)
             words = f"{name}  ({len(f['fields'])} of {most_fields(f)})" if k == "field" else name
             if k in HOMES:
@@ -259,6 +308,8 @@ if global_vars.panel and box:
                 words += f": {HOUSES[k]['people']} people, {HOUSES[k]['rent']} rent"
             elif k in COMMUNITY:
                 words += f": room for {COMMUNITY[k]['room']} people"
+            elif k in TREES:
+                words += f": {GOODS[TREES[k]['fruit']]['name'].lower()} every {clock_words(TREES[k]['grow'])}"
             text(x1 + 66, y + 9, words, INK if not why else DIM, 14, "left", 370)
     elif global_vars.panel == "house":
         i = global_vars.panel_of
@@ -298,19 +349,26 @@ if global_vars.panel and box:
             plain(cx + 138, cy + 140, f"{v['xp']} XP", "#7a5a10", 17)
     elif global_vars.panel == "home":
         home = f["homes"][global_vars.panel_of]
-        info = HOMES[home["kind"]]
+        info = home_info(home["kind"])
         text(x1 + 20, y1 + 14, info["name"], GOLD, 26)
-        text(x1 + 20, y1 + 52, f"Feed each {info['animal']} one {GOODS[info['feed']]['name'].lower()}; "
-             f"after {clock_words(info['time'])} it makes {GOODS[info['makes']]['name'].lower()}.", DIM, 14, "left", 560)
+        if home["kind"] == "dock":
+            text(x1 + 20, y1 + 52, f"Bait each line with one corn; after {clock_words(info['time'])} a fish bites.", DIM, 14, "left", 560)
+        else:
+            text(x1 + 20, y1 + 52, f"Feed each {info['animal']} one {GOODS[info['feed']]['name'].lower()}; "
+                 f"after {clock_words(info['time'])} it makes {GOODS[info['makes']]['name'].lower()}.", DIM, 14, "left", 560)
         for i in range(ANIMALS_EACH):
             ax = x1 + 100 + i * 180
             st = animal_state(home, i)
-            draw_sprite_ext(f"animal_{info['animal']}_{ {'hungry': 'stand', 'eating': 'eat', 'ready': 'ready'}[st] }", 0, ax, y1 + 170, 1.3, 1.3, 0, "white", 1)
-            words = {"hungry": "Hungry", "eating": clock_words(animal_left(home, i)), "ready": "Ready!"}[st]
+            if home["kind"] == "dock":
+                # A fishing line: a fish on it, the clock while it waits, corn for bait.
+                icon({"hungry": "corn", "eating": "clock", "ready": "fish"}[st], ax, y1 + 140, 64, 0.45 if st == "hungry" else 1)
+            else:
+                draw_sprite_ext(f"animal_{info['animal']}_{ {'hungry': 'stand', 'eating': 'eat', 'ready': 'ready'}[st] }", 0, ax, y1 + 170, 1.3, 1.3, 0, "white", 1)
+            words = {"hungry": "No bait" if home["kind"] == "dock" else "Hungry", "eating": clock_words(animal_left(home, i)), "ready": "Ready!"}[st]
             text(ax, y1 + 196, words, MINT if st == "ready" else INK, 15, "center")
     elif global_vars.panel == "mill":
         mill = f["mills"][global_vars.panel_of]
-        info = FACTORIES[mill["kind"]]
+        info = mill_info(mill["kind"])
         text(x1 + 20, y1 + 14, info["name"], GOLD, 26)
         # The queue: making first, then waiting; finished ones wait to be collected.
         for i in range(FACTORY_QUEUE):
@@ -325,19 +383,56 @@ if global_vars.panel and box:
         for i, (item, recipe) in enumerate(info["makes"].items()):
             y = y1 + 176 + i * 70
             icon(item, x1 + 46, y + 22, 52)
-            text(x1 + 80, y + 2, GOODS[item]["name"], INK, 16)
+            text(x1 + 80, y + 2, item_info(item)["name"], INK, 16)
             text(x1 + 80, y + 24, clock_words(recipe["time"]), DIM, 13)
             for j, (k, n) in enumerate(recipe["needs"].items()):
                 nx = x1 + 250 + j * 96
                 icon(k, nx, y + 20, 40)
                 have = f["barn"].get(k, 0)
                 text(nx + 24, y + 10, f"{min(have, n)}/{n}", MINT if have >= n else RED, 14)
+    elif global_vars.panel == "land":
+        p = LAND[global_vars.panel_of]
+        i = global_vars.panel_of
+        text(x1 + 20, y1 + 14, p["name"], GOLD, 26)
+        icon("land", x2 - 90, y1 + 90, 64)
+        text(x1 + 20, y1 + 60, f"New land: {p['w'] * p['h']} tiles, with {wild_in(f, i)} trees and rocks to clear.", INK, 16, "left", 440)
+        extra = [s["name"] for s in SITES.values() if s["land"] == i]
+        if extra:
+            text(x1 + 20, y1 + 110, f"It comes with: {', '.join(extra).lower()}" + (" by the lake." if "Fishing dock" in extra else "."), MINT, 16, "left", 440)
+        text(x1 + 20, y1 + 150, "Clear the wild with an axe, a pickaxe or a shovel.", DIM, 14, "left", 440)
+        text(x1 + 20, y1 + 180, f"Opens at level {p['level']} · {p['cost']} coins", DIM, 14)
+    elif global_vars.panel == "train":
+        text(x1 + 20, y1 + 14, "The train", GOLD, 26)
+        if not train_here(f):
+            icon("train", x1 + 80, y1 + 120, 72)
+            text(x1 + 140, y1 + 90, "Away on its trip.", INK, 18)
+            text(x1 + 140, y1 + 120, f"Back in {clock_words(train_left(f))}", MINT, 18)
+        else:
+            text(x1 + 150, y1 + 22, "Load each wagon from the barn: it brings back what it shows.", DIM, 13)
+            for i, wg in enumerate(f["train"]["wagons"]):
+                cx, cy = x1 + 20 + i * 312, y1 + 60
+                draw_set_color("#fff4dc" if not wg["loaded"] else "#d8efc8")
+                draw_rect(cx, cy, cx + 298, cy + 236)
+                draw_set_color("#8a5226")
+                draw_rect(cx, cy, cx + 298, cy + 236, True)
+                (k, n), = wg["want"].items()
+                icon(k, cx + 70, cy + 60, 64)
+                have = f["barn"].get(k, 0)
+                plain(cx + 70, cy + 98, "Loaded" if wg["loaded"] else f"{min(have, n)}/{n}", "#2a8a3a" if wg["loaded"] or have >= n else "#b0402a", 16, "center")
+                plain(cx + 149, cy + 48, "→", "#8a5226", 28, "center")
+                icon(wg["prize"], cx + 226, cy + 60, 64)
+                plain(cx + 226, cy + 98, KIT[wg["prize"]]["name"], "#5a3a1c", 14, "center")
+                icon("star", cx + 120, cy + 150, 28)
+                plain(cx + 138, cy + 140, f"{wg['xp']} XP", "#7a5a10", 17)
+            text(x1 + 300, y1 + 322, f"Or send it off with what's loaded: back in {clock_words(TRAIN_AWAY)}.", DIM, 13)
 if global_vars.placing:
     p = global_vars.placing
     if p == "field":
         words = f"Tap grass for a new field ({field_cost(f)} coins)"
     elif p == "road":
         words = f"Tap or drag across grass to lay road ({ROAD_COST} coins a piece)"
+    elif p in TREES:
+        words = f"Tap grass for an {TREES[p]['name'].lower()} ({tree_cost(f, p)} coins)" if p == "apple_tree" else f"Tap grass for a {TREES[p]['name'].lower()} ({tree_cost(f, p)} coins)"
     elif p == "move":
         words = "Tap something to pick it up" if global_vars.moving is None else "Tap where it goes"
     else:
@@ -347,10 +442,13 @@ if global_vars.placing:
 if global_vars.levelup is not None:
     level, left = global_vars.levelup
     draw_set_alpha(min(1, left / 30))
-    panel(VIEW_W / 2 - 220, 80, VIEW_W / 2 + 220, 180, 0.95)
-    text(VIEW_W / 2, 92, f"Level {level}!", GOLD, 34, "center")
+    panel(VIEW_W / 2 - 330, 80, VIEW_W / 2 + 330, 196, 0.95)
+    text(VIEW_W / 2, 90, f"Level {level}!", GOLD, 34, "center")
     opened = opened_at(level)
-    text(VIEW_W / 2, 138, (f"New: {', '.join(opened)}.  " if opened else "") + f"+{LEVEL_COINS} coins, room for {FIELDS_PER_LEVEL} more fields.", INK, 15, "center")
+    # Two lines: what's new could be five things long, and one line ran off the panel.
+    if opened:
+        text(VIEW_W / 2, 136, f"New: {', '.join(opened)}.", MINT, 15, "center")
+    text(VIEW_W / 2, 162, f"+{LEVEL_COINS} coins, room for {FIELDS_PER_LEVEL} more fields.", INK, 15, "center")
     draw_set_alpha(1)
 if global_vars.said is not None:
     words, colour, left = global_vars.said

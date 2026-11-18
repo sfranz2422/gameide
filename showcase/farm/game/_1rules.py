@@ -14,7 +14,8 @@ FPS = 60
 # match, 2026-11-17). Tile (gx, gy)'s middle is at
 #   x = ORIGIN_X + (gx - gy) * TILE_W / 2,   y = ORIGIN_Y + (gx + gy) * TILE_H / 2
 TILE_W, TILE_H = 128, 64
-MAP_W, MAP_H = 20, 20                       # tiles
+MAP_W, MAP_H = 30, 30                       # tiles (phase 4: the valley; the farm is the 20 × 20 at the top, HOME)
+HOME = 20
 ORIGIN_X = MAP_H * TILE_W // 2              # so tile (0, MAP_H) touches the left edge
 ORIGIN_Y = 160                              # room above the top corner for tall things
 WORLD_W = (MAP_W + MAP_H) * TILE_W // 2
@@ -169,4 +170,103 @@ DECOR = [
     ("pond", 14, 13), ("grass_flowers", 10, 15), ("grass_flowers", 5, 11), ("bush", 16, 18),
 ]
 # The dirt road: from the farm's gate to the map's edge, a tile at a time.
-ROAD = [(6, y) for y in range(2, 20)] + [(x, 5) for x in range(7, 12)]
+ROAD = [(6, y) for y in range(2, MAP_H)] + [(x, 5) for x in range(7, 12)]
+
+# ---- phase 4: the valley. The farm (HOME × HOME tiles) is open from the start; the
+# rest of the map is LAND to buy, a plot at a time, each wild with trees and rocks
+# (the same for everyone: WILD_SEED) that tools clear. Tiles are a plot's from its top
+# corner (gx, gy), w along gx and h along gy.
+LAND = [
+    {"name": "Pine Wood",     "gx": 20, "gy": 3,  "w": 10, "h": 5,  "level": 5,  "cost": 250,  "wild": "woods"},
+    {"name": "Clover Meadow", "gx": 0,  "gy": 20, "w": 5,  "h": 10, "level": 6,  "cost": 300,  "wild": "meadow"},
+    {"name": "Fox Hill",      "gx": 20, "gy": 8,  "w": 10, "h": 6,  "level": 7,  "cost": 400,  "wild": "woods"},
+    {"name": "Mirror Lake",   "gx": 10, "gy": 20, "w": 5,  "h": 10, "level": 8,  "cost": 500,  "wild": "shore"},
+    {"name": "Old Road",      "gx": 5,  "gy": 20, "w": 5,  "h": 10, "level": 9,  "cost": 650,  "wild": "meadow"},
+    {"name": "Stony Ridge",   "gx": 20, "gy": 14, "w": 10, "h": 6,  "level": 10, "cost": 800,  "wild": "rocks"},
+    {"name": "Deep Wood",     "gx": 15, "gy": 20, "w": 5,  "h": 10, "level": 11, "cost": 1000, "wild": "woods"},
+    {"name": "Sunny Fields",  "gx": 20, "gy": 20, "w": 10, "h": 5,  "level": 12, "cost": 1300, "wild": "meadow"},
+    {"name": "Far Rocks",     "gx": 20, "gy": 25, "w": 10, "h": 5,  "level": 13, "cost": 1600, "wild": "rocks"},
+]
+LAND_XP = 10                                # XP for each plot bought
+# How thick the wild is (the share of tiles with something on), and what grows there.
+WILD = {
+    "woods":  {"thick": 0.5,  "kinds": {"pine": 5, "oak": 3, "stump": 1, "bush": 1}},
+    "meadow": {"thick": 0.3,  "kinds": {"bush": 3, "grass_flowers": 3, "oak": 2, "boulder": 1}},
+    "shore":  {"thick": 0.3,  "kinds": {"bush": 2, "oak": 2, "boulder": 1, "grass_flowers": 1}},
+    "rocks":  {"thick": 0.45, "kinds": {"boulder": 6, "stump": 1, "pine": 1}},
+}
+WILD_SEED = 2026
+# Clearing: what each wild thing needs (one used up), and what clearing one pays. The
+# farm's own trees and rocks (DECOR) clear the same way; the pond stays.
+CLEAR = {"oak": "axe", "pine": "axe", "stump": "shovel", "bush": "shovel", "grass_flowers": "shovel", "boulder": "pickaxe"}
+CLEAR_XP = 2
+CLEAR_COINS = 4
+# Tools and building materials: kept in their own box in the barn (they take no room).
+KIT = {
+    "axe":     {"name": "Axe"},
+    "pickaxe": {"name": "Pickaxe"},
+    "shovel":  {"name": "Shovel"},
+    "nails":   {"name": "Nails"},
+    "planks":  {"name": "Planks"},
+    "paint":   {"name": "Paint"},
+}
+START_KIT = {"axe": 3, "pickaxe": 2, "shovel": 3}   # a new farm's, and an older save's when it loads
+# Now and then a harvest or a collection finds something for the kit, as likely as
+# DROP_CHANCE; which one, by these weights.
+DROP_CHANCE = 0.08
+DROPS = {"axe": 3, "shovel": 3, "pickaxe": 2, "nails": 2, "planks": 2, "paint": 2}
+# A bigger barn: BARN_STEP more room for (BARN_NEEDS + how many times it's grown) each
+# of nails, planks and paint.
+BARN_STEP = 40
+BARN_NEEDS = 2
+BARN_XP = 10
+
+# The train: it waits at the station with TRAIN_WAGONS wagons, each wanting something
+# from the barn and bringing something for the kit in return. Loaded (or sent off), it's
+# away TRAIN_AWAY seconds (real time) and comes back with new wagons.
+STATION = (21, 1)                           # the station's top corner (2 × 2)
+# The railway runs along the station's front row: Gemini's station has its own track
+# there, so the train stops on it.
+RAIL_GY = STATION[1] + 1
+RAIL = [(gx, RAIL_GY) for gx in range(HOME, MAP_W)]
+TRAIN_LEVEL = 6
+TRAIN_WAGONS = 3
+TRAIN_AWAY = 900
+TRAIN_ROLL = 4                              # seconds the train takes to roll in or out
+TRAIN_PARK = 25                             # the engine's tile along the railway, stopped
+TRAIN_XP = 2                                # XP for each thing loaded
+TRAIN_PRIZES = {"axe": 3, "shovel": 3, "pickaxe": 1, "nails": 3, "planks": 3, "paint": 3}
+
+# Places that come with their land (one of each, never moved): a fishing dock by the
+# lake, which catches fish like an animal home (baited with corn), and the mine, a
+# factory digging up what's below with lunch for the miners.
+LAKE = [(gx, gy) for gx in range(10, 15) for gy in range(23, 29)
+        if (gx, gy) not in ((10, 23), (14, 23), (10, 28), (14, 28))]
+SITES = {
+    "dock": {"name": "Fishing dock", "land": 3, "gx": 11, "gy": 21,
+             "animal": "fish", "feed": "corn", "makes": "fish", "time": 600},
+    "mine": {"name": "Mine", "land": 5, "gx": 24, "gy": 16, "makes": {
+        "nails":   {"needs": {"bread": 2}, "time": 600},
+        "pickaxe": {"needs": {"corn_bread": 1, "bread": 1}, "time": 900},
+        "gold":    {"needs": {"cheese": 1, "bread": 2}, "time": 1200}}},
+}
+# The orchard: fruit trees, planted a tile each, as many as you like (each of a kind
+# dearer than the last). They fruit on the clock, again and again.
+TREES = {
+    "apple_tree":  {"name": "Apple tree",  "fruit": "apple",  "grow": 1200, "yield": 3, "xp": 3, "level": 7,  "cost": 50, "step": 10},
+    "cherry_tree": {"name": "Cherry tree", "fruit": "cherry", "grow": 1800, "yield": 3, "xp": 4, "level": 11, "cost": 80, "step": 15},
+}
+GOODS.update({
+    "fish":         {"name": "Fish",         "sell": 22, "xp": 4},
+    "gold":         {"name": "Gold",         "sell": 90, "xp": 10},
+    "apple":        {"name": "Apples",       "sell": 6,  "xp": 2},
+    "cherry":       {"name": "Cherries",     "sell": 9,  "xp": 3},
+    "apple_juice":  {"name": "Apple juice",  "sell": 30, "xp": 6},
+    "cherry_juice": {"name": "Cherry juice", "sell": 40, "xp": 7},
+})
+FACTORIES["juice_press"] = {"name": "Juice press", "level": 9, "cost": 520, "makes": {
+    "apple_juice":  {"needs": {"apple": 3}, "time": 300},
+    "cherry_juice": {"needs": {"cherry": 3}, "time": 420}}}
+FOOTPRINT.update({"station": 2, "dock": 2, "mine": 2, "juice_press": 2, "apple_tree": 1, "cherry_tree": 1})
+START_FARM.append(("station",) + STATION)
+MINE_XP = 3                                 # XP for each tool or material the mine digs up

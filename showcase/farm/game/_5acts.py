@@ -10,7 +10,9 @@
 #   Tap an animal home   collect what's ready and feed the hungry; nothing to do: its window
 #   Tap a factory        collect what's finished; nothing finished: its window, to make more
 #   Tap a house          collect its rent; not ready: its window. The farm stand: its visitors
-#   Build window         Farm, Houses and Town tabs; Move picks up something built and puts it down
+#   Build window         Farm, Factories, Houses and Town tabs; Move picks up something built and puts it down
+#   Tap a tree or rock   cleared with its tool from the kit; on land not bought yet: the land's window
+#   Tap a fruit tree     its fruit picked; the station: the train's window
 #   Drag anywhere else   the map moves (laying roads, the drag lays them)
 import math
 import random
@@ -77,6 +79,28 @@ def walk_step(o, f):
     o.wx, o.wy = x0 + (x1 - x0) * a, y0 + (y1 - y0) * a
 
 
+# ---- trees, rocks and signs standing still (Props)
+
+def make_prop(owner, kind, gx, gy):
+    """A Prop standing on a tile; a tree or rock goes in the Farm's `props`, to be found
+    again when it's cleared."""
+    x, y = tile_xy(gx, gy)
+    o = instance_create(x, y, "Prop")
+    o.sprite = kind
+    o.gx, o.gy = gx, gy
+    o.depth = -y
+    if kind != "sign":
+        owner.props[(gx, gy)] = o
+    return o
+
+
+def shade_props(owner):
+    """What stands on land not bought yet is drawn darker, with the land under it."""
+    f = farm()
+    for (gx, gy), o in owner.props.items():
+        o.image_blend = "#767676" if is_locked(f, gx, gy) else "white"
+
+
 # ---- the camera
 
 def move_camera(x, y):
@@ -104,9 +128,10 @@ def building_at(gx, gy):
 
 BUILDING_WORDS = {
     "house": "Your farmhouse.",
-    "silo": "The silo. Animals and their feed are coming to the farm soon.",
-    "truck": "The delivery truck. Big deliveries are coming soon.",
+    "silo": "The silo, full of grain for the winter.",
+    "truck": "The farm truck: it takes your orders to town.",
 }
+TOOL_WORDS = {"axe": "an axe", "pickaxe": "a pickaxe", "shovel": "a shovel"}
 COMMUNITY_WORDS = "The {name}: room in town for {room} more people."
 
 
@@ -128,6 +153,23 @@ def tap_tile(t):
         tap_town(i)
         return
     kind = building_at(*t)
+    if kind == "station":
+        if train_open(f):
+            open_panel("train")
+        else:
+            say(f"The railway station. The train starts coming at level {TRAIN_LEVEL}.", DIM)
+        return
+    plot = land_at(*t)
+    if plot is not None and locked(f, plot):
+        open_panel("land", plot)
+        return
+    if wild_at(f, *t) is not None:
+        tap_wild(t)
+        return
+    i = tree_at(f, *t)
+    if i is not None:
+        tap_tree(i)
+        return
     if kind == "stand":
         if not f["visitors"]:
             say("The farm stand. Visitors come here once people live in your town.", DIM)
@@ -155,6 +197,52 @@ def tap_tile(t):
     sound_play("click", volume=0.3)
 
 
+def tap_wild(t):
+    """A tree or a rock: cleared, if the kit has its tool."""
+    f = farm()
+    kind = wild_at(f, *t)
+    tool = CLEAR[kind]
+    res, gained = clear_wild(f, *t)
+    if res == "cleared":
+        sound_play("plant", volume=0.7)
+        x, y = tile_xy(*t)
+        effect("dust", x, y - 20, None, 1.2)
+        global_vars.pops.append(["coin", x, y - 50, 0, CLEAR_COINS])
+        level_up(gained)
+        keep(f)
+    else:
+        sound_play("nope", volume=0.5)
+        say(f"Clearing this needs {TOOL_WORDS[tool]}. Tools come by train, from the mine, and sometimes with a harvest.", RED)
+
+
+def tap_tree(i):
+    """A fruit tree: its fruit picked if it's ready; if not, how long it has left."""
+    f = farm()
+    tr = f["trees"][i]
+    info = TREES[tr["kind"]]
+    res, gained = pick_fruit(f, i)
+    if res == "picked":
+        sound_play("harvest", volume=0.6)
+        x, y = tile_xy(tr["gx"], tr["gy"])
+        global_vars.pops.append([info["fruit"], x, y - 60, 0, info["yield"]])
+        level_up(gained)
+        found(x, y)
+        keep(f)
+    elif res == "full":
+        sound_play("nope", volume=0.5)
+        say("The barn is full! Sell something, or fill an order.", RED)
+    else:
+        say(f"{info['name']}: fruit in {clock_words(fruit_left(tr))}.", DIM)
+
+
+def found(x, y):
+    """Now and then, something for the kit turns up (`lucky`), and rises off where it was found."""
+    item = lucky(farm())
+    if item is not None:
+        global_vars.pops.append([item, x + 40, y - 30, -10, 1])
+        say(f"You found {KIT[item]['name'].lower()}!", GOLD)
+
+
 def pop(item, b, n=1):
     """A good rising off the building it came from: n of it."""
     x, y = building_xy(b["kind"], b["gx"], b["gy"])
@@ -164,13 +252,14 @@ def pop(item, b, n=1):
 def tap_home(home):
     """Collect what's ready, feed who's hungry; if there was nothing to do, its window."""
     f = farm()
-    info = HOMES[home["kind"]]
+    info = home_info(home["kind"])
     got, gained = collect_home(f, home)
     fed = feed_home(f, home)
     if got:
         sound_play("harvest", volume=0.6)
         pop(info["makes"], home, got)
         level_up(gained)
+        found(*building_xy(home["kind"], home["gx"], home["gy"]))
     if fed:
         sound_play("plant", volume=0.5)
     if got or fed:
@@ -190,6 +279,7 @@ def tap_mill(mill):
         sound_play("harvest", volume=0.6)
         pop(item, mill, got)
         level_up(gained)
+        found(*building_xy(mill["kind"], mill["gx"], mill["gy"]))
         keep(f)
         return
     if mill_done(mill) and barn_free(f) == 0:
@@ -228,6 +318,7 @@ def harvest_field(fl):
         particles(x, y - 20, 10, ["#ffd23f", "#9ff0a0", "#ffffff"], speed=3, size=4, life=30, gravity=0.2, spread=120, direction=90, shape="circle")
         global_vars.pops.append([crop, x, y - 30, 0, CROPS[crop]["yield"]])
         level_up(gained)
+        found(x, y)
         keep(f)
     elif res == "full":
         sound_play("nope", volume=0.5)
@@ -435,6 +526,8 @@ def place_at(t):
         place_move(t)
     elif global_vars.placing in HOUSES or global_vars.placing in COMMUNITY:
         place_town(global_vars.placing, t)
+    elif global_vars.placing in TREES:
+        place_tree(global_vars.placing, t)
     elif global_vars.placing:
         place_building(global_vars.placing, t)
 
@@ -476,6 +569,26 @@ def place_town(kind, t):
         say("There isn't room there: it needs 2 × 2 free tiles.", RED)
     else:
         sound_play("nope", volume=0.5)
+        global_vars.placing = False
+
+
+def place_tree(kind, t):
+    """A fruit tree where it's tapped; more can follow, as with fields."""
+    f = farm()
+    if t is None:
+        return
+    res = buy_tree(f, kind, *t)
+    if res == "planted":
+        sound_play("plant", volume=0.6)
+        keep(f)
+        if f["coins"] < tree_cost(f, kind):
+            global_vars.placing = False
+    elif res == "taken":
+        sound_play("nope", volume=0.5)
+        say("Something's already there.", RED)
+    else:
+        sound_play("nope", volume=0.5)
+        say(f"Another {TREES[kind]['name'].lower()} costs {tree_cost(f, kind)} coins.", RED)
         global_vars.placing = False
 
 
@@ -581,16 +694,20 @@ def open_panel(kind, of=None):
     f = farm()
     if kind == "barn":
         items = barn_items(f)
-        cols = 2 if len(items) > 5 else 1
-        rows = max(1, (len(items) + cols - 1) // cols)
-        w = 520 if cols == 1 else 920
-        h = 120 + rows * 58
+        cols, rows, w, h, cell = barn_grid(f)
         x1, y1 = VIEW_W / 2 - w / 2, max(HUD_H + 8, VIEW_H / 2 - h / 2)
         global_vars.panel_box = (x1, y1, x1 + w, y1 + h)
+        b = make_button(x1 + w - 230, y1 + 84, 210, 42, f"Make it bigger (+{BARN_STEP})", "grow_barn", None, 14, True)
+        b.off = not can_grow_barn(f)
+        b.hot = not b.off
         for i, k in enumerate(items):
-            x, y = barn_slot(i, cols, x1, y1)
-            make_button(x + 236, y, 92, 38, f"Sell 1 (+{item_info(k)['sell']})", "sell", (k, 1), 12, True)
-            make_button(x + 334, y, 92, 38, "Sell all", "sell", (k, f["barn"][k]), 12, True)
+            x, y = barn_slot(i, x1, y1)
+            if cols <= 2:
+                make_button(x + cell - 196, y, 92, 36, f"Sell 1 (+{item_info(k)['sell']})", "sell", (k, 1), 12, True)
+                make_button(x + cell - 98, y, 88, 36, "Sell all", "sell", (k, f["barn"][k]), 12, True)
+            else:
+                make_button(x + cell - 106, y, 54, 36, f"+{item_info(k)['sell']}", "sell", (k, 1), 12, True)
+                make_button(x + cell - 48, y, 42, 36, "All", "sell", (k, f["barn"][k]), 12, True)
     elif kind == "orders":
         slots = f["orders"]
         rows = (len(slots) + 2) // 3
@@ -609,9 +726,9 @@ def open_panel(kind, of=None):
         x1, y1 = VIEW_W / 2 - 330, HUD_H + 12
         global_vars.panel_box = (x1, y1, x1 + 660, y1 + 64 + max(len(rows), 3) * SHOP_ROW)
         for j, (t, words) in enumerate(SHOP_TABS):
-            b = make_button(x1 + 112 + j * 100, y1 + 10, 94, 36, words, "shop_tab", t, 14, True)
+            b = make_button(x1 + 96 + j * 94, y1 + 10, 88, 36, words, "shop_tab", t, 13, True)
             b.picked = t == tab
-        b = make_button(x1 + 420, y1 + 10, 150, 36, "Move things", "move", None, 14, True)
+        b = make_button(x1 + 476, y1 + 10, 130, 36, "Move things", "move", None, 13, True)
         b.icon = "move"
         for i, (k, name, cost, why) in enumerate(rows):
             b = make_button(x1 + 450, y1 + 56 + i * SHOP_ROW, 180, SHOP_ROW - 8, why or f"{cost} coins", "build", k, 14, True)
@@ -639,8 +756,9 @@ def open_panel(kind, of=None):
         home = f["homes"][of]
         x1, y1 = VIEW_W / 2 - 300, VIEW_H / 2 - 160
         global_vars.panel_box = (x1, y1, x1 + 600, y1 + 320)
-        info = HOMES[home["kind"]]
-        b = make_button(x1 + 30, y1 + 250, 250, 46, f"Feed them ({f['barn'].get(info['feed'], 0)} feed)", "feed", of, 16, True)
+        info = home_info(home["kind"])
+        words = f"Bait them ({f['barn'].get(info['feed'], 0)} corn)" if home["kind"] == "dock" else f"Feed them ({f['barn'].get(info['feed'], 0)} feed)"
+        b = make_button(x1 + 30, y1 + 250, 250, 46, words, "feed", of, 16, True)
         b.off = not any(animal_state(home, i) == "hungry" for i in range(ANIMALS_EACH)) or not f["barn"].get(info["feed"])
         b.hot = not b.off
         b = make_button(x1 + 310, y1 + 250, 260, 46, f"Collect the {GOODS[info['makes']]['name'].lower()}", "collect_home", of, 16, True)
@@ -648,17 +766,38 @@ def open_panel(kind, of=None):
         b.hot = not b.off
     elif kind == "mill":
         mill = f["mills"][of]
-        makes = list(FACTORIES[mill["kind"]]["makes"])
+        makes = list(mill_info(mill["kind"])["makes"])
         x1, y1 = VIEW_W / 2 - 360, HUD_H + 12
         global_vars.panel_box = (x1, y1, x1 + 720, y1 + 190 + len(makes) * 70)
         for i, item in enumerate(makes):
-            recipe = FACTORIES[mill["kind"]]["makes"][item]
-            b = make_button(x1 + 560, y1 + 176 + i * 70, 130, 44, "Make", "make", (of, item), 16, True)
+            recipe = mill_info(mill["kind"])["makes"][item]
+            b = make_button(x1 + 560, y1 + 176 + i * 70, 130, 44, "Dig" if mill["kind"] == "mine" else "Make", "make", (of, item), 16, True)
             b.off = len(mill["queue"]) >= FACTORY_QUEUE or any(f["barn"].get(k, 0) < n for k, n in recipe["needs"].items())
             b.hot = not b.off
         b = make_button(x1 + 540, y1 + 64, 150, 44, "Collect", "collect_mill", of, 16, True)
         b.off = mill_done(mill) == 0
         b.hot = not b.off
+    elif kind == "land":
+        p = LAND[of]
+        x1, y1 = VIEW_W / 2 - 290, VIEW_H / 2 - 150
+        global_vars.panel_box = (x1, y1, x1 + 580, y1 + 300)
+        why = f"Opens at level {p['level']}" if f["level"] < p["level"] else ""
+        b = make_button(x1 + 30, y1 + 230, 300, 46, why or f"Buy it: {p['cost']} coins", "buy_land", of, 16, True)
+        b.off = bool(why) or f["coins"] < p["cost"]
+        b.hot = not b.off
+    elif kind == "train":
+        here = train_here(f)
+        w = 960 if here else 520
+        x1, y1 = VIEW_W / 2 - w / 2, HUD_H + 30
+        global_vars.panel_box = (x1, y1, x1 + w, y1 + (370 if here else 220))
+        if here:
+            for i, wg in enumerate(f["train"]["wagons"]):
+                cx = x1 + 20 + i * 312
+                if not wg["loaded"]:
+                    b = make_button(cx + 14, y1 + 246, 270, 42, "Load it", "load_wagon", i, 16, True)
+                    b.off = not can_deliver(f, wg)
+                    b.hot = not b.off
+            b = make_button(x1 + 20, y1 + 312, 260, 42, "Send it off now", "send_train", None, 15, True)
     box = global_vars.panel_box
     make_button(box[2] - 46, box[1] + 8, 38, 34, "X", "close", None, 16, True)
     if was is not None:
@@ -669,19 +808,35 @@ def barn_items(f):
     return [k for k in list(CROPS) + list(GOODS) if f["barn"].get(k)]
 
 
-def barn_slot(i, cols, x1, y1):
-    """Where the barn window's i-th thing goes: down the first column, then the second."""
-    rows = (len(barn_items(farm())) + cols - 1) // cols
-    return x1 + 20 + (i // rows) * 450, y1 + 84 + (i % rows) * 58
+BARN_TOP = 144             # the barn window: its title, room and kit above its things
+BARN_ROW = 44
 
 
-SHOP_TABS = [("farm", "Farm"), ("houses", "Houses"), ("town", "Town")]
+def barn_grid(f):
+    """The barn window's shape for what's in it: (columns, rows, width, height, column
+    width). Up to four columns of eight, so every kind of thing fits on the screen at once
+    (two columns of five-plus ran off the bottom once the goods came)."""
+    n = len(barn_items(f))
+    cols = 1 if n <= 4 else (2 if n <= 12 else (3 if n <= 21 else 4))
+    rows = max(1, (n + cols - 1) // cols)
+    w = 560 if cols == 1 else 960
+    return cols, rows, w, BARN_TOP + rows * BARN_ROW + 16, (w - 40) / cols
+
+
+def barn_slot(i, x1, y1):
+    """Where the barn window's i-th thing goes: down the first column, then the next."""
+    cols, rows, w, h, cell = barn_grid(farm())
+    return x1 + 20 + (i // rows) * cell, y1 + BARN_TOP + (i % rows) * BARN_ROW
+
+
+SHOP_TABS = [("farm", "Farm"), ("factories", "Factories"), ("houses", "Houses"), ("town", "Town")]
 
 
 def shop_rows(f, tab="farm"):
     """A tab of the Build window, by the level that opens each: (key, name, cost, why it
-    can't be bought now, or ""). Farm: a field, the animal homes and factories. Houses:
-    roads and houses (as many as you like). Town: the community buildings."""
+    can't be bought now, or ""). Farm: a field, fruit trees and the animal homes.
+    Factories. Houses: roads and houses (as many as you like). Town: the community
+    buildings. (All the farm's on one tab ran off the bottom of the screen.)"""
     if tab == "houses":
         rows = [("road", "Road", ROAD_COST, f"Level {ROAD_LEVEL}" if f["level"] < ROAD_LEVEL else "")]
         for k, info in HOUSES.items():
@@ -693,10 +848,14 @@ def shop_rows(f, tab="farm"):
             why = "Built" if any(b["kind"] == k for b in f["town"]) else (f"Level {info['level']}" if f["level"] < info["level"] else "")
             rows.append((k, info["name"], info["cost"], why))
         return rows
-    rows = [("field", "A field", field_cost(f),
+    rows = [] if tab == "factories" else [("field", "A field", field_cost(f),
              "" if len(f["fields"]) < most_fields(f) else f"{most_fields(f)} at most now")]
-    for k in sorted(list(HOMES) + list(FACTORIES), key=lambda k: building_info(k)["level"]):
+    kinds = list(FACTORIES) if tab == "factories" else list(HOMES) + list(TREES)
+    for k in sorted(kinds, key=lambda k: building_info(k)["level"]):
         info = building_info(k)
+        if k in TREES:
+            rows.append((k, info["name"], tree_cost(f, k), f"Level {info['level']}" if f["level"] < info["level"] else ""))
+            continue
         why = "Built" if owned(f, k) else (f"Level {info['level']}" if f["level"] < info["level"] else "")
         rows.append((k, info["name"], info["cost"], why))
     return rows
@@ -739,10 +898,49 @@ def do_act(what, arg):
         close_panel()
         global_vars.placing = "road"
         say(f"Tap or drag across grass to lay road ({ROAD_COST} coins a piece). Done when you're finished.", MINT)
+    elif what == "build" and arg in TREES:
+        close_panel()
+        global_vars.placing = arg
+        say(f"Tap grass for the {TREES[arg]['name'].lower()}. Done when you're finished.", MINT)
     elif what == "build":
         close_panel()
         global_vars.placing = arg
         say(f"Tap where the {building_info(arg)['name'].lower()} goes: it needs 2 × 2 free tiles.", MINT)
+    elif what == "buy_land":
+        res, gained = buy_land(f, arg)
+        if res == "bought":
+            sound_play("levelup", volume=0.6)
+            close_panel()
+            p = LAND[arg]
+            x, y = tile_xy(*sign_tile(arg))
+            effect("confetti", x, y - 40, None, 1.5)
+            level_up(gained)
+            keep(f)
+            say(f"{p['name']} is yours! Clear its trees and rocks to make room.", MINT)
+        else:
+            sound_play("nope", volume=0.5)
+    elif what == "grow_barn":
+        res, gained = grow_barn(f)
+        if res == "bigger":
+            sound_play("levelup", volume=0.6)
+            level_up(gained)
+            keep(f)
+            say(f"The barn holds {barn_space(f)} now!", MINT)
+        open_panel("barn")
+    elif what == "load_wagon":
+        prize = f["train"]["wagons"][arg]["prize"]
+        res, gained = load_wagon(f, arg)
+        if res == "loaded":
+            sound_play("coin", volume=0.7)
+            level_up(gained)
+            keep(f)
+            say(f"Loaded! The train brought you {KIT[prize]['name'].lower()}." + ("  Off it goes!" if not train_here(f) else ""), MINT)
+        open_panel("train")
+    elif what == "send_train":
+        send_train(f)
+        sound_play("plant", volume=0.6)
+        keep(f)
+        open_panel("train")
     elif what == "shop_tab":
         global_vars.shop_tab = arg
         open_panel("shop")

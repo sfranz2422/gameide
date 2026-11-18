@@ -195,7 +195,7 @@ out`);
     expect(py(g, 'add_xp(global_vars.farm, 26)')).toEqual([2, 3]);
     expect(py(g, 'global_vars.farm["coins"]')).toBe(coins + 2 * py<number>(g, "LEVEL_COINS"));
     expect(py(g, "crops_open(global_vars.farm)")).toEqual(["wheat", "corn", "carrot"]);
-    expect(py(g, "opened_at(5)")).toEqual(["Pumpkins", "Cottage", "Fountain", "roads"]);
+    expect(py(g, "opened_at(5)")).toEqual(["Pumpkins", "Cottage", "Fountain", "roads", "land: Pine Wood"]);
     step(g);
     expect(g.scores.at(-1)).toBe(3);
     expect(g.project.settings.scoreboard).toEqual({ unit: "level" });
@@ -339,10 +339,12 @@ out`);
     py(g, 'f["level"] = 3');
     py(g, 'do_act("shop", None)');
     step(g);
-    const rows = py<[string, string, number, string][]>(g, "shop_rows(f)");
-    expect(rows.map((r) => r[0])).toEqual(["field", "feed_mill", "coop", "bakery", "cowshed", "dairy", "sugar_mill", "sheep_pen", "weaving_mill", "jam_kitchen"]);
-    expect(rows[1]![3]).toBe("");
-    expect(rows[2]![3]).toBe("Level 4");
+    // The Farm tab: fields, fruit trees and animal homes; the Factories tab has its own.
+    expect(py<string[][]>(g, "shop_rows(f)").map((r) => r[0])).toEqual(["field", "coop", "cowshed", "apple_tree", "sheep_pen", "cherry_tree"]);
+    const rows = py<[string, string, number, string][]>(g, 'shop_rows(f, "factories")');
+    expect(rows.map((r) => r[0])).toEqual(["feed_mill", "bakery", "dairy", "sugar_mill", "juice_press", "weaving_mill", "jam_kitchen"]);
+    expect(rows[0]![3]).toBe("");
+    expect(rows[1]![3]).toBe("Level 4");
     py(g, 'do_act("build", "feed_mill")');
     expect(py(g, "global_vars.placing")).toBe("feed_mill");
     click(g, ...onScreen(g, 9, 6));                     // on the fields: no room
@@ -687,5 +689,241 @@ for gx in range(11, 17):
     py(g, 'do_act("stop_placing", None)');
     step(g, 30);
     expect(py<number>(g, 'len(instances("Person"))')).toBeGreaterThan(3);
+  });
+
+  it("phase 4: a farm saved before the valley comes back with the starting tools and no land, and plays on", async () => {
+    const g = await start({ farm: { coins: 300, xp: 160, level: 6, barn: { wheat: 4 }, orders: [], made: 3, bought: 0, seed: 5,
+      fields: [{ gx: 7, gy: 6, crop: null, t: 0 }], homes: [], mills: [], town: [], roads: [], visitors: [], met: 0 } });
+    py(g, 'room_goto("Farm")');
+    step(g, 3);
+    expect(py(g, 'f = global_vars.farm\n[f["land"], f["cleared"], f["trees"], f["barn_level"], f["kit"] == START_KIT, f["train"]["wagons"]]'))
+      .toEqual([[], [], [], 0, true, []]);
+    expect(py(g, 'barn_space(f)')).toBe(py<number>(g, "BARN_SPACE"));
+    step(g, 62);
+    expect(py<number>(g, 'len(f["train"]["wagons"])')).toBe(py<number>(g, "TRAIN_WAGONS"));
+  });
+
+  it("phase 4: the valley: wild things leave the road, railway, lake and places clear; land not bought can't be built on; buying it opens it", async () => {
+    const g = await start();
+    await farmOf(g);
+    // Named one by one, not through kept_clear(): a check through it can't see it go wrong.
+    const clash = py<number[][]>(g, `not_wild = set(ROAD) | set(RAIL) | set(LAKE) | set(footprint_tiles("station", *STATION))
+for k, site in SITES.items():
+    not_wild |= set(footprint_tiles(k, site["gx"], site["gy"]))
+not_wild |= {sign_tile(i) for i in range(len(LAND))}
+[list(t) for t in wilds() if t in not_wild]`);
+    expect(clash).toEqual([]);
+    // Every plot is on the map, outside the farm, and no two overlap; the station's yard is no plot's.
+    expect(py(g, `tiles = [t for i in range(len(LAND)) for t in plot_tiles(i)]
+len(tiles) == len(set(tiles)) and all(on_map(*t) and not (t[0] < HOME and t[1] < HOME) for t in tiles) and land_at(*STATION) is None`)).toBe(true);
+    py(g, 'f = global_vars.farm\nf["coins"] = 5000\nf["level"] = 4\nx, y = tile_xy(23, 6)\nmove_camera(x - VIEW_W / 2, y - VIEW_H / 2)');
+    step(g, 2);
+    const free = py<[number, number]>(g, "next(t for t in plot_tiles(0) if t not in wilds() and t != sign_tile(0))");
+    expect(py(g, `can_place(f, ${free[0]}, ${free[1]})`)).toBe(false);
+    expect(py(g, `buy_field(f, ${free[0]}, ${free[1]})`)).toBe("taken");
+    // A tap on it: its window. Too early a level: not yet.
+    click(g, ...onScreen(g, 23, 6));
+    expect(py(g, "[global_vars.panel, global_vars.panel_of]")).toEqual(["land", 0]);
+    expect(py(g, "buy_land(f, 0)[0]")).toBe("level");
+    py(g, 'f["level"] = 5\nopen_panel("land", 0)');
+    step(g);
+    expect(py(g, 'next(b.off for b in instances("Button") if b.act == "buy_land")')).toBe(false);
+    const xp = py<number>(g, 'f["xp"]');
+    py(g, 'do_act("buy_land", 0)');
+    step(g, 2);
+    expect(py(g, '[f["land"], f["coins"]]')).toEqual([[0], 5000 - py<number>(g, 'LAND[0]["cost"]')]);
+    expect(py<number>(g, 'f["xp"]')).toBeGreaterThanOrEqual(xp + py<number>(g, "LAND_XP"));
+    expect(py(g, `can_place(f, ${free[0]}, ${free[1]})`)).toBe(true);
+    expect(py(g, "buy_land(f, 0)[0]")).toBe("owned");
+    // Its sign is gone, and what grows on it isn't drawn darker any more.
+    expect(py(g, 'sum(1 for o in instances("Prop") if o.sprite == "sign")')).toBe(py<number>(g, "len(LAND) - 1"));
+    const wild = py<[number, number]>(g, "next(t for t in plot_tiles(0) if t in wilds())");
+    expect(py(g, `next(o.image_blend for o in instances("Prop") if (o.gx, o.gy) == (${wild[0]}, ${wild[1]}))`)).toBe(py(g, 'next(o.image_blend for o in instances("Prop") if (o.gx, o.gy) == (12, 9))'));
+    expect(py(g, `next(o.image_blend for o in instances("Prop") if (o.gx, o.gy) == next(t for t in plot_tiles(1) if t in wilds()))`)).not.toBe(
+      py(g, 'next(o.image_blend for o in instances("Prop") if (o.gx, o.gy) == (12, 9))'));
+  });
+
+  it("phase 4: a tap clears a tree or a rock with its tool from the kit, for coins and XP; with none, it says which tool", async () => {
+    const g = await start();
+    await farmOf(g);
+    py(g, 'f = global_vars.farm\nf["kit"] = {"axe": 0, "pickaxe": 1, "shovel": 0}\nx, y = tile_xy(12, 9)\nmove_camera(x - VIEW_W / 2, y - VIEW_H / 2)');
+    step(g, 2);
+    expect(py(g, "can_place(f, 12, 9)")).toBe(false);
+    const coins = py<number>(g, 'f["coins"]');
+    click(g, ...onScreen(g, 12, 9));                     // the farm's boulder
+    expect(py(g, '[f["cleared"], f["kit"]["pickaxe"], f["coins"], f["xp"]]')).toEqual([[[12, 9]], 0, coins + py<number>(g, "CLEAR_COINS"), py<number>(g, "CLEAR_XP")]);
+    step(g);                                             // its Prop goes the step after
+    expect(py(g, 'any((o.gx, o.gy) == (12, 9) for o in instances("Prop"))')).toBe(false);
+    expect(py(g, "can_place(f, 12, 9)")).toBe(true);
+    // The bush at (11, 12) needs a shovel, and there isn't one.
+    click(g, ...onScreen(g, 11, 12));
+    expect(py(g, "wild_at(f, 11, 12)")).toBe("bush");
+    expect(py(g, "global_vars.said[0]")).toContain("a shovel");
+    // The pond stays.
+    expect(py(g, "[wild_at(f, 14, 13) is None, clear_wild(f, 14, 13)[0], can_place(f, 14, 13)]")).toEqual([true, "nothing", false]);
+    // Saved: cleared stays cleared.
+    expect(py(g, 'save_get("farm", None)["cleared"]')).toEqual([[12, 9]]);
+  });
+
+  it("phase 4: now and then a harvest finds a tool; a bigger barn takes nails, planks and paint", async () => {
+    const g = await start();
+    await farmOf(g);
+    const finds = py<number>(g, 'f = global_vars.farm\nf["kit"] = {}\nsum(1 for _ in range(1000) if lucky(f))');
+    expect(finds).toBeGreaterThan(40);
+    expect(finds).toBeLessThan(130);
+    expect(py(g, 'sum(f["kit"].values())')).toBe(finds);
+    // The same farm finds the same things (a reload can't buy luck).
+    expect(py(g, 'f["drops"] = 0\na = [lucky(f) for _ in range(300)]\nf["drops"] = 0\na == [lucky(f) for _ in range(300)] and len(set(a)) > 3')).toBe(true);
+    py(g, 'f["kit"] = {"nails": 2, "planks": 2, "paint": 1}\nopen_panel("barn")');
+    step(g);
+    expect(py(g, 'next(b.off for b in instances("Button") if b.act == "grow_barn")')).toBe(true);
+    expect(py(g, "grow_barn(f)[0]")).toBe("short");
+    py(g, 'f["kit"]["paint"] = 2\nopen_panel("barn")');
+    step(g);
+    py(g, 'press(next(b for b in instances("Button") if b.act == "grow_barn"))');
+    step(g);
+    expect(py(g, '[barn_space(f), f["kit"], barn_needs(f)]')).toEqual([
+      py<number>(g, "BARN_SPACE + BARN_STEP"), { nails: 0, planks: 0, paint: 0 }, { nails: 3, planks: 3, paint: 3 }]);
+    expect(py(g, "barn_free(f)")).toBe(py<number>(g, "BARN_SPACE + BARN_STEP"));
+  });
+
+  it("phase 4: the train: wagons from its level, loaded from the barn for tools; away once all are, back on the clock with new ones", async () => {
+    const g = await start();
+    await farmOf(g);
+    py(g, 'f = global_vars.farm\nf["level"] = 5\nx, y = building_xy("station", *STATION)\nmove_camera(x - VIEW_W / 2, y - VIEW_H / 2)');
+    step(g, 62);
+    expect(py(g, 'f["train"]["wagons"]')).toEqual([]);
+    click(g, ...onScreen(g, 22, 2));
+    expect(py(g, "global_vars.said[0]")).toContain("level 6");
+    py(g, 'f["level"] = 6');
+    step(g, 62);
+    expect(py<number>(g, 'len(f["train"]["wagons"])')).toBe(3);
+    expect(py(g, '[o.shown for o in instances("Car")]')).toEqual([true, true, true, true]);
+    // Parked on the railway, along the station's front row: Gemini's station has its own
+    // track there, so a train anywhere else stops beside a track it isn't on.
+    expect(py(g, `front = max(t[1] for t in footprint_tiles("station", *STATION))
+[tuple(tile_at(o.wx, o.wy)) in RAIL and tile_at(o.wx, o.wy)[1] == front for o in instances("Car")]`)).toEqual([true, true, true, true]);
+    click(g, ...onScreen(g, 22, 2));
+    expect(py(g, "global_vars.panel")).toBe("train");
+    // Nothing in the barn: no wagon can be loaded.
+    expect(py(g, "load_wagon(f, 0)[0]")).toBe("short");
+    py(g, `kit = dict(f["kit"])
+prizes = [w["prize"] for w in f["train"]["wagons"]]
+f["barn"] = {}
+for w in f["train"]["wagons"]:
+    for k, n in w["want"].items():
+        f["barn"][k] = f["barn"].get(k, 0) + n`);
+    for (let i = 0; i < 3; i++) {
+      py(g, `open_panel("train")\npress(next(b for b in instances("Button") if b.act == "load_wagon" and b.arg == ${i}))`);
+      step(g);
+    }
+    expect(py(g, 'f["barn"]')).toEqual({});
+    expect(py(g, 'all(f["kit"].get(k, 0) == kit.get(k, 0) + prizes.count(k) for k in KIT)')).toBe(true);
+    expect(py(g, "[train_here(f), f['train']['trips'], f['train']['wagons']]")).toEqual([false, 1, []]);
+    expect(py(g, "load_wagon(f, 0)[0]")).toBe("away");
+    later(g, 10);
+    step(g, 2);
+    expect(py(g, '[o.shown for o in instances("Car")]')).toEqual([false, false, false, false]);
+    later(g, py<number>(g, "TRAIN_AWAY") - 12);
+    step(g, 2);
+    expect(py<number>(g, "train_engine(f)")).toBeGreaterThan(py<number>(g, "TRAIN_PARK"));
+    later(g, 3);
+    step(g, 62);
+    expect(py(g, "train_here(f)")).toBe(true);
+    expect(py<number>(g, 'len(f["train"]["wagons"])')).toBe(3);
+    // Sent off early, with nothing loaded: away all the same.
+    py(g, 'open_panel("train")\npress(next(b for b in instances("Button") if b.act == "send_train"))');
+    expect(py(g, "[train_here(f), f['train']['trips']]")).toEqual([false, 2]);
+  });
+
+  it("phase 4: a fruit tree planted on grass fruits on the clock, again and again, and moves with Move things", async () => {
+    const g = await start();
+    await farmOf(g);
+    py(g, 'f = global_vars.farm\nf["level"] = 7\nf["coins"] = 200');
+    expect(py(g, 'buy_tree(f, "cherry_tree", 11, 8)')).toBe("level");
+    py(g, 'do_act("build", "apple_tree")');
+    click(g, ...onScreen(g, 8, 6));                      // a field: no room
+    expect(py(g, 'f["trees"]')).toEqual([]);
+    click(g, ...onScreen(g, 11, 8));
+    click(g, ...onScreen(g, 12, 8));
+    expect(py(g, '[(t["kind"], t["gx"], t["gy"]) for t in f["trees"]]')).toEqual([["apple_tree", 11, 8], ["apple_tree", 12, 8]]);
+    expect(py(g, 'f["coins"]')).toBe(200 - 50 - 60);
+    py(g, 'do_act("stop_placing", None)');
+    step(g, 2);
+    expect(py(g, "can_place(f, 11, 8)")).toBe(false);
+    click(g, ...onScreen(g, 11, 8));
+    expect(py(g, "global_vars.said[0]")).toContain("fruit in");
+    expect(py(g, 'f["barn"]')).toEqual({});
+    later(g, py<number>(g, 'TREES["apple_tree"]["grow"]'));
+    click(g, ...onScreen(g, 11, 8));
+    expect(py(g, 'f["barn"]')).toEqual({ apple: 3 });
+    expect(py(g, 'fruit_ready(f["trees"][0])')).toBe(false);
+    click(g, ...onScreen(g, 11, 8));
+    expect(py(g, 'f["barn"]')).toEqual({ apple: 3 });
+    expect(py(g, '"apple" in orderable(f)')).toBe(true);
+    py(g, 'do_act("move", None)');
+    click(g, ...onScreen(g, 12, 8));
+    click(g, ...onScreen(g, 13, 10));
+    expect(py(g, '(f["trees"][1]["gx"], f["trees"][1]["gy"])')).toEqual([13, 10]);
+  });
+
+  it("phase 4: the fishing dock and the mine come with their land: fish bite on corn, and the mine digs with lunch, its nails into the kit", async () => {
+    const g = await start();
+    await farmOf(g);
+    py(g, 'f = global_vars.farm\nf["level"] = 10\nf["coins"] = 5000');
+    expect(py(g, "[buy_land(f, 3)[0], buy_land(f, 5)[0]]")).toEqual(["bought", "bought"]);
+    step(g, 2);
+    expect(py(g, '[(b["kind"], b["gx"], b["gy"]) for b in f["homes"] + f["mills"]]')).toEqual([["dock", 11, 21], ["mine", 24, 16]]);
+    expect(py(g, 'sorted(o.kind for o in instances("Thing") if o.of is not None)')).toEqual(["dock", "mine"]);
+    // They stay where they came: nothing to pick up.
+    expect(py(g, "[thing_at(f, 11, 21) is None, thing_at(f, 25, 17) is None]")).toEqual([true, true]);
+    py(g, 'f["barn"] = {"corn": 2, "bread": 2}\ndock = f["homes"][0]\nmine = f["mills"][0]');
+    expect(py(g, "feed_home(f, dock)")).toBe(2);
+    expect(py(g, 'make_in(f, mine, "nails")')).toBe("queued");
+    expect(py(g, 'f["barn"]')).toEqual({});
+    later(g, 601);
+    expect(py(g, "collect_home(f, dock)[0]")).toBe(2);
+    py(g, 'f["kit"] = {}');
+    expect(py(g, "collect_mill(f, mine)[0]")).toBe(1);
+    expect(py(g, '[f["barn"], f["kit"]]')).toEqual([{ fish: 2 }, { nails: 1 }]);
+    expect(py(g, '["fish" in orderable(f), "nails" in orderable(f), "gold" in orderable(f)]')).toEqual([true, false, false]);
+  });
+
+  it("phase 4: every new window, the train and the valley draw, with stand-ins where Gemini's pictures haven't come yet", async () => {
+    const g = await start();
+    await farmOf(g);
+    py(g, `f = global_vars.farm
+f["level"] = 14
+f["coins"] = 9999
+f["barn"] = {k: 1 for k in list(CROPS) + list(GOODS)}
+f["kit"] = {k: 2 for k in KIT}`);
+    py(g, 'open_panel("land", 2)');
+    step(g, 3);
+    py(g, 'do_act("barn", None)');
+    step(g, 3);
+    expect(py(g, "barn_grid(f)[0]")).toBe(4);
+    expect(py<number>(g, "global_vars.panel_box[3]")).toBeLessThanOrEqual(py<number>(g, "VIEW_H"));
+    for (let i = 0; i < 9; i++) py(g, `buy_land(f, ${i})`);
+    py(g, 'f["level"] = 14\nf["coins"] = 9999');
+    step(g, 62);
+    for (const tab of ["farm", "factories", "houses", "town"]) {
+      py(g, `do_act("shop", None) if global_vars.panel != "shop" else None\ndo_act("shop_tab", "${tab}")`);
+      step(g, 3);
+      expect(py<number>(g, "global_vars.panel_box[3]")).toBeLessThanOrEqual(py<number>(g, "VIEW_H"));
+    }
+    py(g, 'open_panel("train")');
+    step(g, 3);
+    py(g, 'open_panel("home", 0)');
+    step(g, 3);
+    py(g, 'open_panel("mill", 0)');
+    step(g, 3);
+    py(g, 'do_act("build", "cherry_tree")');
+    step(g, 3);
+    py(g, 'place_tree("cherry_tree", (11, 8))\ndo_act("stop_placing", None)\nsend_train(f)\nopen_panel("train")');
+    step(g, 62);
+    later(g, 3000);
+    py(g, 'global_vars.levelup = [9, 100]');
+    step(g, 62);
+    expect(py<number>(g, 'len(instances("Prop"))')).toBeGreaterThan(100);
   });
 });

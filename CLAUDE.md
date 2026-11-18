@@ -903,7 +903,7 @@ build's. Both new games are art library packs (`make_gemini_library.py sandwich 
 of Township, an ORIGINAL one; "a big game with a lot of expansion"), built in phases, each
 stopped for review: 1 the farm (done 2026-11-17), 2 animals and factories (done 2026-11-17,
 with Gemini's pictures 6-10), 3 the town (done 2026-11-17, Gemini's 11-14),
-4 expansion, 5 achievements and events. **Time is real** (the teacher's choice): crops grow
+4 the valley (built 2026-11-18, Gemini's 15-18), 5 achievements and events. **Time is real** (the teacher's choice): crops grow
 on the real clock (`now()` = `time.time()` + `global_vars.time_shift`, which the tests move
 on), so the save keeps when each field was planted and things grow while the game's closed.
 **Isometric**: Gemini drew diamonds though asked for top-down, and the teacher chose to match
@@ -934,3 +934,20 @@ was held by; Things and Fields read where they are from the farm each step, so a
 The Build window has tabs (`SHOP_TABS`). The keys' cursor zigzags left and right
 (`cursor_step`): diagonal steps only reached half the tiles. Picture 13 drew each townsperson facing both ways:
 `PEOPLE_FRAMES` in cut_sheets.py picks a column for each frame and flips the right-facing ones.
+Phase 4, the valley (`_2land.py`, `_2train.py`): the map grew to 30 × 30, the farm being the
+top `HOME` × `HOME`; the rest is `LAND`, plots bought by tapping them (`buy_land`), and land not
+bought is in `taken` (`locked_tiles`), so nothing is ever placed there. What grows wild is
+`wilds()`, made from `WILD_SEED`, the same for everyone and never saved; only `cleared` is. The
+farm's own DECOR clears the same way (the pond doesn't). Tools and materials are the `kit`, which
+takes no barn room; they come from the train (wagons loaded from the barn), the mine, and
+`lucky` finds after a harvest or collection (seeded by `drops`, so a reload can't reroll). The
+dock and the mine are `SITES`: a home and a factory that come with their plot, read through
+`home_info`/`mill_info`, never moved. **Wild trees and rocks are `Prop`s, objects with no events**:
+the engine draws their sprite and no Python runs for them, because a couple of hundred Things
+with a step and a draw each would cost every frame. A cleared Prop goes the step after the tap.
+The train is a `Car` per car, each at its own depth, placed from the clock (`train_engine`), so
+a reload shows it where it would be. Gemini drew the train going down-left, not down-right as asked, so
+`cut_sheets.phase_4` flips the station, the cars and the track; flipped, the station's own track is
+along its front row, which is why the railway is that row (`RAIL_GY`). The barn window is up to four columns (`barn_grid`): every
+kind of thing at once ran off the bottom of the screen, and so did the Build window with the
+factories on the Farm tab.

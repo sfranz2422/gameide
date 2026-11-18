@@ -378,7 +378,7 @@ export const GEMINI_PACKS: LibraryPack[] = [
       {
         "name": "Big characters",
         "file": "library/gemini/farm/big-characters.png",
-        "tileWidth": 123,
+        "tileWidth": 103,
         "tileHeight": 128,
         "use": "sprites"
       },

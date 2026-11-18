@@ -178,7 +178,7 @@ def send_away(f, i):
         f["visitors"][i] = {"wait": now() + VISITOR_WAIT}
 
 
-# ---- moving what you've built: ("fields" | "homes" | "mills" | "town" | "roads", index)
+# ---- moving what you've built: ("fields" | "trees" | "homes" | "mills" | "town" | "roads", index)
 
 def thing_at(f, gx, gy):
     """What on this tile can be moved, or None (the farmhouse, barn and the rest stay put)."""
@@ -187,11 +187,13 @@ def thing_at(f, gx, gy):
         return ("town", i)
     for name in ("homes", "mills"):
         for i, b in enumerate(f[name]):
-            if (gx, gy) in footprint_tiles(b["kind"], b["gx"], b["gy"]):
+            # The dock and the mine came with their land and stay there.
+            if b["kind"] not in SITES and (gx, gy) in footprint_tiles(b["kind"], b["gx"], b["gy"]):
                 return (name, i)
-    for i, fl in enumerate(f["fields"]):
-        if (fl["gx"], fl["gy"]) == (gx, gy):
-            return ("fields", i)
+    for name in ("fields", "trees"):
+        for i, fl in enumerate(f[name]):
+            if (fl["gx"], fl["gy"]) == (gx, gy):
+                return (name, i)
     for i, r in enumerate(f["roads"]):
         if (r[0], r[1]) == (gx, gy):
             return ("roads", i)
