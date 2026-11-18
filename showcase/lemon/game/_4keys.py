@@ -17,6 +17,17 @@ ACTIONS = {
     "ok":      (("space", "enter"),       ("a",)),
 }
 FOCUS_COLOUR = "#ffd23f"
+# Holding - or + (or Left or Right on a number) repeats, after HOLD_WAIT steps, every
+# HOLD_EVERY; held past HOLD_FAST, packs go up ten at a time. With no most to buy, forty
+# packs of ice was forty clicks.
+HOLD_WAIT, HOLD_EVERY, HOLD_FAST = 20, 3, 80
+
+
+def held_step(st, frames):
+    """How far a held Stepper moves this step (0 most steps), `frames` into the hold."""
+    if frames <= HOLD_WAIT or frames % HOLD_EVERY:
+        return 0
+    return 10 if frames > HOLD_FAST and st.key.startswith("buy_") else 1
 
 
 def act(name):
@@ -80,6 +91,16 @@ def run_controls(first=None):
     cur = global_vars.focus
     if cur not in items:
         cur = first if first in items else next((o for o in items if not o.off), items[0])
+    # Left or Right held on a number keeps changing it.
+    hold = (1 if any(keyboard_check(k) for k in ACTIONS["right"][0]) or gamepad_check("right") else
+            -1 if any(keyboard_check(k) for k in ACTIONS["left"][0]) or gamepad_check("left") else 0)
+    if hold and cur.object_name == "Stepper":
+        global_vars.key_held = getattr(global_vars, "key_held", 0) + 1
+        n = held_step(cur, global_vars.key_held)
+        if n:
+            change(cur, hold * n)
+    else:
+        global_vars.key_held = 0
     for name, (dx, dy) in (("left", (-1, 0)), ("right", (1, 0)), ("up", (0, -1)), ("down", (0, 1))):
         if act(name):
             if dx and cur.object_name == "Stepper":
@@ -100,7 +121,7 @@ def press(b):
 
 
 def change(st, d):
-    """A Stepper's number, one step up or down, kept between its ends."""
+    """A Stepper's number, d steps up or down, kept between its ends."""
     v = stepper_value(st.key)
     new = stepper_set(st.key, d)
     if new != v:

@@ -926,4 +926,177 @@ f["kit"] = {k: 2 for k in KIT}`);
     step(g, 62);
     expect(py<number>(g, 'len(instances("Prop"))')).toBeGreaterThan(100);
   });
+  it("phase 5: a farm saved before the awards comes back with nothing counted, but its land and houses count already", async () => {
+    const g = await start({ farm: { coins: 300, xp: 900, level: 11, barn: {}, orders: [], made: 3, bought: 0, seed: 5,
+      fields: [{ gx: 7, gy: 6, crop: null, t: 0 }], homes: [], mills: [], town: [{ kind: "cottage", gx: 12, gy: 12, t: 0 }],
+      roads: [], visitors: [], met: 0, land: [0, 1], cleared: [], kit: { axe: 1 }, barn_level: 0, drops: 0, trees: [],
+      train: { wagons: [], back: 0, left: 0, trips: 0 } } });
+    py(g, 'room_goto("Farm")');
+    step(g, 3);
+    expect(py(g, 'f = global_vars.farm\n[f["stats"], f["awards"], progress(f, "land"), progress(f, "houses"), progress(f, "crops")]'))
+      .toEqual([{}, {}, 2, 1, 0]);
+    // Two plots: Landowner's first star is waiting, and the trophy says so.
+    expect(py(g, '[award_ready(f, "land"), award_ready(f, "houses"), award_ready(f, "crops")]')).toEqual([true, false, false]);
+    step(g, 62);
+    expect(py(g, 'instances("Farm")[0].awards_b.hot')).toBe(true);
+  });
+
+  it("phase 5: everything the farm does is counted where the rules do it", async () => {
+    const g = await start();
+    await farmOf(g);
+    py(g, `f = global_vars.farm
+f["level"] = 14
+f["coins"] = 99999
+plant(f, f["fields"][0], "wheat")`);
+    later(g, 61);
+    py(g, `harvest(f, f["fields"][0])
+f["barn"]["wheat"] = 20
+f["orders"][0] = {"want": {"wheat": 1}, "coins": 5, "xp": 1}
+deliver(f, 0)
+spot = next(t for t in wilds() if not is_locked(f, *t))
+clear_wild(f, *spot)
+f["homes"].append({"kind": "coop", "gx": 14, "gy": 14, "animals": [0, None, None]})
+collect_home(f, f["homes"][-1])
+buy_land(f, 3)
+buy_land(f, 5)
+dock = next(b for b in f["homes"] if b["kind"] == "dock")
+dock["animals"][0] = 0
+collect_home(f, dock)
+f["mills"].append({"kind": "bakery", "gx": 14, "gy": 16, "queue": [{"item": "bread", "end": 0}]})
+collect_mill(f, f["mills"][-1])
+mine = next(b for b in f["mills"] if b["kind"] == "mine")
+mine["queue"] = [{"item": "nails", "end": 0}]
+collect_mill(f, mine)
+f["train"]["back"] = 0
+f["train"]["wagons"] = [{"want": {"wheat": 1}, "prize": "axe", "xp": 1, "loaded": False}, {"want": {"wheat": 1}, "prize": "axe", "xp": 1, "loaded": False}]
+load_wagon(f, 0)
+f["trees"].append({"kind": "apple_tree", "gx": 16, "gy": 16, "t": 0})
+pick_fruit(f, len(f["trees"]) - 1)
+f["visitors"] = [{"want": {"wheat": 1}, "coins": 3, "xp": 1, "who": 0}]
+serve(f, 0)`);
+    expect(py(g, 'f["stats"]')).toEqual({ crops: 2, orders: 1, cleared: 1, animal: 1, fish: 1, made: 1, mine: 1, wagons: 1, fruit: 3, visitors: 1 });
+  });
+
+  it("phase 5: an achievement's three stars are collected once each, from the Awards window, for coins and XP", async () => {
+    const g = await start();
+    await farmOf(g);
+    py(g, 'f = global_vars.farm\nf["stats"]["crops"] = 49');
+    step(g, 62);
+    expect(py(g, '[award_ready(f, "crops"), instances("Farm")[0].awards_b.hot]')).toEqual([false, false]);
+    py(g, 'f["stats"]["crops"] = 50');
+    step(g, 62);
+    expect(py(g, '[award_ready(f, "crops"), instances("Farm")[0].awards_b.hot]')).toEqual([true, true]);
+    expect(py(g, "global_vars.said[0]")).toContain("trophy");
+    py(g, 'do_act("awards", None)');
+    step(g);
+    expect(py(g, '[b.arg for b in instances("Button") if b.act == "claim_award"]')).toEqual(["crops"]);
+    const before = py<[number, number, number]>(g, '[f["coins"], f["xp"], f["level"]]');
+    py(g, 'press(next(b for b in instances("Button") if b.act == "claim_award"))');
+    step(g);
+    // (its XP may bring a level, and a level its own coins)
+    const levels = py<number>(g, 'f["level"]') - before[2];
+    expect(py<number[]>(g, '[f["coins"], f["xp"]]')).toEqual([before[0] + py<number>(g, "AWARD_COINS[0]") + levels * py<number>(g, "LEVEL_COINS"), before[1] + py<number>(g, "AWARD_XP[0]")]);
+    expect(py(g, '[award_tier(f, "crops"), claim_award(f, "crops")[0], [b.arg for b in instances("Button") if b.act == "claim_award"]]'))
+      .toEqual([1, "not yet", []]);
+    py(g, 'f["stats"]["crops"] = 5000');
+    expect(py(g, '[claim_award(f, "crops")[0], claim_award(f, "crops")[0], claim_award(f, "crops")[0], award_tier(f, "crops")]'))
+      .toEqual(["claimed", "claimed", "not yet", 3]);
+  });
+
+  it("phase 5: the week's event: from its level, one the farm can do, kept all week, its goals' prizes in order; a new week, a new one", async () => {
+    const g = await start();
+    await farmOf(g);
+    py(g, 'f = global_vars.farm\nf["level"] = EVENT_LEVEL - 1');
+    expect(py(g, "event_now(f) is None")).toBe(true);
+    py(g, 'f["level"] = EVENT_LEVEL');
+    // A new farm can't feed animals or make goods yet: its event is one it can do.
+    const kind = py<string>(g, 'event_now(f)["kind"]');
+    expect(["harvest_fair", "market_week", "clean_up"]).toContain(kind);
+    py(g, 'f["mills"].append({"kind": "bakery", "gx": 14, "gy": 16, "queue": []})');
+    expect(py(g, 'event_now(f)["kind"]')).toBe(kind);
+    const stat = py<string>(g, 'EVENTS[f["event"]["kind"]]["stat"]');
+    py(g, `other = next(s for s in ("crops", "orders", "cleared") if s != "${stat}")\ntally(f, other, 1000)\ntally(f, "${stat}", 3)`);
+    expect(py(g, 'f["event"]["got"]')).toBe(3);
+    expect(py(g, 'claim_event(f)[0]')).toBe("not yet");
+    py(g, 'f["event"]["got"] = EVENTS[f["event"]["kind"]]["goals"][1]\nkit = dict(f["kit"])\ncoins = f["coins"]');
+    expect(py<number>(g, "to_claim(f)")).toBeGreaterThanOrEqual(2);
+    py(g, 'do_act("awards", None)');
+    step(g);
+    py(g, 'press(next(b for b in instances("Button") if b.act == "claim_event"))');
+    step(g);
+    expect(py(g, 'claim_event(f)[0]')).toBe("claimed");
+    expect(py(g, 'claim_event(f)[0]')).toBe("not yet");
+    expect(py(g, `[f["coins"] - coins >= EVENT_PRIZES[0]["coins"] + EVENT_PRIZES[1]["coins"],
+ all(f["kit"].get(k, 0) == kit.get(k, 0) + EVENT_PRIZES[0]["kit"].get(k, 0) + EVENT_PRIZES[1]["kit"].get(k, 0) for k in KIT)]`)).toEqual([true, true]);
+    // A week on: a new event, counted from nothing, chosen in turn from what the farm can do.
+    const seen = new Set<string>();
+    for (let w = 0; w < 8; w++) {
+      later(g, py<number>(g, "WEEK"));
+      const ev = py<{ kind: string; got: number; claimed: number }>(g, 'event_now(f)');
+      expect([ev.got, ev.claimed]).toEqual([0, 0]);
+      seen.add(ev.kind);
+    }
+    expect([...seen].sort()).toEqual(py<string[]>(g, "sorted(events_open(f))"));
+    expect(seen.has("bake_off")).toBe(true);
+  });
+
+  it("phase 5: the seasons follow the calendar: orders for what's in season pay more and say so, and winter snows", async () => {
+    const g = await start();
+    await farmOf(g);
+    const on = (day: string) => py(g, `import calendar\nglobal_vars.time_shift = calendar.timegm(time.strptime("${day}", "%Y-%m-%d")) - time.time()`);
+    // Both sides of every season's first day (a calendar a month out agrees in mid-season).
+    const edges: [string, string][] = [["2026-02-28", "winter"], ["2026-03-01", "spring"], ["2026-05-31", "spring"], ["2026-06-01", "summer"],
+      ["2026-08-31", "summer"], ["2026-09-01", "autumn"], ["2026-11-30", "autumn"], ["2026-12-01", "winter"], ["2026-01-15", "winter"]];
+    for (const [day, season] of edges) {
+      on(day);
+      expect(py(g, "season_now()")).toBe(season);
+    }
+    // The same order made in autumn (pumpkins in season) and in spring (they're not).
+    py(g, 'f = global_vars.farm\nf["level"] = 5');
+    on("2026-10-15");
+    const k = py<number>(g, `k = 0
+while True:
+    f["made"] = k
+    o = make_order(f)
+    if "pumpkin" in o["want"] and not any(x in SEASONS["spring"]["likes"] for x in o["want"]):
+        break
+    k += 1
+k`);
+    const autumn = py<{ coins: number; season?: boolean }>(g, "o");
+    on("2026-04-15");
+    const spring = py<{ coins: number; season?: boolean }>(g, `f["made"] = ${k}\nmake_order(f)`);
+    expect(autumn.coins).toBe(Math.round(spring.coins * py<number>(g, "SEASON_PAY")));
+    expect([autumn.season, spring.season]).toEqual([true, undefined]);
+    // The weather: snow in winter, none in summer, spring's showers come and go.
+    const weatherNow = () => { step(g, 61); return py<string>(g, 'str(instances("Farm")[0].weather)'); };
+    on("2026-01-15");
+    expect(weatherNow()).toBe("snow");
+    on("2026-07-15");
+    expect(weatherNow()).toBe("None");
+    on("2026-04-15");
+    later(g, -py<number>(g, "now() % SHOWER_EVERY"));
+    expect(weatherNow()).toBe("rain");
+    later(g, py<number>(g, "SHOWER_LONG"));
+    expect(weatherNow()).toBe("None");
+  });
+
+  it("phase 5: the Awards window draws in every season, below the event's level and with everything to collect", async () => {
+    const g = await start();
+    await farmOf(g);
+    py(g, 'f = global_vars.farm\ndo_act("awards", None)');
+    step(g, 3);
+    expect(py<number>(g, "global_vars.panel_box[3]")).toBeLessThanOrEqual(py<number>(g, "VIEW_H"));
+    py(g, `f["level"] = 14
+for k in ACHIEVEMENTS:
+    f["stats"][k] = 99999
+event_now(f)["got"] = 99999
+open_panel("awards")`);
+    for (const day of ["2026-01-15", "2026-04-15", "2026-07-15", "2026-10-15"]) {
+      py(g, `import calendar\nglobal_vars.time_shift = calendar.timegm(time.strptime("${day}", "%Y-%m-%d")) - time.time()`);
+      step(g, 62);
+    }
+    expect(py<number>(g, 'len([b for b in instances("Button") if b.act == "claim_award"])')).toBe(py<number>(g, "len(ACHIEVEMENTS) - 2"));
+    py(g, 'do_act("orders", None)');
+    step(g, 3);
+  });
 });

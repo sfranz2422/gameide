@@ -27,7 +27,15 @@ def make_stepper(x, y, key, wide=300):
 def _limits(key):
     s = global_vars.s
     if key.startswith("buy_"):
-        return 0, MAX_PACKS, 1
+        return 0, BUY_MOST, 1
+    if key == "s_open":
+        return 0, 1, 1
+    if key == "s_place":
+        return 0, max(0, len(second_places(s)) - 1), 1
+    if key == "s_price":
+        return PRICE_MIN, PRICE_MAX, PRICE_STEP
+    if key == "s_cups":
+        return 0, SECOND_MOST, SECOND_STEP
     if key in ("lemons", "sugar", "ice"):
         return 0, RECIPE_MAX, 1
     if key == "price":
@@ -39,8 +47,16 @@ def _limits(key):
 
 def stepper_value(key):
     plan = global_vars.s["plan"]
+    sec = plan["second"]
     if key.startswith("buy_"):
         return plan["buy"][key[4:]]
+    if key == "s_open":
+        return 1 if sec["open"] else 0
+    if key == "s_place":
+        where = second_places(global_vars.s)
+        return where.index(sec["place"]) if sec["place"] in where else 0
+    if key in ("s_price", "s_cups"):
+        return sec[key[2:]]
     if key == "place":
         return sorted(global_vars.s["places"]).index(plan["place"])
     if key == "pink":
@@ -56,6 +72,13 @@ def stepper_set(key, d):
     v = max(low, min(high, stepper_value(key) + d * step))
     if key.startswith("buy_"):
         plan["buy"][key[4:]] = v
+    elif key == "s_open":
+        plan["second"]["open"] = bool(v)
+    elif key == "s_place":
+        where = second_places(s)
+        plan["second"]["place"] = where[v] if where else None
+    elif key in ("s_price", "s_cups"):
+        plan["second"][key[2:]] = v
     elif key == "place":
         plan["place"] = sorted(s["places"])[v]
     elif key == "pink":
@@ -87,6 +110,18 @@ def stepper_words(key):
         return "Price a cup", money(plan["price"]), ""
     if key == "pink":
         return "Pink lemonade", "Yes" if plan["pink"] else "No", "Pink fans pay more"
+    sec = plan["second"]
+    if key == "s_open":
+        return "Open it today", "Yes" if sec["open"] else "No", f"Helper: {money(SECOND_WAGE)} a day"
+    if key == "s_place":
+        if sec["place"] not in second_places(s):
+            return "Where", "Nowhere yet", "Unlock another place first"
+        p = PLACES[sec["place"]]
+        return "Where", p["name"], f"Rent {money(p['rent'])} a day" if p["rent"] else "No rent"
+    if key == "s_price":
+        return "Price a cup", money(sec["price"]), "Its own price; your recipe"
+    if key == "s_cups":
+        return "Cups to send", str(sec["cups"]), f"A helper pours {SECOND_MOST} at most"
     place = PLACES[plan["place"]]
     return "Where", place["name"], f"Rent {money(place['rent'])} a day" if place["rent"] else "No rent"
 
@@ -101,7 +136,7 @@ def do_act(name, arg):
         global_vars.scored = False
         room_goto("Morning")
     elif name == "continue":
-        global_vars.s = save_get("summer")
+        global_vars.s = bring_up_to_date(save_get("summer"))
         global_vars.scored = False
         room_goto("Evening" if global_vars.s["phase"] == "evening" else "Morning")
     elif name == "open":
@@ -112,6 +147,16 @@ def do_act(name, arg):
         else:
             global_vars.t = t
             room_goto("Street")
+    elif name == "second":
+        sec = s["plan"]["second"]
+        where = second_places(s)
+        if sec["place"] not in where:
+            sec["place"] = where[-1] if where else None
+        global_vars.problem = ""
+        room_goto("Second")
+    elif name == "done_second":
+        global_vars.problem = ""
+        room_goto("Morning")
     elif name == "speed":
         global_vars.speed = arg
     elif name == "upgrade":

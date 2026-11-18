@@ -56,6 +56,7 @@ def load_wagon(f, i):
     w["loaded"] = True
     f["kit"][w["prize"]] = f["kit"].get(w["prize"], 0) + 1
     gained = add_xp(f, w["xp"])
+    tally(f, "wagons")
     if all(x["loaded"] for x in f["train"]["wagons"]):
         send_train(f)
     return "loaded", gained

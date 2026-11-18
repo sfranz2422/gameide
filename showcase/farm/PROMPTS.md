@@ -212,6 +212,15 @@ and rocks are the ones from picture 2, and the lake is drawn by the game, so nei
 > glass of apple juice; a glass of cherry juice; a little steam train; a wooden signpost; a
 > green arrow pointing up. Flat magenta background.
 
-## Later phases (not yet)
+## Phase 5: awards, events and seasons
 
-- **Phase 5: achievements, events and seasons.**
+Only icons this time: the awards, the week's event and the seasons are windows, and the
+seasons' snow and leaves are drawn by the game.
+
+**19. Award and season icons.** MAGENTA. (Attach picture 4, the icons.)
+> [the style] A sheet of small round-cornered game icons in exactly the style of the
+> attached icons (the same cream tiles), each one a single object on its own, all the same
+> size, two rows of four. Row 1: a gold trophy cup; a blue prize rosette ribbon; a wrapped
+> present with a red bow; a little paper calendar. Row 2: a pink spring blossom; a smiling
+> yellow summer sun; an orange autumn maple leaf; a pale blue winter snowflake. Flat
+> magenta background.

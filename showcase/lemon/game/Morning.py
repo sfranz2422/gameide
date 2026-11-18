@@ -26,9 +26,16 @@ make_stepper(x2, y, "place", 316)
 self.open = make_button(VIEW_W / 2 - 150, 498, 300, 56, "Open the stand", "open", size=24)
 self.open.hot = True
 self.first = self.open
+# The second stand: set up on a screen of its own (this one is full).
+self.second = make_button(16, 504, 316, 44, "", "second", size=16)
+self.second.shown = has(s, "second")
 
 # === step
 question_ok(True)
+s = global_vars.s
+self.second.shown = has(s, "second")
+sec = second_open(s)
+self.second.words = f"Second stand: {PLACES[sec['place']]['name']}, {sec['cups']} cups" if sec and sec["place"] is not None else "Second stand: closed"
 run_controls(self.first)
 
 # === draw
@@ -41,7 +48,8 @@ draw_set_alpha(0.35)
 draw_set_color("#000000")
 draw_rect(0, 0, VIEW_W, VIEW_H)
 draw_set_alpha(1)
-text(20, 14, f"Morning, day {s['day'] + 1} of {DAYS}", GOLD, 28)
+text(20, 14, f"Morning, day {s['day'] + 1}", GOLD, 28)
+text(22, 52, rank_of(s["money"]), DIM, 15)
 text(VIEW_W - 20, 14, f"Money {money(s['money'])}", INK, 26, "right")
 text(VIEW_W - 140, 52, "Reputation", DIM, 14, "right")
 draw_stars(VIEW_W - 118, 62, s["rep"])
@@ -77,11 +85,20 @@ panel(340, 96, 676, 470)
 text(352, 104, "Shopping", GOLD, 20)
 cost = shopping_cost(s)
 rent = place_now(s)["rent"]
+sec = second_open(s)
+if sec and sec["place"] in second_places(s):
+    rent += PLACES[sec["place"]]["rent"] + SECOND_WAGE
 text(352, 356, f"Shopping {money(cost)}", INK, 16)
-text(352, 378, f"Rent {money(rent)}", INK, 16)
+text(352, 378, f"Rent{', both stands and helper' if sec else ''} {money(rent)}", INK, 16)
 text(352, 402, f"Total {money(cost + rent)}", GOLD if cost + rent <= s["money"] else RED, 20)
-text(352, 430, "Lemons go soft after 3 days.", DIM, 13)
-text(352, 448, "Ice melts by morning (unless you've a cooler).", DIM, 13)
+# What the stock makes once the shopping's in (less what the second stand takes).
+shelf = shelf_after_shopping(s)
+if second_open(s):
+    need = second_needs(s)
+    shelf = {k: max(0, shelf[k] - need[k]) for k in SUPPLY_KEYS}
+text(352, 428, f"Makes about {cups_from(s, shelf)} cups" + (" (after the second stand's)" if second_open(s) else ""), MINT, 14)
+text(352, 448, "Lemons go soft after 3 days.", DIM, 11)
+text(352, 461, "Ice melts by morning (unless you've a cooler).", DIM, 11)
 
 panel(684, 96, 1010, 470)
 text(696, 104, "Your lemonade", GOLD, 20)

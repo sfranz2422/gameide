@@ -151,6 +151,7 @@ def clear_wild(f, gx, gy):
     f["kit"][tool] -= 1
     f["cleared"].append([gx, gy])
     f["coins"] += CLEAR_COINS
+    tally(f, "cleared")
     return "cleared", add_xp(f, CLEAR_XP)
 
 
@@ -242,4 +243,5 @@ def pick_fruit(f, i):
         return "full", []
     f["barn"][info["fruit"]] = f["barn"].get(info["fruit"], 0) + info["yield"]
     tr["t"] = now()
+    tally(f, "fruit", info["yield"])
     return "picked", add_xp(f, info["xp"])

@@ -4,7 +4,10 @@
 # $0.30 to a computer, and a student checking the sums would find a cent missing.
 
 VIEW_W, VIEW_H = 1024, 576
-DAYS = 30                    # a summer
+# No last day (the teacher's ask, 2026-11-18: a summer used to end on day 30). The
+# weather follows a summer's arc every MONTH days, each with its own heat wave, rainy
+# spell and parade, for as long as the stand stays open.
+MONTH = 30
 START_MONEY = 2000           # $20.00 to start
 START_REP = 0.3              # reputation, 0 (nobody trusts you) to 1 (the best on the block)
 
@@ -18,7 +21,8 @@ SUPPLIES = [
     ("cups",   "Cups",    25,  "cups",      100, 150),
 ]
 SUPPLY_KEYS = [s[0] for s in SUPPLIES]
-MAX_PACKS = 9                # packs of one thing in a morning
+BUY_MOST = 999               # packs of one thing in a morning: as many as you can pay for (it was 9,
+                             # and on a hot day with two stands nine packs of ice weren't enough)
 LEMON_DAYS = 3               # a lemon bought on day 1 is usable days 1, 2 and 3, and soft on day 4
 ICE_KEPT_OVERNIGHT = 0.0     # without a cooler every cube has melted by morning
 COOLER_KEPT_OVERNIGHT = 0.5  # ...with one, half are still there
@@ -84,7 +88,7 @@ REP_CHANGE = {"perfect": 0.006, "love": 0.010, "sour": -0.006, "sweet": -0.006, 
               "warm": -0.004, "pricey": -0.002, "thirsty": -0.004}
 VERDICTS = ["perfect", "love", "sour", "sweet", "watery", "warm", "pricey", "thirsty"]
 VERDICT_WORDS = {"perfect": "Perfect!", "love": "Love the pink!", "sour": "Too sour", "sweet": "Too sweet",
-                 "watery": "Watery", "warm": "Not cold enough", "pricey": "Too pricey", "thirsty": "Sold out!"}
+                 "watery": "Watery", "warm": "Too warm", "pricey": "Too pricey", "thirsty": "Sold out!"}
 # Which thought bubble picture each verdict shows (the bubble sheet's order).
 BUBBLE = {"sour": 0, "sweet": 1, "watery": 2, "warm": 2, "pricey": 3, "perfect": 4, "love": 4, "thirsty": 5}
 
@@ -110,8 +114,16 @@ UPGRADES = [
     ("sign",   "Big sign",         2000, "More people notice your stand"),
     ("juicer", "Juicer",           2500, "A pitcher needs fewer lemons"),
     ("pink",   "Pink lemonade",    3000, "Some customers love it, and pay more"),
-    ("second", "Second stand",     5000, "Serve twice as fast; a longer queue"),
+    ("helper", "Helper",           3500, "Pours twice as fast at your stand; a longer queue"),
+    ("second", "Second stand",     5000, "A helper sells at another of your places"),
 ]
+
+# ---- the second stand: run by a helper at another place you sell at, with what you
+# send it from your shelf (enough for its cups, at your recipe). It sells by the same
+# rules as yours; what's left comes back in the evening.
+SECOND_WAGE = 500            # $5.00 a day for the helper running it
+SECOND_MOST = 120            # cups a helper can pour in a day
+SECOND_STEP = 5              # cups to send, in steps of this
 
 # ---- the day on the street
 DAY_STEPS = 4800             # 80 seconds at 1x
@@ -126,8 +138,9 @@ DECIDE_X = 330               # where a passer-by decides whether to stop
 QUEUE_GAP = 44               # between people in the queue
 OWNER_LIFT = 45              # you stand this far above the stand's foot: your lower half behind the counter, your hat under the awning
 
-# ---- the end of the summer: names for how you did, by money at the end
-RANKS = [(0, "Sour Start"), (4000, "Squeezer"), (15000, "Lemon Pro"), (40000, "Lemonade Tycoon"), (80000, "Lemon Legend")]
+# Names for how you're doing, by the money you have.
+RANKS = [(0, "Sour Start"), (4000, "Squeezer"), (15000, "Lemon Pro"), (40000, "Lemonade Tycoon"), (80000, "Lemon Legend"),
+         (200000, "Lemon Mogul"), (500000, "Lemonade Royalty")]
 
 
 def money(cents):

@@ -15,6 +15,7 @@
 #   mills       [{"kind", "gx", "gy", "queue": [{"item", "end"}]}]               (phase 2)
 #   town, roads, visitors, met                         (phase 3: see the town script)
 #   land, cleared, kit, barn_level, drops, trees, train (phase 4: see the land and train scripts)
+#   stats, awards, event                                (phase 5: see the awards script)
 import math
 import random
 import time
@@ -32,7 +33,8 @@ def new_farm(seed=None):
          "fields": [{"gx": gx, "gy": gy, "crop": None, "t": 0} for gx, gy in START_FIELDS],
          "homes": [], "mills": [], "town": [], "roads": [], "visitors": [], "met": 0,
          "land": [], "cleared": [], "kit": dict(START_KIT), "barn_level": 0, "drops": 0, "trees": [],
-         "train": {"wagons": [], "back": 0, "left": 0, "trips": 0}}
+         "train": {"wagons": [], "back": 0, "left": 0, "trips": 0},
+         "stats": {}, "awards": {}, "event": None}
     fill_orders(f)
     return f
 
@@ -53,6 +55,10 @@ def load_farm():
     f.setdefault("barn_level", 0)
     f.setdefault("drops", 0)
     f.setdefault("train", {"wagons": [], "back": 0, "left": 0, "trips": 0})
+    # Phase 5: nothing counted yet (land and houses are counted from the farm itself).
+    f.setdefault("stats", {})
+    f.setdefault("awards", {})
+    f.setdefault("event", None)
     return f
 
 
@@ -158,6 +164,7 @@ def harvest(f, fl):
         return "full", []
     f["barn"][fl["crop"]] = f["barn"].get(fl["crop"], 0) + c["yield"]
     fl["crop"], fl["t"] = None, 0
+    tally(f, "crops", c["yield"])
     return "harvested", add_xp(f, c["xp"])
 
 
@@ -337,6 +344,7 @@ def collect_home(f, home):
         if animal_state(home, i) == "ready" and barn_free(f) > 0:
             f["barn"][makes] = f["barn"].get(makes, 0) + 1
             home["animals"][i] = None
+            tally(f, "fish" if home["kind"] == "dock" else "animal")
             got += 1
             gained += add_xp(f, GOODS[makes]["xp"])
     return got, gained
@@ -384,6 +392,7 @@ def collect_mill(f, m):
         else:
             f["barn"][item] = f["barn"].get(item, 0) + 1
             gained += add_xp(f, GOODS[item]["xp"])
+        tally(f, "mine" if m["kind"] == "mine" else "made")
         got += 1
     return got, gained
 
@@ -411,7 +420,8 @@ def orderable(f):
 
 def make_order(f):
     """The next order: a few of what can be grown or made now, more as the farm grows,
-    paying ORDER_PAY times what it would sell for (and XP for what it took)."""
+    paying ORDER_PAY times what it would sell for (and XP for what it took), and
+    SEASON_PAY times that if it wants something in season."""
     rng = random.Random(f["seed"] * 7919 + f["made"])
     f["made"] += 1
     can = orderable(f)
@@ -419,7 +429,12 @@ def make_order(f):
     want = {k: (rng.randint(2, min(10, 2 + f["level"])) if k in CROPS else rng.randint(1, ORDER_GOODS_MOST)) for k in kinds}
     worth = sum(item_info(k)["sell"] * n for k, n in want.items())
     grew = sum((CROPS[k]["xp"] * math.ceil(n / CROPS[k]["yield"])) if k in CROPS else GOODS[k]["xp"] * n for k, n in want.items())
-    return {"want": want, "coins": round(worth * ORDER_PAY) + ORDER_TIP, "xp": max(1, round(grew * ORDER_XP))}
+    order = {"want": want, "coins": round(worth * ORDER_PAY) + ORDER_TIP, "xp": max(1, round(grew * ORDER_XP))}
+    # The season's favourites pay more (the card says so).
+    if any(in_season(k) for k in want):
+        order["coins"] = round(order["coins"] * SEASON_PAY)
+        order["season"] = True
+    return order
 
 
 def fill_orders(f):
@@ -446,6 +461,7 @@ def deliver(f, i):
             del f["barn"][k]
     f["coins"] += o["coins"]
     f["orders"][i] = {"wait": now() + ORDER_WAIT}
+    tally(f, "orders")
     return "delivered", add_xp(f, o["xp"])
 
 

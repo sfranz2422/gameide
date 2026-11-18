@@ -63,6 +63,10 @@ self.barn_b = make_button(VIEW_W - 220, 8, 96, 36, "Barn", "barn", None, 15)
 self.barn_b.icon = "barn"
 self.shop_b = make_button(VIEW_W - 118, 8, 108, 36, "Build", "shop", None, 15)
 self.shop_b.icon = "shovel"
+self.awards_b = make_button(VIEW_W - 384, 8, 46, 36, "", "awards", None, 15)
+self.awards_b.icon = "trophy"
+self.claims = to_claim(f)            # prizes waiting: a new one says so
+self.weather = "unset"               # what's falling now (set the first second)
 self.stop = make_button(VIEW_W / 2 - 80, VIEW_H - 56, 160, 40, "Done", "stop_placing", None, 16)
 
 # === step
@@ -116,12 +120,27 @@ if global_vars.t % FPS == 0:
     fill_visitors(f)
     town_tick(f)
     fill_train(f)
+    # The week's event starts with the week; a prize newly reached says so.
+    week = f["event"]["week"] if f["event"] else None
+    e = event_now(f)
+    if e is not None and e["week"] != week:
+        keep(f)
+    n = to_claim(f)
+    if n > self.claims and not global_vars.said:
+        sound_play("coin", volume=0.6)
+        say("A prize is waiting: tap the trophy to collect it!", GOLD)
+    self.claims = n
+    # The season's weather: snow and showers are the engine's; autumn's leaves are ours.
+    w = season_weather()
+    if w != self.weather:
+        weather(w if w in ("rain", "snow") else None, 1)
+        self.weather = w
     if [dict(o) for o in f["orders"]] + [dict(v) for v in f["visitors"]] + [len(f["train"]["wagons"])] != before:
         keep(f)
         if global_vars.panel in ("orders", "visitors", "train"):
             open_panel(global_vars.panel)
     # An open home's, factory's or house's window keeps up with its clocks (its buttons too).
-    if global_vars.panel in ("home", "mill", "house") or (global_vars.panel == "train" and not train_here(f)):
+    if global_vars.panel in ("home", "mill", "house", "awards") or (global_vars.panel == "train" and not train_here(f)):
         open_panel(global_vars.panel, global_vars.panel_of)
 track_mouse()
 pointer()
@@ -135,6 +154,13 @@ self.stop.shown = global_vars.placing
 self.orders_b.picked = global_vars.panel == "orders"
 self.barn_b.picked = global_vars.panel == "barn"
 self.shop_b.picked = global_vars.panel == "shop"
+self.awards_b.picked = global_vars.panel == "awards"
+self.awards_b.hot = self.claims > 0
+# Autumn: now and then a leaf drifts down across the view (the engine moves it).
+if self.weather == "leaves" and global_vars.t % 9 == 0:
+    particles(view_x + random.uniform(0, VIEW_W), view_y + random.uniform(-20, VIEW_H * 0.6), 1,
+              ["#d9822b", "#c0504d", "#e8b04a", "#a5652a"], speed=1.2, size=8, life=200, gravity=0.015,
+              spread=70, direction=250, shape="square")
 self.orders_b.hot = any(can_deliver(f, o) for o in f["orders"])
 camera_set(*global_vars.cam)
 for p in global_vars.pops:
@@ -150,8 +176,13 @@ if global_vars.levelup is not None:
         global_vars.levelup = None
 
 # === draw
-# In front of the map: where a new field would go, and the keys' cursor.
+# In front of the map: the season's tint, where a new field would go, and the keys' cursor.
 f = global_vars.farm
+s = SEASONS[season_now()]
+draw_set_alpha(s["tint_alpha"])
+draw_set_color(s["tint"])
+draw_rect(view_x, view_y, view_x + VIEW_W, view_y + VIEW_H)
+draw_set_alpha(1)
 if global_vars.placing:
     t = tile_at(mouse_x, mouse_y) if not keyed() else global_vars.cursor
     if t is not None and global_vars.placing in ("field", "road"):
@@ -293,6 +324,13 @@ if global_vars.panel and box:
             plain(cx + 60, cy + 117, str(o["coins"]), "#7a5a10", 18)
             icon("star", cx + 160, cy + 128, 30)
             plain(cx + 180, cy + 117, f"{o['xp']} XP", "#7a5a10", 18)
+            if o.get("season"):
+                # A tag on the card's top edge (three things wanted fill the card's top).
+                draw_set_color("#3f9b4a")
+                draw_rect(cx + 186, cy - 10, cx + 292, cy + 12)
+                draw_set_color("#1e5a24")
+                draw_rect(cx + 186, cy - 10, cx + 292, cy + 12, True)
+                text(cx + 239, cy - 8, f"In season +{round((SEASON_PAY - 1) * 100)}%", INK, 12, "center")
     elif global_vars.panel == "shop":
         text(x1 + 20, y1 + 14, "Build", GOLD, 26)
         for i, (k, name, cost, why) in enumerate(shop_rows(f, global_vars.shop_tab)):
@@ -401,6 +439,66 @@ if global_vars.panel and box:
             text(x1 + 20, y1 + 110, f"It comes with: {', '.join(extra).lower()}" + (" by the lake." if "Fishing dock" in extra else "."), MINT, 16, "left", 440)
         text(x1 + 20, y1 + 150, "Clear the wild with an axe, a pickaxe or a shovel.", DIM, 14, "left", 440)
         text(x1 + 20, y1 + 180, f"Opens at level {p['level']} · {p['cost']} coins", DIM, 14)
+    elif global_vars.panel == "awards":
+        text(x1 + 20, y1 + 14, "Awards", GOLD, 26)
+        # This week's event.
+        draw_set_alpha(0.35)
+        draw_set_color("#1e1208")
+        draw_rect(x1 + 16, y1 + 56, x1 + 314, y1 + 306)
+        draw_rect(x1 + 16, y1 + 316, x1 + 314, y1 + AWARDS_H - 14)
+        draw_set_alpha(1)
+        e = event_now(f)
+        if e is None:
+            icon("ribbon", x1 + 165, y1 + 120, 64)
+            text(x1 + 165, y1 + 166, f"A new event every week, from level {EVENT_LEVEL}.", DIM, 14, "center", 260)
+        else:
+            ev = EVENTS[e["kind"]]
+            goals = ev["goals"]
+            icon("ribbon", x1 + 50, y1 + 92, 52)
+            text(x1 + 84, y1 + 66, "This week", DIM, 12)
+            text(x1 + 84, y1 + 82, ev["name"], GOLD, 20)
+            nxt = next((g for g in goals if e["got"] < g), goals[-1])
+            text(x1 + 30, y1 + 126, f"{ev['about']}: {min(e['got'], nxt)} / {nxt}", INK, 15)
+            # The bar to the last goal, a mark at each, its prize under it.
+            bx1, bx2 = x1 + 30, x1 + 290
+            draw_set_color("#1e1208")
+            draw_rect(bx1, y1 + 152, bx2, y1 + 166)
+            draw_set_color("#9fe06a")
+            draw_rect(bx1, y1 + 152, bx1 + (bx2 - bx1) * min(1, e["got"] / goals[-1]), y1 + 166)
+            for j, g in enumerate(goals):
+                gx = bx1 + (bx2 - bx1) * g / goals[-1]
+                draw_set_color("#3a1e08")
+                draw_rect(gx - 1, y1 + 148, gx + 1, y1 + 170)
+                px = min(bx2 - 22, max(bx1 + 22, gx))
+                icon("gift", px, y1 + 192, 34, 1 if e["got"] >= g else 0.45)
+                text(px, y1 + 210, "Got it" if j < e["claimed"] else str(g), MINT if j < e["claimed"] else INK, 12, "center")
+            icon("calendar", x1 + 100, y1 + 238, 24)
+            text(x1 + 118, y1 + 230, f"Ends in {clock_words(week_left())}", DIM, 12)
+        # The season.
+        sk = season_now()
+        se = SEASONS[sk]
+        icon(sk, x1 + 50, y1 + 352, 52)
+        text(x1 + 84, y1 + 328, "The season", DIM, 12)
+        text(x1 + 84, y1 + 344, se["name"], GOLD, 20)
+        text(x1 + 30, y1 + 388, f"Orders for these pay {round((SEASON_PAY - 1) * 100)}% more:", INK, 13)
+        for j, k in enumerate(se["likes"]):
+            icon(k, x1 + 56 + j * 66, y1 + 440, 48)
+        # The achievements: three stars each, one for every tier collected.
+        for i, (k, a) in enumerate(ACHIEVEMENTS.items()):
+            x, y = award_slot(i, x1, y1)
+            t = award_tier(f, k)
+            draw_set_color("#fff4dc" if not award_ready(f, k) else "#d8efc8")
+            draw_rect(x, y, x + AWARD_W, y + AWARD_ROW - 6)
+            draw_set_color("#8a5226")
+            draw_rect(x, y, x + AWARD_W, y + AWARD_ROW - 6, True)
+            icon(a["icon"], x + 30, y + 32, 44)
+            plain(x + 58, y + 6, a["name"], "#5a3a1c", 15)
+            goal = a["goals"][min(t, len(a["goals"]) - 1)]
+            plain(x + 58, y + 26, a["about"], "#7a5a10", 12)
+            for j in range(len(a["goals"])):
+                icon("star", x + 66 + j * 22, y + 50, 18, 1 if j < t else 0.25)
+            plain(x + 132, y + 41, f"{min(progress(f, k), goal)} / {goal}" if t < len(a["goals"]) else "All three stars!",
+                  "#2a8a3a" if award_ready(f, k) or t == len(a["goals"]) else "#5a3a1c", 13)
     elif global_vars.panel == "train":
         text(x1 + 20, y1 + 14, "The train", GOLD, 26)
         if not train_here(f):

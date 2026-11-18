@@ -47,7 +47,9 @@ ICONS = ["wheat", "corn", "carrot", "pumpkin", "seeds", "coin", "star", "level",
          # phase 3: the town
          "people", "house", "road", "move", "rent",
          # phase 4: the valley
-         "nails", "planks", "paint", "fish", "gold", "apple", "cherry", "apple_juice", "cherry_juice", "train", "land", "up"]
+         "nails", "planks", "paint", "fish", "gold", "apple", "cherry", "apple_juice", "cherry_juice", "train", "land", "up",
+         # phase 5: awards, the week's event, the seasons
+         "trophy", "ribbon", "gift", "calendar", "spring", "summer", "autumn", "winter"]
 ANIMALS = {"chicken": (250, 250, 245), "cow": (240, 240, 240), "sheep": (245, 245, 235)}
 POSES = ["stand", "walk", "eat", "ready"]
 BUILT_COLOURS = {"coop": (200, 150, 90), "cowshed": (190, 70, 60), "sheep_pen": (170, 140, 110), "feed_mill": (200, 170, 110),

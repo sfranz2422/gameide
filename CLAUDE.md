@@ -833,7 +833,7 @@ counted from the match clock (`wait_from`): a 20 s wait was once over in one.
 
 ## Squeeze
 
-`showcase/lemon/`: a lemonade stand over a 30-day summer (the teacher's ask, 2026-11-12;
+`showcase/lemon/`: a lemonade stand over a summer with no last day (the teacher's ask, 2026-11-12;
 one player, the teacher's Gemini art in `raw/`, cut by `cut_sheets.py` into `art/`).
 Every number is in `game/_1rules.py`, and **money is whole cents** so the evening's
 ledger adds up exactly. `_2summer.py` is the whole economy (buying, spoiling, melting,
@@ -842,6 +842,15 @@ to play a summer. The weather comes from the summer's seed, so reloading can't b
 better day. Python check questions only on the title, morning and evening screens.
 The school board gets the money every evening (the teacher's choice: only at the
 summer's end, it stayed empty for weeks); it keeps each player's best.
+**Upgraded 2026-11-18** (the teacher's ask): no last day (each `MONTH` of 30 days has its own
+heat wave, rainy spell and parade; `day_plan` makes any day from the seed and the day alone,
+so it goes on for ever), no most to buy (`BUY_MOST`; holding - or + repeats, `held_step`), and
+the **second stand** is managed: a helper sells at another place you own (the Second room:
+open or not, where, its price, cups to send), stocked from your shelf at your recipe as the
+stand opens (`send_second`); its day is worked out in one go as yours ends (`run_second`, the
+day's own random numbers) and what's left comes back. The old Second stand's faster pouring is
+the Helper upgrade now; `bring_up_to_date` gives it to summers that bought the old one, and
+carries on a summer that ended on day 30.
 
 ## Order Up!
 
@@ -903,7 +912,7 @@ build's. Both new games are art library packs (`make_gemini_library.py sandwich 
 of Township, an ORIGINAL one; "a big game with a lot of expansion"), built in phases, each
 stopped for review: 1 the farm (done 2026-11-17), 2 animals and factories (done 2026-11-17,
 with Gemini's pictures 6-10), 3 the town (done 2026-11-17, Gemini's 11-14),
-4 the valley (built 2026-11-18, Gemini's 15-18), 5 achievements and events. **Time is real** (the teacher's choice): crops grow
+4 the valley (built 2026-11-18, Gemini's 15-18), 5 awards, events and seasons (built 2026-11-18, Gemini's 19). **Time is real** (the teacher's choice): crops grow
 on the real clock (`now()` = `time.time()` + `global_vars.time_shift`, which the tests move
 on), so the save keeps when each field was planted and things grow while the game's closed.
 **Isometric**: Gemini drew diamonds though asked for top-down, and the teacher chose to match
@@ -948,6 +957,14 @@ with a step and a draw each would cost every frame. A cleared Prop goes the step
 The train is a `Car` per car, each at its own depth, placed from the clock (`train_engine`), so
 a reload shows it where it would be. Gemini drew the train going down-left, not down-right as asked, so
 `cut_sheets.phase_4` flips the station, the cars and the track; flipped, the station's own track is
-along its front row, which is why the railway is that row (`RAIL_GY`). The barn window is up to four columns (`barn_grid`): every
+along its front row, which is why the railway is that row (`RAIL_GY`).
+Phase 5 (`_2awards.py`): what the farm does is counted by `tally`, called in the rules where
+it happens (never in a window), into `stats`; `ACHIEVEMENTS` are three tiers of a stat each,
+collected in the Awards window (the trophy). Land and houses are read from the farm itself
+(`progress`), so an older save counts them. The week's event (`EVENTS`) starts on the real
+clock's Monday, chosen among the events the farm can do then (`can_count`) and kept all week.
+The season is the real calendar's (`season_now`): orders for what's in season pay
+`SEASON_PAY` more, the world takes its tint, and winter snows (the engine's weather); autumn's
+leaves are particles from the Farm, now and then. The barn window is up to four columns (`barn_grid`): every
 kind of thing at once ran off the bottom of the screen, and so did the Build window with the
 factories on the Farm tab.

@@ -4,6 +4,7 @@
 
 # === create
 global_vars.focus = None
+weather(None)                       # the farm's season's snow or rain doesn't fall on the title
 self.play = make_button(VIEW_W / 2 - 120, 430, 240, 56, "Play", "play", None, 26)
 self.play.hot = True
 

@@ -11,8 +11,8 @@ art/ (once they've arrived). Any picture not in art/ is a stand-in drawn here, o
 by one, so the game builds and plays with only this file and game/, and each
 Gemini picture replaces its stand-in as soon as it's cut.
 
-THE GAME IS OBJECTS: Title, Morning, Day (the street), Evening are the four
-screens; Button and Stepper are the controls; Stand, Customer, Bubble and Cloud
+THE GAME IS OBJECTS: Title, Morning, Second (setting up the second stand), Day (the
+street), Evening are the five screens; Button and Stepper are the controls; Stand, Customer, Bubble and Cloud
 are on the street. Every number is game/_1rules.py, the business is
 game/_2summer.py, and what each control does is game/_5acts.py.
 """
@@ -412,6 +412,7 @@ def build(out):
     # The title first: the game starts in the first room.
     room("Title", [("Title", 0, 0)])
     room("Morning", [("Morning", 0, 0)])
+    room("Second", [("Second", 0, 0)])
     room("Street", [("Day", 0, 0)])
     room("Evening", [("Evening", 0, 0)])
 

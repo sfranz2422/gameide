@@ -170,6 +170,7 @@ def serve(f, i):
             del f["barn"][k]
     f["coins"] += v["coins"]
     f["visitors"][i] = {"wait": now() + VISITOR_WAIT}
+    tally(f, "visitors")
     return "served", add_xp(f, v["xp"])
 
 

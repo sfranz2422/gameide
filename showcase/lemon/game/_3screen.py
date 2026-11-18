@@ -50,7 +50,8 @@ def event_notes(s, day):
     if day["parade"]:
         out.append("Parade downtown today!")
     if day["rival"] is not None:
-        out.append(f"A rival stand opens next to you, at {money(day['rival'])} a cup.")
+        out.append("A rival stand opens next to you,")
+        out.append(f"at {money(day['rival'])} a cup.")
     return out
 
 

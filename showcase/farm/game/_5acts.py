@@ -13,6 +13,7 @@
 #   Build window         Farm, Factories, Houses and Town tabs; Move picks up something built and puts it down
 #   Tap a tree or rock   cleared with its tool from the kit; on land not bought yet: the land's window
 #   Tap a fruit tree     its fruit picked; the station: the train's window
+#   The trophy           the Awards window: this week's event, the season, the achievements
 #   Drag anywhere else   the map moves (laying roads, the drag lays them)
 import math
 import random
@@ -798,6 +799,19 @@ def open_panel(kind, of=None):
                     b.off = not can_deliver(f, wg)
                     b.hot = not b.off
             b = make_button(x1 + 20, y1 + 312, 260, 42, "Send it off now", "send_train", None, 15, True)
+    elif kind == "awards":
+        x1, y1 = VIEW_W / 2 - AWARDS_W / 2, HUD_H + 8
+        global_vars.panel_box = (x1, y1, x1 + AWARDS_W, y1 + AWARDS_H)
+        e = event_now(f)
+        if e is not None:
+            b = make_button(x1 + 30, y1 + 254, 260, 40, "Collect the prize", "claim_event", None, 15, True)
+            b.off = e["claimed"] >= event_reached(e)
+            b.hot = not b.off
+        for i, k in enumerate(ACHIEVEMENTS):
+            x, y = award_slot(i, x1, y1)
+            if award_ready(f, k):
+                b = make_button(x + AWARD_W - 92, y + 16, 84, 32, "Collect", "claim_award", k, 13, True)
+                b.hot = True
     box = global_vars.panel_box
     make_button(box[2] - 46, box[1] + 8, 38, 34, "X", "close", None, 16, True)
     if was is not None:
@@ -827,6 +841,15 @@ def barn_slot(i, x1, y1):
     """Where the barn window's i-th thing goes: down the first column, then the next."""
     cols, rows, w, h, cell = barn_grid(farm())
     return x1 + 20 + (i // rows) * cell, y1 + BARN_TOP + (i % rows) * BARN_ROW
+
+
+AWARDS_W, AWARDS_H = 980, 500       # the Awards window: the event and the season on the left,
+AWARD_W, AWARD_ROW = 316, 70         # the achievements in two columns of six on the right
+
+
+def award_slot(i, x1, y1):
+    """Where the Awards window's i-th achievement goes: down the first column, then the next."""
+    return x1 + 330 + (i // 6) * (AWARD_W + 8), y1 + 56 + (i % 6) * AWARD_ROW
 
 
 SHOP_TABS = [("farm", "Farm"), ("factories", "Factories"), ("houses", "Houses"), ("town", "Town")]
@@ -867,7 +890,7 @@ def do_act(what, arg):
         room_goto("Farm")
     elif what == "close":
         close_panel()
-    elif what in ("barn", "orders", "shop"):
+    elif what in ("barn", "orders", "shop", "awards"):
         if global_vars.panel == what:
             close_panel()
         else:
@@ -996,6 +1019,26 @@ def do_act(what, arg):
         elif barn_free(f) == 0:
             say("The barn is full! Sell something, or fill an order.", RED)
         open_panel("mill", arg)
+    elif what == "claim_award":
+        res, gained = claim_award(f, arg)
+        if res == "claimed":
+            t = award_tier(f, arg)
+            sound_play("levelup", volume=0.6)
+            effect("confetti", view_x + VIEW_W / 2, view_y + 140, None, 1.5)
+            say(f"{ACHIEVEMENTS[arg]['name']}, {t} of 3 stars: +{AWARD_COINS[t - 1]} coins, +{AWARD_XP[t - 1]} XP!", GOLD)
+            level_up(gained)
+            keep(f)
+        open_panel("awards")
+    elif what == "claim_event":
+        res, prize, gained = claim_event(f)
+        if res == "claimed":
+            sound_play("levelup", volume=0.6)
+            effect("confetti", view_x + VIEW_W / 2, view_y + 140, None, 1.5)
+            things = ", ".join(f"{KIT[k]['name'].lower()} × {n}" for k, n in prize["kit"].items())
+            say(f"+{prize['coins']} coins, +{prize['xp']} XP and {things}!", GOLD)
+            level_up(gained)
+            keep(f)
+        open_panel("awards")
     elif what == "stop_placing":
         global_vars.placing = False
         global_vars.moving = None

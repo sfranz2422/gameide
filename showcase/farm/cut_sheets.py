@@ -191,6 +191,7 @@ ICONS_3 = ["people", "house", "road", "move", "rent"]
 PLACES = [("dock", 2), ("mine", 2), ("juice_press", 2)]
 TREE_KINDS = ["apple_tree", "cherry_tree"]
 ICONS_4 = ["nails", "planks", "paint", "fish", "gold", "apple", "cherry", "apple_juice", "cherry_juice", "train", "land", "up"]
+ICONS_5 = ["trophy", "ribbon", "gift", "calendar", "spring", "summer", "autumn", "winter"]
 SIGN_TALL = 180                     # the sign's height in art/ (twice the game's)
 
 
@@ -292,6 +293,14 @@ def phase_4():
             save(_sw.own(im, b, every).crop(b).resize((128, 128), Image.LANCZOS), f"icon_{name}")
 
 
+def phase_5():
+    if (RAW / "19.jpeg").exists():
+        im = _sw.key_out(Image.open(RAW / "19.jpeg"))
+        boxes, every = drawings(im, 2, 4)
+        for name, b in zip(ICONS_5, boxes):
+            save(_sw.own(im, b, every).crop(b).resize((128, 128), Image.LANCZOS), f"icon_{name}")
+
+
 def main():
     ART.mkdir(exist_ok=True)
     # 1: crops, cut by rows (the ripe wheat touches the corn below it).
@@ -331,6 +340,7 @@ def main():
     phase_2()
     phase_3()
     phase_4()
+    phase_5()
     print(f"{sum(1 for _ in ART.glob('*.png'))} pictures in {ART}")
 
 

@@ -10,17 +10,28 @@ self.off = False
 self.wide = 300
 self.high = 46
 self.order = 0
+self.held = 0           # steps the mouse has held - or + down
 
 # === step
-if self.shown and mouse_check_pressed("left"):
+if self.shown:
     by = self.y + 10
+    d = 0
     if by <= mouse_y <= by + 26:
         if self.x + self.wide - 132 <= mouse_x <= self.x + self.wide - 106:
-            global_vars.focus = self
-            change(self, -1)
+            d = -1
         elif self.x + self.wide - 32 <= mouse_x <= self.x + self.wide - 6:
-            global_vars.focus = self
-            change(self, 1)
+            d = 1
+    if d and mouse_check_pressed("left"):
+        global_vars.focus = self
+        change(self, d)
+        self.held = 0
+    elif d and mouse_check("left"):
+        self.held += 1
+        n = held_step(self, self.held)
+        if n:
+            change(self, d * n)
+    else:
+        self.held = 0
 
 # === draw_gui
 if self.shown:
@@ -34,5 +45,6 @@ if self.shown:
         draw_set_color("#2a1a08")
         draw_rect(bx, self.y + 10, bx + 26, self.y + 36, True)
         text(bx + 13, self.y + 11, sign, INK, 20, "center")
-    text(self.x + self.wide - 69, self.y + 13, value, GOLD, 16, "center")
+    # A long one (a place's name) smaller, so it stays between - and +.
+    text(self.x + self.wide - 69, self.y + (15 if len(value) > 8 else 13), value, GOLD, 13 if len(value) > 8 else 16, "center")
     draw_focus(self)

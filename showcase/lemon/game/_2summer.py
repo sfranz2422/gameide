@@ -11,48 +11,79 @@ import math
 import random
 
 
-def summer_plan(seed):
-    """Each day's weather, forecast, prices and events, the same for the same seed."""
-    rng = random.Random(seed)
-    heat_start = rng.randint(8, DAYS - HEAT_WAVE_DAYS - 2)
-    rain_start = rng.randint(3, DAYS - RAINY_WEEK_DAYS - 1)
+_plans = {}
+
+
+def month_events(seed, m):
+    """A month's heat wave, rainy spell and parade: the days each starts, in that month."""
+    rng = random.Random(seed * 1000003 + m)
+    heat_start = rng.randint(8, MONTH - HEAT_WAVE_DAYS - 2)
+    rain_start = rng.randint(3, MONTH - RAINY_WEEK_DAYS - 1)
     while abs(rain_start - heat_start) < HEAT_WAVE_DAYS + 2:
-        rain_start = rng.randint(3, DAYS - RAINY_WEEK_DAYS - 1)
-    parade = rng.randint(10, DAYS - 3)
-    days = []
-    for d in range(DAYS):
-        temp = TEMP_MID + TEMP_ARC * math.sin(math.pi * d / (DAYS - 1)) + rng.uniform(-TEMP_NOISE, TEMP_NOISE)
-        heat = heat_start <= d < heat_start + HEAT_WAVE_DAYS
-        rainy_week = rain_start <= d < rain_start + RAINY_WEEK_DAYS
-        if heat:
-            temp += HEAT_WAVE_EXTRA
-        r = rng.random()
-        sky = "rain" if rainy_week or (not heat and r < RAIN_CHANCE) else "cloudy" if r < RAIN_CHANCE + CLOUD_CHANCE else "sunny"
-        temp = round(temp - (6 if sky == "rain" else 0))
-        # The forecast: near enough, but not always right.
-        guess = temp + rng.randint(-FORECAST_TEMP_ERROR, FORECAST_TEMP_ERROR)
-        rain_pct = {"rain": rng.choice([60, 70, 80, 90]), "cloudy": rng.choice([10, 20, 30, 40]), "sunny": rng.choice([0, 0, 10, 20])}[sky]
-        prices = {k: round(rng.uniform(low, high) / 5) * 5 for k, _, _, _, low, high in SUPPLIES}
-        rival = round(rng.uniform(*RIVAL_PRICE) / 5) * 5 if d >= 3 and rng.random() < RIVAL_CHANCE else None
-        days.append({"day": d, "temp": temp, "sky": sky, "forecast": guess, "rain_pct": rain_pct, "prices": prices,
-                     "heat": heat, "parade": d == parade, "rival": rival, "rainy_week": rainy_week})
-    return days
+        rain_start = rng.randint(3, MONTH - RAINY_WEEK_DAYS - 1)
+    return heat_start, rain_start, rng.randint(10, MONTH - 3)
+
+
+def day_plan(seed, d):
+    """Day d's weather, forecast, prices and events: the same for the same seed and day,
+    whichever day it's asked for first (each day has its own random numbers), so the days
+    go on for ever and a reload can't bring better weather."""
+    if (seed, d) in _plans:
+        return _plans[(seed, d)]
+    m, k = divmod(d, MONTH)
+    heat_start, rain_start, parade = month_events(seed, m)
+    rng = random.Random(seed * 7919 + d * 104729 + 1)
+    temp = TEMP_MID + TEMP_ARC * math.sin(math.pi * k / (MONTH - 1)) + rng.uniform(-TEMP_NOISE, TEMP_NOISE)
+    heat = heat_start <= k < heat_start + HEAT_WAVE_DAYS
+    rainy_week = rain_start <= k < rain_start + RAINY_WEEK_DAYS
+    if heat:
+        temp += HEAT_WAVE_EXTRA
+    r = rng.random()
+    sky = "rain" if rainy_week or (not heat and r < RAIN_CHANCE) else "cloudy" if r < RAIN_CHANCE + CLOUD_CHANCE else "sunny"
+    temp = round(temp - (6 if sky == "rain" else 0))
+    # The forecast: near enough, but not always right.
+    guess = temp + rng.randint(-FORECAST_TEMP_ERROR, FORECAST_TEMP_ERROR)
+    rain_pct = {"rain": rng.choice([60, 70, 80, 90]), "cloudy": rng.choice([10, 20, 30, 40]), "sunny": rng.choice([0, 0, 10, 20])}[sky]
+    prices = {k2: round(rng.uniform(low, high) / 5) * 5 for k2, _, _, _, low, high in SUPPLIES}
+    rival = round(rng.uniform(*RIVAL_PRICE) / 5) * 5 if d >= 3 and rng.random() < RIVAL_CHANCE else None
+    out = {"day": d, "temp": temp, "sky": sky, "forecast": guess, "rain_pct": rain_pct, "prices": prices,
+           "heat": heat, "parade": k == parade, "rival": rival, "rainy_week": rainy_week}
+    _plans[(seed, d)] = out
+    return out
+
+
+def summer_plan(seed, start=0, n=MONTH):
+    """n days' plans from day `start` (a month's, unless asked otherwise)."""
+    return [day_plan(seed, d) for d in range(start, start + n)]
 
 
 def new_summer(seed):
     return {"seed": seed, "day": 0, "money": START_MONEY, "rep": START_REP,
             "lemons": [], "sugar": 0, "ice": 0.0, "cups": 0, "pitcher": 0,
-            "upgrades": [], "places": [0], "history": [], "news": None, "phase": "morning", "finished": False,
+            "upgrades": [], "places": [0], "history": [], "news": None, "phase": "morning",
             "plan": {"buy": {"lemons": 2, "sugar": 1, "ice": 1, "cups": 2},
-                     "lemons": 4, "sugar": 4, "ice": 3, "price": 100, "place": 0, "pink": False}}
+                     "lemons": 4, "sugar": 4, "ice": 3, "price": 100, "place": 0, "pink": False,
+                     "second": new_second()}}
 
 
-def plan_of(s):
-    return summer_plan(s["seed"])
+def new_second():
+    """The second stand's plan: shut until it's set up; where, its price, cups to send."""
+    return {"open": False, "place": None, "price": 100, "cups": 40}
+
+
+def bring_up_to_date(s):
+    """A summer saved before an update, as this version keeps it. Summers used to end on
+    day 30: one that ended goes on. The old Second stand made you pour faster; that's the
+    Helper now, so a summer that bought it keeps it (and gets the stand elsewhere too)."""
+    s.pop("finished", None)
+    if "second" in s["upgrades"] and "helper" not in s["upgrades"]:
+        s["upgrades"].append("helper")
+    s["plan"].setdefault("second", new_second())
+    return s
 
 
 def today(s):
-    return plan_of(s)[s["day"]]
+    return day_plan(s["seed"], s["day"])
 
 
 def has(s, key):
@@ -114,8 +145,15 @@ def open_stand(s):
     rent = place_now(s)["rent"]
     if s["plan"]["place"] not in s["places"]:
         return "You haven't started selling there yet."
-    if cost + rent > s["money"]:
-        return f"That costs {money(cost + rent)} with the rent, and you have {money(s['money'])}."
+    sec = second_open(s)
+    if sec:
+        problem = second_problem(s)
+        if problem:
+            return problem
+    extra = PLACES[sec["place"]]["rent"] + SECOND_WAGE if sec else 0
+    if cost + rent + extra > s["money"]:
+        return (f"That costs {money(cost + rent + extra)} with the rent" + (" and the helper" if sec else "")
+                + f", and you have {money(s['money'])}.")
     t = {"day": s["day"], "place": s["plan"]["place"], "money_start": s["money"], "supplies": cost, "rent": rent,
          "income": 0, "cups": 0, "passers": 0, "rep_start": s["rep"], "said": {v: 0 for v in VERDICTS},
          "soft": (s["news"] or {}).get("soft", 0), "melted": (s["news"] or {}).get("melted", 0),
@@ -131,8 +169,143 @@ def open_stand(s):
         elif k != "lemons":
             s[k] += n
     s["plan"]["buy"] = {k: 0 for k in SUPPLY_KEYS}    # bought: tomorrow starts from nothing
+    if sec:
+        t["second"] = send_second(s, extra)
     s["phase"] = "day"
     return t
+
+
+# ---- the second stand
+
+def second_open(s):
+    """The second stand's plan if it opens today (it's been bought and is set to open), else None."""
+    sec = s["plan"]["second"]
+    return sec if has(s, "second") and sec["open"] else None
+
+
+def second_places(s):
+    """Where the second stand can go: a place you sell at, not where your own stand is today."""
+    return [i for i in sorted(s["places"]) if i != s["plan"]["place"]]
+
+
+def second_needs(s, cups=None):
+    """What it takes from your shelf for its cups, at your recipe: whole pitchers' lemons
+    and sugar, the ice for every cup, and the cups."""
+    cups = s["plan"]["second"]["cups"] if cups is None else cups
+    pitchers = math.ceil(cups / CUPS_PER_PITCHER)
+    return {"lemons": pitchers * lemons_a_pitcher(s), "sugar": pitchers * s["plan"]["sugar"],
+            "ice": cups * s["plan"]["ice"], "cups": cups}
+
+
+def shelf_after_shopping(s):
+    """What the shelf will hold once the morning's shopping is in."""
+    packs = dict((x[0], x[2]) for x in SUPPLIES)
+    have = {"lemons": lemon_count(s), "sugar": s["sugar"], "ice": int(s["ice"]), "cups": s["cups"]}
+    return {k: have[k] + s["plan"]["buy"].get(k, 0) * packs[k] for k in SUPPLY_KEYS}
+
+
+def second_problem(s):
+    """Why the second stand can't open as planned, in words, or None."""
+    sec = s["plan"]["second"]
+    if sec["place"] not in second_places(s):
+        return "Choose where your second stand goes: another place you sell at."
+    if sec["cups"] < 1:
+        return "Send your second stand some cups to sell."
+    shelf = shelf_after_shopping(s)
+    names = dict((x[0], x[3]) for x in SUPPLIES)
+    for k, n in second_needs(s).items():
+        if n > shelf[k]:
+            return f"Your second stand needs {n - shelf[k]} more {names[k]}: buy more, or send it fewer cups."
+    return None
+
+
+def send_second(s, cost):
+    """Takes the second stand's stock off the shelf, and pays its rent and its helper (in
+    `cost`, already counted in the morning's check). Its part of the day's ledger."""
+    sec = s["plan"]["second"]
+    need = second_needs(s)
+    taken = []                       # the lemon batches it took, oldest first, so what's left goes back as it was
+    n = need["lemons"]
+    for b in s["lemons"]:
+        took = min(b[1], n)
+        if took:
+            taken.append([b[0], took])
+        b[1] -= took
+        n -= took
+    s["lemons"] = [b for b in s["lemons"] if b[1] > 0]
+    s["sugar"] -= need["sugar"]
+    s["ice"] -= need["ice"]
+    s["cups"] -= need["cups"]
+    rent = PLACES[sec["place"]]["rent"]
+    s["money"] -= cost
+    return {"place": sec["place"], "price": sec["price"], "sent": need, "lemon_batches": taken,
+            "rent": rent, "wage": SECOND_WAGE, "cups": 0, "income": 0, "passers": 0,
+            "said": {v: 0 for v in VERDICTS}, "back": None}
+
+
+def run_second(s, t):
+    """The second stand's day, worked out in one go as yours ends: who walks past its
+    place, who buys (the same rules as at yours, with no rival there), what they think
+    (your reputation is the same one), the ice melting in the sun. The day's own random
+    numbers, so a reload can't sell more. What's left goes back on your shelf."""
+    sec = t["second"]
+    day = today(s)
+    rng = random.Random(s["seed"] * 31337 + s["day"] * 7 + 3)
+    at = sec["place"]
+    sent = sec["sent"]
+    per = lemons_a_pitcher(s)
+    pitchers = min(sent["lemons"] // per if per else 10 ** 6, sent["sugar"] // s["plan"]["sugar"] if s["plan"]["sugar"] else 10 ** 6)
+    can_pour = min(sent["cups"], pitchers * CUPS_PER_PITCHER, SECOND_MOST)
+    melt = max(ICE_MELT_LOW, min(ICE_MELT_HIGH, ICE_MELT_LOW + (day["temp"] - 55) / 45 * (ICE_MELT_HIGH - ICE_MELT_LOW)))
+    if has(s, "cooler"):
+        melt *= COOLER_MELT
+    ice_used = 0
+    tt = {"price": sec["price"], "pink": t["pink"], "said": sec["said"]}
+    times = sorted(rng.uniform(0, SPAWN_UNTIL) for _ in range(crowd_size(s, day, at)))
+    for when in times:
+        who = new_customer(s, day, rng, at)
+        sec["passers"] += 1
+        choice = decide(s, who, tt, 0, None, rng)
+        if choice == "pricey":
+            heard(s, tt, "pricey")
+        if choice != "buy":
+            continue
+        ice_left = (sent["ice"] - ice_used) * (1 - melt * when)
+        if sec["cups"] >= can_pour or ice_left < s["plan"]["ice"]:
+            heard(s, tt, "thirsty")
+            continue
+        sec["cups"] += 1
+        ice_used += s["plan"]["ice"]
+        sec["income"] += sec["price"]
+        heard(s, tt, verdict(t["recipe"], who, t["pink"]))
+    s["money"] += sec["income"]
+    # Back on the shelf: what wasn't used. Pitchers are made as needed, so only the
+    # lemons and sugar of the pitchers poured come off; ice melted as the day went.
+    used_pitchers = math.ceil(sec["cups"] / CUPS_PER_PITCHER)
+    lemons_back = sent["lemons"] - used_pitchers * per
+    back = {"lemons": lemons_back, "sugar": sent["sugar"] - used_pitchers * s["plan"]["sugar"],
+            "ice": int(max(0, sent["ice"] - ice_used) * (1 - melt)), "cups": sent["cups"] - sec["cups"]}
+    # The lemons come back newest first: the oldest went into the pitchers.
+    n = lemons_back
+    for b in reversed(sec["lemon_batches"]):
+        give = min(b[1], n)
+        if give:
+            s["lemons"].append([b[0], give])
+        n -= give
+    s["lemons"].sort(key=lambda b: b[0])
+    s["sugar"] += back["sugar"]
+    s["ice"] += back["ice"]
+    s["cups"] += back["cups"]
+    sec["back"] = back
+
+
+def cups_from(s, stock):
+    """About how many cups a stock makes at today's recipe: whatever runs out first."""
+    big = 10 ** 6
+    per = lemons_a_pitcher(s)
+    pitchers = min(stock["lemons"] // per if per else big, stock["sugar"] // s["plan"]["sugar"] if s["plan"]["sugar"] else big)
+    ice = stock["ice"] // s["plan"]["ice"] if s["plan"]["ice"] else big
+    return max(0, min(stock["cups"], pitchers * CUPS_PER_PITCHER, ice))
 
 
 def lemons_a_pitcher(s):
@@ -187,9 +360,10 @@ def thirst_for(temp, rng=random):
     return max(0.0, min(1.0, (temp - THIRST_LOW) / (THIRST_HIGH - THIRST_LOW) + rng.uniform(-0.25, 0.25)))
 
 
-def new_customer(s, day, rng=random):
-    """Who's walking by: their kind, thirst, budget (cents) and taste."""
-    place = PLACES[s["plan"]["place"]]
+def new_customer(s, day, rng=random, at=None):
+    """Who's walking by (at your stand, or `at` another place): their kind, thirst,
+    budget (cents) and taste."""
+    place = PLACES[s["plan"]["place"] if at is None else at]
     kind = rng.choice(place["types"])
     c = CUSTOMERS[kind]
     temp = day["temp"]
@@ -224,7 +398,7 @@ def decide(s, who, t, queue, rival, rng=random):
         return "pricey"
     if rival is not None and rival < t["price"] and rng.random() < RIVAL_STEALS:
         return "rival"
-    if queue >= QUEUE_MAX + (QUEUE_SECOND_STAND if has(s, "second") else 0):
+    if queue >= QUEUE_MAX + (QUEUE_SECOND_STAND if has(s, "helper") else 0):
         return "full"
     return "buy"
 
@@ -249,10 +423,10 @@ def heard(s, t, said):
     s["rep"] = max(0.0, min(1.0, s["rep"] + REP_CHANGE[said]))
 
 
-def crowd_size(s, day=None):
-    """How many walk past the stand today."""
+def crowd_size(s, day=None, at=None):
+    """How many walk past the stand today (yours, or one at `at`, another place)."""
     day = day or today(s)
-    place = place_now(s)
+    place = place_now(s) if at is None else PLACES[at]
     temp = max(CROWD_TEMP_LOW, min(CROWD_TEMP_HIGH, CROWD_TEMP_LOW + (day["temp"] - 60) / 40 * (CROWD_TEMP_HIGH - CROWD_TEMP_LOW)))
     sky = place["rain"] if day["sky"] == "rain" else SKY_CROWD[day["sky"]]
     n = place["crowd"] * temp * sky * (CROWD_REP_BASE + CROWD_REP * s["rep"])
@@ -266,15 +440,19 @@ def crowd_size(s, day=None):
 # ---- the evening
 
 def end_day(s, t):
-    """The day's ledger, kept in the history. Money at the end is money at the start, less what was spent, plus what came in."""
+    """The day's ledger, kept in the history. Money at the end is money at the start,
+    less what was spent, plus what came in (at both stands)."""
+    sec = t.get("second")
+    if sec is not None:
+        run_second(s, t)
     t["money_end"] = s["money"]
     t["profit"] = t["income"] - t["supplies"] - t["rent"]
+    if sec is not None:
+        t["profit"] += sec["income"] - sec["rent"] - sec["wage"]
     t["rep_end"] = s["rep"]
     t["left"] = {"lemons": lemon_count(s), "sugar": s["sugar"], "ice": int(s["ice"]), "cups": s["cups"]}
     s["history"].append(t)
     s["phase"] = "evening"
-    if s["day"] >= DAYS - 1:
-        s["finished"] = True
     return t
 
 

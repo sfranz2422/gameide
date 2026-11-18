@@ -270,3 +270,63 @@ FACTORIES["juice_press"] = {"name": "Juice press", "level": 9, "cost": 520, "mak
 FOOTPRINT.update({"station": 2, "dock": 2, "mine": 2, "juice_press": 2, "apple_tree": 1, "cherry_tree": 1})
 START_FARM.append(("station",) + STATION)
 MINE_XP = 3                                 # XP for each tool or material the mine digs up
+
+# ---- phase 5: achievements, the week's event, the seasons
+# Achievements: each counts one thing the farm does (`tally`, in the rules where it
+# happens), in three tiers; a tier reached is collected for its prize. "land" and
+# "houses" are counted from the farm itself, so an older save's land counts already.
+ACHIEVEMENTS = {
+    "crops":    {"name": "Green thumb",      "about": "Harvest crops",          "icon": "wheat",   "goals": [50, 250, 1000]},
+    "orders":   {"name": "Order up",         "about": "Fill orders",            "icon": "order",   "goals": [10, 50, 200]},
+    "animal":   {"name": "Animal friend",    "about": "Collect from animals",   "icon": "egg",     "goals": [20, 100, 400]},
+    "made":     {"name": "Busy factories",   "about": "Make goods",             "icon": "bread",   "goals": [20, 100, 400]},
+    "cleared":  {"name": "Clearing the way", "about": "Clear trees and rocks",  "icon": "axe",     "goals": [10, 50, 150]},
+    "land":     {"name": "Landowner",        "about": "Buy land",               "icon": "land",    "goals": [1, 4, 9]},
+    "houses":   {"name": "Town builder",     "about": "Build houses",           "icon": "house",   "goals": [2, 6, 15]},
+    "visitors": {"name": "Friendly stand",   "about": "Serve visitors",         "icon": "people",  "goals": [10, 50, 200]},
+    "wagons":   {"name": "All aboard",       "about": "Load train wagons",      "icon": "train",   "goals": [6, 30, 120]},
+    "fruit":    {"name": "Orchard keeper",   "about": "Pick fruit",             "icon": "apple",   "goals": [30, 150, 600]},
+    "fish":     {"name": "Gone fishing",     "about": "Catch fish",             "icon": "fish",    "goals": [10, 50, 200]},
+    "mine":     {"name": "Down the mine",    "about": "Dig in the mine",        "icon": "gold",    "goals": [5, 25, 100]},
+}
+AWARD_COINS = [25, 75, 200]                 # a tier's prize, by tier
+AWARD_XP = [10, 30, 80]
+
+# The week's event: from EVENT_LEVEL, one a week (weeks start Monday, the real
+# clock's), chosen among those the farm can already do as the week begins and kept all
+# week. Three goals, each with a prize, counted from the week's start.
+EVENT_LEVEL = 4
+EVENTS = {
+    "harvest_fair": {"name": "Harvest fair",   "about": "Harvest crops",         "stat": "crops",    "goals": [60, 150, 300]},
+    "market_week":  {"name": "Market week",    "about": "Fill orders",           "stat": "orders",   "goals": [6, 15, 30]},
+    "bake_off":     {"name": "Bake-off",       "about": "Make goods",            "stat": "made",     "goals": [12, 30, 60]},
+    "animal_week":  {"name": "Animal week",    "about": "Collect from animals",  "stat": "animal",   "goals": [15, 40, 80]},
+    "clean_up":     {"name": "Big clean-up",   "about": "Clear trees and rocks", "stat": "cleared",  "goals": [8, 20, 40]},
+    "train_week":   {"name": "Full steam",      "about": "Load train wagons",    "stat": "wagons",   "goals": [6, 15, 30]},
+    "fruit_week":   {"name": "Orchard days",   "about": "Pick fruit",            "stat": "fruit",    "goals": [30, 75, 150]},
+    "derby":        {"name": "Fishing derby",  "about": "Catch fish",            "stat": "fish",     "goals": [8, 20, 40]},
+}
+EVENT_PRIZES = [
+    {"coins": 40,  "xp": 10, "kit": {"axe": 1, "shovel": 1}},
+    {"coins": 100, "xp": 25, "kit": {"nails": 1, "planks": 1, "paint": 1}},
+    {"coins": 250, "xp": 60, "kit": {"pickaxe": 2, "nails": 2, "planks": 2, "paint": 2}},
+]
+WEEK = 7 * 86400
+WEEK_START = 4 * 86400                      # the real clock's 0 was a Thursday: weeks start on Monday
+
+# The seasons follow the real calendar (the school's, in the north). Orders wanting
+# what's in season pay SEASON_PAY times as much; the farm takes on the season's tint,
+# and its weather (snow, falling leaves, now and then a shower).
+SEASONS = {
+    "spring": {"name": "Spring", "months": [3, 4, 5],   "likes": ["strawberry", "egg", "carrot", "jam"],
+               "tint": "#ffd8f0", "tint_alpha": 0.06, "weather": "rain"},
+    "summer": {"name": "Summer", "months": [6, 7, 8],   "likes": ["corn", "cherry", "cherry_juice", "cream"],
+               "tint": "#fff2b0", "tint_alpha": 0.06, "weather": None},
+    "autumn": {"name": "Autumn", "months": [9, 10, 11], "likes": ["pumpkin", "apple", "apple_juice", "pie"],
+               "tint": "#ff9a3c", "tint_alpha": 0.10, "weather": "leaves"},
+    "winter": {"name": "Winter", "months": [12, 1, 2],  "likes": ["wool", "sweater", "cookies", "milk"],
+               "tint": "#cfe4ff", "tint_alpha": 0.16, "weather": "snow"},
+}
+SEASON_PAY = 1.5
+SHOWER_EVERY = 1800                         # spring: a shower for the first SHOWER_LONG seconds of every this many
+SHOWER_LONG = 300
