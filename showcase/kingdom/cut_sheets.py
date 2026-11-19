@@ -50,6 +50,9 @@ ROWS = {
            [("mage_tower_1", 3), ("mage_tower_2", 3), ("mage_tower_3", 3)]],
     "17": [[(f"{k}_{t}", 1) for k in ("spike_pit", "powder_keg", "catapult_snare") for t in (1, 2, 3)],
            [("forge_1", 3), ("forge_2", 3), ("forge_3", 3)]],
+    # 18: the alliance hall. Two versions came: this one's halls (on thick ground, like the other
+    # buildings); the icon is the other's (raw/18-tilted.png: on a tilted tile, as the bar's are).
+    "18": [[("alliance_hall_1", 3), ("alliance_hall_2", 3), ("alliance_hall_3", 3)]],
     "07": [[("oak", 1), ("pine", 1), ("bush", 1), ("boulder", 1), ("stump", 1)],
            [("scaffold_2", 2), ("scaffold_3", 3), ("scaffold_4", 4)]],
 }
@@ -231,6 +234,14 @@ def main():
             sq = Image.new("RGBA", (side, side), (0, 0, 0, 0))
             sq.paste(part, ((side - part.width) // 2, (side - part.height) // 2))
             save(sq.resize((128, 128), Image.LANCZOS), f"icon_{name}")
+    if (RAW / "18-tilted.png").exists():
+        im = _sw.key_out(Image.open(RAW / "18-tilted.png").convert("RGB"))
+        bottom = im.crop((int(im.width * 0.35), int(im.height * 0.62), int(im.width * 0.65), im.height))
+        part = no_shadow(bottom.copy())
+        side = max(part.size)
+        sq = Image.new("RGBA", (side, side), (0, 0, 0, 0))
+        sq.paste(part, ((side - part.width) // 2, (side - part.height) // 2))
+        save(sq.resize((128, 128), Image.LANCZOS), "icon_banner")
     if (RAW / "09.jpeg").exists():
         view = (G["VIEW_W"], G["VIEW_H"])
         Image.open(RAW / "09.jpeg").convert("RGB").resize((view[0] * 2, view[1] * 2), Image.LANCZOS).save(ART / "title.png", optimize=True)
