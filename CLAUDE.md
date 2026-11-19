@@ -846,6 +846,11 @@ A snowball only hits low (near either end of its arc). Art is the teacher's Gemi
 sheets (`raw/`), cut by `cut_sheets.py` into `art/`; without it the build draws stand-ins.
 Bots that have nowhere to walk think every step, so anything counted per think must be
 counted from the match clock (`wait_from`): a 20 s wait was once over in one.
+**The bots' aim was eased 2026-11-19** (the teacher: "the computer players never miss"; over
+whole matches 37% of their throws knocked someone down, all at middling range): more wobble
+growing with distance (`BOT_AIM_ERROR`, `BOT_AIM_AT`), less lead (`BOT_LEAD`), and `BOT_CARELESS`
+throws aimed at where you are. Now about 20%. The test samples their aim from one seed: whole
+matches aren't repeatable enough to test (18% one run, 25% the next).
 
 ## Squeeze
 

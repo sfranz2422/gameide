@@ -417,6 +417,40 @@ for b in instances('Bot'):
     expect(py(g, away) as number).toBeGreaterThan(200);
   }, 120_000);
 
+  it("computer kids miss: a thousand throws at someone 200 pixels off, most wide; a third careless, aimed where they are, not where they'll be", async () => {
+    // The teacher, 2026-11-19: "the computer players never miss". Over whole matches 37%
+    // of their throws knocked someone down (all of them at middling range); now about 20%.
+    // Their aim itself, from one seed: where a thousand throws are aimed.
+    const g = await quiet();
+    const [ox, oy] = OPEN(g);
+    kid(g, "red", ox, oy);
+    py(g, `import random
+random.seed(4)
+e = global_vars.test_kid
+e.vx, e.vy, e.stun, e.safe = 0, 2.0, 0, 0
+b = instance_create(${ox} + 200, ${oy}, "Bot")
+b.team, b.k, b.role, b.why, b.carry = "blue", 1, "defend", "defend", None
+aims = []
+_t0 = throw
+def throw(kid, tx, ty, charge, real=True):
+    aims.append((tx - e.x, ty - e.y))
+    return None
+for _ in range(1000):
+    global_vars.sees = {b: [e]}
+    b.stock, b.throw_t = 1, 0
+    bot_throw(b)
+throw = _t0
+lead = 200 / BALL_PACE * BOT_LEAD * 2.0
+close = sum(1 for dx, dy in aims if abs(dy - lead) < 15) / len(aims)
+mean_dy = sum(dy for dx, dy in aims) / len(aims)`);
+    expect(py(g, "len(aims)")).toBe(1000);
+    // Most go wide of where they'd need to (within 15 pixels of the right spot: under a third).
+    expect(py(g, "close") as number).toBeLessThan(0.3);
+    // A third aimed carelessly at where they are: on average, a third of the lead short.
+    expect(py(g, "mean_dy / lead") as number).toBeGreaterThan(0.6);
+    expect(py(g, "mean_dy / lead") as number).toBeLessThan(0.8);
+  });
+
   it("throw only at someone they can see", async () => {
     const g = await quiet();
     const [ox, oy] = OPEN(g);

@@ -169,7 +169,9 @@ def bot_throw(bot):
         return
     d, e = best
     t = d / BALL_PACE * BOT_LEAD          # steps the ball takes to get there, and how much of that a bot allows for
-    err = BOT_AIM_ERROR * max(0.5, d / 200)
+    err = BOT_AIM_ERROR * max(0.6, d / BOT_AIM_AT)
+    if random.random() < BOT_CARELESS:
+        t, err = 0, err * 2                # careless: at where they are now, and wider
     tx = e.x + e.vx * t + random.uniform(-err, err)
     ty = e.y + e.vy * t + random.uniform(-err, err)
     reach = point_distance(bot.x, bot.y, tx, ty) + 30

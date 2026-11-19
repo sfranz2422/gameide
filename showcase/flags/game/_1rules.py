@@ -70,8 +70,15 @@ SIGHT_EVERY = 15             # steps between working out who can see whom
 THINK_EVERY = 20             # steps between a bot's decisions (each bot on its own beat)
 PATH_EVERY = 90              # steps before a bot looks for a fresh way to the same goal
 GUARD_RADIUS = 260           # how far from home a defender wanders
-BOT_AIM_ERROR = 30           # pixels a bot's throw can be off by, at 200 pixels away (more, further off)
-BOT_LEAD = 0.8               # how much of someone's walk a bot allows for, aiming ahead of them
+# How well the computer kids aim. Eased 2026-11-19 (the teacher: "the computer players
+# never miss"): at 250 pixels they hit every throw they made, as an error of 30 to the
+# side still fell inside a kid. Now the aim wobbles more, they allow for less of your
+# walk, and BOT_CARELESS of their throws are careless: at where you are, not where you'll
+# be, with twice the wobble. Measured: see flags.test.ts's "computer kids miss".
+BOT_AIM_ERROR = 45           # pixels a bot's throw can be off by, at BOT_AIM_AT pixels away (more, further off)
+BOT_AIM_AT = 130
+BOT_LEAD = 0.65              # how much of someone's walk a bot allows for, aiming ahead of them
+BOT_CARELESS = 0.3          # the share of a bot's throws aimed carelessly
 BOT_ROLES = ["attack", "defend", "attack", "roam"]   # the roles, in the order kids are made
 BOT_THROW_WAIT = 50          # steps a computer kid waits between throws (a person, THROW_WAIT)
 CHASE_REACH = 900            # a defender or a roamer goes after someone carrying its flag only this close

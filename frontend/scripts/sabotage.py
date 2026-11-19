@@ -2014,6 +2014,8 @@ CASES = [
  ('flags: a new host starts from nothing', _fl("_7room"), '            apply_g(g, True)', '            pass', "the host leaves mid-match", FLAGS),
  ('flags: nobody fills the teams', _fl("_7room"), '        while len(ks) < size:', '        while False:', "dealt evenly with computer kids", FLAGS),
  ('flags: a carrier waits at home for ever', _fl("_4bots"), 'if mine.state == "carried" and bot.wait_t > STANDOFF_WAIT:', 'if False:', "nobody else to fetch them", FLAGS),
+ ('flags: computer kids never miss again', _fl('_1rules'), 'BOT_AIM_ERROR = 45 ', 'BOT_AIM_ERROR = 12 ', 'computer kids miss', FLAGS),
+ ('flags: no careless throws', _fl('_4bots'), '    if random.random() < BOT_CARELESS:\n        t, err = 0, err * 2', '    if False:\n        t, err = 0, err * 2', 'computer kids miss', FLAGS),
 
  # Tabletop Siege: coins, upgrades and eight cards to buy (the teacher's asks, 2026-11-10)
  ('siege: paid every step', _sg("Hud"), 'if m.over and self.counted != m.match_no:', 'if m.over:', "a match pays coins once", SIEGE),
