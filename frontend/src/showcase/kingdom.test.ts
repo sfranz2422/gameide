@@ -1070,4 +1070,62 @@ again["units"][0]["max"]`)).toBe(56);
     step(g, 2);
     expect(py(g, 'r["awards"]["cleared"]')).toBe(1);
   });
+
+  // ---- 2026-11-19: collecting is seen, and the building window's words clear of its buttons
+
+  it("a mine's bubble: from 5% full, the same size on the screen at any zoom, red when full, said once, and a tap on it collects", async () => {
+    const g = await start();
+    await realmOf(g);
+    py(g, 'r = global_vars.realm\nr["obstacles"] = []\nm = next(b for b in r["buildings"] if b["kind"] == "gold_mine")\nhold = stat("gold_mine", "hold", m["level"])\nrate = stat("gold_mine", "rate", m["level"])\nglobal_vars.said = None');
+    py(g, 'm["t"] = now() - min(hold * 0.04, 90) / rate * 3600');
+    expect(py(g, "bubble(m) is None")).toBe(true);
+    py(g, 'm["t"] = now() - hold * 0.06 / rate * 3600');
+    const sizes = [] as number[];
+    for (const z of [0.55, 1.0]) {
+      py(g, `set_zoom(${z})`);
+      step(g, 2);
+      sizes.push(py<number>(g, "bubble(m)['r'] * zoom()"));
+    }
+    expect(sizes[0]).toBeCloseTo(sizes[1] ?? Number.NaN);
+    expect(py(g, 'bubble(m)["full"]')).toBe(false);
+    step(g, 70);
+    expect(py<string>(g, "global_vars.said[0]")).toContain("tap the bubbles");
+    expect(py(g, 'r["told_collect"]')).toBe(true);
+    // A tap on the bubble (above the building's tiles) collects.
+    py(g, 'm["t"] = now() - hold / rate * 3600 - 10');
+    expect(py(g, 'bubble(m)["full"]')).toBe(true);
+    py(g, 'r["gold"] = 0\nbb = bubble(m)');
+    expect(py(g, "tile_at(bb['x'], bb['y']) in [(m['gx'] + i, m['gy'] + j) for i in range(4) for j in range(4)]")).toBe(false);
+    expect(py(g, "bubble_hit(r, bb['x'], bb['y']) is m")).toBe(true);
+    py(g, "collect_tap(r, bubble_hit(r, bb['x'], bb['y']))");
+    expect(py<number>(g, 'r["gold"]')).toBeGreaterThan(0);
+    expect(py(g, "bubble(m) is None")).toBe(true);
+  });
+
+  it("the building window: no words under its buttons, for every kind of building", async () => {
+    const g = await start();
+    await realmOf(g);
+    py(g, '_words = []\n_real_text = text\ndef text(x, y, words, colour=INK, size=16, align="left", width=None):\n    _words.append((x, y, str(words), size, align))\n    _real_text(x, y, words, colour, size, align, width)');
+    py(g, 'r = global_vars.realm\nr["obstacles"] = []\nr["gold"] = r["food"] = 0');
+    const kinds = py<string[]>(g, '[k for k in BUILDINGS if k not in ("builder_hut",)]');
+    const clashes: string[] = [];
+    for (const kind of kinds) {
+      py(g, `r["buildings"] = [b for b in r["buildings"] if b["kind"] != "${kind}" or b["gx"] > 0]\nb = new_building("${kind}", 2, 2, 1)\nr["buildings"].append(b)\nb["t"] = now() - 3600\nopen_panel("building", len(r["buildings"]) - 1)`);
+      step(g);
+      py(g, "_words.clear()");
+      step(g);
+      clashes.push(...py<string[]>(g, `out = []
+for x, y, w, size, align in _words:
+    h = round(size * TEXT_SCALE) * 1.1
+    wide = len(w) * round(size * TEXT_SCALE) * 0.5
+    x1 = x - wide / 2 if align == "center" else x - wide if align == "right" else x
+    for bt in instances("Button"):
+        if bt.shown and bt.in_panel and x1 < bt.x + bt.wide and x1 + wide > bt.x and y < bt.y + bt.high and y + h > bt.y and w.strip() and w not in (bt.words,):
+            out.append("${kind}: " + w + " under " + bt.words)
+_words.clear()
+close_panel()
+out`));
+    }
+    expect(clashes).toEqual([]);
+  });
 });

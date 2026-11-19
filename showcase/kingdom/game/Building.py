@@ -35,12 +35,21 @@ if b["job"] is not None:
     text(x, top - 20, clock_words(left), INK, 13, "center")
     if global_vars.t % 30 < 15:
         icon("hammer", x + 52, top + 4, 24)
-elif maker(b):
-    n = waiting(b)
-    if n >= stat(kind, "hold", b["level"]) * 0.1 or n >= 500:
-        by = top + 10 + math.sin(global_vars.t * 0.08 + b["gx"]) * 4
-        draw_set_alpha(0.92)
+else:
+    bb = bubble(b)
+    if bb:
+        # Bobbing; full, it pulses red and says so (it has stopped making anything).
+        z = zoom()
+        by = bb["y"] + math.sin(global_vars.t * 0.08 + b["gx"]) * 4 / z
+        grow = 1 + (0.12 * math.sin(global_vars.t * 0.2) if bb["full"] else 0)
+        if bb["full"]:
+            draw_set_alpha(0.85)
+            draw_set_color(RED)
+            draw_circle(x, by, bb["r"] * grow + 3 / z)
+        draw_set_alpha(0.95)
         draw_set_color("#efe6d2")
-        draw_circle(x, by, 18)
+        draw_circle(x, by, bb["r"] * grow)
         draw_set_alpha(1)
-        icon(makes(b), x, by, 28)
+        icon(makes(b), x, by, bb["r"] * 1.55 * grow)
+        if bb["full"]:
+            text(x, by + bb["r"] + 2 / z, "Full!", RED, 13 / z, "center")

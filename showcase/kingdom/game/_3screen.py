@@ -38,6 +38,31 @@ def building_xy(kind, gx, gy):
     return tile_xy(gx + half, gy + half)
 
 
+def bubble(b):
+    """A mine's or farm's "ready to collect" bubble, or None: from BUBBLE_FROM of what it
+    holds (or BUBBLE_LEAST), above the building, where (world) and how big (world units for
+    BUBBLE_R on the screen: the same size at any zoom; drawn in the world, it was a speck at
+    the starting zoom and nobody knew to collect), and whether it's full (it's stopped filling)."""
+    if not maker(b):
+        return None
+    n = waiting(b)
+    hold = stat(b["kind"], "hold", b["level"]) if b["level"] else 0
+    if n <= 0 or n < min(hold * BUBBLE_FROM, BUBBLE_LEAST):
+        return None
+    x, y = building_xy(b["kind"], b["gx"], b["gy"])
+    z = zoom()
+    return {"x": x, "y": y - info(b["kind"])["size"] * TILE_H / 2 - 60 / z, "r": BUBBLE_R / z, "full": n >= hold}
+
+
+def bubble_hit(r, wx, wy):
+    """The building whose bubble is at a world point (a tap on it collects), or None."""
+    for b in r["buildings"]:
+        bb = bubble(b)
+        if bb and (wx - bb["x"]) ** 2 + (wy - bb["y"]) ** 2 <= (bb["r"] * 1.3) ** 2:
+            return b
+    return None
+
+
 def diamond(x, y, colour, alpha=1.0, tiles=1, outline=False):
     """A tile's diamond, filled or outlined, centred on (x, y)."""
     w, h = TILE_W * tiles / 2, TILE_H * tiles / 2

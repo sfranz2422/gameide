@@ -25,6 +25,9 @@ GROUND_STRIPS = -(-WORLD_W // GROUND_STRIP)
 # How far out the view is (the teacher's ask: "zoomed out just a little, or an option to
 # zoom out"): 1 is as drawn; the - and + buttons (and the Q and E keys) step through these.
 ZOOMS = [0.55, 0.7, 0.85, 1.0]
+BUBBLE_FROM = 0.05          # a mine shows its bubble once it's this full...
+BUBBLE_LEAST = 100          # ...or has this much waiting, whichever comes first
+BUBBLE_R = 22               # its size on the screen, at any zoom
 ZOOM_START = 0.55                           # as far out as it goes (the teacher's ask)
 TEXT_SCALE = 1.25                           # every word bigger than it's written (the teacher's ask; Lilita One runs small)
 

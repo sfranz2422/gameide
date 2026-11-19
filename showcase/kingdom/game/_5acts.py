@@ -82,6 +82,20 @@ def look_at(gx, gy):
 
 # ---- a tap on the map
 
+def collect_tap(r, b):
+    """Collects a mine or farm, from a tap on it or on its bubble."""
+    got = collect(r, b)
+    global_vars.chosen = b
+    if got:
+        sound_play("coin", volume=0.6)
+        x, y = building_xy(b["kind"], b["gx"], b["gy"])
+        global_vars.pops.append([makes(b), x, y - 70, 0, got])
+        keep_save(r)
+    else:
+        sound_play("nope", volume=0.5)
+        say(f"Your {'treasuries are' if makes(b) == 'gold' else 'granaries are'} full: upgrade or build another.", RED)
+
+
 def tap_tile(t):
     r = realm()
     if t is None:
@@ -89,16 +103,7 @@ def tap_tile(t):
     b = building_at(r, *t)
     if b is not None:
         if maker(b) and waiting(b) > 0 and global_vars.chosen is not b:
-            got = collect(r, b)
-            global_vars.chosen = b
-            if got:
-                sound_play("coin", volume=0.6)
-                x, y = building_xy(b["kind"], b["gx"], b["gy"])
-                global_vars.pops.append([makes(b), x, y - 70, 0, got])
-                keep_save(r)
-            else:
-                sound_play("nope", volume=0.5)
-                say(f"Your {'treasuries are' if makes(b) == 'gold' else 'granaries are'} full: upgrade or build another.", RED)
+            collect_tap(r, b)
             return
         global_vars.chosen = b
         open_panel("building", r["buildings"].index(b))
@@ -176,7 +181,11 @@ def pointer():
         if d["moved"]:
             return
         if d["mode"] == "pan":
-            tap_tile(d["tile"])
+            b = bubble_hit(realm(), mouse_x, mouse_y)
+            if b is not None:
+                collect_tap(realm(), b)        # a tap on a bubble collects it (it's above the building's tiles)
+            else:
+                tap_tile(d["tile"])
         elif d["mode"] == "place":
             place_at(d["tile"])
 

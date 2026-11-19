@@ -108,6 +108,11 @@ if ally_news() is not self.ally_seen:
     if global_vars.panel == "alliance":
         open_panel("alliance")
 # A prize newly waiting says so (the Awards button turns green too).
+# The first time a bubble shows, say what it's for (the teacher: nothing said gold needed collecting).
+if not r.get("told_collect") and global_vars.t % 60 == 40 and not global_vars.said:
+    if any(bubble(b) for b in r["buildings"]):
+        r["told_collect"] = True
+        say("Your mines and farms have made gold and food: tap the bubbles to collect it!", GOLD)
 if global_vars.t % 60 == 30:
     n = to_claim(r)
     if n > self.claims and not global_vars.said:
@@ -315,11 +320,13 @@ if global_vars.panel and box:
         elif to <= levels(kind) and kind != "builder_hut":
             why = can_upgrade(r, b)
             secs = i["time"][to - 1]
-            text(x1 + 345, y2 - 64, "Instant" if secs == 0 else f"Takes {clock_words(secs)}", DIM, 13)
+            # Above the row of buttons, in the right-hand column: beside the Upgrade button, the
+            # Train troops, Research and Move buttons covered them (the teacher's screenshot).
+            text(x1 + 250, y2 - 120, "Upgrading takes no time" if secs == 0 else f"Upgrading takes {clock_words(secs)}", DIM, 13)
             if why:
-                text(x1 + 345, y2 - 42, why, RED, 13)
+                text(x1 + 250, y2 - 98, why, RED, 13, "left", x2 - x1 - 280)
         if maker(b) and b["level"] and b["job"] is None:
-            text(x1 + 270, y2 - 124, f"Waiting: {big_number(waiting(b))} of {big_number(stat(kind, 'hold', lv))}", GOLD if makes(b) == "gold" else FOOD, 14)
+            text(x1 + 250, y2 - 144, f"Waiting: {big_number(waiting(b))} of {big_number(stat(kind, 'hold', lv))}", GOLD if makes(b) == "gold" else FOOD, 14)
     elif global_vars.panel == "army":
         text(x1 + 20, y1 + 12, "Your army", GOLD, 26)
         tab = getattr(global_vars, "army_tab", "troops")

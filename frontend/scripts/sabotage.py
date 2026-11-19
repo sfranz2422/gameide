@@ -2342,6 +2342,12 @@ CASES = [
  ('kingdom: event prizes without end', _kg('_2awards'), '    if e["claimed"] >= event_reached(e):', '    if False:', 'chosen among what the kingdom can do', KING),
  ('kingdom: no league bonus', _kg('_2awards'), '    return LEAGUES[league_of(r.get("trophies", 0))]["bonus"] * stars // 3', '    return 0', 'leagues by trophies', KING),
  ('kingdom: collect does nothing', _kg('_5acts'), '        res, prize, gained = claim_award(r, arg)', '        res, prize, gained = "no", None, []', "Awards window's three tabs", KING),
+ ('kingdom: a bubble that shrinks', _kg('_3screen'), '"r": BUBBLE_R / z,', '"r": BUBBLE_R,', "a mine's bubble", KING),
+ ('kingdom: a bubble only when 10% full', _kg('_3screen'), '    if n <= 0 or n < min(hold * BUBBLE_FROM, BUBBLE_LEAST):', '    if n <= 0 or n < hold * 0.1:', "a mine's bubble", KING),
+ ('kingdom: a full bubble not said', _kg('_3screen'), '"full": n >= hold}', '"full": False}', "a mine's bubble", KING),
+ ('kingdom: a tap on a bubble does nothing', _kg('_3screen'), '        if bb and (wx - bb["x"]) ** 2 + (wy - bb["y"]) ** 2 <= (bb["r"] * 1.3) ** 2:', '        if False:', "a mine's bubble", KING),
+ ('kingdom: collecting never explained', _kg('Realm'), '        say("Your mines and farms have made gold and food: tap the bubbles to collect it!", GOLD)', '        pass', "a mine's bubble", KING),
+ ('kingdom: words under the buttons', _kg('Realm'), '            text(x1 + 250, y2 - 120, "Upgrading takes no time"', '            text(x1 + 345, y2 - 64, "Upgrading takes no time"', 'no words under its buttons', KING),
 
  ('tell: the page drops them', NETS, '    if (o.tells && !this.away) this.tells.push(...o.tells);\n', '', "one player on a WebSocket and one polling", E2E),
 
