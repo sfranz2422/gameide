@@ -204,6 +204,13 @@ export const GEMINI_PACKS: LibraryPack[] = [
         "use": "sprites"
       },
       {
+        "name": "Things",
+        "file": "library/gemini/lemon/things.png",
+        "tileWidth": 190,
+        "tileHeight": 99,
+        "use": "sprites"
+      },
+      {
         "name": "Small things",
         "file": "library/gemini/lemon/small-things.png",
         "tileWidth": 64,

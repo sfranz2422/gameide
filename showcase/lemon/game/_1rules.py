@@ -109,14 +109,51 @@ RIVAL_CHANCE = 0.2                               # days a rival sets up beside y
 RIVAL_PRICE = (50, 80)                           # what they charge, cents
 
 # ---- upgrades: (key, name, cost, what it does)
+# Every one shows at your stand once it's yours (the kids' ask, 2026-11-19): where, STAND_SPOTS.
 UPGRADES = [
-    ("cooler", "Cooler",           1500, "Ice melts half as fast, and half lasts the night"),
-    ("sign",   "Big sign",         2000, "More people notice your stand"),
-    ("juicer", "Juicer",           2500, "A pitcher needs fewer lemons"),
-    ("pink",   "Pink lemonade",    3000, "Some customers love it, and pay more"),
-    ("helper", "Helper",           3500, "Pours twice as fast at your stand; a longer queue"),
-    ("second", "Second stand",     5000, "A helper sells at another of your places"),
+    ("register", "Cash register",  1200, "Serving is a third quicker"),
+    ("cooler",   "Cooler",         1500, "Ice melts half as fast, and half lasts the night"),
+    ("fridge",   "Mini fridge",    1800, "Lemons stay fresh 5 days, not 3"),
+    ("sign",     "Big sign",       2000, "More people notice your stand"),
+    ("juicer",   "Juicer",         2500, "A pitcher needs fewer lemons"),
+    ("icemaker", "Ice maker",      2800, "Makes a pack of ice free every night"),
+    ("pink",     "Pink lemonade",  3000, "Some customers love it, and pay more"),
+    ("blender",  "Blender",        3200, "Frozen lemonade: pays more at 85°F or hotter"),
+    ("helper",   "Helper",         3500, "Pours twice as fast at your stand; a longer queue"),
+    ("popcorn",  "Popcorn machine", 4000, "Sell popcorn too: it's salty, so buyers get thirsty"),
+    ("second",   "Second stand",   5000, "A helper sells at another of your places"),
 ]
+REGISTER_SAVES = 2 / 3       # a cup takes two thirds as long with a cash register
+FRIDGE_LEMON_DAYS = 5        # with a mini fridge, a lemon keeps this many days
+ICE_MAKER_CUBES = 60         # a pack of ice, made each night
+FROZEN_FROM = 85             # °F: frozen lemonade pays more from here up...
+FROZEN_PAYS = 1.3            # ...this much more; and frozen is never "too warm"
+
+# ---- popcorn (the popcorn machine): kernels and bags bought in the morning, popped in
+# batches as people ask; popped popcorn goes stale overnight, kernels and bags keep.
+POP_SUPPLIES = [
+    # key        name               pack  unit             low  high
+    ("kernels", "Popcorn kernels",  30,  "bags' worth",   150, 240),
+    ("bags",    "Popcorn bags",     30,  "bags",           80, 130),
+]
+POP_KEYS = [s[0] for s in POP_SUPPLIES]
+POP_BATCH = 10               # bags a batch pops
+POP_STEPS = 110              # popping a batch
+HAND_STEPS = 18              # handing over a bag
+POP_WANT, POP_WANT_KID = 0.35, 0.55   # the chance someone who notices you wants popcorn (kids more)
+POP_PAY = 0.9                # what they'd pay for a bag: budget x this x (0.85 + PAY_REP x reputation)
+POP_THIRST = 0.3             # popcorn's salt: thirst goes up this much, so more of them buy lemonade too
+
+# Where each thing shows at your stand: (across from the stand's middle, up from its foot).
+# The counter's things stand on it; the rest stand on the ground to the stand's right,
+# clear of the queue (on the left). The helper stands behind the counter beside you.
+# Measured on Gemini's bare stand (sheet 13): its counter top, its awning's top.
+COUNTER_Y = 65
+STAND_SPOTS = {
+    "sign": (0, 211), "register": (-76, COUNTER_Y), "pitcher": (-34, COUNTER_Y), "juicer": (40, COUNTER_Y),
+    "blender": (80, COUNTER_Y), "helper": (66, 45),   # stands where you do (OWNER_LIFT)
+    "cooler": (152, 0), "fridge": (220, 0), "icemaker": (286, 0), "popcorn": (364, 0),
+}
 
 # ---- the second stand: run by a helper at another place you sell at, with what you
 # send it from your shelf (enough for its cups, at your recipe). It sells by the same
@@ -133,8 +170,8 @@ SERVE_STEPS = 40             # pouring one cup
 PITCHER_STEPS = 100          # making a pitcher
 DRINK_STEPS = 70             # drinking, by the stand, before they say what they think
 SPEEDS = [1, 2, 4]
-STAND_X = 560                # the stand's middle
-DECIDE_X = 330               # where a passer-by decides whether to stop
+STAND_X = 470                # the stand's middle (left of the middle: what you buy stands to its right)
+DECIDE_X = 250               # where a passer-by decides whether to stop
 QUEUE_GAP = 44               # between people in the queue
 OWNER_LIFT = 45              # you stand this far above the stand's foot: your lower half behind the counter, your hat under the awning
 

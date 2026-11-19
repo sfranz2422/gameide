@@ -229,7 +229,7 @@ describe.skipIf(!have)("Squeeze", () => {
     const g = await summer();
     py(g, "s = global_vars.s\ns['lemons'] = [[0, 12]]\ns['ice'] = 100.0");
     py(g, "next_day(global_vars.s)");      // day 1
-    expect(py(g, "[lemon_count(global_vars.s), int(global_vars.s['ice']), global_vars.s['news']]")).toEqual([12, 0, { melted: 100, soft: 0 }]);
+    expect(py(g, "[lemon_count(global_vars.s), int(global_vars.s['ice']), global_vars.s['news']]")).toEqual([12, 0, { melted: 100, soft: 0, made_ice: 0 }]);
     py(g, "s = global_vars.s\ns['lemons'].append([1, 12])\nuse_lemons(s, 5)");
     expect(py(g, "global_vars.s['lemons']")).toEqual([[0, 7], [1, 12]]);
     py(g, "next_day(global_vars.s)\nnext_day(global_vars.s)");     // day 3: day 0's are soft
@@ -543,4 +543,142 @@ b = tt['second']['back']
 [lemon_count(st), st['sugar'], int(st['ice']), st['cups']] == [b['lemons'], b['sugar'], b['ice'], b['cups']] and b['cups'] > 0`)).toBe(true);
   }, 120_000);
 
+
+  // ---- 2026-11-19: what you buy shows at the stand; the kitchen; popcorn
+
+  it("everything bought shows at the stand: on the ground beside it, on the counter, the helper behind it, the sign on top", async () => {
+    const g = await summer();
+    const drawn = () => {
+      py(g, 'do_act("open", None)');
+      step(g, 3);
+      return py<string[]>(g, 'sorted(set(c["sprite"] for c in _draw_log if c["sprite"] in STAND_SPOTS or c["sprite"] in ("helper", "stand")))');
+    };
+    py(g, "_draw_log = []\n_real = draw_sprite\ndef draw_sprite(spr, frame, x, y):\n    _draw_log.append({'sprite': spr, 'x': x, 'y': y})\n    _real(spr, frame, x, y)");
+    // The Stand's draw runs in the engine's draw event: count what it draws through a wrapper.
+    py(g, "global_vars.s['money'] = 10**7");
+    expect(drawn()).toEqual(["pitcher"]);
+    py(g, 'do_act("next", None)' );
+    for (const k of ["register", "cooler", "fridge", "sign", "juicer", "icemaker", "blender", "helper", "popcorn"]) py(g, `buy_upgrade(global_vars.s, "${k}")`);
+    py(g, '_draw_log.clear()\nroom_goto("Morning")');
+    step(g, 2);
+    py(g, '_draw_log.clear()');
+    expect(drawn()).toEqual(["blender", "cooler", "fridge", "helper", "icemaker", "juicer", "pitcher", "popcorn", "register", "sign"]);
+    // Each in its own place: ground things on the ground, to the stand's right (clear of the queue).
+    const at = py<Record<string, [number, number]>>(g, '{c["sprite"]: [c["x"] - STAND_X, instances("Day")[0].ground - c["y"]] for c in _draw_log}');
+    for (const k of ["cooler", "fridge", "icemaker", "popcorn"]) {
+      expect(at[k][1]).toBe(0);
+      expect(at[k][0]).toBeGreaterThan(60);
+    }
+    expect(at.register[1]).toBe(py(g, "COUNTER_Y"));
+    expect(at.sign[1]).toBeGreaterThan(150);
+  });
+
+  it("the kitchen: a fridge keeps lemons 5 days, the ice maker makes a pack a night, a register serves a third quicker", async () => {
+    const g = await summer();
+    py(g, "s = global_vars.s\ns['money'] = 10**6\ns['lemons'] = [[0, 12]]\ns['day'] = 0");
+    py(g, "for _ in range(3):\n    next_day(s)");
+    expect(py(g, "lemon_count(s)")).toBe(0);
+    py(g, "s['day'] = 0\ns['lemons'] = [[0, 12]]\nbuy_upgrade(s, 'fridge')\nfor _ in range(4):\n    next_day(s)");
+    expect(py(g, "lemon_count(s)")).toBe(12);
+    py(g, "next_day(s)");
+    expect(py(g, "lemon_count(s)")).toBe(0);
+    py(g, "s['ice'] = 0.0\nbuy_upgrade(s, 'icemaker')\nnext_day(s)");
+    expect(py(g, "[int(s['ice']), s['news']['made_ice']]")).toEqual([60, 60]);
+    const plain = py<number>(g, "serve_steps(s)");
+    py(g, "buy_upgrade(s, 'register')");
+    expect(py(g, "serve_steps(s)")).toBe(Math.round(plain * 2 / 3));
+  });
+
+  it("the blender: frozen lemonade pays more at 85°F or hotter, never tastes too warm; chosen with pink as the lemonade's style", async () => {
+    const g = await summer();
+    py(g, "s = global_vars.s\ns['money'] = 10**6\nwho = {'thirst': 0.6, 'budget': 200, 'fan': False, 'lemons': 4, 'sugar': 4, 'ice': 5}");
+    py(g, "_temp = today(s)['temp']\ntoday(s)['temp'] = 95");
+    expect(py<number>(g, "would_pay(s, who, False, True)")).toBeGreaterThan(py<number>(g, "would_pay(s, who, False, False)"));
+    py(g, "today(s)['temp'] = 80");
+    expect(py<number>(g, "would_pay(s, who, False, True)")).toBe(py<number>(g, "would_pay(s, who, False, False)"));
+    py(g, "today(s)['temp'] = _temp");
+    expect(py(g, "[verdict([4, 4, 1], who), verdict([4, 4, 1], who, False, True)]")).toEqual(["warm", "perfect"]);
+    // The style stepper: plain only; with pink and a blender, all four, setting both.
+    expect(py(g, "len(styles(s))")).toBe(1);
+    py(g, "buy_upgrade(s, 'pink')\nbuy_upgrade(s, 'blender')");
+    expect(py(g, "[stepper_set('style', 1), stepper_set('style', 1), stepper_set('style', 1), s['plan']['pink'], s['plan']['frozen']]"))
+      .toEqual([1, 2, 3, true, true]);
+    expect(py(g, "open_stand(s)['frozen']")).toBe(true);
+  });
+
+  it("popcorn: bought in the morning, popped in batches, sold at its own price; it goes stale overnight, kernels and bags keep", async () => {
+    const g = await summer();
+    py(g, "s = global_vars.s\ns['money'] = 10**6\nbuy_upgrade(s, 'popcorn')\ns['plan']['buy'] = {'kernels': 1, 'bags': 1}");
+    const before = py<number>(g, "s['money']");
+    py(g, "t = open_stand(s)");
+    expect(py(g, "[s['kernels'], s['bags'], t['popcorn']]")).toEqual([30, 30, true]);
+    expect(before - py<number>(g, "s['money']")).toBe(py(g, "t['supplies'] + t['rent']"));
+    expect(py(g, "t['supplies']")).toBe(py(g, "sum(pop_prices(s).values())"));
+    expect(py(g, "[sell_bag(s, t), sell_bag(s, t), s['kernels'], s['popped'], s['bags'], t['pop_bags'], t['pop_income']]"))
+      .toEqual([true, false, 20, 8, 28, 2, 200]);
+    py(g, "end_day(s, t)\nnext_day(s)");
+    expect(py(g, "[s['popped'], s['kernels'], s['bags']]")).toEqual([0, 20, 28]);
+    expect(py(g, "s['history'][-1]['profit']")).toBe(py<number>(g, "s['history'][-1]['income'] + 200 - s['history'][-1]['supplies'] - s['history'][-1]['rent']"));
+    // Run out: no bags, or no kernels for a new batch.
+    expect(py(g, "pop_why_not(dict(s, bags=0))")).toBe("No popcorn bags left!");
+    expect(py(g, "pop_why_not(dict(s, kernels=0, popped=0))")).toBe("No popcorn kernels left!");
+    expect(py(g, "pop_why_not(dict(s, kernels=0, popped=3)) is None")).toBe(true);
+    // A batch is what kernels there are, if fewer than a whole one.
+    expect(py(g, "s2 = dict(s, kernels=3, popped=0)\n[sell_bag(s2, t), s2['kernels'], s2['popped']]")).toEqual([true, 0, 2]);
+  });
+
+  it("popcorn's salt: buyers get thirsty, so more stop for lemonade; kids want it more; too dear, nobody", async () => {
+    const g = await summer();
+    py(g, "import random\ns = global_vars.s\ns['money'] = 10**6\nbuy_upgrade(s, 'popcorn')\nt = {'popcorn': True, 'pop_price': 100, 'pink': False, 'price': 100}");
+    py(g, "who = {'thirst': 0.1, 'kind': 0}\nsalted(who)");
+    expect(py<number>(g, "who['thirst']")).toBeCloseTo(0.4);
+    const share = (kind: number, price = 100) =>
+      py<number>(g, `rng = random.Random(5)\nt['pop_price'] = ${price}\nsum(wants_popcorn(s, {'kind': ${kind}, 'budget': 200}, t, rng) for _ in range(4000)) / 4000`);
+    const adult = share(0), kid = share(3);
+    expect(kid).toBeGreaterThan(adult + 0.08);
+    expect(share(3, 300)).toBe(0);
+    expect(py(g, "t['popcorn'] = False\nwants_popcorn(s, {'kind': 3, 'budget': 200}, t)")).toBe(false);
+  });
+
+  it("a day selling popcorn too: popcorn and lemonade both sold, and the salt makes the same passers-by buy more lemonade", async () => {
+    const g = await summer();
+    py(g, BOT);
+    py(g, "s = global_vars.s\ns['money'] = 10**6\nbuy_upgrade(s, 'popcorn')\nbot_morning()\ns['plan']['buy'].update({'kernels': 4, 'bags': 4})");
+    openAndPlay(g);
+    const t = py<{ cups: number; pop_bags: number }>(g, "global_vars.s['history'][-1]");
+    expect(t.cups).toBeGreaterThan(5);
+    expect(t.pop_bags).toBeGreaterThan(3);
+    // The same 3000 people, deciding with the same random numbers, with popcorn's salt and without.
+    const buyers = (salt: boolean) => py<number>(g, `import random
+people = [new_customer(s, today(s), random.Random(i)) for i in range(3000)]
+t2 = {"pink": False, "price": 120}
+n = 0
+for i, who in enumerate(people):
+    if ${salt ? "True" : "False"}:
+        salted(who)
+    n += decide(s, who, t2, 0, None, random.Random(10**6 + i)) == "buy"
+n`);
+    expect(buyers(true)).toBeGreaterThan(buyers(false) * 1.15);
+  });
+
+  it("the shop: every upgrade and place fits on the evening, and the popcorn screen opens from the morning", async () => {
+    const g = await summer();
+    py(g, 'global_vars.s["money"] = 10**6\nbuy_upgrade(global_vars.s, "popcorn")\ndo_act("open", None)');
+    step(g, 2);
+    playDay(g);
+    const boxes = py<number[][]>(g, '[[b.x, b.y, b.x + b.wide, b.y + b.high] for b in instances("Button") if b.act in ("upgrade", "unlock")]');
+    expect(boxes.length).toBe(py<number>(g, "len(UPGRADES) + 3"));
+    for (const [x1, y1, x2, y2] of boxes) {
+      expect(x1).toBeGreaterThanOrEqual(688);
+      expect(x2).toBeLessThanOrEqual(1010);
+      expect(y2).toBeLessThanOrEqual(450);
+    }
+    py(g, 'do_act("next", None)');
+    step(g, 2);
+    py(g, 'press(next(b for b in instances("Button") if b.act == "popcorn"))');
+    step(g, 2);
+    expect(room(g)).toBe("Popcorn");
+    py(g, 'stepper_set("buy_kernels", 1)\nstepper_set("pop_price", 1)');
+    expect(py(g, '[global_vars.s["plan"]["buy"]["kernels"], global_vars.s["plan"]["pop_price"]]')).toEqual([1, 105]);
+  });
 });

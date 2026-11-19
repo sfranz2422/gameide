@@ -29,5 +29,9 @@ if self.shown:
     draw_rect(self.x, self.y, self.x + self.wide, self.y + self.high)
     draw_set_color("#2a1a08")
     draw_rect(self.x, self.y, self.x + self.wide, self.y + self.high, True)
-    text(self.x + self.wide / 2, self.y + self.high / 2 - self.size * 0.62, self.words, "#a8a294" if self.off else INK, self.size, "center")
+    # A line break in the words makes two lines, each centred (the Evening's shop).
+    lines = self.words.split("\n")
+    top = self.y + self.high / 2 - self.size * 0.62 * len(lines) - self.size * 0.08 * (len(lines) - 1)
+    for i, line in enumerate(lines):
+        text(self.x + self.wide / 2, top + i * self.size * 1.2, line, "#a8a294" if self.off else INK, self.size, "center")
     draw_focus(self)

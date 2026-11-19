@@ -24,6 +24,18 @@ def make_stepper(x, y, key, wide=300):
 
 # ---- steppers: what each key's number is, how far it goes, and how it reads
 
+def styles(s):
+    """The kinds of lemonade you can make: (pink, frozen), plain first."""
+    out = [(False, False)]
+    if has(s, "pink"):
+        out.append((True, False))
+    if has(s, "blender"):
+        out.append((False, True))
+    if has(s, "pink") and has(s, "blender"):
+        out.append((True, True))
+    return out
+
+
 def _limits(key):
     s = global_vars.s
     if key.startswith("buy_"):
@@ -40,8 +52,12 @@ def _limits(key):
         return 0, RECIPE_MAX, 1
     if key == "price":
         return PRICE_MIN, PRICE_MAX, PRICE_STEP
-    if key == "pink":
+    if key in ("pink", "pop_on"):
         return 0, 1, 1
+    if key == "style":
+        return 0, len(styles(s)) - 1, 1
+    if key == "pop_price":
+        return PRICE_MIN, PRICE_MAX, PRICE_STEP
     return 0, len(s["places"]) - 1, 1
 
 
@@ -49,7 +65,7 @@ def stepper_value(key):
     plan = global_vars.s["plan"]
     sec = plan["second"]
     if key.startswith("buy_"):
-        return plan["buy"][key[4:]]
+        return plan["buy"].get(key[4:], 0)
     if key == "s_open":
         return 1 if sec["open"] else 0
     if key == "s_place":
@@ -61,6 +77,11 @@ def stepper_value(key):
         return sorted(global_vars.s["places"]).index(plan["place"])
     if key == "pink":
         return 1 if plan["pink"] else 0
+    if key == "pop_on":
+        return 1 if plan["popcorn"] else 0
+    if key == "style":
+        now = (bool(plan["pink"]), bool(plan["frozen"]))
+        return styles(global_vars.s).index(now) if now in styles(global_vars.s) else 0
     return plan[key]
 
 
@@ -83,6 +104,10 @@ def stepper_set(key, d):
         plan["place"] = sorted(s["places"])[v]
     elif key == "pink":
         plan["pink"] = bool(v)
+    elif key == "pop_on":
+        plan["popcorn"] = bool(v)
+    elif key == "style":
+        plan["pink"], plan["frozen"] = styles(s)[v]
     else:
         plan[key] = v
     global_vars.problem = ""
@@ -96,9 +121,19 @@ def stepper_words(key):
     day = today(s)
     if key.startswith("buy_"):
         k = key[4:]
-        _, name, pack, unit, _, _ = next(x for x in SUPPLIES if x[0] == k)
-        n = plan["buy"][k]
-        return name, f"{n} pack{'s' if n != 1 else ''}", f"{money(day['prices'][k])} for {pack} {unit}"
+        _, name, pack, unit, _, _ = next(x for x in SUPPLIES + POP_SUPPLIES if x[0] == k)
+        n = plan["buy"].get(k, 0)
+        price = pop_prices(s)[k] if k in POP_KEYS else day["prices"][k]
+        return name, f"{n} pack{'s' if n != 1 else ''}", f"{money(price)} for {pack} {unit}"
+    if key == "style":
+        pink, frozen = styles(s)[stepper_value("style")]
+        words = {(False, False): "Plain", (True, False): "Pink", (False, True): "Frozen", (True, True): "Pink frozen"}[(pink, frozen)]
+        note = "Frozen pays more at 85°F+" if has(s, "blender") else "Pink fans pay more"
+        return "Lemonade", words, note
+    if key == "pop_on":
+        return "Sell popcorn today", "Yes" if plan["popcorn"] else "No", "Salty: buyers get thirsty"
+    if key == "pop_price":
+        return "Price a bag", money(plan["pop_price"]), ""
     if key == "lemons":
         juiced = f" (uses {lemons_a_pitcher(s)}: juicer)" if has(s, "juicer") and plan["lemons"] else ""
         return "Lemons a pitcher", str(plan["lemons"]), f"8 cups a pitcher{juiced}"
@@ -154,6 +189,9 @@ def do_act(name, arg):
             sec["place"] = where[-1] if where else None
         global_vars.problem = ""
         room_goto("Second")
+    elif name == "popcorn":
+        global_vars.problem = ""
+        room_goto("Popcorn")
     elif name == "done_second":
         global_vars.problem = ""
         room_goto("Morning")

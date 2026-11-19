@@ -17,7 +17,11 @@ self.timer = 0
 self.happy = 0
 self.pace = WALK * random.uniform(0.85, 1.15)
 self.anim = random.uniform(0, 20)
-self.drink_x = STAND_X + random.uniform(90, 150)
+# Past the things on the ground beside the stand (cooler, fridge…), so they're seen.
+self.drink_x = STAND_X + random.uniform(420, 470)
+self.lemonade = False       # what they'll be served (decided as they reach the stand)
+self.popcorn = False
+self.has_popcorn = False    # holding a bag (drawn in their hand)
 
 # === step
 s = global_vars.s
@@ -31,13 +35,20 @@ if self.state == "walk":
     if not self.decided and self.x >= DECIDE_X:
         self.decided = True
         t["passers"] += 1
+        # Popcorn first: its salt makes them thirstier, so more stop for lemonade too.
+        pop = wants_popcorn(s, self.who, t) and not pop_why_not(s)
+        if pop:
+            salted(self.who)
         choice = decide(s, self.who, t, len(q), today(s)["rival"])
-        if choice == "buy":
-            if why_not(s):
-                say(self, "thirsty")
-            else:
-                q.append(self)
-                self.state = "queue"
+        lem = choice == "buy" and not why_not(s)
+        if choice == "full":
+            pop = False
+        if lem or pop:
+            self.lemonade, self.popcorn = lem, pop
+            q.append(self)
+            self.state = "queue"
+        elif choice == "buy":
+            say(self, "thirsty")
         elif choice == "pricey":
             say(self, "pricey")
     if self.x > VIEW_W + 60:
@@ -55,7 +66,10 @@ elif self.state == "drink":
     else:
         self.timer -= sp
         if self.timer <= 0:
-            say(self, verdict(t["recipe"], self.who, t["pink"]))
+            if self.lemonade:
+                say(self, verdict(t["recipe"], self.who, t["pink"], t.get("frozen", False)))
+            else:
+                self.happy = 50           # popcorn only: no verdict on the lemonade they didn't have
             self.state = "walk"
 if self.happy > 0:
     self.happy -= sp
@@ -68,3 +82,9 @@ else:
     self.image_index = 2
 if self.happy > 0 and not moving:
     self.image_index = 4
+
+# === draw
+draw_self()
+if self.has_popcorn:
+    # Their bag of popcorn, in the hand in front (they all face right).
+    icon("popcorn", self.x + 22, self.y - 52, 0.42)

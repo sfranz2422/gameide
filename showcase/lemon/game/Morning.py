@@ -19,8 +19,8 @@ y = 136
 for k in ("lemons", "sugar", "ice", "price"):
     make_stepper(x2, y, k, 316)
     y += 54
-if has(s, "pink"):
-    make_stepper(x2, y, "pink", 316)
+if has(s, "pink") or has(s, "blender"):
+    make_stepper(x2, y, "style", 316)
     y += 54
 make_stepper(x2, y, "place", 316)
 self.open = make_button(VIEW_W / 2 - 150, 498, 300, 56, "Open the stand", "open", size=24)
@@ -29,6 +29,9 @@ self.first = self.open
 # The second stand: set up on a screen of its own (this one is full).
 self.second = make_button(16, 504, 316, 44, "", "second", size=16)
 self.second.shown = has(s, "second")
+# Popcorn, also a screen of its own.
+self.pop = make_button(692, 504, 316, 44, "", "popcorn", size=16)
+self.pop.shown = has(s, "popcorn")
 
 # === step
 question_ok(True)
@@ -36,6 +39,9 @@ s = global_vars.s
 self.second.shown = has(s, "second")
 sec = second_open(s)
 self.second.words = f"Second stand: {PLACES[sec['place']]['name']}, {sec['cups']} cups" if sec and sec["place"] is not None else "Second stand: closed"
+n = sum(s["plan"]["buy"].get(k, 0) for k in POP_KEYS)
+self.pop.words = (f"Popcorn: {n} pack{'s' if n != 1 else ''}, {money(s['plan']['pop_price'])} a bag" if s["plan"]["popcorn"]
+                  else "Popcorn: not today")
 run_controls(self.first)
 
 # === draw
@@ -64,7 +70,7 @@ for line in event_notes(s, day):
     text(30, y, line, "#ffb36b", 14)
     y += 20
 news = s["news"] or {}
-if news.get("soft") or news.get("melted"):
+if news.get("soft") or news.get("melted") or news.get("made_ice"):
     text(30, y + 4, "Overnight:", DIM, 14)
     y += 24
     if news.get("soft"):
@@ -73,8 +79,11 @@ if news.get("soft") or news.get("melted"):
     if news.get("melted"):
         text(40, y, f"{news['melted']} ice cubes melted", RED, 14)
         y += 20
+if news.get("made_ice"):
+    text(40, y, f"The ice maker made {news['made_ice']} cubes", MINT, 14)
+    y += 20
 text(30, 330, "On the shelf", GOLD, 20)
-soon = sum(n for d, n in s["lemons"] if d <= s["day"] - LEMON_DAYS + 1)
+soon = sum(n for d, n in s["lemons"] if d <= s["day"] - lemon_days(s) + 1)
 rows = [("lemon", f"{lemon_count(s)} lemons" + (f" ({soon} soft tomorrow)" if soon else "")),
         ("sugar", f"{s['sugar']} scoops of sugar"), ("ice", f"{int(s['ice'])} ice cubes"), ("cups", f"{s['cups']} cups")]
 for i, (pic, words) in enumerate(rows):
@@ -97,7 +106,7 @@ if second_open(s):
     need = second_needs(s)
     shelf = {k: max(0, shelf[k] - need[k]) for k in SUPPLY_KEYS}
 text(352, 428, f"Makes about {cups_from(s, shelf)} cups" + (" (after the second stand's)" if second_open(s) else ""), MINT, 14)
-text(352, 448, "Lemons go soft after 3 days.", DIM, 11)
+text(352, 448, f"Lemons go soft after {lemon_days(s)} days" + (" (in the fridge)." if has(s, "fridge") else "."), DIM, 11)
 text(352, 461, "Ice melts by morning (unless you've a cooler).", DIM, 11)
 
 panel(684, 96, 1010, 470)

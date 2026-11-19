@@ -872,6 +872,15 @@ stand opens (`send_second`); its day is worked out in one go as yours ends (`run
 day's own random numbers) and what's left comes back. The old Second stand's faster pouring is
 the Helper upgrade now; `bring_up_to_date` gives it to summers that bought the old one, and
 carries on a summer that ended on day 30.
+**What you buy shows at the stand** (2026-11-19, the kids' ask): the stand is bare (frame 0, or
+the pink one) and each thing bought is a picture of its own placed by `STAND_SPOTS` (on the
+ground to the stand's right, clear of the queue; on the counter; the helper behind it; the sign
+on top), so they all show at once: the old stand pictures were one per "best" upgrade. New
+upgrades: cash register, mini fridge (`lemon_days`), ice maker, blender (frozen lemonade, chosen
+with pink as the lemonade's style, `styles`), and the **popcorn machine**: kernels and bags
+bought on the Popcorn screen, popped in batches, stale overnight, and salty (`salted`: a buyer is
+thirstier, so more buy lemonade too). The game's `ICONS` and the build's `ICON_NAMES` are one
+list written twice; the build refuses if they differ.
 
 ## Order Up!
 

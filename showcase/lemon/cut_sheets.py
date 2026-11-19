@@ -19,6 +19,8 @@ from PIL import Image
 HERE = Path(__file__).resolve().parent
 RAW, ART = HERE / "raw", HERE / "art"
 S = 2
+FRIDGE_H = 76       # sheet 14's scale: the mini fridge's height in the game
+SIGN_W = 190        # the sign: a bit narrower than the awning (as wide, it towered over the stand)
 OWNER_TOP = 420     # sheet 2: where the second row's hats begin (the first row fades into them)
 
 
@@ -130,6 +132,28 @@ def main():
     apart(im, boxes, [f"bubble_{k}" for k in range(6)], _build.BUBBLE)
     # 12: the title.
     wide(12, "title")
+    # 13-15 (2026-11-19): what you buy, shown at the stand.
+    if (RAW / "13.jpeg").exists():
+        # 13: the bare stand and the pink one, nothing on the counter.
+        im, boxes = sheet(13, [2])
+        together(im, boxes, ["stand_bare_0", "stand_bare_1"], _build.STAND)
+    if (RAW / "14.jpeg").exists():
+        # 14: the things, all drawn at one scale: cut at one scale too (the fridge FRIDGE_H
+        # tall in the game), each at its own size, so a cart stays taller than a juicer.
+        # The sign is fitted to the stand's awning instead.
+        im, boxes = sheet(14, [4, 5, 1])
+        names = ["cooler", "fridge", "icemaker", "popcorn", "register", "juicer", "blender", "pitcher", "pitcher_pink", "sign"]
+        box = dict(zip(names, boxes))
+        k = FRIDGE_H * S / (box["fridge"][3] - box["fridge"][1])
+        for name, b in box.items():
+            kk = SIGN_W * S / (b[2] - b[0]) if name == "sign" else k
+            part = im.crop(b)
+            save(part.resize((max(1, round(part.width * kk)), max(1, round(part.height * kk))), Image.LANCZOS), f"thing_{name}")
+    if (RAW / "15.jpeg").exists():
+        # 15: the helper's two poses (framed as you are, sheet 2), and two icons.
+        im, boxes = sheet(15, [2, 2])
+        together(im, boxes[:2], ["helper_0", "helper_1"], _build.HELPER)
+        apart(im, boxes[2:], ["icon_popcorn", "icon_kernels"], _build.ICON)
 
 
 if __name__ == "__main__":

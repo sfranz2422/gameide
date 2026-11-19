@@ -45,10 +45,16 @@ S = 4   # stand-ins are drawn 4 times bigger and shrunk, for smooth edges
 # Sizes in the game. art/ keeps pictures at twice these (cut_sheets.py).
 STAND = (240, 220)
 OWNER = (130, 110)
+HELPER = (170, 110)    # as tall as you; wider, for the arm handing popcorn over
 PERSON = (120, 130)    # wide enough for a stroller or a dog alongside
 ICON = (64, 64)
 BUBBLE = (76, 76)
-ICON_NAMES = ["lemon", "sugar", "ice", "cups", "pitcher", "pitcher_pink", "coin", "cooler", "juicer", "sign", "second", "strawberry", "soft_lemon"]
+ICON_NAMES = ["lemon", "sugar", "ice", "cups", "pitcher", "pitcher_pink", "coin", "cooler", "juicer", "sign", "second", "strawberry", "soft_lemon",
+              "popcorn", "kernels"]
+# What you buy, shown at the stand (the kids' ask, 2026-11-19): each its own picture, its
+# foot at the bottom middle, placed by STAND_SPOTS in the rules. Sizes in the game.
+THINGS = {"sign": (230, 56), "register": (44, 38), "juicer": (36, 34), "blender": (30, 52), "pitcher": (40, 44),
+          "cooler": (66, 42), "fridge": (54, 76), "icemaker": (52, 66), "popcorn": (76, 118)}
 PERSON_FRAMES = ["walk1", "walk2", "stand", "drink", "happy"]
 
 
@@ -119,24 +125,60 @@ def stand_in_stand(k):
         d.polygon([(x0 * S, top * S), ((x0 + (w - 8) / n) * S, top * S), ((x0 + (w - 8) / n) * S, bot * S), (x0 * S, bot * S)], fill=stripe[i % 2])
         d.pieslice(((x0) * S, (bot - 10) * S, (x0 + (w - 8) / n) * S, (bot + 10) * S), 0, 180, fill=stripe[i % 2])
     d.rectangle((4 * S, top * S, (w - 4) * S, bot * S), outline=dark, width=2 * S)
-    # pitcher on the counter
-    lemonade = (255, 150, 190) if k == 3 else (255, 230, 90)
-    d.rectangle(((w - 70) * S, 86 * S, (w - 46) * S, 112 * S), fill=lemonade, outline=dark, width=S)
-    if k >= 1:   # the sign
-        d.rectangle(((w / 2 - 60) * S, 0, (w / 2 + 60) * S, 32 * S), fill=(250, 240, 210), outline=dark, width=2 * S)
-        d.ellipse(((w / 2 - 12) * S, 6 * S, (w / 2 + 12) * S, 26 * S), fill=(255, 214, 64), outline=dark, width=S)
-    if k >= 2:   # cooler and juicer
-        d.rectangle((0, (h - 50) * S, 40 * S, (h - 4) * S), fill=(60, 140, 220), outline=dark, width=2 * S)
-        d.ellipse((40 * S, 98 * S, 64 * S, 114 * S), fill=(220, 220, 230), outline=dark, width=S)
+    # (Nothing on the counter: the pitcher and everything bought are pictures of their own.)
     return done(im, STAND)
 
 
-def stand_in_owner(k):
+def stand_in_thing(name, pink=False):
+    """A plain drawing of something bought for the stand, until Gemini's."""
+    size = THINGS[name]
+    w, h = size
+    im = canvas(size)
+    d = ImageDraw.Draw(im)
+    ink = (60, 40, 20)
+    box = lambda *v: tuple(x * S for x in v)
+    if name == "sign":
+        d.rectangle(box(20, 0, 28, h), fill=(110, 70, 30))
+        d.rectangle(box(w - 28, 0, w - 20, h), fill=(110, 70, 30))
+        d.rectangle(box(6, 2, w - 6, h - 10), fill=(250, 236, 200), outline=ink, width=2 * S)
+        d.ellipse(box(w / 2 - 14, 10, w / 2 + 14, h - 18), fill=(255, 214, 64), outline=ink, width=S)
+    elif name == "register":
+        d.rectangle(box(2, 14, w - 2, h - 1), fill=(150, 150, 160), outline=ink, width=2 * S)
+        d.rectangle(box(8, 2, w - 8, 16), fill=(60, 60, 70), outline=ink, width=S)
+    elif name == "juicer":
+        d.ellipse(box(2, h - 14, w - 2, h - 1), fill=(220, 220, 230), outline=ink, width=2 * S)
+        d.polygon([(w / 2 * S, 2 * S), ((w - 8) * S, (h - 10) * S), (8 * S, (h - 10) * S)], fill=(240, 240, 248), outline=ink)
+    elif name == "blender":
+        d.rectangle(box(4, h - 12, w - 4, h - 1), fill=(70, 70, 80), outline=ink, width=S)
+        d.polygon([(3 * S, 4 * S), ((w - 3) * S, 4 * S), ((w - 6) * S, (h - 12) * S), (6 * S, (h - 12) * S)], fill=(255, 240, 150), outline=ink)
+    elif name == "pitcher":
+        d.rectangle(box(6, 6, w - 12, h - 1), fill=(255, 150, 190) if pink else (255, 230, 90), outline=ink, width=2 * S)
+        d.arc(box(w - 18, 10, w - 2, h - 14), 270, 90, fill=ink, width=3 * S)
+    elif name == "cooler":
+        d.rectangle(box(2, 12, w - 2, h - 1), fill=(60, 140, 220), outline=ink, width=2 * S)
+        d.rectangle(box(2, 4, w - 2, 14), fill=(240, 240, 240), outline=ink, width=2 * S)
+    elif name == "fridge":
+        d.rectangle(box(2, 2, w - 2, h - 1), fill=(236, 240, 244), outline=ink, width=2 * S)
+        d.line([(2 * S, 26 * S), ((w - 2) * S, 26 * S)], fill=ink, width=S)
+        d.rectangle(box(w - 12, 8, w - 8, 20), fill=ink)
+    elif name == "icemaker":
+        d.rectangle(box(2, 2, w - 2, h - 1), fill=(190, 200, 210), outline=ink, width=2 * S)
+        d.rectangle(box(10, 24, w - 10, 50), fill=(200, 236, 255), outline=ink, width=S)
+    elif name == "popcorn":
+        d.rectangle(box(8, h - 50, w - 8, h - 6), fill=(220, 40, 40), outline=ink, width=2 * S)
+        d.rectangle(box(10, 14, w - 10, h - 50), fill=(255, 248, 200), outline=ink, width=2 * S)
+        d.rectangle(box(6, 2, w - 6, 16), fill=(220, 40, 40), outline=ink, width=2 * S)
+        for x in (14, w - 14):
+            d.ellipse(box(x - 6, h - 12, x + 6, h), fill=(40, 40, 40))
+    return done(im, size)
+
+
+def stand_in_owner(k, apron=(255, 214, 64)):
     w, h = OWNER
     im = canvas(OWNER)
     d = ImageDraw.Draw(im)
     cx = w / 2
-    skin, apron, hat = (240, 196, 150), (255, 214, 64), (236, 210, 140)
+    skin, hat = (240, 196, 150), (236, 210, 140)
     d.rectangle(((cx - 26) * S, 54 * S, (cx + 26) * S, h * S), fill=apron, outline=(90, 60, 20), width=S)
     d.ellipse(((cx - 18) * S, 18 * S, (cx + 18) * S, 54 * S), fill=skin, outline=(90, 60, 20), width=S)
     d.ellipse(((cx - 30) * S, 12 * S, (cx + 30) * S, 26 * S), fill=hat, outline=(90, 60, 20), width=S)
@@ -271,6 +313,17 @@ def stand_in_icon(name):
     elif name == "second":
         d.rectangle(box(10, 30, 54, 56), fill=(176, 116, 62), outline=ink, width=2 * S)
         d.rectangle(box(6, 16, 58, 30), fill=(255, 214, 64), outline=ink, width=2 * S)
+    elif name == "popcorn":
+        d.polygon([(16 * S, 22 * S), (48 * S, 22 * S), (44 * S, 58 * S), (20 * S, 58 * S)], fill=(255, 255, 255), outline=ink)
+        for x in (20, 28, 36, 44):
+            d.rectangle(box(x - 2, 24, x + 2, 56), fill=(220, 40, 40))
+        for x, y in ((22, 16), (32, 12), (42, 16), (27, 20), (37, 20)):
+            d.ellipse(box(x - 6, y - 6, x + 6, y + 6), fill=(255, 246, 200), outline=(200, 170, 80))
+    elif name == "kernels":
+        d.ellipse(box(10, 18, 54, 58), fill=(196, 160, 100), outline=ink, width=2 * S)
+        d.rectangle(box(24, 10, 40, 20), fill=(170, 130, 70), outline=ink, width=S)
+        for x, y in ((26, 34), (36, 40), (30, 46)):
+            d.ellipse(box(x - 3, y - 3, x + 3, y + 3), fill=(255, 210, 60))
     elif name == "strawberry":
         d.polygon([(12 * S, 20 * S), (52 * S, 20 * S), (32 * S, 56 * S)], fill=(230, 50, 60), outline=ink)
         d.rectangle(box(24, 12, 40, 20), fill=(60, 160, 60))
@@ -360,14 +413,51 @@ def event_key(name, P):
 
 
 def build(out):
+    G = {}
+    exec((HERE / "game" / "_3screen.py").read_text().split("\n\n\ndef ")[0], G)
+    assert G["ICONS"] == ICON_NAMES, "the game's ICONS and the build's ICON_NAMES must be the same list"
     P = Lemon("Squeeze")
     # The board: money at the end of a summer, in dollars (whole, as the board keeps them).
     P.p["settings"]["scoreboard"] = {"unit": "dollars"}
     P.p["settings"]["pixelScaling"] = False
     P.font("Ubuntu", HERE.parent / "undertow" / "fonts" / "ubuntu-latin-700-normal.woff2")
 
-    P.sprite("stand", [picture(f"stand_{k}", STAND, lambda k=k: stand_in_stand(k)) for k in range(4)], (STAND[0] // 2, STAND[1]))
+    # The bare stand and the pink one: Gemini's bare ones once they're cut, else the old
+    # pictures (which have a pitcher and cups painted on), else stand-ins.
+    bare = lambda k, old: picture(f"stand_bare_{k}", STAND, lambda: picture(f"stand_{old}", STAND, lambda: stand_in_stand(old)))
+    P.sprite("stand", [bare(0, 0), bare(1, 3)], (STAND[0] // 2, STAND[1]))
     P.sprite("owner", [picture(f"owner_{k}", OWNER, lambda k=k: stand_in_owner(k)) for k in range(6)], (OWNER[0] // 2, OWNER[1]))
+    P.sprite("helper", [picture(f"helper_{k}", HELPER, lambda k=k: stand_in_owner([0, 2][k], (90, 190, 110)).crop((-20, 0, 150, 110)))
+                        for k in range(2)], (HELPER[0] // 2, HELPER[1]))
+    def thing(name, size, icon_name):
+        """Gemini's picture of it for the stand; or its icon (picture 10 drew a pitcher, a pink
+        one, a cooler and a juicer), cut to what's drawn; or a stand-in."""
+        def icon_or_stand_in():
+            if icon_name and have(f"icon_{icon_name}"):
+                im = Image.open(ART / f"icon_{icon_name}.png").convert("RGBA")
+                im = im.crop(im.getbbox())
+                im.thumbnail(size, Image.LANCZOS)
+                out = Image.new("RGBA", size, (0, 0, 0, 0))
+                out.alpha_composite(im, ((size[0] - im.width) // 2, size[1] - im.height))
+                return out
+            return stand_in_thing(name, pink=icon_name == "pitcher_pink")
+        if have(f"thing_{icon_name or name}"):
+            # Cut at its own size (sheet 14 is one scale), kept at twice: halved, not fitted.
+            im = Image.open(ART / f"thing_{icon_name or name}.png").convert("RGBA")
+            return im.resize((max(1, im.width // 2), max(1, im.height // 2)), Image.LANCZOS)
+        return icon_or_stand_in()
+    for name, size in THINGS.items():
+        frames = [thing(name, size, name if name in ("pitcher", "cooler", "juicer") else None)]
+        if name == "pitcher":      # and the pink lemonade's
+            frames.append(thing(name, size, "pitcher_pink"))
+        # Frames one size, each standing on the bottom row, its foot at the bottom middle.
+        w, h = max(f.width for f in frames), max(f.height for f in frames)
+        same = []
+        for f in frames:
+            c = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+            c.alpha_composite(f, ((w - f.width) // 2, h - f.height))
+            same.append(c)
+        P.sprite(name, same, (w // 2, h))
     for kind in range(len(CUSTOMERS)):
         frames = [picture(f"cust_{kind}_{f}", PERSON, lambda f=f, kind=kind: stand_in_person(kind, PERSON_FRAMES.index(f)))
                   for f in PERSON_FRAMES]
@@ -413,6 +503,7 @@ def build(out):
     room("Title", [("Title", 0, 0)])
     room("Morning", [("Morning", 0, 0)])
     room("Second", [("Second", 0, 0)])
+    room("Popcorn", [("Popcorn", 0, 0)])
     room("Street", [("Day", 0, 0)])
     room("Evening", [("Evening", 0, 0)])
 

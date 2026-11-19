@@ -59,10 +59,11 @@ def summer_plan(seed, start=0, n=MONTH):
 
 def new_summer(seed):
     return {"seed": seed, "day": 0, "money": START_MONEY, "rep": START_REP,
-            "lemons": [], "sugar": 0, "ice": 0.0, "cups": 0, "pitcher": 0,
+            "lemons": [], "sugar": 0, "ice": 0.0, "cups": 0, "pitcher": 0, "kernels": 0, "bags": 0, "popped": 0,
             "upgrades": [], "places": [0], "history": [], "news": None, "phase": "morning",
             "plan": {"buy": {"lemons": 2, "sugar": 1, "ice": 1, "cups": 2},
                      "lemons": 4, "sugar": 4, "ice": 3, "price": 100, "place": 0, "pink": False,
+                     "frozen": False, "popcorn": True, "pop_price": 100,
                      "second": new_second()}}
 
 
@@ -79,6 +80,11 @@ def bring_up_to_date(s):
     if "second" in s["upgrades"] and "helper" not in s["upgrades"]:
         s["upgrades"].append("helper")
     s["plan"].setdefault("second", new_second())
+    # 2026-11-19: popcorn, frozen lemonade.
+    for k in ("kernels", "bags", "popped"):
+        s.setdefault(k, 0)
+    for k, v in (("frozen", False), ("popcorn", True), ("pop_price", 100)):
+        s["plan"].setdefault(k, v)
     return s
 
 
@@ -108,10 +114,16 @@ def use_lemons(s, n):
     return True
 
 
+def lemon_days(s):
+    """How many days a lemon keeps: longer in a mini fridge."""
+    return FRIDGE_LEMON_DAYS if has(s, "fridge") else LEMON_DAYS
+
+
 def soften(s):
     """Lemons too old to use are thrown out as a day starts: how many."""
-    soft = sum(n for day, n in s["lemons"] if day <= s["day"] - LEMON_DAYS)
-    s["lemons"] = [b for b in s["lemons"] if b[0] > s["day"] - LEMON_DAYS]
+    keeps = lemon_days(s)
+    soft = sum(n for day, n in s["lemons"] if day <= s["day"] - keeps)
+    s["lemons"] = [b for b in s["lemons"] if b[0] > s["day"] - keeps]
     return soft
 
 
@@ -120,16 +132,31 @@ def next_day(s):
     kept = COOLER_KEPT_OVERNIGHT if has(s, "cooler") else ICE_KEPT_OVERNIGHT
     melted = int(s["ice"]) - int(s["ice"] * kept)
     s["ice"] = float(int(s["ice"] * kept))
+    made = ICE_MAKER_CUBES if has(s, "icemaker") else 0
+    s["ice"] += made          # the ice maker's night's work, after the melting
     s["pitcher"] = 0          # yesterday's lemonade is poured away
+    s["popped"] = 0           # ...and yesterday's popcorn has gone stale
     s["day"] += 1
-    s["news"] = {"melted": melted, "soft": soften(s)}
+    s["news"] = {"melted": melted, "soft": soften(s), "made_ice": made}
     s["phase"] = "morning"
 
 
 def shopping_cost(s, buy=None):
     prices = today(s)["prices"]
     buy = s["plan"]["buy"] if buy is None else buy
-    return sum(buy.get(k, 0) * prices[k] for k in SUPPLY_KEYS)
+    pop = sum(buy.get(k, 0) * pop_prices(s)[k] for k in POP_KEYS)
+    return sum(buy.get(k, 0) * prices[k] for k in SUPPLY_KEYS) + pop
+
+
+def pop_prices(s):
+    """Today's popcorn supply prices: the day's own, from the seed (like the others')."""
+    rng = random.Random(s["seed"] * 6151 + s["day"] * 3571 + 9)
+    return {k: round(rng.uniform(low, high) / 5) * 5 for k, _, _, _, low, high in POP_SUPPLIES}
+
+
+def selling_pop(s):
+    """Popcorn's on sale today: there's a machine, and it's switched on."""
+    return has(s, "popcorn") and bool(s["plan"]["popcorn"])
 
 
 def place_now(s):
@@ -158,17 +185,20 @@ def open_stand(s):
          "income": 0, "cups": 0, "passers": 0, "rep_start": s["rep"], "said": {v: 0 for v in VERDICTS},
          "soft": (s["news"] or {}).get("soft", 0), "melted": (s["news"] or {}).get("melted", 0),
          "price": s["plan"]["price"], "recipe": [s["plan"]["lemons"], s["plan"]["sugar"], s["plan"]["ice"]],
-         "pink": bool(s["plan"]["pink"] and has(s, "pink")), "temp": today(s)["temp"], "sky": today(s)["sky"]}
+         "pink": bool(s["plan"]["pink"] and has(s, "pink")), "temp": today(s)["temp"], "sky": today(s)["sky"],
+         "frozen": bool(s["plan"]["frozen"] and has(s, "blender")),
+         "popcorn": selling_pop(s), "pop_price": s["plan"]["pop_price"], "pop_income": 0, "pop_bags": 0}
     s["money"] -= cost + rent
-    for k in SUPPLY_KEYS:
-        n = s["plan"]["buy"].get(k, 0) * dict((x[0], x[2]) for x in SUPPLIES)[k]
+    packs = dict((x[0], x[2]) for x in SUPPLIES + POP_SUPPLIES)
+    for k in SUPPLY_KEYS + POP_KEYS:
+        n = s["plan"]["buy"].get(k, 0) * packs[k]
         if k == "lemons" and n:
             s["lemons"].append([s["day"], n])
         elif k == "ice":
             s["ice"] += n
         elif k != "lemons":
             s[k] += n
-    s["plan"]["buy"] = {k: 0 for k in SUPPLY_KEYS}    # bought: tomorrow starts from nothing
+    s["plan"]["buy"] = {k: 0 for k in SUPPLY_KEYS + POP_KEYS}    # bought: tomorrow starts from nothing
     if sec:
         t["second"] = send_second(s, extra)
     s["phase"] = "day"
@@ -346,6 +376,56 @@ def pour_cup(s, t):
     return made
 
 
+# ---- popcorn
+
+def pop_why_not(s):
+    """Why the next bag of popcorn can't be handed over, in words, or None if it can."""
+    if s["bags"] < 1:
+        return "No popcorn bags left!"
+    if s["popped"] == 0 and s["kernels"] < 1:
+        return "No popcorn kernels left!"
+    return None
+
+
+def pop_would_pay(s, who):
+    """The most they'd pay for a bag, in cents."""
+    return int(who["budget"] * POP_PAY * (0.85 + PAY_REP * s["rep"]))
+
+
+def wants_popcorn(s, who, t, rng=random):
+    """Whether a passer-by stops for popcorn: on sale today, they notice you, they fancy
+    some (kids more often), at a price they'd pay. Hot or cold, popcorn sells."""
+    if not t.get("popcorn"):
+        return False
+    notice = NOTICE + (NOTICE_SIGN if has(s, "sign") else 0) + NOTICE_REP * s["rep"]
+    if rng.random() > notice:
+        return False
+    if rng.random() > (POP_WANT_KID if CUSTOMERS[who["kind"]]["kid"] else POP_WANT):
+        return False
+    return pop_would_pay(s, who) >= t["pop_price"]
+
+
+def salted(who):
+    """Popcorn's salt: someone eating it is thirstier."""
+    who["thirst"] = min(1.0, who["thirst"] + POP_THIRST)
+
+
+def sell_bag(s, t):
+    """Sells one bag (pop_why_not said it can). True if a new batch had to be popped first."""
+    made = False
+    if s["popped"] == 0:
+        n = min(POP_BATCH, s["kernels"])
+        s["kernels"] -= n
+        s["popped"] = n
+        made = True
+    s["popped"] -= 1
+    s["bags"] -= 1
+    s["money"] += t["pop_price"]
+    t["pop_income"] += t["pop_price"]
+    t["pop_bags"] += 1
+    return made
+
+
 def melt_ice(s, temp, steps):
     """The ice in the sun: a share of it over the whole day, by temperature (a cooler halves it)."""
     share = max(ICE_MELT_LOW, min(ICE_MELT_HIGH, ICE_MELT_LOW + (temp - 55) / 45 * (ICE_MELT_HIGH - ICE_MELT_LOW)))
@@ -375,11 +455,13 @@ def new_customer(s, day, rng=random, at=None):
             "fan": rng.random() < PINK_FANS}
 
 
-def would_pay(s, who, pink):
-    """The most they'd pay for a cup today, in cents."""
+def would_pay(s, who, pink, frozen=False):
+    """The most they'd pay for a cup today, in cents (frozen: more on a hot day)."""
     pay = who["budget"] * (PAY_BASE + PAY_THIRST * who["thirst"]) * (0.85 + PAY_REP * s["rep"])
     if pink and who["fan"]:
         pay *= PINK_PAYS
+    if frozen and today(s)["temp"] >= FROZEN_FROM:
+        pay *= FROZEN_PAYS
     return int(pay)
 
 
@@ -394,7 +476,7 @@ def decide(s, who, t, queue, rival, rng=random):
     notice = NOTICE + (NOTICE_SIGN if has(s, "sign") else 0) + NOTICE_REP * s["rep"]
     if rng.random() > notice:
         return "pass"
-    if would_pay(s, who, t["pink"]) < t["price"]:
+    if would_pay(s, who, t["pink"], t.get("frozen", False)) < t["price"]:
         return "pricey"
     if rival is not None and rival < t["price"] and rng.random() < RIVAL_STEALS:
         return "rival"
@@ -403,8 +485,9 @@ def decide(s, who, t, queue, rival, rng=random):
     return "buy"
 
 
-def verdict(recipe, who, pink=False):
-    """What they think of it: lemons a pitcher, scoops a pitcher, cubes a cup, against what they like."""
+def verdict(recipe, who, pink=False, frozen=False):
+    """What they think of it: lemons a pitcher, scoops a pitcher, cubes a cup, against what they
+    like. Frozen lemonade is never too warm."""
     lemons, sugar, ice = recipe
     if lemons <= who["lemons"] - TASTE_SLACK:
         return "watery"
@@ -412,7 +495,7 @@ def verdict(recipe, who, pink=False):
         return "sweet"
     if lemons >= who["lemons"] + TASTE_SLACK or sugar <= who["sugar"] - TASTE_SLACK:
         return "sour"
-    if ice <= who["ice"] - TASTE_SLACK:
+    if ice <= who["ice"] - TASTE_SLACK and not frozen:
         return "warm"
     return "love" if pink and who["fan"] else "perfect"
 
@@ -446,11 +529,12 @@ def end_day(s, t):
     if sec is not None:
         run_second(s, t)
     t["money_end"] = s["money"]
-    t["profit"] = t["income"] - t["supplies"] - t["rent"]
+    t["profit"] = t["income"] + t.get("pop_income", 0) - t["supplies"] - t["rent"]
     if sec is not None:
         t["profit"] += sec["income"] - sec["rent"] - sec["wage"]
     t["rep_end"] = s["rep"]
-    t["left"] = {"lemons": lemon_count(s), "sugar": s["sugar"], "ice": int(s["ice"]), "cups": s["cups"]}
+    t["left"] = {"lemons": lemon_count(s), "sugar": s["sugar"], "ice": int(s["ice"]), "cups": s["cups"],
+                 "kernels": s["kernels"], "bags": s["bags"]}
     s["history"].append(t)
     s["phase"] = "evening"
     return t

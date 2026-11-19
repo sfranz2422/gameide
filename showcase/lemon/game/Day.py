@@ -58,8 +58,9 @@ if not self.over and self.clock >= DAY_STEPS and (not instance_exists("Customer"
 draw_sprite("place_" + place_now(global_vars.s)["key"], 0, 0, 0)
 if self.day["rival"] is not None:
     # The rival's stand, further down the street, and its price.
-    draw_sprite_ext("stand", 0, STAND_X + 300, self.ground - 8, 0.7, 0.7, 0, "#9aa0b0", 1)
-    text(STAND_X + 300, self.ground - 180, f"Rival: {money(self.day['rival'])}", "#ffb36b", 14, "center")
+    # (Further than your things on the ground and the people drinking by them.)
+    draw_sprite_ext("stand", 0, STAND_X + 520, self.ground - 8, 0.6, 0.6, 0, "#9aa0b0", 1)
+    text(STAND_X + 480, self.ground - 150, f"Rival: {money(self.day['rival'])}", "#ffb36b", 14, "center")
 
 # === draw_gui
 s = global_vars.s
@@ -69,11 +70,15 @@ text(14, 10, f"Day {s['day'] + 1}  ·  {PLACES[t['place']]['name']}  ·  {self.d
 text(VIEW_W / 2 + 40, 10, clock_words(self.clock), GOLD, 22, "center")
 text(VIEW_W - 14, 10, money(s["money"]), GOLD, 22, "right")
 # The day so far, and the stock left.
-panel(0, 48, 360, 100, 0.7)
+stock = [("lemon", lemon_count(s)), ("sugar", s["sugar"]), ("ice", int(s["ice"])), ("cups", s["cups"])]
+if t.get("popcorn"):
+    stock += [("kernels", s["kernels"] + s["popped"]), ("popcorn", s["bags"])]
+# Wider with popcorn's two (they ran past the panel's edge).
+panel(0, 48, 196 + 42 * len(stock) + 8, 100, 0.7)
 text(12, 54, f"Sold {t['cups']} at {money(t['price'])}", INK, 16)
-text(12, 76, f"{t['passers']} walked by", DIM, 13)
+text(12, 76, f"{t['passers']} walked by" + (f" · {t['pop_bags']} popcorn" if t.get("popcorn") else ""), DIM, 13)
 x = 196
-for pic, n in (("lemon", lemon_count(s)), ("sugar", s["sugar"]), ("ice", int(s["ice"])), ("cups", s["cups"])):
+for pic, n in stock:
     icon(pic, x, 74, 0.38)
     text(x + 14, 64, str(n), INK, 14)
     x += 42

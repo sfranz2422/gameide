@@ -13,8 +13,9 @@ def say(cust, said):
 
 
 def serve_steps(s):
-    """How long one cup takes to pour: half as long with a helper."""
-    return SERVE_STEPS // 2 if has(s, "helper") else SERVE_STEPS
+    """How long one cup takes to pour: half as long with a helper, a third less with a register."""
+    n = SERVE_STEPS // 2 if has(s, "helper") else SERVE_STEPS
+    return round(n * REGISTER_SAVES) if has(s, "register") else n
 
 
 def queue_spot(i):

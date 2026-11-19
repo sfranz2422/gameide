@@ -118,3 +118,35 @@ bottom fifth where people walk, and an empty spot in the middle for the stand.
 > striped awning in the middle, a kid behind it pouring lemonade, a short queue of
 > happy customers, lemons in a basket, a bright sun. Leave the top third fairly
 > plain for the game's title.
+
+## What you buy, shown at the stand (2026-11-19)
+
+The kids asked to see what they buy. These go together on the stand, so: **one row
+each, every drawing at the same scale as each other**, as if they all stood side by
+side on the same pavement. Attach picture 1 (the stand) as well as the style picture.
+
+**13. The bare stand.** MAGENTA.
+> The same wooden lemonade stand as the attached picture, twice side by side, each the
+> same size: with a yellow-and-white striped awning, and painted pink with a pink
+> awning. **Nothing at all on the counter** (no pitcher, no cups), and nothing beside
+> it. Flat magenta background.
+
+**14. Things for the stand.** MAGENTA.
+> A sheet of things to buy for a lemonade stand, all at the same scale as each other
+> (a ten-year-old would come up to the top of the fridge), with clear space between
+> them. Row 1, things that stand on the ground: a blue picnic cooler, a small white
+> mini fridge, an ice-maker machine with a little window full of ice cubes, a
+> red-and-white popcorn machine cart on wheels with a glass box full of popcorn. Row 2,
+> things that sit on a counter: an old-fashioned little cash register, a glass lemon
+> juicer, a blender full of frozen yellow lemonade slush, a glass pitcher of lemonade,
+> a glass pitcher of pink lemonade. Row 3: a big wide blank wooden sign on two short
+> legs, made to sit on top of the stand's awning (no words on it). Flat magenta
+> background.
+
+**15. The helper, and popcorn.** MAGENTA.
+> Row 1: a second kid, about twelve, different from the attached kid (short dark hair,
+> a green apron, a cap), standing behind a counter so only the top half shows (the
+> counter itself not drawn), in exactly the same size and framing as picture 2, two
+> drawings: smiling and waiting; handing over a bag of popcorn. Row 2, in the style of
+> the icons (picture 10), each the same size as those: a red-and-white striped paper bag
+> of popcorn, a small burlap sack of popcorn kernels. Flat magenta background.

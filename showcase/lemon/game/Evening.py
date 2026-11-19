@@ -15,14 +15,10 @@ self.buys = []
 # sent only at the summer's end, the board stayed empty until someone played all 30
 # days). The board keeps each player's best, so it ranks the most money made.
 high_score(s["money"] // 100)
-y = 126
-for key, name, cost, _ in UPGRADES:
-    self.buys.append(make_button(700, y, 300, 32, "", "upgrade", key, 15))
-    y += 37
-for i, place in enumerate(PLACES):
-    if place["unlock"]:
-        self.buys.append(make_button(700, y, 300, 32, "", "unlock", i, 15))
-        y += 37
+# Two columns: 11 upgrades and 3 places didn't fit in one.
+spend = [("upgrade", u[0]) for u in UPGRADES] + [("unlock", i) for i, p in enumerate(PLACES) if p["unlock"]]
+for n, (act, arg) in enumerate(spend):
+    self.buys.append(make_button(700 + (n % 2) * 152, 118 + (n // 2) * 46, 146, 40, "", act, arg, 12))
 self.first = make_button(VIEW_W / 2 - 150, 498, 300, 56, "Next morning", "next", size=22)
 self.first.hot = True
 self.title = make_button(VIEW_W - 166, 504, 150, 44, "Title", "title", size=16)
@@ -35,9 +31,9 @@ for b in self.buys:
         _, name, cost, _ = next(u for u in UPGRADES if u[0] == b.arg)
         owned = has(s, b.arg)
     else:
-        name, cost = f"Sell at {PLACES[b.arg]['name']}", PLACES[b.arg]["unlock"]
+        name, cost = PLACES[b.arg]["name"], PLACES[b.arg]["unlock"]
         owned = b.arg in s["places"]
-    b.words = f"{name}: yours" if owned else f"{name}  {money(cost)}"
+    b.words = f"{name}\n" + ("yours" if owned else money(cost))
     b.off = owned or s["money"] < cost
 run_controls(self.first)
 
@@ -63,6 +59,8 @@ rows = [("Money this morning", money(t["money_start"]), INK),
         ("Shopping", money(-t["supplies"]), RED),
         ("Rent", money(-t["rent"]), RED),
         (f"Sales: {t['cups']} cups at {money(t['price'])}", money(t["income"]), MINT)]
+if t.get("popcorn"):
+    rows.append((f"Popcorn: {t['pop_bags']} bags at {money(t['pop_price'])}", money(t["pop_income"]), MINT))
 if sec:
     rows += [(f"{PLACES[sec['place']]['name']}: rent, helper", money(-sec["rent"] - sec["wage"]), RED),
              (f"  sold {sec['cups']} of {sec['sent']['cups']} at {money(sec['price'])}", money(sec["income"]), MINT)]
@@ -71,7 +69,7 @@ y = 100
 for words, amount, colour in rows:
     text(28, y, words, INK, 15)
     text(348, y, amount, colour, 15, "right")
-    y += 24 if sec else 26
+    y += 24 if sec or t.get("popcorn") else 26
 draw_set_color(PANEL_EDGE)
 draw_line(28, y - 4, 348, y - 4)
 text(28, y + 2, "Profit today", INK, 18)
@@ -89,6 +87,9 @@ if t["soft"] or t["melted"]:
     y += 20
 left = t["left"]
 text(28, y, f"Left: {left['lemons']} lemons, {left['sugar']} scoops, {left['ice']} ice, {left['cups']} cups", DIM, 13)
+if t.get("popcorn"):
+    y += 18
+    text(28, y, f"and popcorn: {left['kernels']} bags' worth of kernels, {left['bags']} bags", DIM, 13)
 if sec and sec["back"]:
     b = sec["back"]
     text(28, y + 18, f"(back from the second stand: {b['lemons']}, {b['sugar']}, {b['ice']}, {b['cups']})", DIM, 12)
