@@ -503,7 +503,9 @@ def build(out):
     room("Title", [("Title", 0, 0)])
     room("Morning", [("Morning", 0, 0)])
     room("Second", [("Second", 0, 0)])
-    room("Popcorn", [("Popcorn", 0, 0)])
+    room("Extras", [("Extras", 0, 0)])
+    room("Offer", [("Offer", 0, 0)])
+    room("News", [("News", 0, 0)], "#cbb98f")
     room("Street", [("Day", 0, 0)])
     room("Evening", [("Evening", 0, 0)])
 

@@ -881,6 +881,15 @@ with pink as the lemonade's style, `styles`), and the **popcorn machine**: kerne
 bought on the Popcorn screen, popped in batches, stale overnight, and salty (`salted`: a buyer is
 thirstier, so more buy lemonade too). The game's `ICONS` and the build's `ICON_NAMES` are one
 list written twice; the build refuses if they differ.
+**The teacher's list** (2026-11-19), part 1 in `_2extras.py`: the shopping is remembered from
+yesterday; advertising (`ADS`, your own stand's crowd only, chosen on the Extras screen with
+popcorn and the **combo**: a cup and a bag at one price, `takes_combo`); **contracts** (an offer
+each evening from the seed and the day, `contract_offer`; taken, delivered from the shelf as the
+stand opens and paid in the evening; short, it falls through and costs reputation); **bad luck**
+(`trouble_on`: its own random numbers, so it changes nothing else about a day; the inspector's
+fine is at most what you have: at -$9.45 a summer could never buy again); the **Monday paper**
+(`News`, every `WEEK` mornings, read from the days' own plans, so it's never wrong). Part 2:
+seasons and hot cocoa, staff training, stand upgrades, trophies.
 
 ## Order Up!
 
@@ -998,6 +1007,13 @@ The season is the real calendar's (`season_now`): orders for what's in season pa
 leaves are particles from the Farm, now and then. The barn window is up to four columns (`barn_grid`): every
 kind of thing at once ran off the bottom of the screen, and so did the Build window with the
 factories on the Farm tab.
+**More factories** (2026-11-19, the teacher's ask): thirteen now (popcorn stand, smokehouse, pizza
+oven, candy shop, tailor, ice cream parlor added), each a level sooner than before (sugarcane and
+strawberries too, so the sugar mill and jam kitchen have them). Each can make something the day it
+opens, and every good sells for more than its makings (cookies were less: raised). A factory at
+work smokes from its chimney: `CHIMNEYS` (shares of its picture) in the rules, turned by the build
+into the generated `SMOKE_AT` script, since a game can't measure a picture. The Factories tab goes
+to two columns past ten rows (`shop_layout`), the barn to five past 32 kinds.
 
 ## Highmoor
 

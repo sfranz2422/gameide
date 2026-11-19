@@ -193,3 +193,47 @@ def rank_of(cents):
         if cents >= at:
             out = name
     return out
+
+# ---- 2026-11-19, the teacher's list: advertising, combos, contracts, bad luck, the
+# Monday paper (part 1); seasons and cocoa, staff, stand upgrades, trophies (part 2).
+
+# Advertising, chosen each morning, paid as the stand opens: (key, name, cost, crowd ×).
+ADS = [("none", "No ad", 0, 1.0), ("flyers", "Flyers", 500, 1.15),
+       ("paper", "Paper ad", 1500, 1.3), ("radio", "Radio ad", 4000, 1.6)]
+
+# Snack combos: a cup and a bag together, at one price. Someone buying only one of them
+# takes the combo when what it costs on top is no more than COMBO_PULL × what they'd pay
+# for the other (they hadn't wanted it, so they value it less).
+COMBO_PULL = 0.6
+COMBO_START = 175
+
+# Contracts: some evenings an offer for tomorrow. Accepted, its cups (and bags) are
+# taken from your shelf at your recipe as the stand opens, and paid for in the evening.
+# Not enough on the shelf, and it falls through: your reputation pays.
+CONTRACT_FROM = 3            # no offers before day 4
+CONTRACT_CHANCE = 0.3
+CONTRACT_DONE_REP = 0.03
+CONTRACT_FAIL_REP = -0.08
+CONTRACTS = [
+    # kind        who                          cups        cents a cup  bags     needs
+    ("party",    "A birthday party",           (30, 60),   (130, 170),  (0, 0),   None),
+    ("ballpark", "The Ballpark's snack bar",   (100, 180), (70, 90),    (0, 0),   None),
+    ("wedding",  "A wedding",                  (50, 90),   (180, 230),  (0, 0),   "pink"),
+    ("office",   "An office party",            (40, 70),   (110, 140),  (20, 40), "popcorn"),
+]
+CONTRACT_BAG_PAY = 120       # cents a bag of popcorn in a contract
+
+# Bad luck: some days from day 6, known in the morning's forecast.
+TROUBLE_FROM = 5
+TROUBLE_CHANCE = 0.16
+TROUBLES = ["lemon_shortage", "sugar_shortage", "wasps", "roadworks", "inspector"]
+SHORTAGE_PRICE = 2.0         # a shortage doubles that supply's price for the day
+WASPS_CROWD = 0.6            # wasps at a place: this share of its crowd still comes
+ROADWORKS_CROWD = 0.45
+INSPECTOR_ICE = 3            # the inspector wants this many cubes a cup at least (or a cooler)
+INSPECTOR_PASS_REP = 0.04
+INSPECTOR_FINE = 1000        # $10, and the reputation below
+INSPECTOR_FAIL_REP = -0.05
+
+# The Monday paper: every WEEK days, before the morning.
+WEEK = 7

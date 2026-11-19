@@ -149,6 +149,10 @@ function wholeSummer(g: PythonGame, silly = false, days = 30) {
     if (!silly) py(g, "bot_evening()");
     py(g, 'do_act("next", None)');
     step(g, 2);
+    if (room(g) === "News") {                // Mondays: the paper first
+      py(g, 'do_act("paper_done", None)');
+      step(g, 2);
+    }
     expect(room(g)).toBe("Morning");
   }
   return money;
@@ -373,15 +377,17 @@ avg = sum(d["temp"] for d in p) / len(p)
     step(g, 2);
     expect(room(g)).toBe("Morning");
     const before = py<number>(g, "global_vars.s['plan']['price']");
-    // Tab goes round the controls in order: the four packs, the recipe, the price.
-    for (let k = 0; k < 8; k++) press(g, "tab");
+    // Tab goes round the controls in order: past Extras, then the four packs, the recipe, the price.
+    for (let k = 0; k < 9; k++) press(g, "tab");
     expect(py(g, "global_vars.focus.key")).toBe("price");
     press(g, "right");
     press(g, "right");
     expect(py(g, "global_vars.s['plan']['price']")).toBe(before + 10);
-    // Down to Open the stand, and Space.
+    // Down to Extras (under the price's column), Left to Open the stand, and Space.
     press(g, "down");
     press(g, "down");
+    expect(py<string>(g, "global_vars.focus.words")).toContain("Extras");
+    press(g, "left");
     expect(py(g, "global_vars.focus.words")).toBe("Open the stand");
     press(g, "space");
     step(g, 2);
@@ -677,10 +683,169 @@ n`);
     }
     py(g, 'do_act("next", None)');
     step(g, 2);
-    py(g, 'press(next(b for b in instances("Button") if b.act == "popcorn"))');
+    py(g, 'press(next(b for b in instances("Button") if b.act == "extras"))');
     step(g, 2);
-    expect(room(g)).toBe("Popcorn");
+    expect(room(g)).toBe("Extras");
     py(g, 'stepper_set("buy_kernels", 1)\nstepper_set("pop_price", 1)');
     expect(py(g, '[global_vars.s["plan"]["buy"]["kernels"], global_vars.s["plan"]["pop_price"]]')).toEqual([1, 105]);
+  });
+
+  // ---- 2026-11-19, the teacher's list, part 1
+
+  it("yesterday's shopping is remembered: the next morning starts from it", async () => {
+    const g = await summer();
+    py(g, 'global_vars.s["plan"]["buy"] = {"lemons": 2, "sugar": 1, "ice": 2, "cups": 1}');
+    openAndPlay(g);
+    py(g, 'do_act("next", None)');
+    step(g, 2);
+    expect(py(g, 'global_vars.s["plan"]["buy"]')).toEqual({ lemons: 2, sugar: 1, ice: 2, cups: 1 });
+  });
+
+  it("advertising: paid as the stand opens, brings more people to your stand only, and counts in the day's profit", async () => {
+    const g = await summer();
+    py(g, 's = global_vars.s\ns["money"] = 100000');
+    const plain = py<number>(g, "crowd_size(s)");
+    const other = py<number>(g, "crowd_size(s, None, 1)");
+    py(g, 's["plan"]["ad"] = 3');
+    expect(py<number>(g, "crowd_size(s)")).toBeGreaterThan(plain * 1.4);
+    expect(py(g, "crowd_size(s, None, 1)")).toBe(other);
+    const before = py<number>(g, 's["money"]');
+    py(g, "t = open_stand(s)");
+    expect(before - py<number>(g, 's["money"]')).toBe(py<number>(g, 't["supplies"] + t["rent"]') + 4000);
+    py(g, "end_day(s, t)");
+    expect(py(g, 't["profit"]')).toBe(py<number>(g, 't["income"] - t["supplies"] - t["rent"] - 4000'));
+  });
+
+  it("snack combos: one price for a cup and a bag; someone buying one takes it when the extra's worth it to them", async () => {
+    const g = await summer();
+    py(g, `s = global_vars.s
+s["money"] = 100000
+buy_upgrade(s, "popcorn")
+s["plan"].update({"combo_on": True, "combo": 160, "price": 100, "pop_price": 100})
+s["plan"]["buy"].update({"kernels": 1, "bags": 1})
+t = open_stand(s)
+who = {"thirst": 0.6, "budget": 200, "fan": False, "kind": 0}`);
+    expect(py(g, "t['combo']")).toBe(true);
+    // 60¢ more for a bag they'd pay about 150¢ for: yes. At 300¢ for the two: no.
+    expect(py(g, "takes_combo(s, who, t, True, False)")).toBe(true);
+    expect(py(g, "t['combo_price'] = 300\ntakes_combo(s, who, t, True, False)")).toBe(false);
+    expect(py(g, "takes_combo(s, who, t, True, True)")).toBe(false);
+    py(g, 't["combo_price"] = 160\nm = s["money"]\nsell_combo(s, t)');
+    expect(py(g, '[s["money"] - m, t["combos"], t["cups"], t["pop_bags"], t["income"], t["pop_income"], t["combo_income"]]'))
+      .toEqual([160, 1, 1, 1, 0, 0, 160]);
+    py(g, "end_day(s, t)");
+    expect(py(g, 't["profit"]')).toBe(py<number>(g, '160 - t["supplies"] - t["rent"]'));
+    // No popcorn machine, no combo.
+    expect(py(g, 'combo_on(dict(s, upgrades=[]))')).toBe(false);
+  });
+
+  it("contracts: an offer from the seed and the day; taken, delivered from the shelf and paid; short, it falls through", async () => {
+    const g = await summer();
+    py(g, 's = global_vars.s\ns["money"] = 10**6');
+    const days = py<number[]>(g, "[d for d in range(3, 200) if contract_offer(s, d)]");
+    expect(days.length).toBeGreaterThan(30);
+    expect(py(g, `contract_offer(s, ${days[0]}) == contract_offer(s, ${days[0]})`)).toBe(true);
+    expect(py(g, "contract_offer(s, 2) is None")).toBe(true);
+    // Only what you can make: no weddings without pink, no offices without popcorn.
+    expect(py(g, '{c["kind"] for d in range(3, 400) for c in [contract_offer(s, d)] if c} <= {"party", "ballpark"}')).toBe(true);
+    py(g, 'buy_upgrade(s, "pink")\nbuy_upgrade(s, "popcorn")');
+    expect(py(g, '{"wedding", "office"} <= {c["kind"] for d in range(3, 400) for c in [contract_offer(s, d)] if c}')).toBe(true);
+    // Taken and delivered.
+    py(g, 'c = {"day": 0, "kind": "party", "who": "A birthday party", "cups": 40, "each": 150, "bags": 0, "pink": False, "pay": 6000}\ns["contract"] = c');
+    py(g, 's["plan"]["buy"] = {"lemons": 3, "sugar": 1, "ice": 3, "cups": 2}');
+    expect(py(g, "contract_short(s, c) is None")).toBe(true);
+    const rep = py<number>(g, 's["rep"]');
+    py(g, "t = open_stand(s)");
+    expect(py(g, 't["contract"]["done"]')).toBe(true);
+    expect(py(g, 's["cups"]')).toBe(10);
+    py(g, "m = s['money']\nend_day(s, t)");
+    expect(py<number>(g, 's["money"] - m')).toBeGreaterThanOrEqual(6000);
+    expect(py<number>(g, 's["rep"]')).toBeGreaterThan(rep);
+    // Short: nothing taken, nothing paid, the reputation drops.
+    py(g, 'next_day(s)\nc2 = dict(c, day=s["day"])\ns["contract"] = c2\ns["plan"]["buy"] = {"lemons": 0, "sugar": 0, "ice": 0, "cups": 0}');
+    expect(py<string>(g, "contract_short(s, c2)")).toContain("more");
+    const cups = py<number>(g, 's["cups"]');
+    py(g, "rep2 = s['rep']\nt = open_stand(s)");
+    expect(py(g, '[t["contract"]["done"], s["cups"]]')).toEqual([false, cups]);
+    py(g, "end_day(s, t)");
+    expect(py<number>(g, 's["rep"] - rep2')).toBeLessThan(-0.05);
+    // The evening's offer is tomorrow's.
+    expect(py(g, 's["offer"] == contract_offer(s, s["day"] + 1)')).toBe(true);
+  });
+
+  it("bad luck: shortages double a price, wasps and roadworks thin a place's crowd, the inspector passes or fines (never below $0)", async () => {
+    const g = await summer();
+    py(g, "s = global_vars.s");
+    const find = (kind: string) => py<number>(g, `next(d for d in range(5, 2000) if (trouble_on(s["seed"], d) or {}).get("kind") == "${kind}")`);
+    const d = find("lemon_shortage");
+    // The same day, with and without its trouble: only the lemons' price changes.
+    const withIt = py<Record<string, number>>(g, `day_plan(s["seed"], ${d})["prices"]`);
+    expect(withIt.lemons).toBeGreaterThanOrEqual(py<number>(g, "SUPPLIES[0][4]") * 2 - 5);
+    const w = find("wasps");
+    py(g, `s["day"] = ${w}\nat = day_plan(s["seed"], ${w})["trouble"]["place"]\ns["places"] = [0, 1, 2, 3]\ns["plan"]["place"] = at`);
+    const thin = py<number>(g, "crowd_size(s)");
+    py(g, `_save = day_plan(s["seed"], ${w})["trouble"]\nday_plan(s["seed"], ${w})["trouble"] = None`);
+    const full = py<number>(g, "crowd_size(s)");
+    py(g, `day_plan(s["seed"], ${w})["trouble"] = _save`);
+    expect(thin).toBeLessThan(full * 0.7);
+    expect(py<string[]>(g, `trouble_words(day_plan(s["seed"], ${w}))`)[0]).toContain("Wasps");
+    // The inspector: three cubes a cup passes; one is a fine, at most what you have.
+    const ins = find("inspector");
+    py(g, `s["day"] = ${ins}\ns["plan"]["place"] = 0\ns["plan"]["ice"] = 3\nr0 = s["rep"]`);
+    expect(py(g, "t = {}\ninspect(s, t)")).toBe("passed");
+    py(g, 's["plan"]["ice"] = 1\ns["money"] = 300');
+    expect(py(g, "t = {}\n[inspect(s, t), t['fine'], s['money']]")).toEqual(["fined", 300, 0]);
+  });
+
+  it("the Monday paper: every seventh morning, once; its prices and week ahead come from the days themselves", async () => {
+    const g = await summer();
+    py(g, "s = global_vars.s");
+    expect(py(g, "[paper_due(dict(s, day=d)) for d in (0, 6, 7, 8, 14)]")).toEqual([false, false, true, false, true]);
+    py(g, 's["day"] = 7');
+    const [now, , pct] = py<[number, number, number]>(g, 'price_trend(s, "lemons")');
+    expect(now).toBeCloseTo(py<number>(g, 'sum(day_plan(s["seed"], d)["prices"]["lemons"] for d in range(7, 14)) / 7'));
+    expect(typeof pct).toBe("number");
+    // A week with the parade in it: the paper says so.
+    py(g, 'wk = next(w for w in range(7, 400, 7) if any(day_plan(s["seed"], d)["parade"] for d in range(w, w + 7)))\nsaved_day = s["day"]\ns["day"] = wk');
+    expect(py<string[][]>(g, "week_ahead(s)").some((x) => x[1] === "parade downtown")).toBe(true);
+    py(g, 's["day"] = saved_day');
+    // From the evening on day 7: the paper, then the morning; read, it doesn't come back.
+    py(g, 's["day"] = 6\nroom_goto("Evening")') ;
+    py(g, 's["history"].append(dict(s["history"][-1]) if s["history"] else {"day": 6, "place": 0, "money_start": 2000, "supplies": 0, "rent": 0, "income": 0, "cups": 0, "passers": 0, "rep_start": 0.3, "said": {v: 0 for v in VERDICTS}, "soft": 0, "melted": 0, "price": 100, "recipe": [4, 4, 3], "pink": False, "temp": 80, "sky": "sunny", "money_end": 2000, "profit": 0, "rep_end": 0.3, "left": {"lemons": 0, "sugar": 0, "ice": 0, "cups": 0}})');
+    step(g, 2);
+    py(g, 'do_act("next", None)');
+    step(g, 2);
+    expect(room(g)).toBe("News");
+    py(g, 'do_act("paper_done", None)');
+    step(g, 2);
+    expect([room(g), py(g, "paper_due(s)")]).toEqual(["Morning", false]);
+  });
+
+  it("the new screens draw: Extras, the offer, the paper; and a busy evening's ledger stays in its panel", async () => {
+    const g = await summer();
+    py(g, `s = global_vars.s
+s["money"] = 10**6
+for u in ("popcorn", "pink"):
+    buy_upgrade(s, u)
+s["plan"].update({"ad": 2, "combo_on": True})
+s["plan"]["buy"].update({"kernels": 2, "bags": 2})`);
+    for (const r of ["Extras", "News"]) {
+      py(g, `s["day"] = 7\nroom_goto("${r}")`);
+      step(g, 3);
+      expect(room(g)).toBe(r);
+    }
+    py(g, 's["day"] = 0\nroom_goto("Morning")');
+    step(g, 2);
+    py(g, 's["contract"] = {"day": 0, "kind": "office", "who": "An office party", "cups": 20, "each": 120, "bags": 10, "pink": False, "pay": 3600}');
+    openAndPlay(g);
+    const t = py<Record<string, unknown>>(g, 's["history"][-1]');
+    expect(t.contract).toBeTruthy();
+    expect(py(g, 's["offer"] is None or s["offer"]["day"] == s["day"] + 1')).toBe(true);
+    py(g, 's["offer"] = {"day": s["day"] + 1, "kind": "party", "who": "A birthday party", "cups": 30, "each": 150, "bags": 0, "pink": False, "pay": 4500}');
+    py(g, 'room_goto("Offer")');
+    step(g, 3);
+    py(g, 'do_act("accept", None)');
+    step(g, 2);
+    expect([room(g), py(g, 's["contract"]["cups"]')]).toEqual(["Evening", 30]);
   });
 });

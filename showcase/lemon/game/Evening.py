@@ -22,6 +22,9 @@ for n, (act, arg) in enumerate(spend):
 self.first = make_button(VIEW_W / 2 - 150, 498, 300, 56, "Next morning", "next", size=22)
 self.first.hot = True
 self.title = make_button(VIEW_W - 166, 504, 150, 44, "Title", "title", size=16)
+# Tomorrow's offer (a contract), if one came: see it, take it or leave it.
+self.offer = make_button(16, 504, 316, 44, "", "offer", size=15)
+self.offer.shown = s.get("offer") is not None
 
 # === step
 question_ok(True)
@@ -35,6 +38,10 @@ for b in self.buys:
         owned = b.arg in s["places"]
     b.words = f"{name}\n" + ("yours" if owned else money(cost))
     b.off = owned or s["money"] < cost
+if s.get("offer") is not None:
+    took = s.get("contract") is not None and s["contract"] == s["offer"]
+    self.offer.words = "Contract taken for tomorrow ✓" if took else f"An offer! {s['offer']['who']}"
+    self.offer.hot = not took
 run_controls(self.first)
 
 # === draw
@@ -60,16 +67,29 @@ rows = [("Money this morning", money(t["money_start"]), INK),
         ("Rent", money(-t["rent"]), RED),
         (f"Sales: {t['cups']} cups at {money(t['price'])}", money(t["income"]), MINT)]
 if t.get("popcorn"):
-    rows.append((f"Popcorn: {t['pop_bags']} bags at {money(t['pop_price'])}", money(t["pop_income"]), MINT))
+    rows.append((f"Popcorn: {t['pop_bags'] - t.get('combos', 0)} bags at {money(t['pop_price'])}", money(t["pop_income"]), MINT))
+if t.get("combos"):
+    rows.append((f"Combos: {t['combos']} at {money(t['combo_price'])}", money(t["combo_income"]), MINT))
+if t.get("ad_cost"):
+    rows.append((f"Ad: {next(a[1] for a in ADS if a[0] == t['ad'])}", money(-t["ad_cost"]), RED))
+c = t.get("contract")
+if c:
+    rows.append((f"Contract: {c['who']}" if c["done"] else "Contract fell through!", money(c["pay"]) if c["done"] else "-", MINT if c["done"] else RED))
+if t.get("inspector"):
+    rows.append(("Inspector: passed!" if t["inspector"] == "passed" else "Inspector's fine", money(0) if t["inspector"] == "passed" else money(-t.get("fine", INSPECTOR_FINE)),
+                 MINT if t["inspector"] == "passed" else RED))
 if sec:
     rows += [(f"{PLACES[sec['place']]['name']}: rent, helper", money(-sec["rent"] - sec["wage"]), RED),
              (f"  sold {sec['cups']} of {sec['sent']['cups']} at {money(sec['price'])}", money(sec["income"]), MINT)]
 rows.append(("Money tonight", money(t["money_end"]), GOLD))
 y = 100
+# Closer together the more there are (contracts, combos, ads and the inspector add rows).
+pitch = 26 if len(rows) <= 6 else 23 if len(rows) <= 8 else 20
+size = 15 if len(rows) <= 8 else 13
 for words, amount, colour in rows:
-    text(28, y, words, INK, 15)
-    text(348, y, amount, colour, 15, "right")
-    y += 24 if sec or t.get("popcorn") else 26
+    text(28, y, words, INK, size)
+    text(348, y, amount, colour, size, "right")
+    y += pitch
 draw_set_color(PANEL_EDGE)
 draw_line(28, y - 4, 348, y - 4)
 text(28, y + 2, "Profit today", INK, 18)

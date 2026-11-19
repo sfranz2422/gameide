@@ -41,9 +41,17 @@ elif q and q[0].arrived:
         c.state = "walk"
     else:
         self.busy = 0
-        if c.lemonade:
+        both = c.combo and c.lemonade and c.popcorn
+        if both:
+            # One price for the two (the cup and bag are counted, the money is the combo's).
+            made_pitcher = s["pitcher"] == 0
+            if sell_combo(s, t):
+                self.popping = POP_STEPS
+            self.busy += serve_steps(s) + (PITCHER_STEPS if made_pitcher else 0) + HAND_STEPS + (POP_STEPS if self.popping == POP_STEPS else 0)
+            c.has_popcorn = True
+        if c.lemonade and not both:
             self.busy += serve_steps(s) + (PITCHER_STEPS if pour_cup(s, t) else 0)
-        if c.popcorn:
+        if c.popcorn and not both:
             if sell_bag(s, t):
                 self.popping = POP_STEPS      # a new batch popping: the machine shakes
             self.busy += HAND_STEPS + (POP_STEPS if self.popping == POP_STEPS else 0)

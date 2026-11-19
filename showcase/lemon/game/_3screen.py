@@ -17,6 +17,15 @@ def text(x, y, words, colour=INK, size=16, align="left"):
     draw_set_halign("left")
 
 
+def plain(x, y, words, colour, size=16, align="left"):
+    """Words with no shadow: dark ink on the Monday paper's light page."""
+    draw_set_font("Ubuntu", size)
+    draw_set_halign(align)
+    draw_set_color(colour)
+    draw_text(x, y, words)
+    draw_set_halign("left")
+
+
 def panel(x1, y1, x2, y2, alpha=0.86):
     draw_set_alpha(alpha)
     draw_set_color(PANEL)

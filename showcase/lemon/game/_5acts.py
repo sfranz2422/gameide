@@ -58,6 +58,12 @@ def _limits(key):
         return 0, len(styles(s)) - 1, 1
     if key == "pop_price":
         return PRICE_MIN, PRICE_MAX, PRICE_STEP
+    if key == "combo_on":
+        return 0, 1, 1
+    if key == "combo":
+        return PRICE_MIN, PRICE_MAX * 2, PRICE_STEP
+    if key == "ad":
+        return 0, len(ADS) - 1, 1
     return 0, len(s["places"]) - 1, 1
 
 
@@ -79,6 +85,8 @@ def stepper_value(key):
         return 1 if plan["pink"] else 0
     if key == "pop_on":
         return 1 if plan["popcorn"] else 0
+    if key == "combo_on":
+        return 1 if plan["combo_on"] else 0
     if key == "style":
         now = (bool(plan["pink"]), bool(plan["frozen"]))
         return styles(global_vars.s).index(now) if now in styles(global_vars.s) else 0
@@ -106,6 +114,8 @@ def stepper_set(key, d):
         plan["pink"] = bool(v)
     elif key == "pop_on":
         plan["popcorn"] = bool(v)
+    elif key == "combo_on":
+        plan["combo_on"] = bool(v)
     elif key == "style":
         plan["pink"], plan["frozen"] = styles(s)[v]
     else:
@@ -134,6 +144,14 @@ def stepper_words(key):
         return "Sell popcorn today", "Yes" if plan["popcorn"] else "No", "Salty: buyers get thirsty"
     if key == "pop_price":
         return "Price a bag", money(plan["pop_price"]), ""
+    if key == "combo_on":
+        return "Combo: a cup and a bag", "Yes" if plan["combo_on"] else "No", "One price for the two"
+    if key == "combo":
+        apart = plan["price"] + plan["pop_price"]
+        return "Combo price", money(plan["combo"]), f"Apart they're {money(apart)}"
+    if key == "ad":
+        _, name, cost, more = ADS[plan["ad"]]
+        return "Advertise today", name, f"{money(cost)}, +{round((more - 1) * 100)}% people" if cost else "Nobody's told"
     if key == "lemons":
         juiced = f" (uses {lemons_a_pitcher(s)}: juicer)" if has(s, "juicer") and plan["lemons"] else ""
         return "Lemons a pitcher", str(plan["lemons"]), f"8 cups a pitcher{juiced}"
@@ -189,9 +207,25 @@ def do_act(name, arg):
             sec["place"] = where[-1] if where else None
         global_vars.problem = ""
         room_goto("Second")
-    elif name == "popcorn":
+    elif name == "extras":
         global_vars.problem = ""
-        room_goto("Popcorn")
+        room_goto("Extras")
+    elif name == "offer":
+        room_goto("Offer")
+    elif name == "accept":
+        s["contract"] = s["offer"]
+        sound_play("coin", volume=0.5)
+        keep(s)
+        room_goto("Evening")
+    elif name == "decline":
+        if s.get("contract") is s.get("offer"):
+            s["contract"] = None
+        keep(s)
+        room_goto("Evening")
+    elif name == "paper_done":
+        s["paper_read"] = s["day"]
+        keep(s)
+        room_goto("Morning")
     elif name == "done_second":
         global_vars.problem = ""
         room_goto("Morning")
@@ -209,6 +243,6 @@ def do_act(name, arg):
     elif name == "next":
         next_day(s)
         keep(s)
-        room_goto("Morning")
+        room_goto("News" if paper_due(s) else "Morning")
     elif name == "title":
         room_goto("Title")

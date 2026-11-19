@@ -46,8 +46,13 @@ def day_plan(seed, d):
     rain_pct = {"rain": rng.choice([60, 70, 80, 90]), "cloudy": rng.choice([10, 20, 30, 40]), "sunny": rng.choice([0, 0, 10, 20])}[sky]
     prices = {k2: round(rng.uniform(low, high) / 5) * 5 for k2, _, _, _, low, high in SUPPLIES}
     rival = round(rng.uniform(*RIVAL_PRICE) / 5) * 5 if d >= 3 and rng.random() < RIVAL_CHANCE else None
+    trouble = trouble_on(seed, d)            # bad luck: its own random numbers, so nothing above changes
+    if trouble and trouble["kind"] == "lemon_shortage":
+        prices["lemons"] = round(prices["lemons"] * SHORTAGE_PRICE / 5) * 5
+    if trouble and trouble["kind"] == "sugar_shortage":
+        prices["sugar"] = round(prices["sugar"] * SHORTAGE_PRICE / 5) * 5
     out = {"day": d, "temp": temp, "sky": sky, "forecast": guess, "rain_pct": rain_pct, "prices": prices,
-           "heat": heat, "parade": k == parade, "rival": rival, "rainy_week": rainy_week}
+           "heat": heat, "parade": k == parade, "rival": rival, "rainy_week": rainy_week, "trouble": trouble}
     _plans[(seed, d)] = out
     return out
 
@@ -60,10 +65,10 @@ def summer_plan(seed, start=0, n=MONTH):
 def new_summer(seed):
     return {"seed": seed, "day": 0, "money": START_MONEY, "rep": START_REP,
             "lemons": [], "sugar": 0, "ice": 0.0, "cups": 0, "pitcher": 0, "kernels": 0, "bags": 0, "popped": 0,
-            "upgrades": [], "places": [0], "history": [], "news": None, "phase": "morning",
+            "upgrades": [], "places": [0], "history": [], "news": None, "phase": "morning", "contract": None, "offer": None,
             "plan": {"buy": {"lemons": 2, "sugar": 1, "ice": 1, "cups": 2},
                      "lemons": 4, "sugar": 4, "ice": 3, "price": 100, "place": 0, "pink": False,
-                     "frozen": False, "popcorn": True, "pop_price": 100,
+                     "frozen": False, "popcorn": True, "pop_price": 100, "ad": 0, "combo_on": False, "combo": COMBO_START,
                      "second": new_second()}}
 
 
@@ -83,8 +88,11 @@ def bring_up_to_date(s):
     # 2026-11-19: popcorn, frozen lemonade.
     for k in ("kernels", "bags", "popped"):
         s.setdefault(k, 0)
-    for k, v in (("frozen", False), ("popcorn", True), ("pop_price", 100)):
+    for k, v in (("frozen", False), ("popcorn", True), ("pop_price", 100), ("ad", 0), ("combo_on", False),
+                 ("combo", COMBO_START)):
         s["plan"].setdefault(k, v)
+    s.setdefault("contract", None)
+    s.setdefault("offer", None)
     return s
 
 
@@ -127,6 +135,16 @@ def soften(s):
     return soft
 
 
+def sell_combo(s, t):
+    """A cup and a bag, paid for as one (combo_price)."""
+    pour_cup(s, t, False)
+    made = sell_bag(s, t, False)
+    s["money"] += t["combo_price"]
+    t["combo_income"] += t["combo_price"]
+    t["combos"] += 1
+    return made
+
+
 def next_day(s):
     """Overnight: the ice melts (a cooler keeps half), the day moves on, old lemons go soft."""
     kept = COOLER_KEPT_OVERNIGHT if has(s, "cooler") else ICE_KEPT_OVERNIGHT
@@ -138,6 +156,7 @@ def next_day(s):
     s["popped"] = 0           # ...and yesterday's popcorn has gone stale
     s["day"] += 1
     s["news"] = {"melted": melted, "soft": soften(s), "made_ice": made}
+    s["offer"] = None            # an offer not taken is gone
     s["phase"] = "morning"
 
 
@@ -178,17 +197,20 @@ def open_stand(s):
         if problem:
             return problem
     extra = PLACES[sec["place"]]["rent"] + SECOND_WAGE if sec else 0
-    if cost + rent + extra > s["money"]:
-        return (f"That costs {money(cost + rent + extra)} with the rent" + (" and the helper" if sec else "")
-                + f", and you have {money(s['money'])}.")
+    ad = ad_now(s)              # paid here; `extra` is the second stand's, paid as it's sent
+    if cost + rent + extra + ad[2] > s["money"]:
+        return (f"That costs {money(cost + rent + extra + ad[2])} with the rent" + (" and the helper" if sec else "")
+                + (" and the ad" if ad[2] else "") + f", and you have {money(s['money'])}.")
     t = {"day": s["day"], "place": s["plan"]["place"], "money_start": s["money"], "supplies": cost, "rent": rent,
          "income": 0, "cups": 0, "passers": 0, "rep_start": s["rep"], "said": {v: 0 for v in VERDICTS},
          "soft": (s["news"] or {}).get("soft", 0), "melted": (s["news"] or {}).get("melted", 0),
          "price": s["plan"]["price"], "recipe": [s["plan"]["lemons"], s["plan"]["sugar"], s["plan"]["ice"]],
          "pink": bool(s["plan"]["pink"] and has(s, "pink")), "temp": today(s)["temp"], "sky": today(s)["sky"],
          "frozen": bool(s["plan"]["frozen"] and has(s, "blender")),
-         "popcorn": selling_pop(s), "pop_price": s["plan"]["pop_price"], "pop_income": 0, "pop_bags": 0}
-    s["money"] -= cost + rent
+         "popcorn": selling_pop(s), "pop_price": s["plan"]["pop_price"], "pop_income": 0, "pop_bags": 0,
+         "combo": combo_on(s), "combo_price": s["plan"]["combo"], "combos": 0, "combo_income": 0,
+         "ad": ad[0], "ad_cost": ad[2]}
+    s["money"] -= cost + rent + ad[2]
     packs = dict((x[0], x[2]) for x in SUPPLIES + POP_SUPPLIES)
     for k in SUPPLY_KEYS + POP_KEYS:
         n = s["plan"]["buy"].get(k, 0) * packs[k]
@@ -198,9 +220,11 @@ def open_stand(s):
             s["ice"] += n
         elif k != "lemons":
             s[k] += n
-    s["plan"]["buy"] = {k: 0 for k in SUPPLY_KEYS + POP_KEYS}    # bought: tomorrow starts from nothing
+    # The shopping stays as it was, so tomorrow's starts from today's (the teacher's ask,
+    # 2026-11-19: it used to start from nothing every morning).
     if sec:
         t["second"] = send_second(s, extra)
+    t["contract"] = deliver_contract(s, t)
     s["phase"] = "day"
     return t
 
@@ -359,8 +383,9 @@ def why_not(s):
     return None
 
 
-def pour_cup(s, t):
-    """Sells one cup (why_not said it can). Returns True if a new pitcher had to be made first."""
+def pour_cup(s, t, charge=True):
+    """Sells one cup (why_not said it can). Returns True if a new pitcher had to be made first.
+    charge=False: part of a combo, paid for as one."""
     made = False
     if s["pitcher"] == 0:
         use_lemons(s, lemons_a_pitcher(s))
@@ -370,8 +395,9 @@ def pour_cup(s, t):
     s["pitcher"] -= 1
     s["cups"] -= 1
     s["ice"] -= s["plan"]["ice"]
-    s["money"] += t["price"]
-    t["income"] += t["price"]
+    if charge:
+        s["money"] += t["price"]
+        t["income"] += t["price"]
     t["cups"] += 1
     return made
 
@@ -410,8 +436,9 @@ def salted(who):
     who["thirst"] = min(1.0, who["thirst"] + POP_THIRST)
 
 
-def sell_bag(s, t):
-    """Sells one bag (pop_why_not said it can). True if a new batch had to be popped first."""
+def sell_bag(s, t, charge=True):
+    """Sells one bag (pop_why_not said it can). True if a new batch had to be popped first.
+    charge=False: part of a combo."""
     made = False
     if s["popped"] == 0:
         n = min(POP_BATCH, s["kernels"])
@@ -420,8 +447,9 @@ def sell_bag(s, t):
         made = True
     s["popped"] -= 1
     s["bags"] -= 1
-    s["money"] += t["pop_price"]
-    t["pop_income"] += t["pop_price"]
+    if charge:
+        s["money"] += t["pop_price"]
+        t["pop_income"] += t["pop_price"]
     t["pop_bags"] += 1
     return made
 
@@ -517,6 +545,9 @@ def crowd_size(s, day=None, at=None):
         n *= SIGN_CROWD
     if day["parade"] and place["key"] == "downtown":
         n *= PARADE_CROWD
+    n *= trouble_crowd(day, PLACES.index(place))
+    if at is None:
+        n *= ad_now(s)[3]            # an ad brings people to your own stand
     return max(3, round(n))
 
 
@@ -528,14 +559,23 @@ def end_day(s, t):
     sec = t.get("second")
     if sec is not None:
         run_second(s, t)
+    settle_contract(s, t)
+    t["inspector"] = inspect(s, t)
     t["money_end"] = s["money"]
-    t["profit"] = t["income"] + t.get("pop_income", 0) - t["supplies"] - t["rent"]
+    t["profit"] = (t["income"] + t.get("pop_income", 0) + t.get("combo_income", 0) - t["supplies"] - t["rent"]
+                   - t.get("ad_cost", 0))
+    c = t.get("contract")
+    if c and c["done"]:
+        t["profit"] += c["pay"]
+    if t["inspector"] == "fined":
+        t["profit"] -= t["fine"]
     if sec is not None:
         t["profit"] += sec["income"] - sec["rent"] - sec["wage"]
     t["rep_end"] = s["rep"]
     t["left"] = {"lemons": lemon_count(s), "sugar": s["sugar"], "ice": int(s["ice"]), "cups": s["cups"],
                  "kernels": s["kernels"], "bags": s["bags"]}
     s["history"].append(t)
+    s["offer"] = contract_offer(s, s["day"] + 1)     # tomorrow's, if any: taken or left in the evening
     s["phase"] = "evening"
     return t
 

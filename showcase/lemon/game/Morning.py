@@ -29,9 +29,8 @@ self.first = self.open
 # The second stand: set up on a screen of its own (this one is full).
 self.second = make_button(16, 504, 316, 44, "", "second", size=16)
 self.second.shown = has(s, "second")
-# Popcorn, also a screen of its own.
-self.pop = make_button(692, 504, 316, 44, "", "popcorn", size=16)
-self.pop.shown = has(s, "popcorn")
+# Extras (ads; popcorn and the combo), a screen of its own.
+self.pop = make_button(692, 504, 316, 44, "", "extras", size=16)
 
 # === step
 question_ok(True)
@@ -39,9 +38,8 @@ s = global_vars.s
 self.second.shown = has(s, "second")
 sec = second_open(s)
 self.second.words = f"Second stand: {PLACES[sec['place']]['name']}, {sec['cups']} cups" if sec and sec["place"] is not None else "Second stand: closed"
-n = sum(s["plan"]["buy"].get(k, 0) for k in POP_KEYS)
-self.pop.words = (f"Popcorn: {n} pack{'s' if n != 1 else ''}, {money(s['plan']['pop_price'])} a bag" if s["plan"]["popcorn"]
-                  else "Popcorn: not today")
+ad = ad_now(s)[1] if s["plan"]["ad"] else "no ad"
+self.pop.words = f"Extras: {ad}" + (f", popcorn {money(s['plan']['pop_price'])}" if selling_pop(s) else "")
 run_controls(self.first)
 
 # === draw
@@ -66,9 +64,18 @@ text(30, 104, "Forecast", GOLD, 20)
 text(30, 134, f"{day['forecast']}°F, {forecast_words(day)}", INK, 22)
 text(30, 166, f"Chance of rain {day['rain_pct']}%", SKY, 15)
 y = 192
-for line in event_notes(s, day):
+for line in event_notes(s, day) + trouble_words(day):
     text(30, y, line, "#ffb36b", 14)
     y += 20
+c = contract_today(s)
+if c is not None:
+    # Today's contract: delivered from your shelf as the stand opens.
+    text(30, y + 2, f"Contract: {c['cups']} cups" + (f", {c['bags']} bags" if c["bags"] else "") + f" for {money(c['pay'])}", MINT, 14)
+    y += 20
+    short = contract_short(s, c)
+    if short:
+        text(40, y, f"Short: {short}!", RED, 13)
+        y += 18
 news = s["news"] or {}
 if news.get("soft") or news.get("melted") or news.get("made_ice"):
     text(30, y + 4, "Overnight:", DIM, 14)
@@ -97,15 +104,22 @@ rent = place_now(s)["rent"]
 sec = second_open(s)
 if sec and sec["place"] in second_places(s):
     rent += PLACES[sec["place"]]["rent"] + SECOND_WAGE
+ad_cost = ad_now(s)[2]
 text(352, 356, f"Shopping {money(cost)}", INK, 16)
-text(352, 378, f"Rent{', both stands and helper' if sec else ''} {money(rent)}", INK, 16)
+text(352, 378, f"Rent{', both stands and helper' if sec else ''}" + (", the ad" if ad_cost else "") + f" {money(rent + ad_cost)}", INK, 16)
+rent += ad_cost
 text(352, 402, f"Total {money(cost + rent)}", GOLD if cost + rent <= s["money"] else RED, 20)
 # What the stock makes once the shopping's in (less what the second stand takes).
 shelf = shelf_after_shopping(s)
 if second_open(s):
     need = second_needs(s)
     shelf = {k: max(0, shelf[k] - need[k]) for k in SUPPLY_KEYS}
-text(352, 428, f"Makes about {cups_from(s, shelf)} cups" + (" (after the second stand's)" if second_open(s) else ""), MINT, 14)
+c = contract_today(s)
+if c is not None:
+    need = contract_needs(s, c)
+    shelf = {k: max(0, shelf[k] - need[k]) for k in SUPPLY_KEYS}
+taken = [w for w, on in (("the second stand's", second_open(s)), ("the contract's", c is not None)) if on]
+text(352, 428, f"Makes about {cups_from(s, shelf)} cups" + (f" (after {' and '.join(taken)})" if taken else ""), MINT, 14)
 text(352, 448, f"Lemons go soft after {lemon_days(s)} days" + (" (in the fridge)." if has(s, "fridge") else "."), DIM, 11)
 text(352, 461, "Ice melts by morning (unless you've a cooler).", DIM, 11)
 

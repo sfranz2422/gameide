@@ -22,6 +22,7 @@ self.drink_x = STAND_X + random.uniform(420, 470)
 self.lemonade = False       # what they'll be served (decided as they reach the stand)
 self.popcorn = False
 self.has_popcorn = False    # holding a bag (drawn in their hand)
+self.combo = False          # a cup and a bag at the combo price
 
 # === step
 s = global_vars.s
@@ -43,6 +44,9 @@ if self.state == "walk":
         lem = choice == "buy" and not why_not(s)
         if choice == "full":
             pop = False
+        # Buying one of the two, with a combo on: the combo, if the extra's worth it to them.
+        if (lem or pop) and lem != pop and not why_not(s) and not pop_why_not(s) and takes_combo(s, self.who, t, lem, pop):
+            lem = pop = self.combo = True
         if lem or pop:
             self.lemonade, self.popcorn = lem, pop
             q.append(self)
