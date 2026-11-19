@@ -37,6 +37,7 @@ import gamestore
 import publishing
 import pycheck
 import multiplayer
+import raids
 from gamestore import GameAsset, GameProject, GameVersion
 
 APP_NAME = "gameide"
@@ -901,6 +902,8 @@ publishing.init(app, _db, current_user)
 app.register_blueprint(pycheck.bp)
 # Multiplayer rooms in published games (multiplayer.py).
 multiplayer.init(app)
+# Raids between players' kingdoms in published games (raids.py).
+raids.init(app)
 # Classes, assignments, turning in, comments and Google Classroom (classes.py).
 classes.init(app, _db, current_user, _scheme, _problem)
 # XP, levels, leaderboards, avatars, the token shop and random events (rewards.py).

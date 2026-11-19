@@ -120,6 +120,14 @@ to the LEFT (two steps, two swings). The game turns them round to face right.
 > in the style of the icons (picture 8: a small rounded square of dark stone with a brass
 > edge): a gold star; a crossed sword and axe; a soldier's iron helmet. Flat magenta background.
 
+## Phase 3: raiding classmates
+
+**13. Trophies and a shield.** MAGENTA. (Attach picture 8, the icons.)
+> In exactly the style of the attached icons (a small rounded square of dark weathered
+> stone with a brass edge, the same size), one row of two, no text: a gold trophy cup with
+> two handles; a glowing blue magical shield (a translucent dome of light over a small
+> castle). Flat magenta background.
+
 ## Later phases
 
 - **Phase 3 on:** champions, alliances' banners and league badges.

@@ -235,6 +235,21 @@ export interface NetMessageIn {
 }
 
 /** What a frame's net_send / net_shout / net_tell / net_away asked for. */
+/** What a game asks the server about raids (raid_ functions in runtime.py; player/raids.ts). */
+export type RaidOrder =
+  | { op: "share"; base: { buildings: { kind: string; gx: number; gy: number; level: number }[]; gold: number; food: number; power: number } }
+  | { op: "find" }
+  | { op: "finish"; id: number; stars: number; percent: number; gold: number; food: number; replay: unknown[] }
+  | { op: "seen"; ids: number[] };
+
+/** What comes back into the game about raids (any of these, in one go). */
+export interface RaidNews {
+  online?: boolean;
+  found?: unknown;
+  result?: unknown;
+  news?: unknown;
+}
+
 export interface NetOut {
   state?: Record<string, unknown>;
   msgs?: unknown[];

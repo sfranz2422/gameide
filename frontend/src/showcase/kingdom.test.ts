@@ -12,11 +12,12 @@ import { buildGame } from "../python/codegen";
 import { PythonGame } from "../python/bridge";
 import { KEY_CODE } from "../engine/input";
 import type { Project } from "../store/project";
+import type { RaidOrder } from "../engine/game";
 
 const BUILT = resolve(__dirname, "../../../showcase/kingdom/out/project.json");
 const have = existsSync(BUILT);
 
-type Game = PythonGame & { saved: () => Record<string, unknown>; scores: number[]; project: Project; questionOk: boolean[] };
+type Game = PythonGame & { saved: () => Record<string, unknown>; scores: number[]; project: Project; questionOk: boolean[]; orders: RaidOrder[] };
 
 async function start(save: Record<string, unknown> = {}): Promise<Game> {
   const project = JSON.parse(readFileSync(BUILT, "utf8")) as Project;
@@ -24,7 +25,9 @@ async function start(save: Record<string, unknown> = {}): Promise<Game> {
   let saved: Record<string, unknown> = save;
   const scores: number[] = [];
   const questionOk: boolean[] = [];
+  const raids: RaidOrder[] = [];
   const { game, error } = await PythonGame.load({ ...def, save } as typeof def, {
+    raid: (o) => raids.push(...o),
     stdout: () => undefined, stderr: () => undefined, warning: () => undefined,
     save: (d) => (saved = d),
     score: (n) => scores.push(n),
@@ -32,7 +35,8 @@ async function start(save: Record<string, unknown> = {}): Promise<Game> {
   });
   if (error) throw new Error(`${error.object} ${error.event} line ${error.line}: ${error.message}`);
   step(game, 2);
-  return Object.assign(game, { saved: () => saved, scores, project, questionOk });
+  // `orders`, not `raids`: the game keeps its own `raids` (what's come from the server).
+  return Object.assign(game, { saved: () => saved, scores, project, questionOk, orders: raids });
 }
 function step(game: PythonGame, n = 1) {
   for (let i = 0; i < n; i++) {
@@ -532,5 +536,133 @@ res = finish_raid(r, 0, b)`);
       step(g, 3);
       expect(py<number>(g, "global_vars.panel_box[3]")).toBeLessThanOrEqual(py<number>(g, "VIEW_H"));
     }
+  });
+
+  // ---- phase 3: raiding classmates (the server's answers played in with raidArrive)
+
+  /** A kingdom with an army, online (as the published game is, signed in). */
+  async function online() {
+    const g = await start();
+    await realmOf(g);
+    py(g, 'r = global_vars.realm\nr["army"] = {"footman": 25, "archer": 5}\nr["gold"] = 2000');
+    g.raidArrive({ online: true, news: { trophies: 120, shield: 0, defenses: [] } });
+    step(g, 2);
+    return g;
+  }
+  /** A classmate's kingdom as the server would send it: a computer village's layout. */
+  const FOUND = (g: Game) => ({ id: 41, name: "Ben", trophies: 130, gold: 3000, food: 2000, win: 22, lose: 13,
+    buildings: py<unknown[]>(g, 'village_layout(1)') });
+
+  it("phase 3: offline (the editor, signed out) there are no raids: the Classmates tab says so and a search does nothing", async () => {
+    const g = await start();
+    await realmOf(g);
+    py(g, 'global_vars.realm["army"] = {"footman": 5}\nglobal_vars.attack_tab = "classmates"\nopen_panel("campaign")');
+    step(g, 3);
+    expect(py(g, 'next(b for b in instances("Button") if b.act == "search").off')).toBe(true);
+    expect(py(g, 'search(global_vars.realm)')).toBe("Raiding classmates works in the published game, signed in.");
+    expect(g.orders).toEqual([]);
+  });
+
+  it("phase 3: online, the kingdom is shared: buildings standing, gold, food and keep level (only a change goes)", async () => {
+    const g = await online();
+    py(g, 'r["buildings"].append(new_building("granary", 2, 2, 0))\nshare_kingdom(r)\nshare_kingdom(r)');
+    step(g);
+    const shares = g.orders.filter((o) => o.op === "share");
+    expect(shares.length).toBe(1);
+    const base = (shares[0] as Extract<RaidOrder, { op: "share" }>).base;
+    expect([base.gold, base.food, base.power, base.buildings.some((b) => b.kind === "granary")]).toEqual([2000, 1000, 1, false]);
+    expect(base.buildings.length).toBe(py(g, 'len(r["buildings"]) - 1'));
+    expect(py(g, 'r["trophies"]')).toBe(120);
+  });
+
+  it("phase 3: a search costs gold, the kingdom found is raided like a village, and the result goes to the server, loot and replay", async () => {
+    const g = await online();
+    py(g, 'global_vars.attack_tab = "classmates"\nopen_panel("campaign")');
+    step(g, 2);
+    py(g, 'press(next(b for b in instances("Button") if b.act == "search"))');
+    step(g);
+    expect(py(g, 'r["gold"]')).toBe(2000 - 50);
+    expect(g.orders.at(-1)).toEqual({ op: "find" });
+    g.raidArrive({ found: FOUND(g) });
+    step(g, 3);
+    expect(room(g)).toBe("Battle");
+    expect(py(g, '[global_vars.raid["kind"], global_vars.raid["name"], len(global_vars.battle["bs"]) == len(village_layout(1))]')).toEqual(["player", "Ben", true]);
+    // Before any troop, the clock doesn't run.
+    step(g, 60);
+    expect(py(g, 'global_vars.battle["time"]')).toBe(0);
+    py(g, 'for n in range(20):\n    deploy(global_vars.battle, "footman", MID - 14 + n % 5, MID - 14)');
+    for (let k = 0; k < 12000 && !py<boolean>(g, 'global_vars.battle["over"]'); k++) step(g);
+    step(g, 2);
+    const fin = g.orders.find((o) => o.op === "finish") as Extract<RaidOrder, { op: "finish" }>;
+    expect([fin.id, fin.stars, fin.percent, fin.replay.length]).toEqual([41, 3, 100, 20]);
+    expect(fin.gold <= 3000 && fin.food <= 2000 && fin.gold > 0).toBe(true);
+    expect(py(g, 'r["army"]')).toEqual({ footman: 5, archer: 5 });
+    // The trophies: what they should be at once, the server's when it answers.
+    expect(py(g, 'instances("Battlefield")[0].result["trophies"]')).toBe(22);
+    g.raidArrive({ result: { trophies: 22, mine: 142 } });
+    step(g, 2);
+    expect(py(g, 'raid_result()')).toEqual({ trophies: 22, mine: 142 });
+  }, 120_000);
+
+  it("phase 3: nobody to raid: the search's gold comes back; Next before the first troop looks again", async () => {
+    const g = await online();
+    py(g, 'do_act("search", None)');
+    step(g);
+    g.raidArrive({ found: { id: null, why: "Nobody to raid right now." } });
+    step(g, 2);
+    expect(py(g, '[r["gold"], global_vars.searching, global_vars.said[0]]')).toEqual([2000, false, "Nobody to raid right now."]);
+    py(g, 'do_act("search", None)');
+    step(g);
+    g.raidArrive({ found: FOUND(g) });
+    step(g, 3);
+    expect(room(g)).toBe("Battle");
+    py(g, 'press(instances("Battlefield")[0].next)');
+    step(g, 3);
+    expect([room(g), py(g, 'global_vars.searching'), py(g, 'r["gold"]')]).toEqual(["Realm", true, 2000 - 100]);
+    expect(g.orders.filter((o) => o.op === "find").length).toBe(3);
+    expect(g.orders.some((o) => o.op === "finish")).toBe(false);      // no troop sent: no result, no trophies lost
+  });
+
+  it("phase 3: raids on you: their gold and food come off once, the server's told, and a replay plays the raid out as it went", async () => {
+    const g = await online();
+    // A raid, played here first: what the raider's game would have sent.
+    // Troops in two waves, ten seconds apart: a replay has to send each when it went.
+    py(g, `b = new_battle(village_layout(1), {"footman": 12}, [1000, 600])
+for n in range(12):
+    if n == 6:
+        for _ in range(300):
+            tick(b)
+    deploy(b, "footman", MID - 14 + n % 4, MID - 14 - n // 4)
+while not b["over"]:
+    tick(b)
+done = [b["stars"], destroyed_pct(b)]`);
+    const defense = { id: 77, name: "Ben", stars: py<number>(g, 'b["stars"]'), percent: 0, gold: 500, food: 300, trophies: -20, at: 0, new: true,
+      buildings: py<unknown[]>(g, 'village_layout(1)'), replay: py<unknown[]>(g, 'b["replay"]') };
+    py(g, 'r["food"] = 1000');
+    g.raidArrive({ news: { trophies: 100, shield: 4 * 3600, defenses: [defense] } });
+    step(g, 70);
+    expect(py(g, '[r["gold"], r["food"], r["trophies"], r["raids_applied"]]')).toEqual([1500, 700, 100, [77]]);
+    expect(g.orders).toContainEqual({ op: "seen", ids: [77] });
+    expect(py<string>(g, 'global_vars.said[0]')).toContain("Ben raided you!");
+    // The same news again (before the server's next): nothing taken twice.
+    step(g, 70);
+    expect(py(g, '[r["gold"], r["food"]]')).toEqual([1500, 700]);
+    // Watched: the same battle, the same end.
+    py(g, 'do_act("watch", 0)');
+    step(g, 3);
+    expect([room(g), py(g, 'global_vars.raid["kind"]')]).toEqual(["Battle", "replay"]);
+    for (let k = 0; k < 12000 && !py<boolean>(g, 'global_vars.battle["over"]'); k++) step(g);
+    expect(py(g, '[global_vars.battle["stars"], destroyed_pct(global_vars.battle)]')).toEqual(py(g, "done"));
+    expect(py(g, 'r["army"]')).toEqual({ footman: 25, archer: 5 });      // watching costs nothing
+  }, 120_000);
+
+  it("phase 3: the Classmates tab draws, with raids on you to watch", async () => {
+    const g = await online();
+    g.raidArrive({ news: { trophies: 100, shield: 3600, defenses: [{ id: 1, name: "Ben", stars: 2, percent: 60, gold: 10, food: 5, trophies: -12, at: 0, new: false, buildings: [], replay: [] }] } });
+    step(g, 2);
+    py(g, 'global_vars.attack_tab = "classmates"\nopen_panel("campaign")');
+    step(g, 3);
+    expect(py<number>(g, 'len([b for b in instances("Button") if b.act == "watch"])')).toBe(1);
+    expect(py<number>(g, "global_vars.panel_box[3]")).toBeLessThanOrEqual(py<number>(g, "VIEW_H"));
   });
 });

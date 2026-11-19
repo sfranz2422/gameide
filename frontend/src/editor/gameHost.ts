@@ -29,7 +29,7 @@
  * Without that, switching tabs for a minute would "rescue" a healthy game.
  */
 import type { PythonGameError, TouchSpec } from "../engine/engine";
-import type { GameDefinition, NetMessageIn, NetOut, NetPlayerState } from "../engine/game";
+import type { GameDefinition, NetMessageIn, NetOut, NetPlayerState, RaidNews, RaidOrder } from "../engine/game";
 import { attachInput, KEY_CODE, readPads, type InputSink } from "../engine/input";
 import { SoundPlayer } from "./sound";
 import { pyodideURLs } from "../python/pyodideSource";
@@ -68,6 +68,8 @@ export interface HostEvents {
   score?: (score: number) => void;
   /** net_send / net_shout / net_away: only the published player listens (player/net.ts). */
   net?: (out: NetOut) => void;
+  /** raid_ functions' orders: only the published player listens (player/raids.ts). */
+  raid?: (orders: RaidOrder[]) => void;
   /** The game was held for a Python check, or let go: a player is away from their room meanwhile. */
   held?: (on: boolean) => void;
   /** save_set changed the save (already kept in this browser): only the published player listens, to keep it in the player's account. */
@@ -269,6 +271,9 @@ export class GameHost {
         break;
       case "net":
         this.events.net?.(m.out);
+        break;
+      case "raid":
+        this.events.raid?.(m.orders);
         break;
       case "questionOk":
         this.questionOk = m.ok;
@@ -586,6 +591,11 @@ export class GameHost {
       const timer = setTimeout(finish, maxMs);
       this.okWaiters.push(finish);
     });
+  }
+
+  /** What the server said about raids, for the game's next step. */
+  raidArrive(news: RaidNews) {
+    this.send({ type: "raid", news });
   }
 
   /** What the game's multiplayer room sent back, for the game's next step. */

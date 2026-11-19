@@ -236,3 +236,10 @@ CAMPAIGN = [
     {"name": "Dragonsmoor",   "keep": 9, "towers": 8, "ballistas": 6, "trebuchets": 4, "ring": 2, "gold": 140000, "food": 140000},
 ]
 CAMPAIGN_XP = 8                   # renown for each new star, times the village's number
+
+# ---- phase 3: raiding classmates (the server's raids.py decides who, the loot on offer,
+# the trophies at stake and the shields; these are the game's own numbers)
+SEARCH_COST = 50                  # gold to look for a kingdom, times your keep level (as Next, too)
+RAID_XP = 6                       # renown for each star won against a classmate
+SHARE_EVERY_STEPS = 300           # how often the kingdom is offered to the server (only a change goes)
+APPLIED_KEPT = 60                 # raids on you whose loss has been taken, remembered (so never twice)

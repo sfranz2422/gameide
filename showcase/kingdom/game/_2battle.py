@@ -22,7 +22,8 @@ def new_battle(layout, army, loot):
     """A battle against a layout ([{"kind", "gx", "gy", "level"}]) with `loot` ([gold,
     food]) to win, shared out among its keep, stores, mines and farms."""
     b = {"bs": [], "cells": {}, "units": [], "shots": [], "army": {k: n for k, n in army.items() if n > 0},
-         "sent": {}, "time": 0.0, "loot": [0, 0], "over": False, "stars": 0, "flows": {}, "walls_v": 0, "ended": ""}
+         "sent": {}, "time": 0.0, "loot": [0, 0], "over": False, "stars": 0, "flows": {}, "walls_v": 0, "ended": "",
+         "replay": []}
     for d in layout:
         n = BUILDINGS[d["kind"]]["size"]
         hp = stat(d["kind"], "hp", d["level"])
@@ -102,6 +103,9 @@ def deploy(b, kind, x, y):
     if not b["army"][kind]:
         del b["army"][kind]
     b["sent"][kind] = b["sent"].get(kind, 0) + 1
+    # The replay: when and where each troop went down (a battle is the same every time
+    # from the same troops at the same moments, so the defender can watch it).
+    b["replay"].append([round(b["time"], 3), kind, round(float(x), 3), round(float(y), 3)])
     t = TROOPS[kind]
     b["units"].append({"kind": kind, "x": float(x), "y": float(y), "hp": t["hp"], "max": t["hp"], "dead": False,
                        "goal": None, "hit": None, "cool": 0.0, "moving": False, "dir": (1, 1)})
@@ -325,6 +329,8 @@ def tick(b, dt=BATTLE_TICK):
     if it's over (time up, everything down, or nobody left to fight)."""
     if b["over"]:
         return
+    if not b["units"]:
+        return              # the clock starts with the first troop (looking round is free)
     b["time"] += dt
     for u in b["units"]:
         if not u["dead"]:

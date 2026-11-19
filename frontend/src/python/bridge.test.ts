@@ -211,6 +211,39 @@ describe("events", () => {
     expect(py(game, "instances('K')[0].seen")).toEqual([[false, true, true], [false, false, false]]);
   });
 
+  it("raids: nothing happens offline; online, orders go out and the server's answers come back for the next step", async () => {
+    const { game, raids: orders } = await load({
+      code: {
+        R: one("R", `    def on_create(self):
+        self.seen = []
+    def on_step(self):
+        self.seen.append([raid_online(), raid_found(), raid_news()])
+`),
+      },
+      instances: [{ object: "R", x: 0, y: 0 }],
+    });
+    // Offline (the editor): nothing goes out, nothing comes.
+    py(game, 'raid_share([{"kind": "keep", "gx": 1, "gy": 2, "level": 3}], 10, 20)\nraid_find()');
+    run(game, 1);
+    expect(orders).toEqual([]);
+    game.raidArrive({ online: true, news: { trophies: 5 } });
+    run(game, 1);
+    expect(py(game, "s = instances('R')[0].seen[-1]\n[s[0], s[1] is None, s[2]]")).toEqual([true, true, { trophies: 5 }]);
+    // Online: a kingdom goes out once (only a change is sent), then a search, a finish, a seen.
+    py(game, 'b = [{"kind": "keep", "gx": 1, "gy": 2, "level": 3}]\nraid_share(b, 10, 20, 2)\nraid_share(b, 10, 20, 2)\nraid_find()\nraid_finish(7, 2, 60, 5, 6, [[0.5, "footman", 1, 2]])\nraid_seen([3])');
+    run(game, 1);
+    expect(orders).toEqual([
+      { op: "share", base: { buildings: [{ kind: "keep", gx: 1, gy: 2, level: 3 }], gold: 10, food: 20, power: 2 } },
+      { op: "find" },
+      { op: "finish", id: 7, stars: 2, percent: 60, gold: 5, food: 6, replay: [[0.5, "footman", 1, 2]] },
+      { op: "seen", ids: [3] },
+    ]);
+    game.raidArrive({ found: { id: 9, name: "Ben" } });
+    game.raidArrive({ result: { trophies: 13 } });
+    run(game, 1);
+    expect(py(game, "[raid_found(), raid_result()]")).toEqual([{ id: 9, name: "Ben" }, { trophies: 13 }]);
+  });
+
   it("the mouse wheel: notches turned since the last step, up positive, for that step only", async () => {
     const { game } = await load({
       code: {

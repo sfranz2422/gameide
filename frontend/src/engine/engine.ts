@@ -23,7 +23,7 @@
  * the frame still crosses the bridge only once from the JavaScript side.
  */
 import { EV, EVENTS_HEADER, F, G, HANDLES, STRIDE } from "./layout";
-import type { GameDefinition, NetOut, SoundOrder } from "./game";
+import type { GameDefinition, NetOut, RaidOrder, SoundOrder } from "./game";
 import { InputState } from "./input";
 import { Effects, type FxOrder, type Light } from "./effects";
 import { SpatialHash } from "./spatialHash";
@@ -111,6 +111,7 @@ export interface FrameCommands {
   score?: number;
   /** What net_send / net_shout / net_away asked the room for (player/net.ts). */
   net?: NetOut;
+  raid?: RaidOrder[];
   /** question_ok(): a change in whether now is a fair moment for a Python check question. */
   question_ok?: boolean;
   /** Particles, weather, lighting and screen-effect orders (effects.ts). */

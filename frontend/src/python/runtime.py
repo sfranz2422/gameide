@@ -128,6 +128,7 @@ __all__ = [
     "save_set", "save_get", "save_delete", "save_clear", "high_score",
     # multiplayer
     "net_room", "net_me", "net_players", "net_send", "net_shout", "net_messages", "net_away", "net_tell", "net_host",
+    "raid_online", "raid_share", "raid_find", "raid_found", "raid_finish", "raid_result", "raid_news", "raid_seen",
     # game feel
     "particles", "effect", "weather", "particles_clear", "hit_pause", "lighting", "light", "screen_effect",
     "screen_flash", "screen_fade", "tween", "tween_stop", "ease", "say", "ask", "answer", "dialogue_open", "dialogue_clear",
@@ -2580,10 +2581,110 @@ def _net_smooth_step():
             del _net_smooth[n]
 
 
+# ---- raids: a published game's kingdoms, kept on the server (raids.py; the page's side is
+# player/raids.ts). A game shares its kingdom now and then; raid_find asks the server for
+# someone at the same school to raid, and the answer arrives a moment later (raid_found);
+# raid_finish says how it went. The server decides who, the loot on offer, the trophies and
+# the shields, never the game. Outside a published game, signed in, they quietly do nothing:
+# raid_online() is False and raid_found() stays None.
+
+RAID_SHARE_LIMIT = 60000    # characters of JSON a kingdom may be
+_raid_online = False
+_raid_found = None
+_raid_result = None
+_raid_news = None
+_raid_shared = None         # the JSON last shared, to send only a change
+_raid_out = []
+
+
+def raid_online():
+    """True in a published game, signed in: raids can happen."""
+    return _raid_online
+
+
+def _raid_order(order):
+    if _raid_online:
+        _raid_out.append(order)
+
+
+def raid_share(buildings, gold, food, power=1):
+    """Shares your kingdom, for others to raid while you're away: its buildings, as a list
+    of {"kind", "gx", "gy", "level"}, and the gold and food in it. Sent only when it's
+    changed, and the page sends it at most every few seconds."""
+    global _raid_shared
+    clean = []
+    for b in buildings:
+        clean.append({"kind": str(b["kind"]), "gx": int(b["gx"]), "gy": int(b["gy"]), "level": int(b["level"])})
+    base = {"buildings": clean, "gold": int(gold), "food": int(food), "power": int(power)}
+    text = json.dumps(base, separators=(",", ":"))
+    if len(text) > RAID_SHARE_LIMIT:
+        raise ValueError(f"raid_share: a kingdom is {RAID_SHARE_LIMIT} characters at most; this one is {len(text)}.")
+    if text != _raid_shared:
+        _raid_shared = text
+        _raid_order({"op": "share", "base": base})
+
+
+def raid_find():
+    """Asks the server for a kingdom to raid. The answer comes a moment later: raid_found()."""
+    global _raid_found
+    _raid_found = None
+    _raid_order({"op": "find"})
+
+
+def raid_found():
+    """The kingdom found to raid, once it's come: {"id", "name", "trophies", "buildings",
+    "gold", "food" (the loot on offer), "win", "lose" (trophies at stake)}; with nobody to
+    raid, {"id": None, "why": "…"}. None while it's coming, or never asked."""
+    return _raid_found
+
+
+def raid_finish(raid_id, stars, percent, gold, food, replay=None):
+    """How a raid went: stars (0-3), percent knocked down, the gold and food taken (no more
+    than was on offer), and the replay, a list of [seconds, troop, x, y], so the defender
+    can watch it. The trophies won or lost come back in raid_result()."""
+    global _raid_result
+    _raid_result = None
+    _raid_order({"op": "finish", "id": raid_id, "stars": int(stars), "percent": int(percent), "gold": int(gold),
+                 "food": int(food), "replay": list(replay or [])})
+
+
+def raid_result():
+    """After raid_finish: {"trophies" (your change), "mine" (your trophies now)}, once the
+    server's answered; None before."""
+    return _raid_result
+
+
+def raid_news():
+    """Your trophies, your shield (seconds left) and the raids on your kingdom:
+    {"trophies", "shield", "defenses": [{"id", "name", "stars", "percent", "gold", "food",
+    "trophies", "new", "buildings", "replay"}]}, kept up to date by the page; None until the
+    first comes, or outside a published game."""
+    return _raid_news
+
+
+def raid_seen(ids):
+    """Tells the server your game has taken these raids' losses off (so they're not new)."""
+    _raid_order({"op": "seen", "ids": [int(i) for i in ids]})
+
+
+def _raid_arrive(got):
+    global _raid_online, _raid_found, _raid_result, _raid_news
+    if "online" in got:
+        _raid_online = bool(got["online"])
+    if "found" in got:
+        _raid_found = got["found"]
+    if "result" in got:
+        _raid_result = got["result"]
+    if "news" in got:
+        _raid_news = got["news"]
+
+
 def _net_arrive(text):
     """What the page brought back: from the room, everyone's state and new messages; and whether a question is waiting."""
     global _net_players, _question_waiting
     got = json.loads(text)
+    for r in got.get("raid", []):
+        _raid_arrive(r)
     if "question" in got:
         _question_waiting = bool(got["question"])
     if "players" in got:
@@ -3082,6 +3183,9 @@ def _commands():
     if _net_out:
         out["net"] = dict(_net_out)
         _net_out.clear()
+    if _raid_out:
+        out["raid"] = list(_raid_out)
+        _raid_out.clear()
     global _question_ok_sent
     if _question_ok != _question_ok_sent:
         out["question_ok"] = _question_ok_sent = _question_ok

@@ -3,7 +3,7 @@
  * and helpers to step them and read Python values back.
  */
 import type { PythonGameError } from "../engine/engine";
-import type { GameDefinition, NetJoined, NetOut, ObjectDef, RoomInstance, SpriteDef, TilesetDef } from "../engine/game";
+import type { GameDefinition, NetJoined, NetOut, ObjectDef, RaidOrder, RoomInstance, SpriteDef, TilesetDef } from "../engine/game";
 import { KEY_CODE } from "../engine/input";
 import { PythonGame } from "./bridge";
 
@@ -34,6 +34,8 @@ export interface Loaded {
   nets: NetOut[];
   /** Each change of question_ok() that reached the page. */
   questionOks: boolean[];
+  /** What the game asked the server about raids, in order. */
+  raids: RaidOrder[];
 }
 
 export async function load(m: MiniGame): Promise<Loaded> {
@@ -41,6 +43,7 @@ export async function load(m: MiniGame): Promise<Loaded> {
   const warnings: string[] = [];
   const nets: NetOut[] = [];
   const questionOks: boolean[] = [];
+  const raids: RaidOrder[] = [];
   const code = m.code ?? {};
   const objects = m.objects ?? Object.keys(code).map((name) => ({ name, sprite: "box" }));
   const def: GameDefinition = {
@@ -58,8 +61,9 @@ export async function load(m: MiniGame): Promise<Loaded> {
     warning: (s) => warnings.push(s),
     net: (n) => nets.push(n),
     questionOk: (ok) => questionOks.push(ok),
+    raid: (o) => raids.push(...o),
   });
-  return { game, error, out, warnings, nets, questionOks };
+  return { game, error, out, warnings, nets, questionOks, raids };
 }
 
 /** Steps n times; throws if the game raised, so a test shows the Python error. */

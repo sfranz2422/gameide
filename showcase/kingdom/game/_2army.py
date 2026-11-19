@@ -16,7 +16,7 @@ def load_army(r):
     r.setdefault("train_t", now())
     r.setdefault("campaign", {})          # a village's number (as text): the most stars won there
     r.setdefault("campaign_loot", {})     # a village's number: [gold, food] still there to take
-    return r
+    return load_raids(r)
 
 
 def barracks_level(r):

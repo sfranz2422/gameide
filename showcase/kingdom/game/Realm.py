@@ -21,6 +21,8 @@ global_vars.pops = []                # gold and food rising off where they were 
 global_vars.focus = None
 global_vars.cursor = (MID, MID)
 global_vars.shop_tab = "economy"
+if not hasattr(global_vars, "searching"):
+    global_vars.searching = False    # a raid search asked for, its answer not come yet (kept across Next)
 r = global_vars.realm
 if getattr(global_vars, "zoom", None) is None:
     global_vars.zoom = ZOOM_START
@@ -36,9 +38,9 @@ self.trees = {}                      # (gx, gy) -> the Prop of the tree or rock 
 self.shop_b = make_button(VIEW_W - 130, 9, 120, 38, "Build", "shop", None, 16)
 self.shop_b.icon = "hammer"
 self.army_b = make_button(VIEW_W - 256, 9, 118, 38, "Army", "army", None, 16)
-self.army_b.icon = "shield"
+self.army_b.icon = "army"
 self.attack_b = make_button(14, VIEW_H - 74, 150, 60, "Attack!", "campaign", None, 22)
-self.attack_b.icon = "sword"
+self.attack_b.icon = "attack"
 self.attack_b.hot = True
 self.stop = make_button(VIEW_W / 2 - 80, VIEW_H - 58, 160, 42, "Done", "stop_placing", None, 16)
 self.zoom_out = make_button(VIEW_W - 108, VIEW_H - 56, 46, 44, "-", "zoom", -1, 24)
@@ -66,6 +68,33 @@ if global_vars.t % 30 == 0:
         keep_save(r)
     if global_vars.panel in ("building", "army"):
         open_panel(global_vars.panel, global_vars.panel_of)
+# Raids: the kingdom offered to the server now and then (only a change goes); raids on it
+# come in the news, their losses taken off once; a search's answer opens the battle.
+if global_vars.t % SHARE_EVERY_STEPS == 5:
+    share_kingdom(r)
+if raid_news():
+    r["trophies"] = raid_news().get("trophies", r["trophies"])     # the server's count, shown at once
+if global_vars.t % 60 == 10 and raid_online():
+    fresh = take_raids(r, raid_news())
+    if fresh:
+        keep_save(r)
+        d = fresh[0]
+        sound_play("nope", volume=0.6)
+        say(f"{d['name']} raided you! {d['stars']} star{'s' if d['stars'] != 1 else ''}: "
+            f"-{big_number(d['gold'])} gold, -{big_number(d['food'])} food. Watch it in Attack, Classmates.", GOLD)
+if global_vars.searching and raid_found() is not None:
+    global_vars.searching = False
+    found = raid_found()
+    if found.get("id") is None:
+        r["gold"] += search_cost(r)        # nobody there: the search is free
+        keep_save(r)
+        say(found.get("why", "Nobody to raid right now."), GOLD)
+    else:
+        close_panel()
+        global_vars.battle = start_player_raid(r, found)
+        global_vars.raid = {"kind": "player", "id": found["id"], "name": found["name"], "trophies": found["trophies"],
+                            "win": found["win"], "lose": found["lose"]}
+        room_goto("Battle")
 # What's on the map, kept in step with the kingdom: a Building each, a Prop for a wall.
 now_ids = {}
 walls = {(b["gx"], b["gy"]) for b in r["buildings"] if b["kind"] == "wall"}
@@ -183,6 +212,16 @@ for i, res in enumerate(RESOURCES):
     text(x + 125, 19, f"{big_number(r[res])} / {big_number(cap)}", SHADOW if r[res] / max(1, cap) > 0.55 else INK, 13, "center")
 icon("builder", 660, 28, 38)
 text(682, 17, f"{free_builders(r)} / {builders(r)}", INK if free_builders(r) else RED, 18)
+# Trophies, under the bar (online: the server keeps the count), and a shield if there is one.
+if raid_online():
+    draw_set_alpha(0.75)
+    draw_set_color("#1d1b18")
+    draw_rect(0, HUD_H, 150, HUD_H + 40)
+    draw_set_alpha(1)
+    icon("trophy", 24, HUD_H + 20, 30)
+    text(44, HUD_H + 8, str(r["trophies"]), GOLD, 18)
+    if (raid_news() or {}).get("shield"):
+        icon("shield_on", 118, HUD_H + 20, 28)
 # Something being placed: what to do.
 if global_vars.placing:
     p = global_vars.placing
@@ -262,8 +301,40 @@ if global_vars.panel and box:
             text(x1 + 420, y + 24, f"{ready} ready" + (f", {queued} coming" if queued else ""), GOLD if ready else DIM, 13)
     elif global_vars.panel == "campaign":
         text(x1 + 20, y1 + 12, "Attack!", GOLD, 26)
-        text(x1 + 170, y1 + 22, f"Villages round about. Your army: {army_size(r)} troops.", DIM, 14)
-        for i, v in enumerate(CAMPAIGN):
+        text(x1 + 460, y1 + 22, f"Your army: {army_size(r)} troops", DIM, 14)
+        if getattr(global_vars, "attack_tab", "villages") == "classmates":
+            news = raid_news() or {}
+            icon("trophy", x1 + 50, y1 + 92, 44)
+            text(x1 + 82, y1 + 70, f"{r['trophies']} trophies", GOLD, 22)
+            shield = news.get("shield", 0)
+            text(x1 + 82, y1 + 100, f"Shielded for {clock_words(shield)}: raiding ends it" if shield else "No shield", MINT if shield else DIM, 13)
+            if not raid_online():
+                text(x1 + 30, y1 + 222, "Raiding classmates works in the published", DIM, 14)
+                text(x1 + 30, y1 + 244, "game, signed in with your school account.", DIM, 14)
+            elif global_vars.searching:
+                text(x1 + 30, y1 + 222, "Looking for a kingdom near your trophies…", MINT, 15)
+            else:
+                text(x1 + 30, y1 + 222, "Someone at your school, near your trophies. Win", DIM, 13)
+                text(x1 + 30, y1 + 242, "stars to take trophies and a share of their gold and food.", DIM, 13)
+            text(x1 + 30, y1 + 290, "Others raid you while you're away: build walls", DIM, 13)
+            text(x1 + 30, y1 + 310, "and defenses! A raid that wins gives you a shield.", DIM, 13)
+            text(x1 + 380, y1 + 62, "Raids on your kingdom", GOLD, 18)
+            ds = (news.get("defenses") or [])[:DEFENSE_ROWS]
+            if not ds:
+                text(x1 + 380, y1 + 96, "None yet.", DIM, 14)
+            for i, d in enumerate(ds):
+                y = y1 + 84 + i * DEFENSE_ROW
+                draw_set_alpha(0.3)
+                draw_set_color("#000000")
+                draw_rect(x1 + 370, y - 4, x1 + 960, y + DEFENSE_ROW - 10)
+                draw_set_alpha(1)
+                text(x1 + 380, y + 2, d["name"], INK, 16)
+                for k in range(3):
+                    icon("star", x1 + 520 + k * 20, y + 12, 18, 1 if k < d["stars"] else 0.2)
+                text(x1 + 590, y + 2, f"-{big_number(d['gold'])}", GOLD, 13)
+                text(x1 + 590, y + 20, f"-{big_number(d['food'])}", FOOD, 13)
+                text(x1 + 690, y + 10, f"{d['trophies']:+} trophies", MINT if d["trophies"] >= 0 else RED, 14)
+        for i, v in enumerate(CAMPAIGN if getattr(global_vars, "attack_tab", "villages") == "villages" else []):
             cx, cy = x1 + 16 + (i % 4) * 240, y1 + 58 + (i // 4) * CAMP_ROW
             open_ = village_open(r, i)
             draw_set_alpha(0.35 if open_ else 0.18)

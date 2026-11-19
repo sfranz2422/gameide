@@ -291,6 +291,24 @@ export const API: ApiEntry[] = [
   fn("Multiplayer", "net_away", [p("away", "boolean", "True")], "nothing",
     "Hides you from the others, for a pause menu: they don't see you, and their messages don't reach you. net_away(False) brings you back. A Python check question does this by itself."),
 
+  // Raids: players' kingdoms kept on the server (runtime.py's raid_ section, player/raids.ts, backend/raids.py)
+  fn("Multiplayer", "raid_online", [], "True or False",
+    "True in a published game, signed in: raids between players' kingdoms can happen. In the editor it's False, and every raid_ function does nothing."),
+  fn("Multiplayer", "raid_share", [p("buildings", "any"), p("gold", "number"), p("food", "number"), p("power", "number", "1")], "nothing",
+    'Shares your kingdom for others at your school to raid while you\'re away: a list of {"kind", "gx", "gy", "level"}, and the gold and food in it. Only a change is sent.'),
+  fn("Multiplayer", "raid_find", [], "nothing",
+    "Asks the server for a kingdom to raid, near your trophies, at your school. The answer comes a moment later, in raid_found()."),
+  fn("Multiplayer", "raid_found", [], "a dict, or None",
+    'The kingdom found: {"id", "name", "trophies", "buildings", "gold", "food", "win", "lose"} (the loot on offer, the trophies at stake); {"id": None, "why": ...} with nobody to raid; None while it\'s coming.'),
+  fn("Multiplayer", "raid_finish", [p("raid_id", "number"), p("stars", "number"), p("percent", "number"), p("gold", "number"), p("food", "number"), p("replay", "any", "None")], "nothing",
+    "How the raid went: stars (0-3), percent knocked down, the gold and food taken, and a replay (a list of [seconds, troop, x, y]). The server checks it against what was on offer."),
+  fn("Multiplayer", "raid_result", [], "a dict, or None",
+    'After raid_finish: {"trophies": your change, "mine": your trophies now}, once the server has answered.'),
+  fn("Multiplayer", "raid_news", [], "a dict, or None",
+    'Your trophies, your shield (seconds left) and the raids on your kingdom: {"trophies", "shield", "defenses": [...]}, each defense with who, stars, what they took and whether it\'s new.'),
+  fn("Multiplayer", "raid_seen", [p("ids", "any")], "nothing",
+    "Tells the server your game has taken these raids' losses off your kingdom, so they're no longer new."),
+
   // Effects: game feel (engine/effects.ts, render/feel.ts)
   fn("Effects", "effect", [p("kind", "string"), p("x", "number"), p("y", "number"), p("color", "color", "None"), p("scale", "number", "1")], "nothing",
     'A ready-made effect at (x, y): "explosion", "sparkle", "dust", "smoke", "confetti" or "hit". scale makes it bigger or smaller; color changes its colours.'),

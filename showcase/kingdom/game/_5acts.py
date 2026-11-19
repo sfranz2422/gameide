@@ -435,7 +435,17 @@ def open_panel(kind, of=None):
     elif kind == "campaign":
         x1, y1 = VIEW_W / 2 - 490, HUD_H + 4
         global_vars.panel_box = (x1, y1, x1 + 980, y1 + 66 + 4 * CAMP_ROW)
-        for i, v in enumerate(CAMPAIGN):
+        tab = getattr(global_vars, "attack_tab", "villages")
+        for j, (t, words) in enumerate((("villages", "Villages"), ("classmates", "Classmates"))):
+            b = make_button(x1 + 190 + j * 130, y1 + 10, 122, 38, words, "attack_tab", t, 15, True)
+            b.picked = t == tab
+        if tab == "classmates":
+            f = make_button(x1 + 30, y1 + 150, 300, 54, f"Find a kingdom: {search_cost(r):,} gold", "search", None, 17, True)
+            f.off = not raid_online() or army_size(r) == 0 or r["gold"] < search_cost(r) or global_vars.searching
+            f.hot = not f.off
+            for i, d in enumerate(((raid_news() or {}).get("defenses") or [])[:DEFENSE_ROWS]):
+                make_button(x1 + 860, y1 + 84 + i * DEFENSE_ROW, 96, 40, "Watch", "watch", i, 14, True)
+        for i, v in enumerate(CAMPAIGN if tab == "villages" else []):
             cx, cy = x1 + 16 + (i % 4) * 240, y1 + 58 + (i // 4) * CAMP_ROW
             a = make_button(cx + 140, cy + CAMP_ROW - 48, 84, 36, "Attack", "attack", i, 14, True)
             a.off = not village_open(r, i) or army_size(r) == 0
@@ -469,6 +479,7 @@ def open_panel(kind, of=None):
 
 ARMY_ROW = 52              # the Army window's rows, a troop each
 CAMP_ROW = 112             # the Attack window's cards, four to a row
+DEFENSE_ROWS, DEFENSE_ROW = 8, 56   # the Classmates tab's raids on you
 
 
 def shop_rows(r, tab):
@@ -527,8 +538,33 @@ def do_act(what, arg):
         else:
             close_panel()
             global_vars.battle = b
-            global_vars.raid = {"village": arg, "name": CAMPAIGN[arg]["name"]}
+            global_vars.raid = {"kind": "village", "village": arg, "name": CAMPAIGN[arg]["name"]}
             room_goto("Battle")
+    elif what == "attack_tab":
+        global_vars.attack_tab = arg
+        open_panel("campaign")
+    elif what in ("search", "next_raid"):
+        res = search(r)
+        if res == "searching":
+            sound_play("click", volume=0.5)
+            global_vars.searching = True
+            keep_save(r)
+            if what == "next_raid":
+                room_goto("Realm")          # back home while the next one's found; it opens the battle
+            else:
+                open_panel("campaign")
+        else:
+            sound_play("nope", volume=0.5)
+            say(res, RED)
+    elif what == "watch":
+        d = raid_news()["defenses"][arg]
+        army = {}
+        for s in d["replay"]:
+            army[s[1]] = army.get(s[1], 0) + 1
+        close_panel()
+        global_vars.battle = new_battle(found_layout(d), army, [d["gold"], d["food"]])
+        global_vars.raid = {"kind": "replay", "name": d["name"], "steps": d["replay"]}
+        room_goto("Battle")
     elif what == "troop":
         for f in instances("Battlefield"):
             f.chosen = arg

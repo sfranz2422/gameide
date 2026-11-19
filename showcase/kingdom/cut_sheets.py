@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-Cuts the teacher's Gemini pictures for Highmoor (PROMPTS.md, in order, copied into raw/
+Cuts the teacher's Gemini pictures for Highmoor (phase 1: 01-09; phase 2's troops, rubble
+and icons: 10-12) (PROMPTS.md, in order, copied into raw/
 as 01.jpeg, 02.jpeg …) into the named pictures in art/, which build.py reads. Both raw/
 and art/ are committed, so the art can't be lost.
 
@@ -48,6 +49,16 @@ ROWS = {
            [("scaffold_2", 2), ("scaffold_3", 3), ("scaffold_4", 4)]],
 }
 ICONS = ["gold", "food", "renown", "builder", "hammer", "clock", "shield", "sword", "up", "keep"]
+# Phase 2's troops: a sheet's rows, one troop each, and which of its columns are our four
+# frames facing you (walk, walk, swing, swing) and four facing away. Sheet 10 came back with
+# ten frames a troop, not eight, with grid lines between them (cut by its grid, a little in
+# from each line); sheet 11 with the eight asked for.
+TROOP_SHEETS = {
+    "10": (10, ["footman", "archer", "brute", "raider"], [0, 1, 3, 4], [5, 6, 8, 9]),
+    "11": (8, ["sapper", "knight", "ram"], [0, 1, 2, 3], [4, 5, 6, 7]),
+}
+TROOP_FACING_RIGHT = {"ram"}     # Gemini drew the ram's iron head on the right: turned to face left like the rest
+TROOP_TALL = {"footman": 124, "archer": 120, "brute": 150, "raider": 116, "sapper": 116, "knight": 176, "ram": 150}
 
 
 def save(pic, name):
@@ -154,6 +165,39 @@ def main():
         for i, name in enumerate(ICONS):
             c, r_ = i % 5, i // 5
             part = no_shadow(im.crop((int(c * w), int(r_ * h), int((c + 1) * w), int((r_ + 1) * h))))
+            side = max(part.size)
+            sq = Image.new("RGBA", (side, side), (0, 0, 0, 0))
+            sq.paste(part, ((side - part.width) // 2, (side - part.height) // 2))
+            save(sq.resize((128, 128), Image.LANCZOS), f"icon_{name}")
+    for sheet, (cols, troops, front, back) in TROOP_SHEETS.items():
+        if not (RAW / f"{sheet}.jpeg").exists():
+            continue
+        raw = Image.open(RAW / f"{sheet}.jpeg")
+        w, h = raw.width / cols, raw.height / len(troops)
+        for r_, troop in enumerate(troops):
+            cells = []
+            for c in range(cols):
+                inset = 10
+                cell = _sw.key_out(raw.crop((int(c * w) + inset, int(r_ * h) + inset, int((c + 1) * w) - inset, int((r_ + 1) * h) - inset)))
+                part = no_shadow(cell.copy())      # (keyed out from an array: read-only)
+                cells.append(part)
+            k = TROOP_TALL[troop] / max(cells[i].height for i in front + back)
+            for view, cols_ in (("front", front), ("back", back)):
+                frames = [cells[i].resize((max(1, round(cells[i].width * k)), max(1, round(cells[i].height * k))), Image.LANCZOS) for i in cols_]
+                for j, pic in enumerate(_farm.same_size(frames)):
+                    if troop in TROOP_FACING_RIGHT:
+                        pic = pic.transpose(Image.FLIP_LEFT_RIGHT)
+                    save(pic, f"troop_{troop}_{view}_{j}")
+    if (RAW / "12.jpeg").exists():
+        # Rubble along the top, four sizes; three icons along the bottom (their shadows out).
+        im = _sw.key_out(Image.open(RAW / "12.jpeg"))
+        top = im.crop((0, 0, im.width, im.height // 2))
+        found = sorted(_farm.islands(top, 4), key=lambda b: b[0])
+        for n, b in zip((1, 2, 3, 4), found):
+            save(fitted(_farm.shadow(de_rim(_sw.own(top, b, found).crop(b))), n), f"rubble_{n}")
+        third = im.width / 3
+        for c, name in enumerate(("star", "attack", "army")):
+            part = no_shadow(im.crop((int(c * third), im.height // 2, int((c + 1) * third), im.height)))
             side = max(part.size)
             sq = Image.new("RGBA", (side, side), (0, 0, 0, 0))
             sq.paste(part, ((side - part.width) // 2, (side - part.height) // 2))

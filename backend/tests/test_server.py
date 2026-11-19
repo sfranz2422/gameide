@@ -2299,6 +2299,93 @@ check("live rooms: unpublishing takes its rooms, memory and all", _nia.delete("/
 multiplayer.LIVE = False
 multiplayer.Live.reset()
 
+# ---------------------------------------------------------------- raids (raids.py)
+# Kingdoms kept here, matched at the same school by trophies; the server decides the loot,
+# the trophies and the shield, and checks a result against its offer. First names only.
+import raids
+put(_amy, "rd1", project("rd1", "Kingdom"), 0)
+RD = _amy.post("/api/projects/rd1/publish", json={"title": "Kingdom", "visibility": "unlisted"}).get_json()["published"]["id"]
+_KEEP = [{"kind": "keep", "gx": 33, "gy": 33, "level": 2}, {"kind": "wall", "gx": 30, "gy": 30, "level": 1}]
+def _share(c, gold=10000, food=5000, buildings=None, power=2):
+    return c.put(f"/api/play/{RD}/raid/base", json={"buildings": _KEEP if buildings is None else buildings, "gold": gold, "food": food, "power": power})
+def _find(c):
+    return c.post(f"/api/play/{RD}/raid/find", json={}).get_json()
+def _finish(c, rid, **kw):
+    body = {"stars": 0, "percent": 0, "gold": 0, "food": 0, "replay": []}
+    body.update(kw)
+    return c.post(f"/api/play/{RD}/raid/{rid}", json=body)
+def _news(c):
+    return c.get(f"/api/play/{RD}/raid/news").get_json()
+check("raids: signing in comes first", client().put(f"/api/play/{RD}/raid/base", json={}).status_code == 401
+      and client().post(f"/api/play/{RD}/raid/find", json={}).status_code == 401)
+check("raids: a kingdom is buildings, gold, food and power",
+      all(_share(_amy, buildings=b).status_code == 400 for b in ("castle", [{"kind": "Keep!", "gx": 1, "gy": 1, "level": 1}],
+                                                                [{"kind": "keep", "gx": "1", "gy": 1, "level": 1}], [{"kind": "keep"}]))
+      and _share(_amy, gold=-1).status_code == 400 and _share(_amy, gold=True).status_code == 400)
+check("raids: nobody else yet: nobody to raid", _share(_amy).status_code == 200 and _find(_amy)["raid"] is None)
+_share(_ben, gold=20000, food=8000)
+_share(_far)
+_share(_look)
+_share(_mail2)
+def _give_up(c, f):
+    """A raid found and left: finished with nothing, so its defender is free again."""
+    if f["raid"]:
+        _finish(c, f["raid"]["id"])
+    return f
+# Picked at random among the nearest: asked a dozen times, only ever someone at the same school.
+check("raids: only ever matched at your own school (never another school, a look-alike domain or a gmail)",
+      all((_give_up(_pat, _find(_pat))["raid"] or {}).get("name") in ("Amy", "Ben") for _ in range(12)))
+_f = _find(_amy)
+_r = _f["raid"]
+check("raids: matched with someone at your own school (never a look-alike domain or another school)", _r and _r["name"] == "Ben", _f)
+_raw = json.dumps(_f)
+check("raids: a raid names a first name, never an email or a last name", "@" not in _raw and "Yoder" not in _raw and M not in _raw, _raw)
+check("raids: the loot on offer is the server's share of what they have", (_r["gold"], _r["food"]) == (4000, 1600), _r)
+check("raids: a kingdom comes as its buildings only", _r["buildings"] == _KEEP)
+check("raids: a personal address has no school, so nobody to raid", _find(_mail2)["raid"] is None)
+# Picked at random among the nearest: asked a dozen times, never the one being raided.
+check("raids: someone being raided isn't offered to anyone else meanwhile",
+      all((_give_up(_pat, _find(_pat))["raid"] or {}).get("name") != "Ben" for _ in range(12)))
+check("raids: no more loot than was on offer", _finish(_amy, _r["id"], stars=3, gold=4001, replay=[[0.1, "footman", 1, 1]]).status_code == 400
+      and _finish(_amy, _r["id"], stars=4).status_code == 400)
+check("raids: someone else can't finish your raid", _finish(_ben, _r["id"], stars=3).status_code == 404)
+check("raids: a replay is a list of [time, troop, x, y]", _finish(_amy, _r["id"], replay=[["x", "footman", 1, 2]]).status_code == 400)
+_amy_before = _news(_amy)["trophies"]
+_done = _finish(_amy, _r["id"], stars=2, percent=60, gold=3000, food=1000, replay=[[0.5, "footman", 20.5, 21], [1.0, "archer", 20, 22]])
+check("raids: two stars win two thirds of what's at stake", _done.status_code == 200 and _done.get_json()["trophies"] == _r["win"] * 2 // 3, _done.get_json())
+check("raids: …and it can't be finished twice", _finish(_amy, _r["id"], stars=3).status_code == 404)
+_bn = _news(_ben)
+_d = _bn["defenses"][0]
+check("raids: the defender hears of it: who, the stars, what was taken, the trophies lost, and the replay",
+      (_d["name"], _d["stars"], _d["gold"], _d["food"], _d["trophies"], _d["new"], len(_d["replay"])) == ("Amy", 2, 3000, 1000, -(_r["win"] * 2 // 3), True, 2), _d)
+check("raids: …with no email or last name in it", "@" not in json.dumps(_bn) and "Zebrowski" not in json.dumps(_bn))
+check("raids: two stars give the defender a shield of eight hours", 8 * 3600 - 60 < _bn["shield"] <= 8 * 3600, _bn["shield"])
+check("raids: a shielded kingdom isn't offered", all((_give_up(_pat, _find(_pat))["raid"] or {}).get("name") != "Ben" for _ in range(12)))
+check("raids: the raider's trophies go up by that", _done.get_json()["mine"] == _amy_before + _r["win"] * 2 // 3, _done.get_json())
+_sdb = server.SessionLocal()
+# The loot taken comes off the defender's kingdom kept here.
+_bb = _sdb.query(raids.RaidBase).join(accounts.User, accounts.User.id == raids.RaidBase.user_id).filter(accounts.User.email == f"ben@{M}").first()
+check("raids: the loot taken comes off the defender's kingdom kept here", (_bb.gold, _bb.food) == (17000, 7000), (_bb.gold, _bb.food))
+_sdb.close()
+check("raids: only the defender's game can say it's taken the loss",
+      _amy.post(f"/api/play/{RD}/raid/seen", json={"ids": [_d["id"]]}).status_code == 200
+      and _news(_ben)["defenses"][0]["new"] is True and _d["id"] not in [x["id"] for x in _news(_amy)["defenses"]])
+check("raids: the defender's game says it's taken the loss", _ben.post(f"/api/play/{RD}/raid/seen", json={"ids": [_d["id"]]}).status_code == 200
+      and _news(_ben)["defenses"][0]["new"] is False)
+# Raiding ends your own shield; no stars lose trophies; trophies never below nothing.
+_pr = _find(_ben)["raid"]
+check("raids: raiding ends your own shield", _news(_ben)["shield"] == 0 and _pr is not None)
+_before = _news(_ben)["trophies"]
+check("raids: stars need troops", _finish(_ben, _pr["id"], stars=1).status_code == 400)
+check("raids: no stars lose what's at stake", _finish(_ben, _pr["id"], stars=0, replay=[[0.1, "footman", 1, 1]]).get_json()["trophies"] == -_pr["lose"])
+_lf = _find(_ben)["raid"]
+check("raids: leaving without sending a troop costs nothing", _lf is None or _finish(_ben, _lf["id"]).get_json()["trophies"] == 0)
+check("raids: …never below nothing", _news(_ben)["trophies"] == max(0, _before - _pr["lose"]))
+check("raids: the trophies at stake: more against someone ahead, less against someone behind",
+      raids.stakes(0, 300)[0] > raids.stakes(0, 0)[0] > raids.stakes(300, 0)[0] and raids.stakes(300, 0)[1] > raids.stakes(0, 300)[1])
+check("raids: unpublishing takes the kingdoms and raids", _amy.delete("/api/projects/rd1/publish").status_code == 200
+      and server.SessionLocal().query(raids.Raid).count() == 0 and server.SessionLocal().query(raids.RaidBase).count() == 0)
+
 print()
 if failures:
     print(f"FAILED: {len(failures)} — " + "; ".join(failures))

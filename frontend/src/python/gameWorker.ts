@@ -138,6 +138,7 @@ async function play(msg: Extract<ToWorker, { type: "play" }>) {
     save: (data) => post({ type: "save", data }),
     score: (score) => post({ type: "score", score }),
     net: (out) => post({ type: "net", out }),
+    raid: (orders) => post({ type: "raid", orders }),
     questionOk: (ok) => post({ type: "questionOk", ok }),
     touch: (spec) => post({ type: "touch", spec }),
   });
@@ -247,6 +248,9 @@ self.onmessage = async (ev: MessageEvent<ToWorker>) => {
         break;
       case "net":
         game?.netArrive(msg.players, msg.msgs, msg.host);
+        break;
+      case "raid":
+        game?.raidArrive(msg.news);
         break;
       case "questionWaiting":
         game?.setQuestionWaiting(msg.on);

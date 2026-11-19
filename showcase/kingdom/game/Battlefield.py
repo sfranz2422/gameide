@@ -6,6 +6,11 @@
 # The battle itself is the battle script's (global_vars.battle); this only shows it and
 # passes on the taps: tap outside the village to put the chosen troop down, hold still to
 # keep putting them down, drag to look round.
+#
+# global_vars.raid says whose: {"kind": "village", "village": i, "name"}, a classmate's
+# kingdom {"kind": "player", "id", "name", "trophies", "win", "lose"} (raids script), or a
+# replay of a raid on you {"kind": "replay", "name", "steps"}: no taps then, the troops go
+# down when the raider's did.
 
 # === create
 r = global_vars.realm
@@ -32,13 +37,18 @@ for i, s in enumerate(b["bs"]):
             self.props[i].sprite += "_gy"
 self.troops = []                     # a Prop for each troop, in the battle's order
 self.chosen = next(iter(b["army"]), None)
+self.kind = global_vars.raid["kind"]
+self.steps = list(global_vars.raid.get("steps", []))     # a replay's: [seconds, troop, x, y], in order
 self.tray = []
 for k, kind in enumerate(TROOPS):
-    if r["army"].get(kind, 0):
+    if self.kind != "replay" and r["army"].get(kind, 0):
         bt = make_button(16 + len(self.tray) * 108, VIEW_H - 96, 100, 82, TROOPS[kind]["name"], "troop", kind, 11)
         bt.pic = f"troop_{kind}_front"
         self.tray.append(bt)
-self.end = make_button(VIEW_W - 170, 66, 156, 40, "End battle", "end_battle", None, 15)
+self.end = make_button(VIEW_W - 170, 66, 156, 40, "Stop watching" if self.kind == "replay" else "End battle", "end_battle", None, 15)
+# A classmate's kingdom: before the first troop, Next looks for another (a search's cost).
+self.next = make_button(VIEW_W - 170, 114, 156, 40, f"Next: {search_cost(r):,} gold", "next_raid", None, 14)
+self.next.shown = self.kind == "player"
 self.home = make_button(VIEW_W / 2 - 140, VIEW_H / 2 + 120, 280, 54, "Back to your kingdom", "go_home", None, 20)
 self.home.hot = True
 self.home.shown = False
@@ -65,19 +75,32 @@ for j, bt in enumerate(self.tray):
     bt.count = b["army"].get(bt.arg, 0)
     bt.shown = not b["over"]
 self.end.shown = not b["over"]
+self.next.shown = self.kind == "player" and not b["units"] and not b["over"]
+self.next.off = r["gold"] < search_cost(r)
 if self.chosen is not None and b["army"].get(self.chosen, 0) == 0:
     self.chosen = next(iter(b["army"]), None)
 if b["over"]:
     run_buttons(self.home)          # only then: in battle, Space sends a troop and 1-7 choose one
 if not b["over"]:
-    battle_pointer(self)
-    battle_keys(self)
+    if self.kind == "replay":
+        # The raider's troops, each at the moment it went down.
+        while self.steps and self.steps[0][0] <= b["time"] + 1e-6:
+            s = self.steps.pop(0)
+            deploy(b, s[1], s[2], s[3])
+    else:
+        battle_pointer(self)
+        battle_keys(self)
     if global_vars.t % 2 == 0:
         tick(b)
 camera_set(*global_vars.cam)
 if b["over"] and self.result is None:
     # Over: the troops sent are gone, the loot goes home, the stars are kept (once).
-    self.result = finish_raid(r, global_vars.raid["village"], b)
+    if self.kind == "village":
+        self.result = finish_raid(r, global_vars.raid["village"], b)
+    elif self.kind == "player":
+        self.result = finish_player_raid(r, global_vars.raid, b)
+    else:
+        self.result = {"stars": b["stars"], "new_stars": 0, "gold": b["loot"][0], "food": b["loot"][1], "lost": 0, "levels": []}
     keep_save(r)
     level_up(self.result["levels"])
     self.home.shown = True
@@ -166,7 +189,11 @@ draw_rect(0, 0, VIEW_W, HUD_H)
 draw_set_alpha(1)
 draw_set_color(EDGE)
 draw_line(0, HUD_H, VIEW_W, HUD_H, 2)
-text(16, 14, raid["name"], GOLD, 22)
+text(16, 14, ("Watching: " if self.kind == "replay" else "") + raid["name"], GOLD, 22)
+if self.kind == "player":
+    # The trophies at stake (the server's), under the bar.
+    icon("trophy", 30, HUD_H + 26, 30)
+    text(50, HUD_H + 12, f"{raid['trophies']}  ·  win +{raid['win']}  ·  lose -{raid['lose']}", INK, 15)
 left = battle_left(b)
 text(VIEW_W / 2 - 40, 12, f"{int(left) // 60}:{int(left) % 60:02d}", INK if left > 30 else RED, 24, "center")
 for k in range(3):
@@ -176,12 +203,17 @@ icon("gold", VIEW_W - 250, 28, 30)
 text(VIEW_W - 230, 16, big_number(b["loot"][0]), GOLD, 17)
 icon("food", VIEW_W - 130, 28, 30)
 text(VIEW_W - 110, 16, big_number(b["loot"][1]), FOOD, 17)
-if not b["over"] and not b["units"]:
-    text(VIEW_W / 2, HUD_H + 14, "Tap the grass outside the village to send in your troops.", MINT, 17, "center")
+if not b["over"] and not b["units"] and self.kind != "replay":
+    text(VIEW_W / 2, HUD_H + 14, "Look round, then tap the grass outside to send in your troops: the clock starts then.", MINT, 16, "center")
 if b["over"] and self.result is not None:
     res = self.result
     panel(VIEW_W / 2 - 300, VIEW_H / 2 - 170, VIEW_W / 2 + 300, VIEW_H / 2 + 190)
-    text(VIEW_W / 2, VIEW_H / 2 - 156, "Victory!" if res["stars"] else "Defeat", GOLD if res["stars"] else RED, 40, "center")
+    if self.kind == "replay":
+        title = "They won!" if res["stars"] else "You held them off!"
+        good = not res["stars"]
+    else:
+        title, good = ("Victory!" if res["stars"] else "Defeat"), bool(res["stars"])
+    text(VIEW_W / 2, VIEW_H / 2 - 156, title, GOLD if good else RED, 40, "center")
     text(VIEW_W / 2, VIEW_H / 2 - 104, b["ended"], DIM, 15, "center")
     for k in range(3):
         icon("star", VIEW_W / 2 - 60 + k * 60, VIEW_H / 2 - 50, 52, 1 if k < res["stars"] else 0.2)
@@ -190,6 +222,12 @@ if b["over"] and self.result is not None:
     text(VIEW_W / 2 - 98, VIEW_H / 2 + 28, f"+{big_number(res['gold'])}", GOLD, 18)
     icon("food", VIEW_W / 2 + 40, VIEW_H / 2 + 40, 34)
     text(VIEW_W / 2 + 62, VIEW_H / 2 + 28, f"+{big_number(res['food'])}", FOOD, 18)
+    if self.kind == "player":
+        # The trophies: the server's answer once it's come, what it should be till then.
+        got = raid_result()
+        n = got["trophies"] if got and "trophies" in got else res["trophies"]
+        icon("trophy", VIEW_W / 2 - 50, VIEW_H / 2 + 92, 30)
+        text(VIEW_W / 2 - 30, VIEW_H / 2 + 80, f"{'+' if n >= 0 else ''}{n} trophies", MINT if n >= 0 else RED, 17)
     if res["lost"]:
         text(VIEW_W / 2, VIEW_H / 2 + 66, f"{big_number(res['lost'])} didn't fit in your storage.", RED, 13, "center")
     elif res["new_stars"]:

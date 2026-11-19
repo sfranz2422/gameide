@@ -11,7 +11,7 @@
  * is input going in; stats and output come out a few times a second.
  */
 import type { PythonGameError, TouchSpec } from "../engine/engine";
-import type { GameDefinition, NetMessageIn, NetOut, NetPlayerState, SoundOrder } from "../engine/game";
+import type { GameDefinition, NetMessageIn, NetOut, NetPlayerState, RaidNews, RaidOrder, SoundOrder } from "../engine/game";
 import type { PadState } from "../engine/input";
 
 export type InputMessage =
@@ -39,6 +39,8 @@ export type ToWorker =
   | { type: "net"; players: NetPlayerState[] | null; msgs: NetMessageIn[]; host?: number | null }
   /** A Python check question is waiting for a good moment (question_waiting()). */
   | { type: "questionWaiting"; on: boolean }
+  /** What the server said about raids (player/raids.ts). */
+  | { type: "raid"; news: RaidNews }
   | { type: "inspect"; id: number; at: { x: number; y: number } | { slot: number } };
 
 export interface WorkerStats {
@@ -67,5 +69,6 @@ export type FromWorker =
   | { type: "save"; data: Record<string, unknown> }
   | { type: "score"; score: number }
   | { type: "net"; out: NetOut }
+  | { type: "raid"; orders: RaidOrder[] }
   | { type: "questionOk"; ok: boolean }
   | { type: "touch"; spec: TouchSpec | null };

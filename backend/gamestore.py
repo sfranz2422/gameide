@@ -321,6 +321,53 @@ class HighScore(Base):
 
 
 
+class RaidBase(Base):
+    """A player's kingdom in a raid game (raid_share in a published game: raids.py), as
+    the server last had it: its buildings (cleaned: kinds, places, levels and nothing
+    else), the gold and food in it, and the server's own count of their trophies and
+    their shield. Others are matched against it while its owner is away."""
+    __tablename__ = "gameide_raid_bases"
+    __table_args__ = (UniqueConstraint("published_id", "user_id", name="uq_gameide_raid_base"),)
+
+    id = Column(Integer, primary_key=True)
+    published_id = Column(Integer, ForeignKey("gameide_published.id"), index=True, nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True, nullable=False)
+    buildings = Column(Text, nullable=False, default="[]")
+    gold = Column(BigInteger, nullable=False, default=0)
+    food = Column(BigInteger, nullable=False, default=0)
+    power = Column(Integer, nullable=False, default=1)          # the game's own measure (Highmoor: keep level)
+    trophies = Column(Integer, nullable=False, default=0)
+    shield_until = Column(DateTime, nullable=True)
+    updated_at = Column(DateTime, nullable=False, default=now)
+
+
+class Raid(Base):
+    """One raid: found (a defender picked, their kingdom as it was, the loot on offer and
+    the trophies at stake, all decided here) and then finished (the result the attacker's
+    game sent, checked against the offer). The defender's game is told of it, takes the
+    loss off its own save, and can watch it (the replay: when each troop went down)."""
+    __tablename__ = "gameide_raids"
+
+    id = Column(Integer, primary_key=True)
+    published_id = Column(Integer, ForeignKey("gameide_published.id"), index=True, nullable=False)
+    attacker_id = Column(Integer, ForeignKey("users.id"), index=True, nullable=False)
+    defender_id = Column(Integer, ForeignKey("users.id"), index=True, nullable=False)
+    buildings = Column(Text, nullable=False, default="[]")
+    offer_gold = Column(BigInteger, nullable=False, default=0)
+    offer_food = Column(BigInteger, nullable=False, default=0)
+    win = Column(Integer, nullable=False, default=0)            # trophies for three stars
+    lose = Column(Integer, nullable=False, default=0)           # trophies lost with none
+    stars = Column(Integer, nullable=True)                      # None until finished
+    percent = Column(Integer, nullable=False, default=0)
+    gold = Column(BigInteger, nullable=False, default=0)
+    food = Column(BigInteger, nullable=False, default=0)
+    trophies = Column(Integer, nullable=False, default=0)       # the attacker's change (the defender's is minus it)
+    replay = Column(Text, nullable=False, default="[]")
+    seen = Column(Integer, nullable=False, default=0)           # the defender's game has taken the loss
+    created_at = Column(DateTime, nullable=False, default=now)
+    finished_at = Column(DateTime, nullable=True)
+
+
 class GameSave(Base):
     """What a signed-in player's game saved (save_set) in one published game, so it
     follows them to another computer, and outlives the browser (the teacher's ask,

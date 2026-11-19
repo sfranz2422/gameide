@@ -212,6 +212,8 @@ def _merge(db, src, dst):
         if (h.score < d.score) if lowest else (h.score > d.score):
             d.score, d.updated_at = h.score, h.updated_at
         db.delete(h)
+    import raids
+    raids.merge(db, src, dst)
     for g in db.query(GameSave).filter_by(published_id=src.id).all():
         d = db.query(GameSave).filter_by(published_id=dst.id, user_id=g.user_id).first()
         if d is None:
@@ -364,7 +366,9 @@ def unpublish(slug):
 
 def _delete(db, pub):
     import multiplayer
+    import raids
     multiplayer.delete_rooms(db, pub.id)
+    raids.delete_for(db, pub.id)
     for table in (PublishedAsset, Like, Report, HighScore, GameSave):
         db.query(table).filter_by(published_id=pub.id).delete()
     db.delete(pub)

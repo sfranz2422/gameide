@@ -419,7 +419,7 @@ export const GEMINI_PACKS: LibraryPack[] = [
         "name": "Characters",
         "file": "library/gemini/kingdom/characters.png",
         "tileWidth": 67,
-        "tileHeight": 56,
+        "tileHeight": 88,
         "use": "sprites"
       },
       {

@@ -12,6 +12,7 @@ import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import type { PythonGameError } from "../engine/engine";
 import { GameHost } from "../editor/gameHost";
 import { buildGame } from "../python/codegen";
+import { RaidLink, usesRaids } from "./raids";
 import { CloudSaver, settle } from "./cloudSave";
 import { api } from "../store/api";
 
@@ -86,6 +87,8 @@ export function PlayerApp() {
   const net = useRef<NetSession | null>(null);
   /** Sends the game's saves to the player's account (cloudSave.ts); none for an exported game. */
   const cloud = useRef<CloudSaver | null>(null);
+  /** Raids with other players' kingdoms (raids.ts), for a published game whose code uses raid_. */
+  const raids = useRef<RaidLink | null>(null);
   const [joined, setJoined] = useState<Joined | null>(null);
   const [alone, setAlone] = useState(false);
   const [here, setHere] = useState(1);
@@ -113,6 +116,7 @@ export function PlayerApp() {
       score: (n) => sendScore.current(n),
       saved: (data, at) => cloud.current?.saved(data, at),
       net: (o) => net.current?.out(o),
+      raid: (o) => raids.current?.handle(o),
       held: (on) => net.current?.hold(on),
     });
     host.current = h;
@@ -120,6 +124,7 @@ export function PlayerApp() {
     h.container = stage.current;
     return () => {
       cloud.current?.stop();
+      raids.current?.stop();
       h.dispose();
     };
   }, []);
@@ -157,6 +162,12 @@ export function PlayerApp() {
       void goLandscape();
     }
     void host.current.play(def, id ? `play:${id}` : `export:${pkg.project.id}`);
+    if (id && usesRaids(pkg.project)) {
+      raids.current?.stop();
+      const h = host.current;
+      raids.current = new RaidLink(id, (news) => h.raidArrive(news));
+      raids.current.start();
+    }
     setPhase({ kind: "playing" });
     if (id) void fetch(`/api/play/${encodeURIComponent(id)}/played`, { method: "POST" }).catch(() => undefined);
   };

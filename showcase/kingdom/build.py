@@ -41,7 +41,8 @@ exec((HERE / "game" / "_1rules.py").read_text(), G)
 VIEW_W, VIEW_H, TW, TH = G["VIEW_W"], G["VIEW_H"], G["TILE_W"], G["TILE_H"]
 ART = HERE / "art"
 ICONS = ["gold", "food", "renown", "builder", "hammer", "clock", "shield", "sword", "up", "keep",
-         "star"]                       # phase 2: a battle's stars (a stand-in until Gemini's)
+         "star", "attack", "army",     # phase 2: a battle's stars, the Attack! and Army buttons
+         "trophy", "shield_on"]        # phase 3: trophies, and a shield (stand-ins until Gemini's)
 # Stand-ins' colours: stone grey, timber brown, thatch… a plain block each, taller with each tier.
 COLOURS = {"keep": (150, 146, 138), "gold_mine": (120, 104, 84), "farm": (176, 150, 92), "treasury": (160, 150, 120),
            "granary": (170, 130, 80), "builder_hut": (140, 110, 80), "archer_tower": (140, 136, 128),

@@ -18,7 +18,7 @@
 import type { PyodideInterface } from "pyodide";
 import type { PyBuffer, PyProxy } from "pyodide/ffi";
 import { Engine, type FrameCommands, type PythonGameError, type SharedViews } from "../engine/engine";
-import type { GameDefinition, NetMessageIn, NetOut, NetPlayerState, SoundOrder } from "../engine/game";
+import type { GameDefinition, NetMessageIn, NetOut, NetPlayerState, RaidNews, RaidOrder, SoundOrder } from "../engine/game";
 import type { TouchSpec } from "../engine/engine";
 import { layoutForPython } from "../engine/layout";
 import runtimeSource from "./runtime.py?raw";
@@ -66,6 +66,8 @@ export interface GameCallbacks {
   touch?: (spec: TouchSpec | null) => void;
   /** net_send / net_shout / net_away: for the page, which talks to the room. */
   net?: (out: NetOut) => void;
+  /** raid_share / raid_find / raid_finish / raid_seen: for the page, which talks to the server. */
+  raid?: (orders: RaidOrder[]) => void;
   /** question_ok(): whether now is a fair moment for a Python check question. */
   questionOk?: (ok: boolean) => void;
 }
@@ -257,6 +259,7 @@ export class PythonGame {
     if (cmds?.score !== undefined) this.callbacks.score?.(cmds.score);
     if (cmds && cmds.touch !== undefined) this.callbacks.touch?.(cmds.touch);
     if (cmds?.net) this.callbacks.net?.(cmds.net);
+    if (cmds?.raid) this.callbacks.raid?.(cmds.raid);
     if (cmds && cmds.question_ok !== undefined) this.callbacks.questionOk?.(cmds.question_ok);
     return this.engine.endStep(cmds);
   }
@@ -281,16 +284,24 @@ export class PythonGame {
     if (host !== undefined) this.netHost = host;
   }
   private netHost: number | null | undefined = undefined;
+  private raids: RaidNews[] = [];
+
+  /** What the server said about raids (player/raids.ts): kept for the next step, in order. */
+  raidArrive(news: RaidNews) {
+    this.raids.push(news);
+  }
 
   /** The room's news for this step, as JSON for _frame — or undefined, with none. */
   private takeNet(): string | undefined {
-    if (!this.netPlayers && !this.netMessages.length && this.questionWaiting === null && this.netHost === undefined) return undefined;
+    if (!this.netPlayers && !this.netMessages.length && this.questionWaiting === null && this.netHost === undefined && !this.raids.length) return undefined;
     const out = JSON.stringify({
       ...(this.netPlayers ? { players: this.netPlayers } : {}),
       ...(this.netHost === undefined ? {} : { host: this.netHost }),
       msgs: this.netMessages,
       ...(this.questionWaiting === null ? {} : { question: this.questionWaiting }),
+      ...(this.raids.length ? { raid: this.raids } : {}),
     });
+    this.raids = [];
     this.netPlayers = null;
     this.netMessages = [];
     this.questionWaiting = null;

@@ -1020,4 +1020,16 @@ phase 3 a classmate's kingdom fight the same way. Troops follow a flow field to 
 defenses shoot shots that fly. The Battlefield only shows it: buildings and troops are Props
 (no events), moved each step from the battle; `tick` runs every other step. Loot comes out of a
 building as it's damaged. `finish_raid` applies a battle to the kingdom once.
+**Phase 3, raiding classmates** (the teacher's ask: kids attack each other's bases; buildings
+knocked down stand again afterwards, the teacher's choice; trophies move): the engine's
+`raid_` functions (runtime.py; page side `player/raids.ts`, server `backend/raids.py`, tables
+`RaidBase` and `Raid`). **The server decides the fair parts**: who is matched (same email
+domain as the boards, nearest in trophies, not shielded, not being raided), the loot on offer
+(`LOOT_SHARE` of what the kingdom shared), the trophies at stake (`stakes`), the shield, and it
+checks a result against its offer. The battle is played in the raider's browser, so stars can
+be faked with browser tools: it touches no grade. A defender's game takes a raid's loss off its
+own save once (`raids_applied`) and tells the server (`raid_seen`). A battle records its
+deploys (`replay`), and replaying them at the same moments gives the same battle (no randomness
+in `_2battle.py`: keep it that way). Looking round before the first troop is free (the clock
+starts then); Next costs a search. Names are first names: a new raid route needs a leak check.
 
