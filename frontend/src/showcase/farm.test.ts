@@ -195,7 +195,7 @@ out`);
     expect(py(g, 'add_xp(global_vars.farm, 26)')).toEqual([2, 3]);
     expect(py(g, 'global_vars.farm["coins"]')).toBe(coins + 2 * py<number>(g, "LEVEL_COINS"));
     expect(py(g, "crops_open(global_vars.farm)")).toEqual(["wheat", "corn", "carrot"]);
-    expect(py(g, "opened_at(5)")).toEqual(["Pumpkins", "Cottage", "Fountain", "roads", "land: Pine Wood"]);
+    expect(py(g, "opened_at(5)")).toEqual(["Pumpkins", "Popcorn stand", "Cottage", "Fountain", "roads", "land: Pine Wood"]);
     step(g);
     expect(g.scores.at(-1)).toBe(3);
     expect(g.project.settings.scoreboard).toEqual({ unit: "level" });
@@ -336,15 +336,17 @@ out`);
     await farmOf(g);
     py(g, 'f = global_vars.farm\nf["coins"] = 1000');
     expect(py(g, 'build(f, "feed_mill", 11, 7)')).toBe("level");
-    py(g, 'f["level"] = 3');
+    py(g, 'f["level"] = 2');
     py(g, 'do_act("shop", None)');
     step(g);
     // The Farm tab: fields, fruit trees and animal homes; the Factories tab has its own.
     expect(py<string[][]>(g, "shop_rows(f)").map((r) => r[0])).toEqual(["field", "coop", "cowshed", "apple_tree", "sheep_pen", "cherry_tree"]);
     const rows = py<[string, string, number, string][]>(g, 'shop_rows(f, "factories")');
-    expect(rows.map((r) => r[0])).toEqual(["feed_mill", "bakery", "dairy", "sugar_mill", "juice_press", "weaving_mill", "jam_kitchen"]);
+    // Each a level sooner than it was (2026-11-19), and six more.
+    expect(rows.map((r) => r[0])).toEqual(["feed_mill", "bakery", "popcorn_stand", "dairy", "sugar_mill", "juice_press", "smokehouse",
+      "weaving_mill", "pizza_oven", "jam_kitchen", "candy_shop", "tailor", "ice_cream_parlor"]);
     expect(rows[0]![3]).toBe("");
-    expect(rows[1]![3]).toBe("Level 4");
+    expect(rows[1]![3]).toBe("Level 3");
     py(g, 'do_act("build", "feed_mill")');
     expect(py(g, "global_vars.placing")).toBe("feed_mill");
     click(g, ...onScreen(g, 9, 6));                     // on the fields: no room
@@ -901,7 +903,7 @@ f["kit"] = {k: 2 for k in KIT}`);
     step(g, 3);
     py(g, 'do_act("barn", None)');
     step(g, 3);
-    expect(py(g, "barn_grid(f)[0]")).toBe(4);
+    expect(py(g, "barn_grid(f)[0]")).toBe(5);
     expect(py<number>(g, "global_vars.panel_box[3]")).toBeLessThanOrEqual(py<number>(g, "VIEW_H"));
     for (let i = 0; i < 9; i++) py(g, `buy_land(f, ${i})`);
     py(g, 'f["level"] = 14\nf["coins"] = 9999');
@@ -1098,5 +1100,91 @@ open_panel("awards")`);
     expect(py<number>(g, 'len([b for b in instances("Button") if b.act == "claim_award"])')).toBe(py<number>(g, "len(ACHIEVEMENTS) - 2"));
     py(g, 'do_act("orders", None)');
     step(g, 3);
+  });
+
+  // ---- more factories (2026-11-19): six more, each a level sooner, smoke while at work
+
+  it("more factories: each can make something the day it opens (so none opens before it can work)", async () => {
+    const g = await start();
+    const late = py<string[]>(g, `opens = {}
+for k, c in CROPS.items():
+    opens[k] = c["level"]
+for k, t in TREES.items():
+    opens[t["fruit"]] = t["level"]
+for k, h in HOMES.items():
+    opens[h["makes"]] = h["level"]
+opens["fish"] = 1
+changed = True
+while changed:
+    changed = False
+    for k, fac in FACTORIES.items():
+        for item, recipe in fac["makes"].items():
+            need = max([fac["level"]] + [opens.get(n, 99) for n in recipe["needs"]])
+            if opens.get(item, 99) > need:
+                opens[item] = need
+                changed = True
+# Some recipes open later than their factory (pie waits for pumpkins): one at least works at once.
+[k for k, fac in FACTORIES.items()
+ if not any(all(opens.get(n, 99) <= fac["level"] for n in r["needs"]) for r in fac["makes"].values())]`);
+    expect(late).toEqual([]);
+    // Every new good sells for more than what goes into it.
+    const cheap = py<string[]>(g, `def worth(k):
+    return CROPS[k]["sell"] if k in CROPS else GOODS[k]["sell"]
+[item for fac in FACTORIES.values() for item, r in fac["makes"].items()
+ if not item.endswith("_feed") and worth(item) <= sum(worth(n) * c for n, c in r["needs"].items())]`);
+    expect(cheap).toEqual([]);
+    expect(py<number>(g, "len(FACTORIES)")).toBe(13);
+  });
+
+  it("a factory at work smokes from its chimney; idle, or with only finished things waiting, it doesn't", async () => {
+    const g = await start();
+    await farmOf(g);
+    py(g, `f = global_vars.farm
+f["level"] = 14
+f["coins"] = 9999
+assert build(f, "popcorn_stand", 11, 7) == "built"
+f["barn"]["corn"] = 9
+m = mill_of(f, 11, 7)
+_puffs = []
+_real_effect = effect
+def effect(name, x, y, colour=None, scale=1):
+    _puffs.append((name, x, y))
+    _real_effect(name, x, y, colour, scale)`);
+    step(g, 3);
+    const puffs = () => {
+      py(g, "_puffs.clear()");
+      step(g, 30);
+      return py<number>(g, 'len([p for p in _puffs if p[0] == "smoke"])');
+    };
+    expect(puffs()).toBe(0);
+    expect(py(g, 'make_in(f, m, "popcorn")')).toBe("queued");
+    expect(puffs()).toBeGreaterThan(0);
+    // From the chimney: above the building, where SMOKE_AT says.
+    const [x, y] = py<[number, number]>(g, '_puffs[-1][1:] if _puffs else (0, 0)');
+    const [bx, by] = py<[number, number]>(g, 'building_xy("popcorn_stand", 11, 7)');
+    expect([x - bx, y - by]).toEqual(py(g, 'list(SMOKE_AT["popcorn_stand"])'));
+    expect(y).toBeLessThan(by - 60);
+    later(g, 600);
+    expect(puffs()).toBe(0);
+  });
+
+  it("the Build window's factories: thirteen in two columns, all on the screen", async () => {
+    const g = await start();
+    await farmOf(g);
+    py(g, 'f = global_vars.farm\nf["level"] = 14\nf["coins"] = 9999\nglobal_vars.shop_tab = "factories"\nopen_panel("shop")');
+    step(g, 2);
+    const box = py<number[]>(g, "list(global_vars.panel_box)");
+    expect(box[3]).toBeLessThanOrEqual(py<number>(g, "VIEW_H"));
+    expect(box[0]).toBeGreaterThanOrEqual(0);
+    expect(box[2]).toBeLessThanOrEqual(py<number>(g, "VIEW_W"));
+    const buttons = py<number[][]>(g, '[[b.x, b.y, b.x + b.wide, b.y + b.high] for b in instances("Button") if b.act == "build"]');
+    expect(buttons.length).toBe(13);
+    for (const [bx1, by1, bx2, by2] of buttons) {
+      expect(bx1).toBeGreaterThanOrEqual(box[0] ?? 0);
+      expect(bx2).toBeLessThanOrEqual(box[2] ?? 0);
+      expect(by2).toBeLessThanOrEqual(box[3] ?? 0);
+      void by1;
+    }
+    expect(new Set(buttons.map((b) => b[0])).size).toBe(2);
   });
 });

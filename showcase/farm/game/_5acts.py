@@ -19,6 +19,23 @@ import math
 import random
 
 SHOP_ROW = 44               # the Build window's rows: ten of them fit the screen
+SHOP_ONE_COLUMN = 10        # more rows than this (13 factories), and they go in two columns
+
+
+def shop_layout(n):
+    """The Build window's width and columns for n rows."""
+    return (980, 2) if n > SHOP_ONE_COLUMN else (660, 1)
+
+
+def shop_slot(i, n, x1, y1):
+    """Where row i of n starts, and how wide its words and button are."""
+    w, cols = shop_layout(n)
+    per = -(-n // cols)
+    col, row = divmod(i, per)
+    col_w = w // cols
+    return {"x": x1 + col * col_w, "y": y1 + 56 + row * SHOP_ROW,
+            "words": 370 if cols == 1 else 270, "button_x": x1 + col * col_w + (450 if cols == 1 else 330),
+            "button_w": 180 if cols == 1 else 150}
 DRAG_START = 10             # pixels a press must move before it's a drag, not a tap
 HUD_H = 52                  # the bar along the top
 PAN_KEYS = 12               # pixels a step the arrows move the view when it follows the cursor
@@ -724,15 +741,17 @@ def open_panel(kind, of=None):
     elif kind == "shop":
         tab = global_vars.shop_tab
         rows = shop_rows(f, tab)
-        x1, y1 = VIEW_W / 2 - 330, HUD_H + 12
-        global_vars.panel_box = (x1, y1, x1 + 660, y1 + 64 + max(len(rows), 3) * SHOP_ROW)
+        w, cols = shop_layout(len(rows))
+        x1, y1 = VIEW_W / 2 - w / 2, HUD_H + 12
+        global_vars.panel_box = (x1, y1, x1 + w, y1 + 64 + max(-(-len(rows) // cols), 3) * SHOP_ROW)
         for j, (t, words) in enumerate(SHOP_TABS):
             b = make_button(x1 + 96 + j * 94, y1 + 10, 88, 36, words, "shop_tab", t, 13, True)
             b.picked = t == tab
         b = make_button(x1 + 476, y1 + 10, 130, 36, "Move things", "move", None, 13, True)
         b.icon = "move"
         for i, (k, name, cost, why) in enumerate(rows):
-            b = make_button(x1 + 450, y1 + 56 + i * SHOP_ROW, 180, SHOP_ROW - 8, why or f"{cost} coins", "build", k, 14, True)
+            at = shop_slot(i, len(rows), x1, y1)
+            b = make_button(at["button_x"], at["y"], at["button_w"], SHOP_ROW - 8, why or f"{cost} coins", "build", k, 14, True)
             b.off = bool(why) or f["coins"] < cost
             b.hot = not b.off
     elif kind == "house":
@@ -824,6 +843,7 @@ def barn_items(f):
 
 BARN_TOP = 144             # the barn window: its title, room and kit above its things
 BARN_ROW = 44
+BARN_ROW_TIGHT = 38        # five columns' rows
 
 
 def barn_grid(f):
@@ -831,16 +851,22 @@ def barn_grid(f):
     width). Up to four columns of eight, so every kind of thing fits on the screen at once
     (two columns of five-plus ran off the bottom once the goods came)."""
     n = len(barn_items(f))
-    cols = 1 if n <= 4 else (2 if n <= 12 else (3 if n <= 21 else 4))
+    # Five, on shorter rows, past 32 kinds (2026-11-19: the six new factories' goods ran
+    # four columns off the bottom of the screen).
+    cols = 1 if n <= 4 else (2 if n <= 12 else (3 if n <= 21 else (4 if n <= 32 else 5)))
     rows = max(1, (n + cols - 1) // cols)
     w = 560 if cols == 1 else 960
-    return cols, rows, w, BARN_TOP + rows * BARN_ROW + 16, (w - 40) / cols
+    return cols, rows, w, BARN_TOP + rows * barn_row(cols) + 16, (w - 40) / cols
+
+
+def barn_row(cols):
+    return BARN_ROW if cols < 5 else BARN_ROW_TIGHT
 
 
 def barn_slot(i, x1, y1):
     """Where the barn window's i-th thing goes: down the first column, then the next."""
     cols, rows, w, h, cell = barn_grid(farm())
-    return x1 + 20 + (i // rows) * cell, y1 + BARN_TOP + (i % rows) * BARN_ROW
+    return x1 + 20 + (i // rows) * cell, y1 + BARN_TOP + (i % rows) * barn_row(cols)
 
 
 AWARDS_W, AWARDS_H = 980, 500       # the Awards window: the event and the season on the left,

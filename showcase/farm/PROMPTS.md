@@ -224,3 +224,23 @@ seasons' snow and leaves are drawn by the game.
 > present with a red bow; a little paper calendar. Row 2: a pink spring blossom; a smiling
 > yellow summer sun; an orange autumn maple leaf; a pale blue winter snowflake. Flat
 > magenta background.
+
+## More factories (2026-11-19)
+
+**20. Six more factories.** MAGENTA. (Attach picture 8, the first factories, for the style.)
+> [the style] In exactly the same isometric style, size and ground as the attached
+> factories: six small farm-town factories, each on its own square patch of grass the
+> size of 2 × 2 ground diamonds, two rows of three, clear space between them. **Every one
+> has a chimney** (brick or metal) sticking up from its roof. Row 1: a red-and-white
+> striped popcorn stand with a big popcorn machine in its window; a dark wooden
+> smokehouse with fish hanging inside; a pizza kitchen with a round brick oven. Row 2: a
+> candy shop painted pink with jars of sweets in the window; a tailor's shop with a
+> spinning wheel and rolls of cloth; an ice cream parlor with a striped awning and a
+> big cone sign (no words). Flat magenta background.
+
+**21. What they make.** MAGENTA. (Attach picture 4, the icons.)
+> [the style] In the style and size of the attached icons, eleven icons, evenly spaced
+> in three rows of four (the last row three): a bucket of popcorn; caramel popcorn;
+> a smoked fish; a fish pie; a pizza; a block of toffee; a red candy apple on a stick;
+> a knitted scarf; a woolly hat with a bobble; a cone of vanilla ice cream; a cone of
+> pink strawberry ice cream. Flat magenta background.

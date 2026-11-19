@@ -15,6 +15,12 @@ if self.of is not None:
     b = farm()[self.of[0]][self.of[1]]
     self.gx, self.gy = b["gx"], b["gy"]
 self.depth = -(building_xy(self.kind, self.gx, self.gy)[1] if self.kind in FOOTPRINT else tile_xy(self.gx, self.gy)[1])
+# A factory at work smokes from its chimney (the teacher's ask: you see it's busy).
+if self.kind in FACTORIES and self.of is not None and global_vars.t % SMOKE_EVERY == (self.gx * 3 + self.gy) % SMOKE_EVERY:
+    if working(mill_of(farm(), self.gx, self.gy)):
+        x, y = building_xy(self.kind, self.gx, self.gy)
+        dx, dy = SMOKE_AT.get(self.kind, (0, -100))
+        effect("smoke", x + dx, y + dy, None, SMOKE_SIZE)
 
 # === draw
 pic_x, pic_y = building_xy(self.kind, self.gx, self.gy) if self.kind in FOOTPRINT else tile_xy(self.gx, self.gy)

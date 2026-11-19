@@ -333,8 +333,12 @@ if global_vars.panel and box:
                 text(cx + 239, cy - 8, f"In season +{round((SEASON_PAY - 1) * 100)}%", INK, 12, "center")
     elif global_vars.panel == "shop":
         text(x1 + 20, y1 + 14, "Build", GOLD, 26)
-        for i, (k, name, cost, why) in enumerate(shop_rows(f, global_vars.shop_tab)):
-            y = y1 + 56 + i * SHOP_ROW
+        rows = shop_rows(f, global_vars.shop_tab)
+        for i, (k, name, cost, why) in enumerate(rows):
+            at = shop_slot(i, len(rows), x1, y1)
+            y = at["y"]
+            x1_ = x1
+            x1 = at["x"]
             pic = {"field": "shovel", "road": "road"}.get(k, "barn" if k in HOMES else ("house" if k in HOUSES else ("people" if k in COMMUNITY else (TREES[k]["fruit"] if k in TREES else "hammer"))))
             icon(pic, x1 + 40, y + 18, 34)
             words = f"{name}  ({len(f['fields'])} of {most_fields(f)})" if k == "field" else name
@@ -348,7 +352,8 @@ if global_vars.panel and box:
                 words += f": room for {COMMUNITY[k]['room']} people"
             elif k in TREES:
                 words += f": {GOODS[TREES[k]['fruit']]['name'].lower()} every {clock_words(TREES[k]['grow'])}"
-            text(x1 + 66, y + 9, words, INK if not why else DIM, 14, "left", 370)
+            text(x1 + 66, y + 9, words, INK if not why else DIM, 14, "left", at["words"])
+            x1 = x1_
     elif global_vars.panel == "house":
         i = global_vars.panel_of
         b = f["town"][i]

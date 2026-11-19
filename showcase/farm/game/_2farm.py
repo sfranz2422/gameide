@@ -362,6 +362,11 @@ def mill_done(m):
     return n
 
 
+def working(m):
+    """Whether a factory is making something now (not just holding finished things)."""
+    return m is not None and mill_done(m) < len(m["queue"])
+
+
 def make_in(f, m, item):
     """Starts making something: 'queued', or why not: 'full' (the queue), 'short' (the
     barn hasn't what it needs). It starts when the one before it finishes."""

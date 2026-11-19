@@ -49,7 +49,10 @@ ICONS = ["wheat", "corn", "carrot", "pumpkin", "seeds", "coin", "star", "level",
          # phase 4: the valley
          "nails", "planks", "paint", "fish", "gold", "apple", "cherry", "apple_juice", "cherry_juice", "train", "land", "up",
          # phase 5: awards, the week's event, the seasons
-         "trophy", "ribbon", "gift", "calendar", "spring", "summer", "autumn", "winter"]
+         "trophy", "ribbon", "gift", "calendar", "spring", "summer", "autumn", "winter",
+         # more factories (2026-11-19): what they make
+         "popcorn", "caramel_corn", "smoked_fish", "fish_pie", "pizza", "toffee", "candy_apple", "scarf", "wool_hat",
+         "ice_cream", "berry_ice_cream"]
 ANIMALS = {"chicken": (250, 250, 245), "cow": (240, 240, 240), "sheep": (245, 245, 235)}
 POSES = ["stand", "walk", "eat", "ready"]
 BUILT_COLOURS = {"coop": (200, 150, 90), "cowshed": (190, 70, 60), "sheep_pen": (170, 140, 110), "feed_mill": (200, 170, 110),
@@ -58,7 +61,9 @@ BUILT_COLOURS = {"coop": (200, 150, 90), "cowshed": (190, 70, 60), "sheep_pen": 
                  "cottage": (240, 210, 160), "family_house": (150, 190, 230), "townhouse": (230, 160, 140), "manor": (235, 225, 200),
                  "fountain": (170, 200, 220), "park": (90, 170, 90), "school": (210, 80, 70), "cafe": (240, 180, 90),
                  "town_hall": (220, 220, 230), "library": (160, 110, 80),
-                 "station": (200, 90, 70), "dock": (170, 130, 90), "mine": (120, 110, 100), "juice_press": (240, 170, 60)}
+                 "station": (200, 90, 70), "dock": (170, 130, 90), "mine": (120, 110, 100), "juice_press": (240, 170, 60),
+                 "popcorn_stand": (230, 70, 60), "smokehouse": (110, 90, 80), "pizza_oven": (200, 110, 70),
+                 "candy_shop": (240, 140, 190), "tailor": (130, 110, 170), "ice_cream_parlor": (150, 210, 230)}
 TREE_FRUIT = {"apple_tree": (220, 40, 40), "cherry_tree": (150, 20, 50)}
 PEOPLE_COLOURS = {"girl": (230, 90, 140), "boy": (70, 130, 220), "woman": (120, 180, 90), "grandpa": (150, 120, 90)}
 NATURE = ["soil", "soil_wet", "grass_flowers", "path", "fence", "gate", "boulder", "bush", "oak", "pine", "stump", "pond"]
@@ -350,6 +355,7 @@ def build(out):
     for name in NATURE:
         im, origin = standing(name, 1, (110, 160, 80))
         P.sprite(name, [im], origin)
+    smoke_at = {}
     for kind, tiles in G["FOOTPRINT"].items():
         if kind in G["TREES"]:
             frames = [half(f"{kind}_{k}") if (ART / f"{kind}_{k}.png").exists() else stand_in_tree(kind, k) for k in range(2)]
@@ -361,6 +367,10 @@ def build(out):
             im = stand_in_building(kind)
             origin = (im.width // 2, im.height - TH * tiles // 2)
         P.sprite(kind, [im], origin)
+        if kind in G["FACTORIES"]:
+            # Where its smoke comes out, from its origin (a share of its picture, CHIMNEYS).
+            fx, fy = G["CHIMNEYS"].get(kind, G["SMOKE_DEFAULT"])
+            smoke_at[kind] = (round(fx * im.width - origin[0]), round(fy * im.height - origin[1]))
     sign = half("sign") if (ART / "sign.png").exists() else stand_in_sign()
     P.sprite("sign", [sign], (sign.width // 2, sign.height - 6))
     for name, frames in (("train_engine", ["train_engine"]), ("train_wagon", ["train_wagon", "train_wagon_full"])):
@@ -390,6 +400,10 @@ def build(out):
     for f in sorted((HERE / "game").glob("_*.py")):
         head, _ = _tw.read_code(f)
         P.script(head.get("script", f.stem.strip("_")), f.read_text())
+    # Made by the build from the pictures (a game can't measure one): each factory's chimney.
+    P.script("chimneys", "# script: chimneys\n# Made by build.py from CHIMNEYS and the pictures: where each factory's smoke\n"
+             "# comes out, from where it stands. Don't edit: change CHIMNEYS in the rules.\n"
+             f"SMOKE_AT = {smoke_at!r}\n")
     files = sorted(f for f in (HERE / "game").glob("*.py") if not f.name.startswith("_"))
     parsed = {f.stem: _tw.read_code(f) for f in files}
     for name, (head, _) in parsed.items():

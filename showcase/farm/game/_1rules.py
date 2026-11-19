@@ -28,8 +28,8 @@ CROPS = {
     "corn":    {"name": "Corn",     "grow": 180, "seed": 2, "yield": 2, "xp": 2, "sell": 3,  "level": 2},
     "carrot":  {"name": "Carrots",  "grow": 420, "seed": 4, "yield": 2, "xp": 3, "sell": 5,  "level": 3},
     "pumpkin": {"name": "Pumpkins", "grow": 900, "seed": 8, "yield": 2, "xp": 5, "sell": 12, "level": 5},
-    "sugarcane": {"name": "Sugarcane", "grow": 1200, "seed": 6, "yield": 2, "xp": 4, "sell": 8, "level": 8},
-    "strawberry": {"name": "Strawberries", "grow": 600, "seed": 5, "yield": 3, "xp": 4, "sell": 7, "level": 11},
+    "sugarcane": {"name": "Sugarcane", "grow": 1200, "seed": 6, "yield": 2, "xp": 4, "sell": 8, "level": 7},
+    "strawberry": {"name": "Strawberries", "grow": 600, "seed": 5, "yield": 3, "xp": 4, "sell": 7, "level": 10},
 }
 STAGES = 4                                  # pictures of a growing crop: sprouts, young, nearly, ready
 
@@ -63,7 +63,7 @@ GOODS = {
     "bread":        {"name": "Bread",        "sell": 6,   "xp": 2},
     "corn_bread":   {"name": "Corn bread",   "sell": 18,  "xp": 4},
     "pie":          {"name": "Pumpkin pie",  "sell": 30,  "xp": 7},
-    "cookies":      {"name": "Cookies",      "sell": 26,  "xp": 6},
+    "cookies":      {"name": "Cookies",      "sell": 34,  "xp": 6},   # (26 was less than its wheat, sugar and egg)
     "cream":        {"name": "Cream",        "sell": 20,  "xp": 4},
     "cheese":       {"name": "Cheese",       "sell": 32,  "xp": 6},
     "butter":       {"name": "Butter",       "sell": 50,  "xp": 8},
@@ -84,25 +84,25 @@ HOMES = {
 # FACTORY_QUEUE (finished ones wait in it until collected).
 FACTORY_QUEUE = 3
 FACTORIES = {
-    "feed_mill":    {"name": "Feed mill",    "level": 3,  "cost": 80,  "makes": {
+    "feed_mill":    {"name": "Feed mill",    "level": 2,  "cost": 80,  "makes": {
         "chicken_feed": {"needs": {"wheat": 2, "corn": 1}, "time": 60},
         "cow_feed":     {"needs": {"corn": 2, "carrot": 1}, "time": 120},
         "sheep_feed":   {"needs": {"wheat": 2, "carrot": 1}, "time": 120}}},
-    "bakery":       {"name": "Bakery",       "level": 4,  "cost": 140, "makes": {
+    "bakery":       {"name": "Bakery",       "level": 3,  "cost": 140, "makes": {
         "bread":      {"needs": {"wheat": 3}, "time": 180},
         "corn_bread": {"needs": {"corn": 2, "egg": 1}, "time": 300},
         "pie":        {"needs": {"pumpkin": 1, "wheat": 2, "egg": 1}, "time": 600},
         "cookies":    {"needs": {"wheat": 2, "sugar": 1, "egg": 1}, "time": 480}}},
-    "dairy":        {"name": "Dairy",        "level": 7,  "cost": 260, "makes": {
+    "dairy":        {"name": "Dairy",        "level": 6,  "cost": 260, "makes": {
         "cream":  {"needs": {"milk": 1}, "time": 180},
         "cheese": {"needs": {"milk": 2}, "time": 360},
         "butter": {"needs": {"milk": 2, "cream": 1}, "time": 480}}},
-    "sugar_mill":   {"name": "Sugar mill",   "level": 8,  "cost": 300, "makes": {
+    "sugar_mill":   {"name": "Sugar mill",   "level": 7,  "cost": 300, "makes": {
         "sugar": {"needs": {"sugarcane": 2}, "time": 300}}},
-    "weaving_mill": {"name": "Weaving mill", "level": 10, "cost": 420, "makes": {
+    "weaving_mill": {"name": "Weaving mill", "level": 9, "cost": 420, "makes": {
         "yarn":    {"needs": {"wool": 2}, "time": 360},
         "sweater": {"needs": {"yarn": 2}, "time": 720}}},
-    "jam_kitchen":  {"name": "Jam kitchen",  "level": 11, "cost": 480, "makes": {
+    "jam_kitchen":  {"name": "Jam kitchen",  "level": 10, "cost": 480, "makes": {
         "jam": {"needs": {"strawberry": 3, "sugar": 1}, "time": 480}}},
 }
 ORDER_GOODS_MOST = 3                        # an order wants at most this many of a made good
@@ -264,7 +264,7 @@ GOODS.update({
     "apple_juice":  {"name": "Apple juice",  "sell": 30, "xp": 6},
     "cherry_juice": {"name": "Cherry juice", "sell": 40, "xp": 7},
 })
-FACTORIES["juice_press"] = {"name": "Juice press", "level": 9, "cost": 520, "makes": {
+FACTORIES["juice_press"] = {"name": "Juice press", "level": 8, "cost": 520, "makes": {
     "apple_juice":  {"needs": {"apple": 3}, "time": 300},
     "cherry_juice": {"needs": {"cherry": 3}, "time": 420}}}
 FOOTPRINT.update({"station": 2, "dock": 2, "mine": 2, "juice_press": 2, "apple_tree": 1, "cherry_tree": 1})
@@ -330,3 +330,51 @@ SEASONS = {
 SEASON_PAY = 1.5
 SHOWER_EVERY = 1800                         # spring: a shower for the first SHOWER_LONG seconds of every this many
 SHOWER_LONG = 300
+
+# ---- more factories (the teacher's ask, 2026-11-19): six more, each making something
+# worth more from what the farm already has; and each factory a level sooner than it was
+# (sugarcane and strawberries too, so the sugar mill and the jam kitchen have them).
+# A factory at work puffs smoke from its chimney: where, CHIMNEYS (a share of its
+# picture across and down; the build turns them into SMOKE_AT for the game).
+GOODS.update({
+    "popcorn":         {"name": "Popcorn",          "sell": 14,  "xp": 3},
+    "caramel_corn":    {"name": "Caramel corn",     "sell": 40,  "xp": 7},
+    "smoked_fish":     {"name": "Smoked fish",      "sell": 56,  "xp": 9},
+    "fish_pie":        {"name": "Fish pie",         "sell": 52,  "xp": 9},
+    "pizza":           {"name": "Pizza",            "sell": 62,  "xp": 10},
+    "toffee":          {"name": "Toffee",           "sell": 118, "xp": 14},
+    "candy_apple":     {"name": "Candy apples",     "sell": 46,  "xp": 8},
+    "scarf":           {"name": "Scarf",            "sell": 124, "xp": 15},
+    "wool_hat":        {"name": "Woolly hat",       "sell": 112, "xp": 14},
+    "ice_cream":       {"name": "Ice cream",        "sell": 92,  "xp": 12},
+    "berry_ice_cream": {"name": "Strawberry ice cream", "sell": 78, "xp": 11},
+})
+FACTORIES.update({
+    "popcorn_stand": {"name": "Popcorn stand", "level": 5, "cost": 200, "makes": {
+        "popcorn":      {"needs": {"corn": 3}, "time": 240},
+        "caramel_corn": {"needs": {"corn": 2, "sugar": 1}, "time": 480}}},
+    "smokehouse":    {"name": "Smokehouse", "level": 8, "cost": 380, "makes": {
+        "smoked_fish": {"needs": {"fish": 2}, "time": 600},
+        "fish_pie":    {"needs": {"fish": 1, "wheat": 2, "egg": 1}, "time": 900}}},
+    "pizza_oven":    {"name": "Pizza oven", "level": 9, "cost": 560, "makes": {
+        "pizza": {"needs": {"wheat": 3, "cheese": 1, "carrot": 1}, "time": 900}}},
+    "candy_shop":    {"name": "Candy shop", "level": 12, "cost": 700, "makes": {
+        "toffee":      {"needs": {"sugar": 2, "butter": 1}, "time": 720},
+        "candy_apple": {"needs": {"apple": 2, "sugar": 1}, "time": 600}}},
+    "tailor":        {"name": "Tailor", "level": 13, "cost": 820, "makes": {
+        "scarf":    {"needs": {"yarn": 2}, "time": 900},
+        "wool_hat": {"needs": {"yarn": 1, "wool": 2}, "time": 840}}},
+    "ice_cream_parlor": {"name": "Ice cream parlor", "level": 14, "cost": 950, "makes": {
+        "ice_cream":       {"needs": {"milk": 2, "sugar": 1, "cream": 1}, "time": 720},
+        "berry_ice_cream": {"needs": {"cream": 1, "strawberry": 2, "sugar": 1}, "time": 720}}},
+})
+FOOTPRINT.update({k: 2 for k in ("popcorn_stand", "smokehouse", "pizza_oven", "candy_shop", "tailor", "ice_cream_parlor")})
+# Where smoke comes out: (across, down) as shares of the picture (measured on Gemini's;
+# the roof's peak where there's no chimney). A factory not listed puffs from SMOKE_DEFAULT.
+CHIMNEYS = {"feed_mill": (0.66, 0.12), "bakery": (0.72, 0.08), "dairy": (0.55, 0.06), "sugar_mill": (0.52, 0.1),
+            "weaving_mill": (0.55, 0.1), "jam_kitchen": (0.52, 0.1), "juice_press": (0.5, 0.16),
+            "popcorn_stand": (0.7, 0.05), "smokehouse": (0.69, 0.08), "pizza_oven": (0.73, 0.11),
+            "candy_shop": (0.65, 0.09), "tailor": (0.66, 0.06), "ice_cream_parlor": (0.67, 0.07)}
+SMOKE_DEFAULT = (0.62, 0.08)
+SMOKE_EVERY = 10                            # steps between puffs
+SMOKE_SIZE = 0.8                            # the engine smoke's scale (0.45 was too faint to notice)

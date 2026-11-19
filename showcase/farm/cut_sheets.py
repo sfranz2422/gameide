@@ -341,7 +341,42 @@ def main():
     phase_3()
     phase_4()
     phase_5()
+    more_factories()
     print(f"{sum(1 for _ in ART.glob('*.png'))} pictures in {ART}")
+
+
+def no_wisp(part):
+    """Rubs out the wisp of smoke Gemini drew over a chimney (it came out pink from the
+    magenta): pinkish pixels in the picture's top tenth. The game puffs its own smoke."""
+    px = part.load()
+    for y in range(part.height // 10):
+        for x in range(part.width):
+            r, g, b, a = px[x, y]
+            if a and (r + b) / 2 - g > 25:
+                px[x, y] = (0, 0, 0, 0)
+    return part
+
+
+def more_factories():
+    """20: six more factories, two rows of three. 21: what they make, a grid of five
+    across; Gemini drew the fish pie and the woolly hat twice (cells 4 and 10, skipped)
+    and left the last two cells empty."""
+    if (RAW / "20.jpeg").exists():
+        im = _sw.key_out(Image.open(RAW / "20.jpeg"))
+        boxes, every = drawings(im, 2, 3)
+        for name, b in zip(["popcorn_stand", "smokehouse", "pizza_oven", "candy_shop", "tailor", "ice_cream_parlor"], boxes):
+            part = _sw.own(im, b, every).crop(b)
+            if name in ("smokehouse", "pizza_oven"):
+                part = no_wisp(part)
+            save(fitted(part, 2), name)
+    if (RAW / "21.jpeg").exists():
+        im = _sw.key_out(Image.open(RAW / "21.jpeg"))
+        cells, _ = drawings(im, 3, 5)
+        names = {0: "popcorn", 1: "caramel_corn", 2: "smoked_fish", 3: "fish_pie", 5: "pizza", 6: "toffee",
+                 7: "candy_apple", 8: "scarf", 9: "wool_hat", 11: "ice_cream", 12: "berry_ice_cream"}
+        for i, name in names.items():
+            b = cells[i]
+            save(_sw.own(im, b, cells).crop(b).resize((128, 128), Image.LANCZOS), f"icon_{name}")
 
 
 if __name__ == "__main__":
