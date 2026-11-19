@@ -2279,6 +2279,18 @@ CASES = [
  ('kingdom: a champion replayed at full health', _kg('_2battle'), '        b["champs"].setdefault(parts[0], [int(parts[1]), int(parts[2])])', '        b["champs"].setdefault(parts[0], [int(parts[1]), CHAMPIONS[parts[0]]["hp"][int(parts[1]) - 1]])', 'replays exactly', KING),
  ('kingdom: rage does nothing', _kg('_2battle'), '    step = min(d, t["speed"] * dt * (RAGE_SPEED if rage else 1))', '    step = min(d, t["speed"] * dt)', 'spells in battle', KING),
  ("kingdom: a champion's button never turns to their ability", _kg('Battlefield'), '            bt.act, bt.words = "ability", CHAMPIONS[bt.arg]["ability_name"]', '            pass', "a champion's button sends them", KING),
+ ('kingdom: traps are buildings', _kg('_2battle'), '            b["traps"].append({"kind": d["kind"], "gx": d["gx"], "gy": d["gy"], "level": d["level"], "armed": True})\n            continue', '            b["traps"].append({"kind": d["kind"], "gx": d["gx"], "gy": d["gy"], "level": d["level"], "armed": True})', 'traps are hidden', KING),
+ ('kingdom: traps never go off', _kg('_2battle'), '        if not near or near[0][0] > TRAP_TRIGGER:', '        if True:', 'a trap goes off once', KING),
+ ('kingdom: traps go off again and again', _kg('_2battle'), '        t["armed"] = False\n        t["at"]', '        t["at"]', 'a trap goes off once', KING),
+ ('kingdom: the keg hits one', _kg('_2battle'), '                if d <= KEG_SPLASH:', '                if d <= 0.1:', 'a trap goes off once', KING),
+ ('kingdom: the snare flings everyone', _kg('_2battle'), '                if d > KEG_SPLASH or space > room:', '                if d > KEG_SPLASH:', 'a trap goes off once', KING),
+ ('kingdom: villages without traps', _kg('_2campaign'), '        put(kinds[n % len(kinds)], 2, inner)', '        pass', 'villages from the fifth hide traps', KING),
+ ('kingdom: research for free', _kg('_2forge'), '    r["gold"] -= RESEARCH_COST[to - 1]\n', '', 'the forge researches', KING),
+ ('kingdom: research all at once', _kg('_2forge'), '    if r["research"] is not None:\n        return "The forge is busy: one at a time."', '    if False:\n        return "The forge is busy: one at a time."', 'the forge researches', KING),
+ ('kingdom: research past the forge', _kg('_2forge'), '    if to > research_top(r):', '    if False:', 'the forge researches', KING),
+ ('kingdom: research never done', _kg('_2forge'), '    if job is not None and now() >= job["end"]:', '    if job is not None and False:', 'the forge researches', KING),
+ ('kingdom: levels do nothing', _kg('_2forge'), '    t["hp"] = round(t["hp"] * (1 + LEVEL_HP * up))', '    t["hp"] = t["hp"]', 'the forge researches', KING),
+ ('kingdom: a leveled troop replayed at level 1', _kg('_2battle'), '        b["levels"][parts[0]] = int(parts[1])\n', '', 'the forge researches', KING),
 
  ('tell: the page drops them', NETS, '    if (o.tells && !this.away) this.tells.push(...o.tells);\n', '', "one player on a WebSocket and one polling", E2E),
 

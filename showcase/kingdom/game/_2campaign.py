@@ -71,6 +71,10 @@ def village_layout(i):
         put("ballista", 3, inner if v["ring"] < 2 else 11)
     for _ in range(v["trebuchets"]):
         put("trebuchet", 2, inner)
+    # Traps, hidden inside, from the fifth village: more the further you go.
+    kinds = [k for k in TRAPS if BUILDINGS[k]["keep"][0] <= keep]
+    for n in range(max(0, (i - 1) // TRAPS_IN_VILLAGE) if kinds else 0):
+        put(kinds[n % len(kinds)], 2, inner)
     outside = 13 if v["ring"] >= 2 else 8 if v["ring"] else 10
     for kind in ("gold_mine", "farm", "gold_mine", "farm", "builder_hut", "army_camp", "barracks"):
         put(kind, outside, outside + 6)
@@ -97,7 +101,8 @@ def start_raid(r, i):
         return f"Win a star at {CAMPAIGN[i - 1]['name']} first."
     if army_size(r) == 0 and not champs_for_battle(r):
         return "Train an army first: tap a barracks, or the Army button."
-    return new_battle(village_layout(i), r["army"], village_loot(r, i), champs_for_battle(r), r["spells"], tower_level(r))
+    return new_battle(village_layout(i), r["army"], village_loot(r, i), champs_for_battle(r), r["spells"], tower_level(r),
+                      troop_levels_for(r))
 
 
 def finish_raid(r, i, b):

@@ -64,9 +64,13 @@ if global_vars.t % 30 == 0:
     if len(busy(r)) < jobs or grew:
         level_up(gained)
         keep_save(r)
+    if research_tick(r):
+        sound_play("levelup", volume=0.5)
+        say("The forge has finished its research!", MINT)
+        keep_save(r)
     if train_tick(r) + brew_tick(r):
         keep_save(r)
-    if global_vars.panel in ("building", "army"):
+    if global_vars.panel in ("building", "army", "forge"):
         open_panel(global_vars.panel, global_vars.panel_of)
 # Raids: the kingdom offered to the server now and then (only a change goes); raids on it
 # come in the news, their losses taken off once; a search's answer opens the battle.
@@ -338,6 +342,24 @@ if global_vars.panel and box:
             ready = r["army"].get(k, 0)
             queued = r["training"].count(k)
             text(x1 + 420, y + 24, f"{ready} ready" + (f", {queued} coming" if queued else ""), GOLD if ready else DIM, 13)
+    elif global_vars.panel == "forge":
+        text(x1 + 20, y1 + 12, "The forge", GOLD, 26)
+        job = r["research"]
+        if job:
+            text(x1 + 230, y1 + 22, f"Researching {TROOPS[job['kind']]['name'].lower()} level {job['to']}: {clock_words(research_left(r))}", MINT, 15)
+        else:
+            text(x1 + 230, y1 + 22, f"Forge level {forge_level(r)}: troops up to level {research_top(r)}. One at a time.", DIM, 14)
+        text(x1 + 20, y1 + 56, f"Each level: +{round(LEVEL_HP * 100)}% health, +{round(LEVEL_DAMAGE * 100)}% damage, for every troop of that kind.", DIM, 13)
+        for i, (k, t) in enumerate(TROOPS.items()):
+            y = y1 + 92 + i * ARMY_ROW
+            lv = troop_level(r, k)
+            draw_sprite_ext(f"troop_{k}_front", 0, x1 + 40, y + 40, 0.7, 0.7, 0, "white", 1)
+            text(x1 + 76, y + 2, f"{t['name']}  ·  level {lv}", INK, 15)
+            now_, nxt = troop_at(k, lv), troop_at(k, min(TROOP_LEVEL_MOST, lv + 1))
+            text(x1 + 76, y + 22, f"Health {now_['hp']}  ·  damage {now_['damage']:.1f}", DIM, 12)
+            if lv < TROOP_LEVEL_MOST:
+                text(x1 + 300, y + 22, f"→ {nxt['hp']}  ·  {nxt['damage']:.1f}", MINT, 12)
+                text(x1 + 440, y + 4, clock_words(RESEARCH_TIME[lv]), DIM, 12)
     elif global_vars.panel == "campaign":
         text(x1 + 20, y1 + 12, "Attack!", GOLD, 26)
         text(x1 + 460, y1 + 22, f"Your army: {army_size(r)} troops", DIM, 14)

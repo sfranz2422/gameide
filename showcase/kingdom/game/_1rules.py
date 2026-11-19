@@ -155,6 +155,39 @@ BUILDINGS = {
                    "keep": [5, 5, 6, 7, 8, 9],
                    "hp":   [425, 470, 520, 570, 620, 680],
                    "room": [2, 3, 4, 5, 6, 7]},
+    # -- traps (phase 5): one tile each, hidden from raiders until they go off
+    "spike_pit": {"name": "Spike pit", "size": 1, "pays": "gold", "group": "traps",
+                  "about": "Hidden. A hard blow to the first raider who steps in.",
+                  "count": [0, 0, 2, 3, 4, 5, 6, 6, 7, 8],
+                  "cost": [400, 1200, 4000, 12000, 30000, 60000],
+                  "time": [10, 600, 1800, 3600, 7200, 14400],
+                  "keep": [3, 3, 4, 5, 6, 7],
+                  "hp": [1] * 6,
+                  "damage": [120, 160, 210, 270, 340, 420]},
+    "powder_keg": {"name": "Powder keg", "size": 1, "pays": "gold", "group": "traps",
+                   "about": "Hidden. Blows up among the raiders who come near.",
+                   "count": [0, 0, 0, 2, 3, 4, 4, 5, 6, 6],
+                   "cost": [1500, 4000, 12000, 30000, 60000, 100000],
+                   "time": [60, 900, 3600, 7200, 14400, 21600],
+                   "keep": [4, 4, 5, 6, 7, 8],
+                   "hp": [1] * 6,
+                   "damage": [40, 55, 70, 90, 110, 135]},
+    "catapult_snare": {"name": "Catapult snare", "size": 1, "pays": "gold", "group": "traps",
+                       "about": "Hidden. Flings raiders right out of the battle.",
+                       "count": [0, 0, 0, 0, 0, 1, 2, 2, 3, 3],
+                       "cost": [10000, 25000, 50000, 90000],
+                       "time": [1800, 7200, 14400, 28800],
+                       "keep": [6, 6, 7, 8],
+                       "hp": [1] * 4,
+                       "room": [6, 8, 10, 12]},             # troops' room it can fling at once
+    # -- the forge (phase 5): deeper upgrades, troops' own levels
+    "forge": {"name": "Forge", "size": 3, "pays": "food", "group": "army",
+              "about": "Researches your troops' levels: tougher, harder-hitting soldiers.",
+              "count": [0, 0, 1, 1, 1, 1, 1, 1, 1, 1],
+              "cost": [5000, 25000, 75000, 150000, 300000, 600000],
+              "time": [1800, 7200, 21600, 43200, 64800, 86400],
+              "keep": [3, 4, 5, 6, 7, 8],
+              "hp": [500, 560, 620, 690, 760, 840]},
     # -- walls: one tile each, many of them, upgraded at once (no builder)
     "wall": {"name": "Wall", "size": 1, "pays": "gold", "group": "walls",
              "about": "Slows raiders down: they must break through, or go round.",
@@ -164,7 +197,7 @@ BUILDINGS = {
              "keep": [2, 2, 3, 4, 5, 6, 7, 8, 9, 10],
              "hp":   [300, 500, 700, 900, 1400, 2000, 2500, 3000, 3500, 4000]},
 }
-GROUPS = [("economy", "Economy"), ("defense", "Defense"), ("army", "Army"), ("walls", "Walls")]
+GROUPS = [("economy", "Economy"), ("defense", "Defense"), ("traps", "Traps"), ("army", "Army"), ("walls", "Walls")]
 BUILDER_COSTS = [0, 0, 2500, 10000, 40000]       # the 1st, 2nd … 5th builder's hut (two come with the keep)
 TIERS = [3, 6]                                   # a building's picture: levels 1-3, 4-6 and 7 on
 
@@ -302,3 +335,17 @@ SPELLS = {
 }
 SPELL_GROW = 0.15
 RAGE_SPEED, RAGE_DAMAGE = 1.6, 1.8
+
+
+# ---- phase 5: traps and the forge
+TRAPS = ["spike_pit", "powder_keg", "catapult_snare"]
+TRAP_TRIGGER = 0.7                # tiles: a troop this near sets it off
+KEG_SPLASH = 1.8                  # tiles: the keg hits every troop this near
+# The forge's research: a troop's level (1 to TROOP_LEVEL_MOST), as high as the forge's
+# level + 1; each level costs gold and takes real time, one at a time. Each level over the
+# first: health and damage up by these.
+TROOP_LEVEL_MOST = 7
+RESEARCH_COST = [0, 4000, 12000, 30000, 70000, 140000, 260000]      # to reach level 2, 3 …
+RESEARCH_TIME = [0, 3600, 3 * 3600, 6 * 3600, 12 * 3600, 18 * 3600, 24 * 3600]
+LEVEL_HP, LEVEL_DAMAGE = 0.12, 0.10
+TRAPS_IN_VILLAGE = 3              # a campaign village from its fifth hides one trap for every this many villages

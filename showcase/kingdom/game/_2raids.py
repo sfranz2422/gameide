@@ -72,7 +72,7 @@ def found_layout(found):
 def start_player_raid(r, found):
     """A battle against the kingdom found."""
     return new_battle(found_layout(found), r["army"], [found.get("gold", 0), found.get("food", 0)],
-                      champs_for_battle(r), r["spells"], tower_level(r))
+                      champs_for_battle(r), r["spells"], tower_level(r), troop_levels_for(r))
 
 
 def expected_trophies(raid, stars, sent):

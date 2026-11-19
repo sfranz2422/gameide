@@ -45,7 +45,7 @@ ICONS = ["gold", "food", "renown", "builder", "hammer", "clock", "shield", "swor
          "trophy", "shield_on",        # phase 3: trophies, and a shield (stand-ins until Gemini's)
          "heal", "rage", "lightning", "freeze"]   # phase 4: the spells
 # Stand-ins' colours: stone grey, timber brown, thatch… a plain block each, taller with each tier.
-COLOURS = {"warlord_altar": (150, 60, 50), "huntress_altar": (70, 120, 80), "mage_tower": (90, 80, 150),"keep": (150, 146, 138), "gold_mine": (120, 104, 84), "farm": (176, 150, 92), "treasury": (160, 150, 120),
+COLOURS = {"forge": (90, 70, 60), "warlord_altar": (150, 60, 50), "huntress_altar": (70, 120, 80), "mage_tower": (90, 80, 150),"keep": (150, 146, 138), "gold_mine": (120, 104, 84), "farm": (176, 150, 92), "treasury": (160, 150, 120),
            "granary": (170, 130, 80), "builder_hut": (140, 110, 80), "archer_tower": (140, 136, 128),
            "ballista": (120, 90, 60), "trebuchet": (110, 84, 56), "barracks": (130, 100, 76), "army_camp": (120, 110, 90)}
 TALL = {"keep": 150, "archer_tower": 130, "trebuchet": 90, "army_camp": 30, "farm": 26}
@@ -79,6 +79,25 @@ def stand_in_building(kind, tier):
     for k in range(tier):
         px = cx - bw / 2 - 8 + k * 9
         d.ellipse((px, base - 14 + k * 4, px + 7, base - 7 + k * 4), fill=(230, 200, 90), outline=(80, 60, 20))
+    return im
+
+
+def stand_in_trap(kind, tier):
+    """A trap on its tile, for a picture not cut yet: spikes in a pit, a keg, a snare's arm."""
+    im = Image.new("RGBA", (TW, TH + 30), (0, 0, 0, 0))
+    d = ImageDraw.Draw(im)
+    cx, cy = TW / 2, 30 + TH / 2
+    d.polygon([(cx, 30 + 4), (TW - 6, cy), (cx, 30 + TH - 4), (6, cy)], fill=(70, 56, 40), outline=(40, 30, 20))
+    if kind == "spike_pit":
+        for k in range(-2, 3):
+            x = cx + k * 7
+            d.polygon([(x - 3, cy + 4), (x, cy - 10 - tier * 2), (x + 3, cy + 4)], fill=(170, 170, 175))
+    elif kind == "powder_keg":
+        d.ellipse((cx - 10, cy - 18, cx + 10, cy + 4), fill=(110, 70, 30), outline=(40, 25, 10))
+        d.line([(cx, cy - 18), (cx + 4, cy - 26)], fill=(220, 160, 60), width=2)
+    else:
+        d.line([(cx - 14, cy + 2), (cx + 12, cy - 14 - tier * 2)], fill=(120, 80, 40), width=4)
+        d.ellipse((cx + 8, cy - 20 - tier * 2, cx + 18, cy - 10 - tier * 2), fill=(90, 70, 50))
     return im
 
 
@@ -269,6 +288,8 @@ def build(out):
             name = f"{kind}_{t}"
             if kind == "wall":
                 im = half(name) if (ART / f"{name}.png").exists() else stand_in_wall(t)
+            elif kind in G["TRAPS"]:
+                im = half(name) if (ART / f"{name}.png").exists() else stand_in_trap(kind, t)
             else:
                 im = half(name) if (ART / f"{name}.png").exists() else stand_in_building(kind, t)
             # Standing on the middle of its footprint's diamond.

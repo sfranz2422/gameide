@@ -150,6 +150,18 @@ to the LEFT (two steps, two swings). The game turns them round to face right.
 > healing potion; a red-violet flask of rage with bubbles; a forked bolt of lightning; a
 > frost crystal snowflake in ice blue. Flat magenta background.
 
+## Phase 5: traps and the forge
+
+**17. Traps and the forge.** MAGENTA.
+> [the style] Row 1, each on ONE small ground diamond of earth, each in three ages left to
+> right (a little bigger and better made each time): a spike pit (sharpened stakes in a
+> shallow pit); a powder keg (a barrel of black powder with a fuse, half hidden in straw);
+> a catapult snare (a wooden throwing arm pegged flat to the ground with a rope trigger).
+> Row 2, each on its own square patch of ground the size of 3 × 3 ground diamonds, a forge
+> in three ages: a smith's lean-to with an anvil and a small furnace; a stone smithy with a
+> big furnace, bellows and racks of swords; a great forge hall with glowing furnaces, a
+> water wheel and armour on stands. Flat magenta background.
+
 ## Later phases
 
 - **Phase 3 on:** champions, alliances' banners and league badges.

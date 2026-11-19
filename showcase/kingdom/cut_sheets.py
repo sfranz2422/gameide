@@ -45,6 +45,11 @@ ROWS = {
     "05": [[("trebuchet_1", 3), ("trebuchet_2", 3), ("trebuchet_3", 3)], [("barracks_1", 3), ("barracks_2", 3), ("barracks_3", 3)]],
     "06": [[("army_camp_1", 4), ("army_camp_2", 4), ("army_camp_3", 4)],
            [("builder_hut_1", 2), ("wall_1", 1), ("wall_2", 1), ("wall_3", 1)]],
+    "15": [[("warlord_altar_1", 3), ("warlord_altar_2", 3), ("warlord_altar_3", 3)],
+           [("huntress_altar_1", 3), ("huntress_altar_2", 3), ("huntress_altar_3", 3)],
+           [("mage_tower_1", 3), ("mage_tower_2", 3), ("mage_tower_3", 3)]],
+    "17": [[(f"{k}_{t}", 1) for k in ("spike_pit", "powder_keg", "catapult_snare") for t in (1, 2, 3)],
+           [("forge_1", 3), ("forge_2", 3), ("forge_3", 3)]],
     "07": [[("oak", 1), ("pine", 1), ("bush", 1), ("boulder", 1), ("stump", 1)],
            [("scaffold_2", 2), ("scaffold_3", 3), ("scaffold_4", 4)]],
 }
@@ -56,9 +61,13 @@ ICONS = ["gold", "food", "renown", "builder", "hammer", "clock", "shield", "swor
 TROOP_SHEETS = {
     "10": (10, ["footman", "archer", "brute", "raider"], [0, 1, 3, 4], [5, 6, 8, 9]),
     "11": (8, ["sapper", "knight", "ram"], [0, 1, 2, 3], [4, 5, 6, 7]),
+    "14": (8, ["warlord", "huntress"], [0, 1, 2, 3], [4, 5, 6, 7]),       # the champions (phase 4)
 }
+# Cut by the drawings, not the grid: the champions' axes and bows reach over into the next
+# frame's cell (an even grid gave the Warlord his neighbour's axe head).
+BY_DRAWINGS = {"14"}
 TROOP_FACING_RIGHT = {"ram"}     # Gemini drew the ram's iron head on the right: turned to face left like the rest
-TROOP_TALL = {"footman": 124, "archer": 120, "brute": 150, "raider": 116, "sapper": 116, "knight": 176, "ram": 150}
+TROOP_TALL = {"footman": 124, "archer": 120, "brute": 150, "raider": 116, "sapper": 116, "knight": 176, "ram": 150, "warlord": 172, "huntress": 146}
 
 
 def save(pic, name):
@@ -174,9 +183,19 @@ def main():
             continue
         raw = Image.open(RAW / f"{sheet}.jpeg")
         w, h = raw.width / cols, raw.height / len(troops)
+        if sheet in BY_DRAWINGS:
+            keyed = _sw.key_out(raw)
+            want = cols * len(troops)
+            found = [b for b in _farm.islands(keyed, want + 30) if (b[2] - b[0]) * (b[3] - b[1]) > keyed.width * keyed.height / 600][:want]
+            assert len(found) == want, (sheet, len(found), want)
+            grid = rows_of(found, [cols] * len(troops))
         for r_, troop in enumerate(troops):
             cells = []
             for c in range(cols):
+                if sheet in BY_DRAWINGS:
+                    b = grid[r_][c]
+                    cells.append(no_shadow(_sw.own(keyed, b, found).crop(tuple(b)).copy()))
+                    continue
                 inset = 10
                 cell = _sw.key_out(raw.crop((int(c * w) + inset, int(r_ * h) + inset, int((c + 1) * w) - inset, int((r_ + 1) * h) - inset)))
                 part = no_shadow(cell.copy())      # (keyed out from an array: read-only)
@@ -198,6 +217,16 @@ def main():
         third = im.width / 3
         for c, name in enumerate(("star", "attack", "army")):
             part = no_shadow(im.crop((int(c * third), im.height // 2, int((c + 1) * third), im.height)))
+            side = max(part.size)
+            sq = Image.new("RGBA", (side, side), (0, 0, 0, 0))
+            sq.paste(part, ((side - part.width) // 2, (side - part.height) // 2))
+            save(sq.resize((128, 128), Image.LANCZOS), f"icon_{name}")
+    if (RAW / "16.jpeg").exists():
+        # The spells' icons, one row of four, cut by the grid (their shadows out).
+        im = _sw.key_out(Image.open(RAW / "16.jpeg"))
+        quarter = im.width / 4
+        for c, name in enumerate(("heal", "rage", "lightning", "freeze")):
+            part = no_shadow(im.crop((int(c * quarter), 0, int((c + 1) * quarter), im.height)))
             side = max(part.size)
             sq = Image.new("RGBA", (side, side), (0, 0, 0, 0))
             sq.paste(part, ((side - part.width) // 2, (side - part.height) // 2))

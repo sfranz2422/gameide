@@ -36,6 +36,7 @@ for i, s in enumerate(b["bs"]):
         if ((gx, gy - 1) in walls or (gx, gy + 1) in walls) and not ((gx - 1, gy) in walls or (gx + 1, gy) in walls):
             self.props[i].sprite += "_gy"
 self.troops = []                     # a Prop for each troop, in the battle's order
+self.sprung = set()                  # traps shown, once they've gone off (hidden till then)
 self.chosen = next(iter(b["army"]), next(iter(b["champs"]), None))
 self.kind = global_vars.raid["kind"]
 self.steps = list(global_vars.raid.get("steps", []))     # a replay's: [seconds, troop, x, y], in order
@@ -53,6 +54,7 @@ self.spell_buttons = []
 for i, kind in enumerate(k for k in SPELLS if b["spells"].get(k)):
     bt = make_button(VIEW_W - 100, 170 + i * 70, 86, 62, SPELLS[kind]["name"], "spell", kind, 11)
     bt.icon = kind
+    bt.stacked = True
     self.spell_buttons.append(bt)
 self.end = make_button(VIEW_W - 170, 66, 156, 40, "Stop watching" if self.kind == "replay" else "End battle", "end_battle", None, 15)
 # A classmate's kingdom: before the first troop, Next looks for another (a search's cost).
@@ -148,6 +150,15 @@ for i, s in enumerate(b["bs"]):
             x, y = building_xy(s["kind"], s["gx"], s["gy"])
             effect("dust", x, y - 20, None, 1.2)
             sound_play("build", volume=0.4)
+# A trap that's gone off shows itself.
+for j, t in enumerate(b["traps"]):
+    if not t["armed"] and j not in self.sprung:
+        self.sprung.add(j)
+        x, y = tile_xy(t["gx"], t["gy"])
+        o = instance_create(x, y, "Prop")
+        o.sprite, o.depth = f"{t['kind']}_{tier(t['level'])}", -y + 1
+        effect("explosion" if t["kind"] == "powder_keg" else "dust", x, y - 10, None, 1.2)
+        sound_play("build", volume=0.6)
 # The troops: a Prop each, where the battle has them, facing their way, stepping or swinging.
 while len(self.troops) < len(b["units"]):
     o = instance_create(0, 0, "Prop")

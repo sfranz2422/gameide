@@ -435,6 +435,8 @@ def open_panel(kind, of=None):
         make_button(x2 - 120, by, 96, 48, "Move", "move", of, 15, True)
         if b["kind"] in ("barracks", "army_camp") and b["level"] > 0:
             make_button(x2 - 300, by, 170, 48, "Train troops", "army", None, 15, True)
+        if b["kind"] == "forge" and b["level"] > 0:
+            make_button(x2 - 300, by, 170, 48, "Research", "forge", None, 15, True)
     elif kind == "army":
         x1, y1 = VIEW_W / 2 - 400, HUD_H + 6
         global_vars.panel_box = (x1, y1, x1 + 800, y1 + 108 + len(TROOPS) * ARMY_ROW)
@@ -478,6 +480,18 @@ def open_panel(kind, of=None):
             a = make_button(cx + 140, cy + CAMP_ROW - 48, 84, 36, "Attack", "attack", i, 14, True)
             a.off = not village_open(r, i) or army_size(r) == 0
             a.hot = not a.off
+    elif kind == "forge":
+        x1, y1 = VIEW_W / 2 - 400, HUD_H + 6
+        global_vars.panel_box = (x1, y1, x1 + 800, y1 + 108 + len(TROOPS) * ARMY_ROW)
+        for i, k in enumerate(TROOPS):
+            y = y1 + 92 + i * ARMY_ROW
+            why = can_research(r, k)
+            to = troop_level(r, k) + 1
+            words = (f"Level {to}: {RESEARCH_COST[to - 1]:,} gold" if to <= TROOP_LEVEL_MOST and (not why or why.startswith("That needs"))
+                     else "Top level" if to > TROOP_LEVEL_MOST else "Busy" if why and "busy" in why else "Locked")
+            t = make_button(x1 + 576, y, 210, ARMY_ROW - 8, words, "research", k, 13, True)
+            t.off = why is not None
+            t.hot = not t.off
     elif kind == "obstacle":
         o = r["obstacles"][of]
         x1, y1 = VIEW_W / 2 - 240, VIEW_H / 2 - 110
@@ -540,7 +554,16 @@ def do_act(what, arg):
         room_goto("Realm")
     elif what == "close":
         close_panel()
-    elif what in ("shop", "army", "campaign"):
+    elif what == "research":
+        res = research(r, arg)
+        if res == "started":
+            sound_play("build", volume=0.5)
+            keep_save(r)
+        else:
+            sound_play("nope", volume=0.5)
+            say(res, RED)
+        open_panel("forge")
+    elif what in ("shop", "army", "campaign", "forge"):
         if global_vars.panel == what:
             close_panel()
         else:

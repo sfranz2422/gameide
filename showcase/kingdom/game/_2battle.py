@@ -18,15 +18,20 @@ import heapq
 import math
 
 
-def new_battle(layout, army, loot, champs=None, spells=None, tower=1):
+def new_battle(layout, army, loot, champs=None, spells=None, tower=1, levels=None):
     """A battle against a layout ([{"kind", "gx", "gy", "level"}]) with `loot` ([gold,
     food]) to win, shared out among its keep, stores, mines and farms. `champs` {kind:
     [level, health]} and `spells` {kind: n} (at the mage tower's level) come too (phase 4)."""
     b = {"bs": [], "cells": {}, "units": [], "shots": [], "army": {k: n for k, n in army.items() if n > 0},
          "sent": {}, "time": 0.0, "loot": [0, 0], "over": False, "stars": 0, "flows": {}, "walls_v": 0, "ended": "",
          "replay": [], "champs": dict(champs or {}), "spells": {k: n for k, n in (spells or {}).items() if n > 0},
-         "tower": max(1, tower), "cast": {}, "zones": []}
+         "tower": max(1, tower), "cast": {}, "zones": [],
+         "levels": {k: v for k, v in (levels or {}).items() if v > 1}, "traps": []}
     for d in layout:
+        if d["kind"] in TRAPS:
+            # A trap: hidden, walked over, not a building (no stars, nobody goes for it).
+            b["traps"].append({"kind": d["kind"], "gx": d["gx"], "gy": d["gy"], "level": d["level"], "armed": True})
+            continue
         n = BUILDINGS[d["kind"]]["size"]
         hp = stat(d["kind"], "hp", d["level"])
         x = {"kind": d["kind"], "gx": d["gx"], "gy": d["gy"], "n": n, "level": d["level"], "hp": hp, "max": hp,
@@ -117,10 +122,14 @@ def deploy(b, kind, x, y):
     b["sent"][kind] = b["sent"].get(kind, 0) + 1
     # The replay: when and where each troop went down (a battle is the same every time
     # from the same troops at the same moments, so the defender can watch it).
-    b["replay"].append([round(b["time"], 3), kind, round(float(x), 3), round(float(y), 3)])
-    t = TROOPS[kind]
-    b["units"].append({"kind": kind, "x": float(x), "y": float(y), "hp": t["hp"], "max": t["hp"], "dead": False,
-                       "goal": None, "hit": None, "cool": 0.0, "moving": False, "dir": (1, 1)})
+    level = b["levels"].get(kind, 1)
+    b["replay"].append([round(b["time"], 3), kind if level == 1 else f"{kind}_{level}", round(float(x), 3), round(float(y), 3)])
+    t = TROOPS[kind] if level == 1 else troop_at(kind, level)
+    u = {"kind": kind, "x": float(x), "y": float(y), "hp": t["hp"], "max": t["hp"], "dead": False,
+         "goal": None, "hit": None, "cool": 0.0, "moving": False, "dir": (1, 1)}
+    if level > 1:
+        u["stats"] = t          # the forge's level: this troop's own numbers
+    b["units"].append(u)
     return "sent"
 
 
@@ -234,6 +243,9 @@ def battle_act(b, code, x, y):
     if parts[0] in CHAMPIONS and len(parts) == 3:
         b["champs"].setdefault(parts[0], [int(parts[1]), int(parts[2])])
         return deploy(b, parts[0], x, y)
+    if parts[0] in TROOPS and len(parts) == 2:
+        b["levels"][parts[0]] = int(parts[1])
+        return deploy(b, parts[0], x, y)
     if parts[0] in SPELLS and len(parts) == 2:
         b["tower"] = int(parts[1])
         b["spells"][parts[0]] = b["spells"].get(parts[0], 0) + 1
@@ -242,12 +254,46 @@ def battle_act(b, code, x, y):
 
 
 def replay_army(steps):
-    """The troops a replay sends ({kind: n}); its champions and spells come with their steps."""
+    """The troops a replay sends ({kind: n}, levels and all); its champions and spells come with their steps."""
     army = {}
     for s in steps:
-        if s[1] in TROOPS:
-            army[s[1]] = army.get(s[1], 0) + 1
+        k = s[1].split("_")[0]
+        if k in TROOPS and (s[1] == k or len(s[1].split("_")) == 2):
+            army[k] = army.get(k, 0) + 1
     return army
+
+
+def traps_tick(b):
+    """A hidden trap goes off when a troop comes near: the spike pit hits that one hard, the
+    powder keg everyone round it, the catapult snare flings out as many as its room."""
+    for t in b["traps"]:
+        if not t["armed"]:
+            continue
+        near = sorted((math.hypot(u["x"] - t["gx"], u["y"] - t["gy"]), j) for j, u in enumerate(b["units"]) if not u["dead"])
+        if not near or near[0][0] > TRAP_TRIGGER:
+            continue
+        t["armed"] = False
+        t["at"] = b["time"]
+        if t["kind"] == "spike_pit":
+            u = b["units"][near[0][1]]
+            u["hp"] -= stat("spike_pit", "damage", t["level"])
+            u["dead"] = u["hp"] <= 0
+        elif t["kind"] == "powder_keg":
+            for d, j in near:
+                if d <= KEG_SPLASH:
+                    u = b["units"][j]
+                    u["hp"] -= stat("powder_keg", "damage", t["level"])
+                    u["dead"] = u["hp"] <= 0
+        else:
+            room = stat("catapult_snare", "room", t["level"])
+            for d, j in near:
+                u = b["units"][j]
+                space = 10 if u.get("champ") else TROOPS[u["kind"]]["space"]
+                if d > KEG_SPLASH or space > room:
+                    continue
+                room -= space
+                u["hp"] = 0
+                u["dead"] = True
 
 
 # ---- where troops go
@@ -479,6 +525,7 @@ def tick(b, dt=BATTLE_TICK):
     for u in b["units"]:
         if not u["dead"]:
             unit_tick(b, u, dt)
+    traps_tick(b)
     for i, s in enumerate(b["bs"]):
         if s["kind"] in DEFENSE_SHOTS and not s["dead"]:
             defense_tick(b, i, dt)

@@ -18,6 +18,7 @@ self.hot = False        # the button to press, drawn green
 self.picked = False     # a window that's open, drawn lighter
 self.in_panel = False   # part of a window: goes when it closes
 self.icon = None        # an icon drawn at its left
+self.stacked = False    # its icon above its words (a battle's spells), not beside them
 self.pic = None         # a sprite drawn in it, above its words (a battle's troops), and
 self.count = None       # a number in its corner: drawn here, as the Battlefield's draw_gui is behind the buttons
 
@@ -49,9 +50,8 @@ if self.shown:
     draw_set_color("#15130f")
     draw_rect(self.x, self.y, self.x + self.wide, self.y + self.high, True)
     tx = self.x + self.wide / 2
-    tall = bool(self.icon) and self.high >= 56
-    if tall:
-        # A tall button (a battle's spells): the icon above, the words under it.
+    if self.icon and self.stacked:
+        # A battle's spell: the icon above, the words under it.
         icon(self.icon, tx, self.y + (self.high - 16) / 2, self.high - 28, 0.4 if self.off else 1)
         text(tx, self.y + self.high - 19, self.words, "#ece6da" if self.off else INK, self.size, "center")
     else:

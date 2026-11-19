@@ -1040,4 +1040,9 @@ once, the others as `zones`. Every action goes in the replay as a code `battle_a
 (a troop's kind, "warlord_5_900", "rage_3", "cry"); a replay step is due within half a tick of
 its time (they're kept to thousandths: matched exactly, a step landed a tick late and the
 replay drifted).
+**Phase 5, traps and the forge**: traps are buildings at home but not in battle (`new_battle`
+puts them in `b["traps"]`: no cells, no stars, nobody goes for them); `traps_tick` sets one off
+once when a troop comes within `TRAP_TRIGGER`. They re-arm (a raid leaves buildings standing).
+The forge researches troops' levels (`_2forge.py`): a leveled troop carries its own `stats`
+(`troop_at`), and its replay step is "footman_3".
 

@@ -838,4 +838,83 @@ got = [again["stars"], destroyed_pct(again), round(champ_unit(again, "warlord")[
     click(g, ...py<[number, number]>(g, 'list(to_screen(*tile_xy(MID, MID)))'));
     expect(py(g, 'global_vars.battle["cast"]')).toEqual({ lightning: 1 });
   });
+
+  // ---- phase 5: traps and the forge
+
+  it("phase 5: traps are hidden: no stars for them, nobody goes for them or walks round them, troops may go down on them", async () => {
+    const g = await start();
+    await realmOf(g);
+    py(g, `lay = village_layout(0) + [{"kind": "spike_pit", "gx": MID - 8, "gy": MID - 8, "level": 1}]
+b = new_battle(lay, {"footman": 1}, [0, 0])`);
+    expect(py(g, '[len(b["traps"]), any(x["kind"] in TRAPS for x in b["bs"]), (MID - 8, MID - 8) in b["cells"]]')).toEqual([1, false, false]);
+    expect(py(g, 'stars_now(b) == stars_now(new_battle(village_layout(0), {}, [0, 0]))')).toBe(true);
+  });
+
+  it("phase 5: a trap goes off once when a troop comes near: the spike pit hits one, the keg everyone round it, the snare flings out its room", async () => {
+    const g = await start();
+    await realmOf(g);
+    py(g, `def trap_test(kind, level, army):
+    lay = village_layout(0) + [{"kind": kind, "gx": MID - 25, "gy": MID - 25, "level": level}]
+    b = new_battle(lay, army, [0, 0])
+    for k, n in army.items():
+        for _ in range(n):
+            deploy(b, k, MID - 25.3, MID - 25.3)
+    tick(b)
+    return b`);
+    // Spike pit: one footman, hit hard (120 kills a 45-health footman); the rest untouched.
+    expect(py(g, 'b = trap_test("spike_pit", 1, {"footman": 3})\n[sum(u["dead"] for u in b["units"]), b["traps"][0]["armed"]]')).toEqual([1, false]);
+    // Keg: everyone round it.
+    expect(py(g, 'b = trap_test("powder_keg", 2, {"archer": 4})\nsum(u["dead"] for u in b["units"])')).toBe(4);
+    // Snare: as many as its room (6 at level 1: six footmen of seven).
+    expect(py(g, 'b = trap_test("catapult_snare", 1, {"footman": 7})\nsum(u["dead"] for u in b["units"])')).toBe(6);
+    // Once only.
+    expect(py(g, 'b = trap_test("spike_pit", 1, {"footman": 3})\nfor _ in range(30):\n    tick(b)\nsum(u["dead"] for u in b["units"])')).toBe(1);
+  });
+
+  it("phase 5: villages from the fifth hide traps; a kingdom's traps go to raiders as they are", async () => {
+    const g = await start();
+    await realmOf(g);
+    expect(py(g, '[sum(1 for d in village_layout(i) if d["kind"] in TRAPS) for i in (0, 3, 4, 9, 15)]')).toEqual([0, 0, 1, 2, 4]);
+    py(g, 'r = global_vars.realm\nr["buildings"].append(new_building("powder_keg", 3, 3, 2))');
+    expect(py(g, '[d for d in kingdom_for_raids(r) if d["kind"] in TRAPS] == [{"kind": "powder_keg", "gx": 3, "gy": 3, "level": 2}]')).toBe(true);
+    expect(py(g, 'len(new_battle(found_layout({"buildings": kingdom_for_raids(r)}), {}, [0, 0])["traps"])')).toBe(1);
+  });
+
+  it("phase 5: the forge researches a troop's level for gold on the real clock, one at a time, as high as its level allows; leveled troops are stronger", async () => {
+    const g = await start();
+    await realmOf(g);
+    py(g, `r = global_vars.realm
+r["obstacles"] = []
+r["gold"] = 100000
+next(b for b in r["buildings"] if b["kind"] == "keep")["level"] = 6
+r["buildings"].append(new_building("barracks", 2, 2, 4))`);
+    expect(py(g, 'can_research(r, "footman")')).toBe("Build a forge first.");
+    py(g, 'fg = new_building("forge", 8, 2, 1)\nr["buildings"].append(fg)');
+    expect(py(g, '[research(r, "footman"), r["gold"], can_research(r, "archer")]')).toEqual(["started", 96000, "The forge is busy: one at a time."]);
+    later(g, 3601);
+    expect(py(g, '[research_tick(r), troop_level(r, "footman")]')).toEqual([true, 2]);
+    expect(py(g, 'can_research(r, "footman")')).toBe("Upgrade the forge to level 2 first.");
+    expect(py(g, 'can_research(r, "knight")')).toBe("Upgrade a barracks to level 6 first.");
+    // A level-3 footman in battle: health and damage up; its replay step says so, and plays back the same.
+    py(g, `b = new_battle(village_layout(0), {"footman": 1}, [0, 0], levels={"footman": 3})
+deploy(b, "footman", MID - 14, MID - 14)
+u = b["units"][0]`);
+    expect(py(g, '[u["max"], round(troop_stats(u)["damage"], 2), b["replay"][0][1]]')).toEqual([56, 9.6, "footman_3"]);
+    expect(py(g, `again = new_battle(village_layout(0), replay_army(b["replay"]), [0, 0])
+battle_act(again, "footman_3", MID - 14, MID - 14)
+again["units"][0]["max"]`)).toBe(56);
+  });
+
+  it("phase 5: the Build window's Traps tab and the Forge window fit the screen", async () => {
+    const g = await start();
+    await realmOf(g);
+    py(g, 'r = global_vars.realm\nnext(b for b in r["buildings"] if b["kind"] == "keep")["level"] = 9\nr["buildings"].append(new_building("forge", 2, 2, 3))\nr["gold"] = 10 ** 6');
+    py(g, 'open_panel("shop")\ndo_act("shop_tab", "traps")');
+    step(g, 3);
+    expect(py<number>(g, "global_vars.panel_box[3]")).toBeLessThanOrEqual(py<number>(g, "VIEW_H"));
+    expect(py<string[]>(g, '[k for k, *_ in shop_rows(r, "traps")]')).toEqual(["spike_pit", "powder_keg", "catapult_snare"]);
+    py(g, 'research(r, "footman")\nopen_panel("forge")');
+    step(g, 3);
+    expect(py<number>(g, "global_vars.panel_box[3]")).toBeLessThanOrEqual(py<number>(g, "VIEW_H"));
+  });
 });
