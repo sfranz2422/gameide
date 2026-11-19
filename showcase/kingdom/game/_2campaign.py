@@ -117,6 +117,8 @@ def finish_raid(r, i, b):
     champs_home(r, b)
     spells_home(r, b)
     kept = [add(r, "gold", b["loot"][0]), add(r, "food", b["loot"][1])]
+    tally(r, "stars", b["stars"])
+    tally(r, "loot", kept[0] + kept[1])
     left = village_loot(r, i)
     r["campaign_loot"][str(i)] = [max(0, left[0] - b["loot"][0]), max(0, left[1] - b["loot"][1])]
     best = r["campaign"].get(str(i), 0)

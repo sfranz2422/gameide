@@ -372,3 +372,52 @@ PHRASES = ["Hello!", "Need troops, please!", "Sent you troops!", "Thanks!", "Gre
            "Back soon!", "Let's climb the trophies!", "Nice kingdom!", "Ha! Missed me!", "On my way!", "Goodnight!"]
 GIVE_MOST = 5                     # troops you may give to one request (the server's rule too)
 GIFTS_KEPT = 80                   # gifts put in your army, remembered (so never twice)
+
+# ---- phase 7: leagues, the week's event, achievements
+# Leagues by trophies (the server's count): a raid on a classmate won with stars pays the
+# league's bonus, a share for each star (all of it for three).
+LEAGUES = [
+    {"name": "Bronze",   "from": 0,    "bonus": 1000,  "colour": "#b07040"},
+    {"name": "Silver",   "from": 300,  "bonus": 3000,  "colour": "#c0c4c8"},
+    {"name": "Gold",     "from": 800,  "bonus": 8000,  "colour": "#e8c040"},
+    {"name": "Crystal",  "from": 1500, "bonus": 16000, "colour": "#a070e0"},
+    {"name": "Master",   "from": 2500, "bonus": 30000, "colour": "#40a0e0"},
+    {"name": "Champion", "from": 4000, "bonus": 50000, "colour": "#e04050"},
+]
+
+# Achievements: each counts one thing (`tally`, where the rules do it) or reads one from the
+# kingdom (`progress`), in three tiers; a tier reached is collected for its prize.
+ACHIEVEMENTS = {
+    "keep":       {"name": "Lord of the Keep",   "about": "Upgrade your keep",          "icon": "keep",    "goals": [3, 6, 9]},
+    "built":      {"name": "Master Builder",     "about": "Finish builds and upgrades", "icon": "hammer",  "goals": [25, 100, 400]},
+    "cleared":    {"name": "Clearing the Land",  "about": "Clear trees and rocks",      "icon": "builder", "goals": [10, 40, 120]},
+    "trained":    {"name": "Drill Sergeant",     "about": "Train troops",               "icon": "army",    "goals": [100, 1000, 5000]},
+    "stars":      {"name": "Star Collector",     "about": "Win stars in battle",        "icon": "star",    "goals": [10, 60, 200]},
+    "villages":   {"name": "Conqueror",          "about": "Three-star villages",        "icon": "attack",  "goals": [3, 8, 16]},
+    "raids_won":  {"name": "Raider",             "about": "Win raids on classmates",    "icon": "sword",   "goals": [5, 25, 100]},
+    "loot":       {"name": "Treasure Hunter",    "about": "Win gold and food",          "icon": "gold",    "goals": [50000, 500000, 5000000]},
+    "trophies":   {"name": "Rising Star",        "about": "Reach trophies",             "icon": "trophy",  "goals": [300, 1500, 4000]},
+    "spells":     {"name": "Spellcaster",        "about": "Cast spells in battle",      "icon": "lightning", "goals": [10, 75, 300]},
+    "researched": {"name": "Smith",              "about": "Research troop levels",      "icon": "up",      "goals": [3, 12, 30]},
+    "gifts":      {"name": "Good Ally",          "about": "Give troops to allies",      "icon": "banner",  "goals": [10, 100, 500]},
+    "walls":      {"name": "Wall Builder",       "about": "Walls at level 5 or more",   "icon": "shield",  "goals": [25, 100, 225]},
+    "defenses":   {"name": "Held the Line",      "about": "Raids on you held off",      "icon": "shield_on", "goals": [3, 15, 50]},
+    "renown":     {"name": "Legend",             "about": "Reach renown",               "icon": "renown",  "goals": [10, 25, 50]},
+}
+AWARD_PRIZES = [{"gold": 2000, "food": 2000, "xp": 20}, {"gold": 25000, "food": 25000, "xp": 80},
+                {"gold": 200000, "food": 200000, "xp": 250}]
+
+# The week's event: one a week (weeks start Monday, the real clock's), chosen among those the
+# kingdom can do as the week begins, kept all week; three goals, each with a prize.
+EVENTS = {
+    "raid_week":     {"name": "Raid Week",       "about": "Win stars in battle",        "stat": "stars",   "goals": [10, 25, 50]},
+    "builders_week": {"name": "Builders' Week",  "about": "Finish builds and upgrades", "stat": "built",   "goals": [5, 15, 30]},
+    "training_week": {"name": "Training Week",   "about": "Train troops",               "stat": "trained", "goals": [60, 200, 500]},
+    "plunder_week":  {"name": "Plunder Week",    "about": "Win gold and food",          "stat": "loot",    "goals": [20000, 100000, 400000]},
+    "clearing_week": {"name": "Clearing Week",   "about": "Clear trees and rocks",      "stat": "cleared", "goals": [5, 15, 30]},
+    "magic_week":    {"name": "Week of Magic",   "about": "Cast spells in battle",      "stat": "spells",  "goals": [5, 15, 40]},
+}
+EVENT_PRIZES = [{"gold": 5000, "food": 5000, "xp": 20}, {"gold": 20000, "food": 20000, "xp": 50},
+                {"gold": 60000, "food": 60000, "xp": 120}]
+WEEK = 7 * 86400
+WEEK_START = 4 * 86400            # the real clock's 0 was a Thursday: weeks start on Monday

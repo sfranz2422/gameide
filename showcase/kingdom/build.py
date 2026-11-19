@@ -42,9 +42,11 @@ VIEW_W, VIEW_H, TW, TH = G["VIEW_W"], G["VIEW_H"], G["TILE_W"], G["TILE_H"]
 ART = HERE / "art"
 ICONS = ["gold", "food", "renown", "builder", "hammer", "clock", "shield", "sword", "up", "keep",
          "star", "attack", "army",     # phase 2: a battle's stars, the Attack! and Army buttons
-         "trophy", "shield_on",        # phase 3: trophies, and a shield (stand-ins until Gemini's)
+         "trophy", "shield_on",        # phase 3: trophies, and a raid held off
          "heal", "rage", "lightning", "freeze",   # phase 4: the spells
-         "banner"]                     # phase 6: the Alliance button
+         "banner",                     # phase 6: the Alliance button
+         "medal", "scroll",            # phase 7: the Awards button, the week's event
+         "league_0", "league_1", "league_2", "league_3", "league_4", "league_5"]   # and the leagues' crests
 # Stand-ins' colours: stone grey, timber brown, thatch… a plain block each, taller with each tier.
 COLOURS = {"alliance_hall": (160, 130, 60), "forge": (90, 70, 60), "warlord_altar": (150, 60, 50), "huntress_altar": (70, 120, 80), "mage_tower": (90, 80, 150),"keep": (150, 146, 138), "gold_mine": (120, 104, 84), "farm": (176, 150, 92), "treasury": (160, 150, 120),
            "granary": (170, 130, 80), "builder_hut": (140, 110, 80), "archer_tower": (140, 136, 128),

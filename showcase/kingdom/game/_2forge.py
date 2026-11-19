@@ -74,6 +74,7 @@ def research_tick(r):
     if job is not None and now() >= job["end"]:
         r["troop_levels"][job["kind"]] = job["to"]
         r["research"] = None
+        tally(r, "researched")
         return True
     return False
 

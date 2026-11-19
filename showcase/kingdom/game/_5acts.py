@@ -492,6 +492,24 @@ def open_panel(kind, of=None):
             t = make_button(x1 + 576, y, 210, ARMY_ROW - 8, words, "research", k, 13, True)
             t.off = why is not None
             t.hot = not t.off
+    elif kind == "awards":
+        x1, y1 = VIEW_W / 2 - 480, HUD_H + 4
+        global_vars.panel_box = (x1, y1, x1 + 960, y1 + 508)
+        tab = getattr(global_vars, "awards_tab", "achievements")
+        for j, (t_, words) in enumerate((("achievements", "Achievements"), ("event", "This week"), ("league", "League"))):
+            b = make_button(x1 + 300 + j * 150, y1 + 10, 142, 36, words, "awards_tab", t_, 14, True)
+            b.picked = t_ == tab
+        if tab == "achievements":
+            for i, k in enumerate(ACHIEVEMENTS):
+                if award_ready(r, k):
+                    x, y = award_slot(i, x1, y1)
+                    c = make_button(x + AWARD_W - 92, y + 14, 84, 32, "Collect", "claim_award", k, 13, True)
+                    c.hot = True
+        elif tab == "event":
+            e = event_now(r)
+            c = make_button(x1 + 30, y1 + 380, 300, 50, "Collect the prize", "claim_event", None, 16, True)
+            c.off = e["claimed"] >= event_reached(e)
+            c.hot = not c.off
     elif kind == "alliance":
         x1, y1 = VIEW_W / 2 - 480, HUD_H + 4
         global_vars.panel_box = (x1, y1, x1 + 960, y1 + 508)
@@ -552,6 +570,13 @@ def open_panel(kind, of=None):
         global_vars.focus = next((b for b in instances("Button") if b.in_panel and (b.act, b.arg) == was), None)
 
 
+AWARD_W, AWARD_ROW = 300, 54      # the achievements: three columns of five
+
+
+def award_slot(i, x1, y1):
+    return x1 + 20 + (i // 5) * (AWARD_W + 10), y1 + 70 + (i % 5) * (AWARD_ROW + 30)
+
+
 ALLY_ROWS = 8              # alliances listed, or requests shown
 ARMY_ROW = 52              # the Army window's rows, a troop each
 CAMP_ROW = 112             # the Attack window's cards, four to a row
@@ -597,6 +622,26 @@ def do_act(what, arg):
             sound_play("nope", volume=0.5)
             say(res, RED)
         open_panel("forge")
+    elif what == "awards_tab":
+        global_vars.awards_tab = arg
+        open_panel("awards")
+    elif what == "claim_award":
+        res, prize, gained = claim_award(r, arg)
+        if res == "claimed":
+            sound_play("levelup", volume=0.6)
+            effect("confetti", view_x + VIEW_W / 2 / zoom(), view_y + 120, None, 1.5)
+            say(f"{ACHIEVEMENTS[arg]['name']}, {award_tier(r, arg)} of 3 stars: +{big_number(prize['gold'])} gold and food!", GOLD)
+            level_up(gained)
+            keep_save(r)
+        open_panel("awards")
+    elif what == "claim_event":
+        res, prize, gained = claim_event(r)
+        if res == "claimed":
+            sound_play("levelup", volume=0.6)
+            say(f"+{big_number(prize['gold'])} gold and food!", GOLD)
+            level_up(gained)
+            keep_save(r)
+        open_panel("awards")
     elif what == "ally_tab":
         global_vars.ally_tab = arg
         open_panel("alliance")
@@ -637,7 +682,7 @@ def do_act(what, arg):
     elif what == "ally_say":
         ally_say(arg)
         sound_play("click", volume=0.4)
-    elif what in ("shop", "army", "campaign", "forge", "alliance"):
+    elif what in ("shop", "army", "campaign", "forge", "alliance", "awards"):
         if global_vars.panel == what:
             close_panel()
         else:

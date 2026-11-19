@@ -141,6 +141,7 @@ def brew_left(r):
 
 def spells_home(r, b):
     """After a battle: the spells cast are gone."""
+    tally(r, "spells", sum(b["cast"].values()))
     for k, n in b["cast"].items():
         r["spells"][k] = r["spells"].get(k, 0) - n
         if r["spells"][k] <= 0:

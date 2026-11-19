@@ -253,12 +253,26 @@ def news(slug):
         raids = (db.query(Raid, User).join(User, User.id == Raid.attacker_id)
                  .filter(Raid.published_id == pub.id, Raid.defender_id == user.id, Raid.stars.isnot(None))
                  .order_by(Raid.finished_at.desc()).limit(10).all())
-        return jsonify(trophies=mine.trophies, shield=_shield_left(mine), defenses=[
+        return jsonify(trophies=mine.trophies, shield=_shield_left(mine), top=school_top(db, pub, user), defenses=[
             {"id": r.id, "name": _board_name(u), "stars": r.stars, "percent": r.percent, "gold": r.gold, "food": r.food,
              "trophies": -r.trophies, "at": int(_aware(r.finished_at).timestamp()), "new": not r.seen,
              "buildings": json.loads(r.buildings), "replay": json.loads(r.replay)} for r, u in raids])
     finally:
         db.close()
+
+
+TOP_SHOWN = 10
+
+
+def school_top(db, pub, user):
+    """The school's best raiders by trophies (first names), you marked: the leagues' board."""
+    domain = school_domain(user)
+    if domain is None:
+        return []
+    rows = (db.query(RaidBase, User).join(User, User.id == RaidBase.user_id)
+            .filter(RaidBase.published_id == pub.id, User.email.ilike("%@" + domain), RaidBase.buildings != "[]")
+            .order_by(RaidBase.trophies.desc(), RaidBase.id).limit(TOP_SHOWN).all())
+    return [{"name": _board_name(u), "trophies": b.trophies, "you": u.id == user.id} for b, u in rows]
 
 
 @bp.post("/api/play/<slug>/raid/seen")

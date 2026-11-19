@@ -16,7 +16,7 @@ def load_army(r):
     r.setdefault("train_t", now())
     r.setdefault("campaign", {})          # a village's number (as text): the most stars won there
     r.setdefault("campaign_loot", {})     # a village's number: [gold, food] still there to take
-    return load_allies(load_forge(load_magic(load_raids(r))))
+    return load_awards(load_allies(load_forge(load_magic(load_raids(r)))))
 
 
 def barracks_level(r):
@@ -103,6 +103,7 @@ def train_tick(r):
         n += 1
     if not r["training"]:
         r["train_t"] = now()
+    tally(r, "trained", n)
     return n
 
 

@@ -298,6 +298,7 @@ CASES = [
  ('alliances: a leaderless alliance', '../backend/alliances.py', '        elif a.leader_id == user.id:\n            a.leader_id = rest[0].user_id', '        elif False:\n            a.leader_id = rest[0].user_id', 'the next longest-serving leads', PY),
  ('alliances: unpublishing leaves them', '../backend/publishing.py', '    import alliances\n    alliances.delete_for(db, pub.id)', '    import alliances', 'unpublishing takes them', PY),
  ('alliances: orders sent offline', 'src/python/runtime.py', 'def ally_say(phrase):\n    """A message to your alliance: one of your game\'s phrases, by number."""\n    _raid_order(', 'def ally_say(phrase):\n    """A message to your alliance: one of your game\'s phrases, by number."""\n    _raid_out.append(', 'nothing happens offline'),
+ ('raids: another school on the top board', '../backend/raids.py', '.filter(RaidBase.published_id == pub.id, User.email.ilike("%@" + domain), RaidBase.buildings != "[]")', '.filter(RaidBase.published_id == pub.id, RaidBase.buildings != "[]")', 'best raiders by trophies', PY),
  ("every picture at once", "src/store/cloudStore.ts", "Array.from({ length: Math.min(UPLOADS_AT_ONCE, total) }, upload)", "Array.from({ length: total }, upload)", "pictures go up two at a time"),
  ("retries hammer a struggling server", "src/store/cloudStore.ts", "        this.nextTry = Date.now() + retryWait(this.failures);", "        this.nextTry = 0;", "after a failed save the background waits"),
  ("the wait never resets", "src/store/cloudStore.ts", "        this.failures = 0;\n        this.nextTry = 0;", "        this.nextTry = 0;", "after a failed save the background waits"),
@@ -2315,6 +2316,15 @@ CASES = [
  ("kingdom: a gift that doesn't fit", _kg('_2allies'), '    fits = [(n, k) for k, n in r["army"].items() if n > 0 and TROOPS[k]["space"] <= left]', '    fits = [(n, k) for k, n in r["army"].items() if n > 0]', 'asking needs the hall', KING),
  ('kingdom: gifts taken twice', _kg('_2allies'), 'if g["id"] not in r["gifts_taken"] and g["kind"] in TROOPS]', 'if g["kind"] in TROOPS]', 'gifts from allies go into your army once', KING),
  ('kingdom: the server told every step', _kg('_2allies'), '    fresh = [i for i in ids if (say_to_server.__name__, i) not in sent]', '    fresh = list(ids)', 'gifts from allies go into your army once', KING),
+ ('kingdom: clearing not counted', _kg('_2realm'), '    r["obstacles"].remove(o)\n    tally(r, "cleared")', '    r["obstacles"].remove(o)', 'counted where the rules do it', KING),
+ ('kingdom: the event never counts', _kg('_2awards'), '        e["got"] += n', '        pass', 'counted where the rules do it', KING),
+ ('kingdom: a tier collected twice', _kg('_2awards'), '    r["awards"][key] = t + 1', '    pass', 'collected once, for its prize', KING),
+ ('kingdom: a prize before the goal', _kg('_2awards'), '    return t < len(goals) and progress(r, key) >= goals[t]', '    return t < len(goals)', 'collected once, for its prize', KING),
+ ("kingdom: an event you can't do", _kg('_2awards'), '    return [k for k, e in EVENTS.items() if can_count(r, e["stat"])]', '    return list(EVENTS)', 'chosen among what the kingdom can do', KING),
+ ('kingdom: the event changes mid-week', _kg('_2awards'), '    if e is None or e["week"] != w:', '    if True:', 'chosen among what the kingdom can do', KING),
+ ('kingdom: event prizes without end', _kg('_2awards'), '    if e["claimed"] >= event_reached(e):', '    if False:', 'chosen among what the kingdom can do', KING),
+ ('kingdom: no league bonus', _kg('_2awards'), '    return LEAGUES[league_of(r.get("trophies", 0))]["bonus"] * stars // 3', '    return 0', 'leagues by trophies', KING),
+ ('kingdom: collect does nothing', _kg('_5acts'), '        res, prize, gained = claim_award(r, arg)', '        res, prize, gained = "no", None, []', "Awards window's three tabs", KING),
 
  ('tell: the page drops them', NETS, '    if (o.tells && !this.away) this.tells.push(...o.tells);\n', '', "one player on a WebSocket and one polling", E2E),
 

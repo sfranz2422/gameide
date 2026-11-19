@@ -92,11 +92,17 @@ def finish_player_raid(r, raid, b):
             del r["army"][k]
     champs_home(r, b)
     spells_home(r, b)
-    kept = [add(r, "gold", b["loot"][0]), add(r, "food", b["loot"][1])]
+    # The league's bonus on top, for a raid won (a share for each star).
+    bonus = league_bonus(r, b["stars"])
+    kept = [add(r, "gold", b["loot"][0] + bonus), add(r, "food", b["loot"][1] + bonus)]
+    tally(r, "stars", b["stars"])
+    tally(r, "loot", kept[0] + kept[1])
+    if b["stars"]:
+        tally(r, "raids_won")
     levels_ = add_xp(r, RAID_XP * b["stars"]) if b["stars"] else []
     raid_finish(raid["id"], b["stars"], destroyed_pct(b), b["loot"][0], b["loot"][1], b["replay"])
-    return {"stars": b["stars"], "new_stars": 0, "gold": kept[0], "food": kept[1],
-            "lost": b["loot"][0] + b["loot"][1] - kept[0] - kept[1], "levels": levels_,
+    return {"stars": b["stars"], "new_stars": 0, "gold": kept[0], "food": kept[1], "bonus": bonus,
+            "lost": b["loot"][0] + b["loot"][1] + 2 * bonus - kept[0] - kept[1], "levels": levels_,
             "trophies": expected_trophies(raid, b["stars"], len(b["replay"]))}
 
 
@@ -111,6 +117,8 @@ def take_raids(r, news):
         r["gold"] = max(0, r["gold"] - d["gold"])
         r["food"] = max(0, r["food"] - d["food"])
         r["raids_applied"].append(d["id"])
+        if d["stars"] == 0:
+            tally(r, "defenses")
     r["raids_applied"] = r["raids_applied"][-APPLIED_KEPT:]
     told(raid_seen, [d["id"] for d in news.get("defenses", []) if d.get("new")])
     return fresh

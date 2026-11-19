@@ -2363,6 +2363,10 @@ _d = _bn["defenses"][0]
 check("raids: the defender hears of it: who, the stars, what was taken, the trophies lost, and the replay",
       (_d["name"], _d["stars"], _d["gold"], _d["food"], _d["trophies"], _d["new"], len(_d["replay"])) == ("Amy", 2, 3000, 1000, -(_r["win"] * 2 // 3), True, 5), _d)
 check("raids: …with no email or last name in it", "@" not in json.dumps(_bn) and "Zebrowski" not in json.dumps(_bn))
+_top = _bn["top"]
+check("raids: the news has the school's best raiders by trophies, first names, you marked, nobody from elsewhere",
+      [t["name"] for t in _top] == sorted([t["name"] for t in _top], key=lambda n: -next(x["trophies"] for x in _top if x["name"] == n))
+      and {t["name"] for t in _top} <= {"Amy", "Ben", "Pat"} and [t["you"] for t in _top if t["name"] == "Ben"] == [True], _top)
 check("raids: two stars give the defender a shield of eight hours", 8 * 3600 - 60 < _bn["shield"] <= 8 * 3600, _bn["shield"])
 check("raids: a shielded kingdom isn't offered", all((_give_up(_pat, _find(_pat))["raid"] or {}).get("name") != "Ben" for _ in range(12)))
 check("raids: the raider's trophies go up by that", _done.get_json()["mine"] == _amy_before + _r["win"] * 2 // 3, _done.get_json())

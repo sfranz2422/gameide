@@ -1058,4 +1058,11 @@ are asked for (the alliance hall's room) and given (the server checks they fit, 
 `GIVE_MOST` each); gifts go into the army once (`gifts_taken`). Raids never match allies. A notice
 to the server (a raid seen, gifts taken) goes once (`told`): sent every step until the next news,
 it was a request a second.
+**Phase 7, leagues, events and achievements** (`_2awards.py`): what the kingdom does is counted
+by `tally`, called in the rules where it happens (never in a window), into `stats`; keep, walls,
+villages, trophies and renown are read from the kingdom (`progress`), so an older save counts
+them. `ACHIEVEMENTS` are three tiers each, collected in the Awards window. The week's event starts
+on the real clock's Monday, chosen among those the kingdom can do then (`can_count`) and kept all
+week. Leagues are by trophies (`LEAGUES`): a raid won pays the league's bonus, a share a star. The
+school's best raiders come with the raid news (`raids.school_top`, first names).
 

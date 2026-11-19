@@ -90,6 +90,7 @@ def give_troop(r, req):
     req["gave"] += 1
     req["filled"] += TROOPS[k]["space"]
     ally_give(req["id"], k, 1, TROOPS[k]["space"])
+    tally(r, "gifts")
     return "given"
 
 

@@ -172,6 +172,16 @@ to the LEFT (two steps, two swings). The game turns them round to face right.
 > (picture 8: a small rounded square of dark stone with a brass edge): a crossed pair of
 > banners on poles. Flat magenta background.
 
+## Phase 7: leagues, the week's event, achievements
+
+**19. Trophies, medals and league crests.** MAGENTA.
+> [the style] Every one in the style of the icons (picture 8: a small rounded square of dark
+> stone with a brass edge, tilted a little, seen from above), evenly spaced in a 4 × 3 grid.
+> Row 1: a gold trophy cup; a medal on a red ribbon; a raised shield with an arrow stuck in it
+> (a raid held off); a scroll with a wax seal (the week's event). Rows 2-3, the six league
+> crests, each a heraldic shield: bronze, silver, gold, purple crystal, blue with a silver
+> crown, red with a gold crown and laurels. Flat magenta background.
+
 ## Later phases
 
 - **Phase 3 on:** champions, alliances' banners and league badges.

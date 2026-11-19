@@ -1001,4 +1001,73 @@ again["units"][0]["max"]`)).toBe(56);
     step(g);
     expect(g.orders.at(-1)).toEqual({ op: "ally_say", phrase: 3 });
   });
+
+  // ---- phase 7: leagues, the week's event, achievements
+
+  it("phase 7: what the kingdom does is counted where the rules do it, for its achievement and the week's event", async () => {
+    const g = await start();
+    await realmOf(g);
+    py(g, 'r = global_vars.realm\nr["gold"] = r["food"] = 90000\nr["event"] = {"week": week_now(), "kind": "clearing_week", "got": 0, "claimed": 0}');
+    // Clear two trees, train troops: both counted; only clearing is this week's event.
+    py(g, 'for o in [o for o in r["obstacles"]][:2]:\n    clear(r, o)');
+    const s = py<Record<string, number>>(g, 'r["stats"]');
+    expect(s.cleared).toBe(2);
+    expect(py(g, 'r["event"]["got"]')).toBe(2);
+    expect(py(g, 'progress(r, "keep")')).toBe(py(g, "keep_level(r)"));
+  });
+
+  it("phase 7: an achievement's tier is collected once, for its prize, then the next goal shows", async () => {
+    const g = await start();
+    await realmOf(g);
+    py(g, 'r = global_vars.realm\nr["gold"] = r["food"] = 0\nr["stats"]["cleared"] = 12');
+    expect(py(g, 'award_ready(r, "cleared")')).toBe(true);
+    expect(py(g, 'claim_award(r, "cleared")[0]')).toBe("claimed");
+    expect(py(g, '[r["awards"]["cleared"], r["gold"] > 0, award_ready(r, "cleared"), claim_award(r, "cleared")[0]]'))
+      .toEqual([1, true, false, "not yet"]);
+    py(g, 'r["stats"]["cleared"] = 500');
+    expect(py(g, '[claim_award(r, "cleared")[0], claim_award(r, "cleared")[0], claim_award(r, "cleared")[0], award_tier(r, "cleared")]'))
+      .toEqual(["claimed", "claimed", "not yet", 3]);
+  });
+
+  it("phase 7: the week's event is chosen among what the kingdom can do, kept all week, and a new week starts afresh", async () => {
+    const g = await start();
+    await realmOf(g);
+    py(g, 'r = global_vars.realm\nr["buildings"] = [b for b in r["buildings"] if b["kind"] not in ("barracks", "mage_tower")]\nr["event"] = None');
+    // With no barracks or mage tower, only building and clearing are fair.
+    for (let w = 0; w < 4; w++) {
+      expect(["builders_week", "clearing_week"]).toContain(py(g, 'event_now(r)["kind"]'));
+      later(g, 7 * 86400);
+    }
+    py(g, 'r["buildings"].append(new_building("barracks", 2, 2, 1))\ne = event_now(r)\ne["got"] = 10**9');
+    const kind = py(g, 'e["kind"]');
+    expect(py(g, '[claim_event(r)[0], claim_event(r)[0], claim_event(r)[0], claim_event(r)[0]]')).toEqual(["claimed", "claimed", "claimed", "not yet"]);
+    expect(py(g, 'event_now(r)["kind"]')).toBe(kind);
+    later(g, 7 * 86400);
+    expect(py(g, '[event_now(r)["got"], event_now(r)["claimed"]]')).toEqual([0, 0]);
+  });
+
+  it("phase 7: leagues by trophies, and a raid won pays the league's bonus a share a star", async () => {
+    const g = await start();
+    expect(py(g, '[league_of(0), league_of(299), league_of(300), league_of(4000), league_of(99999)]')).toEqual([0, 0, 1, 5, 5]);
+    py(g, 'rr = {"trophies": 900}');
+    expect(py(g, '[league_bonus(rr, 0), league_bonus(rr, 1), league_bonus(rr, 3)]')).toEqual([0, 2666, 8000]);
+  });
+
+  it("phase 7: the Awards window's three tabs fit, a ready tier has a Collect, and the board is first names", async () => {
+    const g = await start();
+    await realmOf(g);
+    py(g, 'r = global_vars.realm\nr["stats"]["cleared"] = 12');
+    g.raidArrive({ online: true, news: { trophies: 100, shield: 0, defenses: [], top: [{ name: "Amy", trophies: 900, you: false }, { name: "Ben", trophies: 100, you: true }] } });
+    step(g, 2);
+    for (const t of ["achievements", "event", "league"]) {
+      py(g, `global_vars.awards_tab = "${t}"\nopen_panel("awards")`);
+      step(g, 3);
+      expect(py<number>(g, "global_vars.panel_box[3]")).toBeLessThanOrEqual(py<number>(g, "VIEW_H"));
+    }
+    py(g, 'global_vars.awards_tab = "achievements"\nopen_panel("awards")');
+    step(g);
+    py(g, 'press(next(b for b in instances("Button") if b.act == "claim_award" and b.arg == "cleared"))');
+    step(g, 2);
+    expect(py(g, 'r["awards"]["cleared"]')).toBe(1);
+  });
 });

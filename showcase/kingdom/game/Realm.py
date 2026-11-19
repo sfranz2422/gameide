@@ -40,7 +40,10 @@ self.shop_b.icon = "hammer"
 self.army_b = make_button(VIEW_W - 256, 9, 118, 38, "Army", "army", None, 16)
 self.ally_b = make_button(VIEW_W - 152, HUD_H + 8, 142, 38, "Alliance", "alliance", None, 15)
 self.ally_b.icon = "banner"
-self.ally_seen = None                # the alliance news last drawn (a new one redraws its window)
+self.ally_seen = None
+self.awards_b = make_button(VIEW_W - 152, HUD_H + 52, 142, 38, "Awards", "awards", None, 15)
+self.awards_b.icon = "medal"
+self.claims = to_claim(r)            # prizes waiting: a new one says so                # the alliance news last drawn (a new one redraws its window)
 self.army_b.icon = "army"
 self.attack_b = make_button(14, VIEW_H - 74, 150, 60, "Attack!", "campaign", None, 22)
 self.attack_b.icon = "attack"
@@ -104,6 +107,13 @@ if ally_news() is not self.ally_seen:
     self.ally_seen = ally_news()
     if global_vars.panel == "alliance":
         open_panel("alliance")
+# A prize newly waiting says so (the Awards button turns green too).
+if global_vars.t % 60 == 30:
+    n = to_claim(r)
+    if n > self.claims and not global_vars.said:
+        sound_play("coin", volume=0.6)
+        say("A prize is waiting: tap Awards to collect it!", GOLD)
+    self.claims = n
 if global_vars.searching and raid_found() is not None:
     global_vars.searching = False
     found = raid_found()
@@ -162,6 +172,8 @@ self.shop_b.picked = global_vars.panel == "shop"
 self.army_b.picked = global_vars.panel == "army"
 self.ally_b.picked = global_vars.panel == "alliance"
 self.ally_b.shown = global_vars.panel is None            # (a window's own X closes it)
+self.awards_b.shown = global_vars.panel is None
+self.awards_b.hot = self.claims > 0
 self.attack_b.picked = global_vars.panel == "campaign"
 # With a window open, the corner buttons step aside (the Attack window reaches the bottom).
 self.attack_b.shown = self.zoom_out.shown = self.zoom_in.shown = global_vars.panel is None
@@ -244,6 +256,9 @@ if raid_online():
     draw_set_alpha(1)
     icon("trophy", 24, HUD_H + 20, 30)
     text(44, HUD_H + 8, str(r["trophies"]), GOLD, 18)
+    lg_i = league_of(r["trophies"])
+    icon(f"league_{lg_i}", 172, HUD_H + 20, 34)
+    text(192, HUD_H + 9, LEAGUES[lg_i]["name"], LEAGUES[lg_i]["colour"], 16)
     if (raid_news() or {}).get("shield"):
         icon("shield_on", 118, HUD_H + 20, 28)
 # Something being placed: what to do.
@@ -362,6 +377,62 @@ if global_vars.panel and box:
             ready = r["army"].get(k, 0)
             queued = r["training"].count(k)
             text(x1 + 420, y + 24, f"{ready} ready" + (f", {queued} coming" if queued else ""), GOLD if ready else DIM, 13)
+    elif global_vars.panel == "awards":
+        text(x1 + 20, y1 + 12, "Awards", GOLD, 26)
+        tab = getattr(global_vars, "awards_tab", "achievements")
+        if tab == "achievements":
+            for i, (k, a) in enumerate(ACHIEVEMENTS.items()):
+                x, y = award_slot(i, x1, y1)
+                t = award_tier(r, k)
+                draw_set_alpha(0.35)
+                draw_set_color("#1a5a2a" if award_ready(r, k) else "#000000")
+                draw_rect(x, y, x + AWARD_W, y + AWARD_ROW + 20)
+                draw_set_alpha(1)
+                icon(a["icon"], x + 28, y + 30, 40)
+                text(x + 56, y + 4, a["name"], INK, 14)
+                text(x + 56, y + 24, a["about"], DIM, 11)
+                for j in range(3):
+                    icon("star", x + 66 + j * 20, y + 56, 18, 1 if j < t else 0.25)
+                goal = a["goals"][min(t, 2)]
+                text(x + 130, y + 48, f"{big_number(min(progress(r, k), goal))} / {big_number(goal)}" if t < 3 else "All three!",
+                     MINT if award_ready(r, k) or t == 3 else DIM, 12)
+        elif tab == "event":
+            e = event_now(r)
+            ev = EVENTS[e["kind"]]
+            icon("scroll", x1 + 62, y1 + 92, 64)
+            text(x1 + 104, y1 + 70, ev["name"], GOLD, 28)
+            text(x1 + 104, y1 + 110, f"{ev['about']}: {big_number(e['got'])} this week", INK, 17)
+            text(x1 + 104, y1 + 140, f"Ends in {clock_words(week_left())}  ·  a new event every Monday", DIM, 13)
+            goals = ev["goals"]
+            bx1, bx2 = x1 + 40, x1 + 900
+            draw_set_color("#0c0b0a")
+            draw_rect(bx1, y1 + 210, bx2, y1 + 228)
+            draw_set_color(MINT)
+            draw_rect(bx1, y1 + 210, bx1 + (bx2 - bx1) * min(1, e["got"] / goals[-1]), y1 + 228)
+            for j, g in enumerate(goals):
+                gx = bx1 + (bx2 - bx1) * g / goals[-1]
+                draw_set_color(EDGE)
+                draw_rect(gx - 2, y1 + 202, gx + 2, y1 + 236)
+                p = EVENT_PRIZES[j]
+                px = min(bx2 - 90, max(bx1 + 90, gx))
+                text(px, y1 + 250, f"{big_number(g)}", INK if e["got"] < g else MINT, 15, "center")
+                text(px, y1 + 274, "Collected" if j < e["claimed"] else f"+{big_number(p['gold'])} gold and food", MINT if j < e["claimed"] else DIM, 12, "center")
+        else:
+            lg_i = league_of(r["trophies"])
+            for i, lg in enumerate(LEAGUES):
+                y = y1 + 70 + i * 62
+                icon(f"league_{i}", x1 + 50, y + 24, 54, 1 if i == lg_i else 0.45)
+                text(x1 + 84, y + 4, lg["name"] + ("  ← you" if i == lg_i else ""), GOLD if i == lg_i else INK, 17)
+                text(x1 + 84, y + 26, f"from {big_number(lg['from'])} trophies  ·  raid win bonus up to {big_number(lg['bonus'])} gold and food", DIM, 12)
+            text(x1 + 600, y1 + 64, "Your school's best raiders", GOLD, 17)
+            top = (raid_news() or {}).get("top", [])
+            if not top:
+                text(x1 + 600, y1 + 100, "In the published game, signed in.", DIM, 13)
+            for i, t in enumerate(top):
+                y = y1 + 96 + i * 36
+                text(x1 + 600, y, f"{i + 1}. {t['name']}" + (" (you)" if t["you"] else ""), GOLD if t["you"] else INK, 15)
+                icon("trophy", x1 + 860, y + 10, 22)
+                text(x1 + 876, y, str(t["trophies"]), INK, 14)
     elif global_vars.panel == "alliance":
         news = ally_news() or {}
         al = news.get("alliance")

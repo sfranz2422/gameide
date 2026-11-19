@@ -242,6 +242,21 @@ def main():
         sq = Image.new("RGBA", (side, side), (0, 0, 0, 0))
         sq.paste(part, ((side - part.width) // 2, (side - part.height) // 2))
         save(sq.resize((128, 128), Image.LANCZOS), "icon_banner")
+    if (RAW / "19.jpeg").exists():
+        # 19: a 4 × 3 grid, by the grid like sheet 8; the last two came back empty tiles.
+        im = _sw.key_out(Image.open(RAW / "19.jpeg"))
+        w, h = im.width / 4, im.height / 3
+        names = ["trophy", "medal", "shield_on", "scroll"] + [f"league_{i}" for i in range(6)]
+        for i, name in enumerate(names):
+            c, r_ = i % 4, i // 4
+            cell = im.crop((int(c * w), int(r_ * h), int((c + 1) * w), int((r_ + 1) * h)))
+            # The tiles nearly touch: keep the cell's biggest piece, not the neighbours' edges.
+            biggest = max(_farm.islands(cell, 8), key=lambda b: (b[2] - b[0]) * (b[3] - b[1]))
+            part = no_shadow(_sw.own(cell, biggest, [biggest]).crop(tuple(biggest[:4])))
+            side = max(part.size)
+            sq = Image.new("RGBA", (side, side), (0, 0, 0, 0))
+            sq.paste(part, ((side - part.width) // 2, (side - part.height) // 2))
+            save(sq.resize((128, 128), Image.LANCZOS), f"icon_{name}")
     if (RAW / "09.jpeg").exists():
         view = (G["VIEW_W"], G["VIEW_H"])
         Image.open(RAW / "09.jpeg").convert("RGB").resize((view[0] * 2, view[1] * 2), Image.LANCZOS).save(ART / "title.png", optimize=True)

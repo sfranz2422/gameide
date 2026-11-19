@@ -261,6 +261,7 @@ def start_job(r, b, to):
         collect(r, b)
     if seconds <= 0:
         b["level"] = to
+        tally(r, "built")
         return add_xp(r, build_xp(seconds))
     b["job"] = {"to": to, "end": now() + seconds, "paid": price}
     return []
@@ -326,6 +327,7 @@ def finish_jobs(r):
             b["level"] = job["to"]
             b["job"] = None
             b["t"] = job["end"]
+            tally(r, "built")
             gained += add_xp(r, build_xp(info(b["kind"])["time"][job["to"] - 1]))
     return gained
 
@@ -375,6 +377,7 @@ def clear(r, o):
         return f"That needs {info_['cost']:,} {info_['pays']}.", []
     r[info_["pays"]] -= info_["cost"]
     r["obstacles"].remove(o)
+    tally(r, "cleared")
     return "cleared", add_xp(r, info_["xp"])
 
 
