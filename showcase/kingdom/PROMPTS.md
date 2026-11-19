@@ -162,6 +162,16 @@ to the LEFT (two steps, two swings). The game turns them round to face right.
 > big furnace, bellows and racks of swords; a great forge hall with glowing furnaces, a
 > water wheel and armour on stands. Flat magenta background.
 
+## Phase 6: alliances
+
+**18. The alliance hall and its banner.** MAGENTA.
+> [the style] Row 1, each on its own square patch of ground the size of 3 × 3 ground
+> diamonds, an alliance hall in three ages: a timber meeting hall with a long table seen
+> through its open front and a plain flag; a stone guildhall with many coloured banners; a
+> great hall with a bell tower and a courtyard of flags. Row 2, in the style of the icons
+> (picture 8: a small rounded square of dark stone with a brass edge): a crossed pair of
+> banners on poles. Flat magenta background.
+
 ## Later phases
 
 - **Phase 3 on:** champions, alliances' banners and league badges.

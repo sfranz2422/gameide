@@ -368,6 +368,70 @@ class Raid(Base):
     finished_at = Column(DateTime, nullable=True)
 
 
+class Alliance(Base):
+    """Players of a raid game at one school, banded together (alliances.py). Its name is two
+    word numbers and its banner a number: the game turns them into words and colours, so no
+    typed name reaches anyone."""
+    __tablename__ = "gameide_alliances"
+
+    id = Column(Integer, primary_key=True)
+    published_id = Column(Integer, ForeignKey("gameide_published.id"), index=True, nullable=False)
+    word1 = Column(Integer, nullable=False, default=0)
+    word2 = Column(Integer, nullable=False, default=0)
+    banner = Column(Integer, nullable=False, default=0)
+    founder_id = Column(Integer, ForeignKey("users.id"), nullable=False)    # the school it belongs to is theirs
+    leader_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_at = Column(DateTime, nullable=False, default=now)
+
+
+class AllianceMember(Base):
+    """One player in one alliance (one alliance a game per player)."""
+    __tablename__ = "gameide_alliance_members"
+    __table_args__ = (UniqueConstraint("published_id", "user_id", name="uq_gameide_alliance_member"),)
+
+    id = Column(Integer, primary_key=True)
+    alliance_id = Column(Integer, ForeignKey("gameide_alliances.id"), index=True, nullable=False)
+    published_id = Column(Integer, ForeignKey("gameide_published.id"), index=True, nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True, nullable=False)
+    joined_at = Column(DateTime, nullable=False, default=now)
+
+
+class AllianceRequest(Base):
+    """A member asking their alliance for troops: so much room."""
+    __tablename__ = "gameide_alliance_requests"
+
+    id = Column(Integer, primary_key=True)
+    alliance_id = Column(Integer, ForeignKey("gameide_alliances.id"), index=True, nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    room = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime, nullable=False, default=now)
+
+
+class AllianceGift(Base):
+    """Troops given to a request; `taken` once the asker's game has put them in its army."""
+    __tablename__ = "gameide_alliance_gifts"
+
+    id = Column(Integer, primary_key=True)
+    request_id = Column(Integer, ForeignKey("gameide_alliance_requests.id"), index=True, nullable=False)
+    from_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    to_id = Column(Integer, ForeignKey("users.id"), index=True, nullable=False)
+    kind = Column(String(24), nullable=False)
+    count = Column(Integer, nullable=False, default=1)
+    space = Column(Integer, nullable=False, default=1)
+    taken = Column(Integer, nullable=False, default=0)
+
+
+class AllianceMessage(Base):
+    """A message in an alliance: one of the game's phrases, by number (never typed words)."""
+    __tablename__ = "gameide_alliance_messages"
+
+    id = Column(Integer, primary_key=True)
+    alliance_id = Column(Integer, ForeignKey("gameide_alliances.id"), index=True, nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    phrase = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime, nullable=False, default=now)
+
+
 class GameSave(Base):
     """What a signed-in player's game saved (save_set) in one published game, so it
     follows them to another computer, and outlives the browser (the teacher's ask,

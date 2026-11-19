@@ -43,9 +43,10 @@ ART = HERE / "art"
 ICONS = ["gold", "food", "renown", "builder", "hammer", "clock", "shield", "sword", "up", "keep",
          "star", "attack", "army",     # phase 2: a battle's stars, the Attack! and Army buttons
          "trophy", "shield_on",        # phase 3: trophies, and a shield (stand-ins until Gemini's)
-         "heal", "rage", "lightning", "freeze"]   # phase 4: the spells
+         "heal", "rage", "lightning", "freeze",   # phase 4: the spells
+         "banner"]                     # phase 6: the Alliance button
 # Stand-ins' colours: stone grey, timber brown, thatch… a plain block each, taller with each tier.
-COLOURS = {"forge": (90, 70, 60), "warlord_altar": (150, 60, 50), "huntress_altar": (70, 120, 80), "mage_tower": (90, 80, 150),"keep": (150, 146, 138), "gold_mine": (120, 104, 84), "farm": (176, 150, 92), "treasury": (160, 150, 120),
+COLOURS = {"alliance_hall": (160, 130, 60), "forge": (90, 70, 60), "warlord_altar": (150, 60, 50), "huntress_altar": (70, 120, 80), "mage_tower": (90, 80, 150),"keep": (150, 146, 138), "gold_mine": (120, 104, 84), "farm": (176, 150, 92), "treasury": (160, 150, 120),
            "granary": (170, 130, 80), "builder_hut": (140, 110, 80), "archer_tower": (140, 136, 128),
            "ballista": (120, 90, 60), "trebuchet": (110, 84, 56), "barracks": (130, 100, 76), "army_camp": (120, 110, 90)}
 TALL = {"keep": 150, "archer_tower": 130, "trebuchet": 90, "army_camp": 30, "farm": 26}

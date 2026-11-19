@@ -214,6 +214,8 @@ def _merge(db, src, dst):
         db.delete(h)
     import raids
     raids.merge(db, src, dst)
+    import alliances
+    alliances.merge(db, src, dst)
     for g in db.query(GameSave).filter_by(published_id=src.id).all():
         d = db.query(GameSave).filter_by(published_id=dst.id, user_id=g.user_id).first()
         if d is None:
@@ -369,6 +371,8 @@ def _delete(db, pub):
     import raids
     multiplayer.delete_rooms(db, pub.id)
     raids.delete_for(db, pub.id)
+    import alliances
+    alliances.delete_for(db, pub.id)
     for table in (PublishedAsset, Like, Report, HighScore, GameSave):
         db.query(table).filter_by(published_id=pub.id).delete()
     db.delete(pub)

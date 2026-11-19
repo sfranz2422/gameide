@@ -159,7 +159,10 @@ def find(slug):
                 .filter(RaidBase.published_id == pub.id, RaidBase.user_id != user.id,
                         RaidBase.updated_at > t - BASE_FRESH,
                         User.email.ilike("%@" + domain)).all())
-        fair = [(b, u) for b, u in rows if b.user_id not in busy and _shield_left(b) == 0 and b.buildings != "[]"]
+        import alliances
+        allies = alliances.allies_of(db, pub.id, user.id)
+        fair = [(b, u) for b, u in rows if b.user_id not in busy and _shield_left(b) == 0 and b.buildings != "[]"
+                and b.user_id not in allies]
         if not fair:
             db.commit()
             return jsonify(raid=None, why="Nobody to raid at your school right now: everyone's shielded or not playing yet.")

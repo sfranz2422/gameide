@@ -188,6 +188,15 @@ BUILDINGS = {
               "time": [1800, 7200, 21600, 43200, 64800, 86400],
               "keep": [3, 4, 5, 6, 7, 8],
               "hp": [500, 560, 620, 690, 760, 840]},
+    # -- the alliance hall (phase 6): troops your alliance gives you come here
+    "alliance_hall": {"name": "Alliance hall", "size": 3, "pays": "gold", "group": "army",
+                      "about": "Join an alliance, and ask your allies for troops: the hall says how many.",
+                      "count": [0, 0, 1, 1, 1, 1, 1, 1, 1, 1],
+                      "cost": [10000, 40000, 100000, 250000, 500000, 900000],
+                      "time": [600, 7200, 21600, 43200, 64800, 86400],
+                      "keep": [3, 4, 5, 6, 7, 8],
+                      "hp": [1000, 1200, 1400, 1600, 1800, 2000],
+                      "room": [10, 15, 20, 25, 30, 40]},
     # -- walls: one tile each, many of them, upgraded at once (no builder)
     "wall": {"name": "Wall", "size": 1, "pays": "gold", "group": "walls",
              "about": "Slows raiders down: they must break through, or go round.",
@@ -349,3 +358,17 @@ RESEARCH_COST = [0, 4000, 12000, 30000, 70000, 140000, 260000]      # to reach l
 RESEARCH_TIME = [0, 3600, 3 * 3600, 6 * 3600, 12 * 3600, 18 * 3600, 24 * 3600]
 LEVEL_HP, LEVEL_DAMAGE = 0.12, 0.10
 TRAPS_IN_VILLAGE = 3              # a campaign village from its fifth hides one trap for every this many villages
+
+
+# ---- phase 6: alliances. The server keeps them as numbers (no typed words reach anyone):
+# a name is ALLY_FIRST[a] + ALLY_SECOND[b], a banner BANNERS[n], a message PHRASES[n].
+ALLY_FIRST = ["Iron", "Silver", "Golden", "Crimson", "Black", "White", "Storm", "Stone",
+              "Thunder", "Frost", "Ember", "Shadow", "Royal", "Wild", "Brave", "Ancient"]
+ALLY_SECOND = ["Wolves", "Ravens", "Lions", "Dragons", "Stags", "Bears", "Hawks", "Knights",
+               "Guardians", "Riders", "Shields", "Blades", "Towers", "Oaks", "Foxes", "Owls"]
+BANNERS = ["#b03030", "#2f5fb0", "#2f8a40", "#c09020", "#6a3a9a", "#3a3a3a", "#d06a20", "#2a9a9a"]
+PHRASES = ["Hello!", "Need troops, please!", "Sent you troops!", "Thanks!", "Great raid!", "Good luck!",
+           "Who wants to team up?", "Upgrade your walls!", "Watch out for traps!", "Well played!",
+           "Back soon!", "Let's climb the trophies!", "Nice kingdom!", "Ha! Missed me!", "On my way!", "Goodnight!"]
+GIVE_MOST = 5                     # troops you may give to one request (the server's rule too)
+GIFTS_KEPT = 80                   # gifts put in your army, remembered (so never twice)

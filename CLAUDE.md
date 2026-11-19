@@ -1050,4 +1050,12 @@ puts them in `b["traps"]`: no cells, no stars, nobody goes for them); `traps_tic
 once when a troop comes within `TRAP_TRIGGER`. They re-arm (a raid leaves buildings standing).
 The forge researches troops' levels (`_2forge.py`): a leveled troop carries its own `stats`
 (`troop_at`), and its replay step is "footman_3".
+**Phase 6, alliances** (`backend/alliances.py`, the engine's `ally_` functions, `_2allies.py`):
+same school only (an alliance is its founder's school's), first names only, and **no typed
+words ever**: an alliance's name is two word numbers and a banner number, a message a phrase
+number (`ALLY_FIRST`, `ALLY_SECOND`, `BANNERS`, `PHRASES`), so there's nothing to moderate. Troops
+are asked for (the alliance hall's room) and given (the server checks they fit, at most
+`GIVE_MOST` each); gifts go into the army once (`gifts_taken`). Raids never match allies. A notice
+to the server (a raid seen, gifts taken) goes once (`told`): sent every step until the next news,
+it was a request a second.
 

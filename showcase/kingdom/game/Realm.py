@@ -38,6 +38,9 @@ self.trees = {}                      # (gx, gy) -> the Prop of the tree or rock 
 self.shop_b = make_button(VIEW_W - 130, 9, 120, 38, "Build", "shop", None, 16)
 self.shop_b.icon = "hammer"
 self.army_b = make_button(VIEW_W - 256, 9, 118, 38, "Army", "army", None, 16)
+self.ally_b = make_button(VIEW_W - 152, HUD_H + 8, 142, 38, "Alliance", "alliance", None, 15)
+self.ally_b.icon = "banner"
+self.ally_seen = None                # the alliance news last drawn (a new one redraws its window)
 self.army_b.icon = "army"
 self.attack_b = make_button(14, VIEW_H - 74, 150, 60, "Attack!", "campaign", None, 22)
 self.attack_b.icon = "attack"
@@ -86,6 +89,21 @@ if global_vars.t % 60 == 10 and raid_online():
         sound_play("nope", volume=0.6)
         say(f"{d['name']} raided you! {d['stars']} star{'s' if d['stars'] != 1 else ''}: "
             f"-{big_number(d['gold'])} gold, -{big_number(d['food'])} food. Watch it in Attack, Classmates.", GOLD)
+# Alliances: gifts into the army (once), a refusal said, the window redrawn when news comes.
+if global_vars.t % 60 == 20 and raid_online():
+    got = take_gifts(r)
+    if got:
+        keep_save(r)
+        sound_play("coin", volume=0.6)
+        say(f"{got[0]['from']} sent you {got[0]['count']} {TROOPS[got[0]['kind']]['name'].lower()}{'s' if got[0]['count'] > 1 else ''}!", MINT)
+e = ally_error()
+if e:
+    sound_play("nope", volume=0.5)
+    say(e, RED)
+if ally_news() is not self.ally_seen:
+    self.ally_seen = ally_news()
+    if global_vars.panel == "alliance":
+        open_panel("alliance")
 if global_vars.searching and raid_found() is not None:
     global_vars.searching = False
     found = raid_found()
@@ -142,6 +160,8 @@ else:
 self.stop.shown = bool(global_vars.placing)
 self.shop_b.picked = global_vars.panel == "shop"
 self.army_b.picked = global_vars.panel == "army"
+self.ally_b.picked = global_vars.panel == "alliance"
+self.ally_b.shown = global_vars.panel is None            # (a window's own X closes it)
 self.attack_b.picked = global_vars.panel == "campaign"
 # With a window open, the corner buttons step aside (the Attack window reaches the bottom).
 self.attack_b.shown = self.zoom_out.shown = self.zoom_in.shown = global_vars.panel is None
@@ -342,6 +362,70 @@ if global_vars.panel and box:
             ready = r["army"].get(k, 0)
             queued = r["training"].count(k)
             text(x1 + 420, y + 24, f"{ready} ready" + (f", {queued} coming" if queued else ""), GOLD if ready else DIM, 13)
+    elif global_vars.panel == "alliance":
+        news = ally_news() or {}
+        al = news.get("alliance")
+        if al is None:
+            text(x1 + 20, y1 + 12, "Alliances", GOLD, 26)
+            if not raid_online():
+                text(x1 + 30, y1 + 80, "Alliances are in the published game, signed in with your school account.", DIM, 15)
+            else:
+                text(x1 + 30, y1 + 54, "At your school, best first:", DIM, 14)
+                schools = news.get("school", [])
+                if not schools:
+                    text(x1 + 30, y1 + 90, "None yet: found the first!", INK, 15)
+                for i, a in enumerate(schools[:ALLY_ROWS]):
+                    y = y1 + 84 + i * 50
+                    draw_set_color(banner_colour(a["banner"]))
+                    draw_rect(x1 + 30, y + 2, x1 + 56, y + 36)
+                    text(x1 + 70, y + 2, ally_name(a["words"]), INK, 16)
+                    text(x1 + 70, y + 22, f"{a['members']} of 20  ·  {big_number(a['trophies'])} trophies", DIM, 12)
+            pick = getattr(global_vars, "ally_pick", [0, 0, 0])
+            px = x1 + 620
+            text(px, y1 + 60, "Found your own", GOLD, 20)
+            for n, (label, y) in enumerate((("First word", 120), ("Second word", 180), ("Banner", 240))):
+                text(px + 155, y1 + y - 18, label, DIM, 12, "center")
+                shown_ = [ALLY_FIRST[pick[0]], ALLY_SECOND[pick[1]], ""][n]
+                if n == 2:
+                    draw_set_color(banner_colour(pick[2]))
+                    draw_rect(px + 120, y1 + y + 4, px + 190, y1 + y + 32)
+                else:
+                    text(px + 155, y1 + y + 6, shown_, INK, 18, "center")
+            text(px + 155, y1 + 300, ally_name(pick[:2]), GOLD, 22, "center")
+        else:
+            draw_set_color(banner_colour(al["banner"]))
+            draw_rect(x1 + 20, y1 + 12, x1 + 44, y1 + 46)
+            text(x1 + 56, y1 + 12, ally_name(al["words"]), GOLD, 24)
+            tab = getattr(global_vars, "ally_tab", "members")
+            if tab == "members":
+                text(x1 + 30, y1 + 62, f"{al['members'] if isinstance(al['members'], int) else len(al['members'])} members  ·  {big_number(al['trophies'])} trophies  ·  led by {al['leader']}", DIM, 14)
+                for i, m in enumerate(al["members"][:20]):
+                    x, y = x1 + 30 + (i // 10) * 460, y1 + 96 + (i % 10) * 38
+                    text(x, y, ("★ " if m["leader"] else "") + m["name"] + (" (you)" if m["you"] else ""), GOLD if m["you"] else INK, 15)
+                    icon("trophy", x + 250, y + 10, 22)
+                    text(x + 266, y + 2, str(m["trophies"]), INK, 14)
+                    text(x + 330, y + 2, f"keep {m['power']}", DIM, 13)
+            elif tab == "troops":
+                why = can_ask(r)
+                text(x1 + 350, y1 + 82, why or "Ask: your allies send troops into your army.", DIM if why else MINT, 13)
+                mine = [q for q in al["requests"] if q["yours"]]
+                if mine:
+                    text(x1 + 30, y1 + 126, f"Your request: {mine[0]['filled']} of {mine[0]['room']} room filled", INK, 14)
+                others = [q for q in al["requests"] if not q["yours"]][:ALLY_ROWS]
+                text(x1 + 30, y1 + 150 if mine else y1 + 130, "Your allies are asking:" if others else "Nobody else is asking right now.", GOLD, 15)
+                for i, q in enumerate(others):
+                    y = y1 + 136 + i * 46 + (24 if mine else 0)
+                    text(x1 + 300, y + 8, q["name"], INK, 15)
+                    text(x1 + 470, y + 8, f"{q['filled']} of {q['room']} room", DIM, 13)
+                    if q["gave"]:
+                        text(x1 + 620, y + 8, f"you gave {q['gave']}", MINT, 12)
+            else:
+                text(x1 + 30, y1 + 62, "Messages", DIM, 14)
+                for i, m in enumerate(al["messages"][-11:]):
+                    y = y1 + 90 + i * 36
+                    text(x1 + 30, y, m["name"] + ":", GOLD if m["you"] else INK, 14)
+                    text(x1 + 150, y, PHRASES[m["phrase"] % len(PHRASES)], DIM, 14)
+                text(x1 + 30, y1 + 470, "Tap a message on the right to send it to your alliance.", DIM, 13)
     elif global_vars.panel == "forge":
         text(x1 + 20, y1 + 12, "The forge", GOLD, 26)
         job = r["research"]

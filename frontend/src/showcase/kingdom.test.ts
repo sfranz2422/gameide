@@ -917,4 +917,88 @@ again["units"][0]["max"]`)).toBe(56);
     step(g, 3);
     expect(py<number>(g, "global_vars.panel_box[3]")).toBeLessThanOrEqual(py<number>(g, "VIEW_H"));
   });
+
+  // ---- phase 6: alliances (the server's news played in with raidArrive)
+
+  const ALLIANCE = (extra: Record<string, unknown> = {}) => ({
+    id: 3, words: [0, 0], banner: 1, trophies: 300, leader: "Amy", you_lead: false,
+    members: [{ name: "Amy", you: false, trophies: 200, power: 5, leader: true }, { name: "Ben", you: true, trophies: 100, power: 3, leader: false }],
+    requests: [], messages: [], gifts: [], ...extra });
+  async function allied(extra: Record<string, unknown> = {}) {
+    const g = await start();
+    await realmOf(g);
+    py(g, 'r = global_vars.realm\nr["obstacles"] = []\nr["army"] = {"footman": 6, "brute": 1}\nr["buildings"].append(new_building("alliance_hall", 2, 2, 2))');
+    g.raidArrive({ online: true, news: { trophies: 100, shield: 0, defenses: [] }, ally: { school: [], alliance: ALLIANCE(extra), can: true } });
+    step(g, 2);
+    return g;
+  }
+
+  it("phase 6: names, banners and messages are the game's own words, by number", async () => {
+    const g = await start();
+    expect(py(g, '[ally_name([0, 0]), ally_name([3, 7]), PHRASES[3], len(ALLY_FIRST) <= 64 and len(PHRASES) <= 64]'))
+      .toEqual(["The Iron Wolves", "The Crimson Knights", "Thanks!", true]);
+  });
+
+  it("phase 6: not in one: your school's alliances to join, or found your own from the word lists", async () => {
+    const g = await start();
+    await realmOf(g);
+    g.raidArrive({ online: true, ally: { can: true, alliance: null, school: [{ id: 7, words: [1, 2], banner: 0, members: 4, trophies: 900 }] } });
+    step(g, 2);
+    py(g, 'do_act("alliance", None)');
+    step(g, 2);
+    py(g, 'press(next(b for b in instances("Button") if b.act == "ally_join"))');
+    step(g);
+    expect(g.orders.at(-1)).toEqual({ op: "ally_join", id: 7 });
+    py(g, 'do_act("ally_pick", (0, 1))\ndo_act("ally_pick", (1, -1))\ndo_act("ally_pick", (2, 1))\ndo_act("ally_found", None)');
+    step(g);
+    expect(g.orders.at(-1)).toEqual({ op: "ally_create", words: [1, 15], banner: 1 });
+    expect(py<number>(g, "global_vars.panel_box[3]")).toBeLessThanOrEqual(py<number>(g, "VIEW_H"));
+  });
+
+  it("phase 6: asking needs the hall, and one open request at a time; giving sends your most plentiful troop that fits, at most five", async () => {
+    const g = await allied({ requests: [{ id: 11, name: "Amy", yours: false, room: 6, filled: 0, gave: 0 }] });
+    const allyOrders = () => g.orders.filter((o) => o.op.startsWith("ally_"));
+    expect(py(g, 'ask_troops(r)')).toBe("asked");
+    step(g);
+    expect(allyOrders().at(-1)).toEqual({ op: "ally_ask", room: 15 });
+    // Its request open (the news says so): no second one till it's filled.
+    g.raidArrive({ ally: { school: [], can: true, alliance: ALLIANCE({ requests: [{ id: 30, name: "Ben", yours: true, room: 15, filled: 4, gave: 0 }, { id: 11, name: "Amy", yours: false, room: 6, filled: 0, gave: 0 }] }) } });
+    step(g, 2);
+    expect(py(g, 'can_ask(r)')).toBe("Your request is still open.");
+    py(g, 'q = next(x for x in my_alliance()["requests"] if not x["yours"])');
+    expect(py(g, '[give_troop(r, q), r["army"]]')).toEqual(["given", { footman: 5, brute: 1 }]);
+    step(g);
+    expect(allyOrders().at(-1)).toEqual({ op: "ally_give", request: 11, kind: "footman", count: 1, space: 1 });
+    expect(py(g, 'for _ in range(4):\n    give_troop(r, q)\n[q["gave"], give_troop(r, q)]')).toEqual([5, "You've given 5 to that one."]);
+    // A brute (5 room) won't fit what's left; with no hall there's nothing to ask for.
+    py(g, 'q2 = {"id": 12, "yours": False, "room": 6, "filled": 3, "gave": 0}\nr["army"] = {"brute": 2}');
+    expect(py(g, 'can_give(r, q2)')).toBe("None of your troops fit.");
+    py(g, 'r["buildings"] = [b for b in r["buildings"] if b["kind"] != "alliance_hall"]');
+    expect(py(g, 'can_ask(r)')).toBe("Build an alliance hall first: it holds the troops you're given.");
+  });
+
+  it("phase 6: gifts from allies go into your army once, the server's told once, and a refusal is said", async () => {
+    const g = await allied({ gifts: [{ id: 21, from: "Amy", kind: "archer", count: 3 }] });
+    step(g, 70);
+    expect(py(g, 'r["army"]["archer"]')).toBe(3);
+    expect(py<string>(g, "global_vars.said[0]")).toContain("Amy sent you 3 archers!");
+    step(g, 130);
+    expect(py(g, 'r["army"]["archer"]')).toBe(3);
+    expect(g.orders.filter((o) => o.op === "ally_taken")).toEqual([{ op: "ally_taken", ids: [21] }]);
+    g.raidArrive({ ally_error: "That alliance is full (20)." });
+    step(g, 2);
+    expect(py<string>(g, "global_vars.said[0]")).toBe("That alliance is full (20).");
+  });
+
+  it("phase 6: in an alliance: members, troops and chat tabs all fit; a phrase goes by its number", async () => {
+    const g = await allied({ messages: [{ name: "Amy", phrase: 4, you: false, at: 0 }], requests: [{ id: 11, name: "Amy", yours: false, room: 6, filled: 0, gave: 0 }] });
+    for (const t of ["members", "troops", "chat"]) {
+      py(g, `global_vars.ally_tab = "${t}"\nopen_panel("alliance")`);
+      step(g, 3);
+      expect(py<number>(g, "global_vars.panel_box[3]")).toBeLessThanOrEqual(py<number>(g, "VIEW_H"));
+    }
+    py(g, 'press(next(b for b in instances("Button") if b.act == "ally_say" and b.arg == 3))');
+    step(g);
+    expect(g.orders.at(-1)).toEqual({ op: "ally_say", phrase: 3 });
+  });
 });

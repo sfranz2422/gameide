@@ -52,6 +52,17 @@ describe("RaidLink", () => {
       ["/api/play/abc/raid/base", "PUT", 1], ["/api/play/abc/raid/base", "PUT", 3]]);
   });
 
+  it("alliance orders go to their routes, then the alliance's news; a refusal comes back in words", async () => {
+    const link = new RaidLink("abc", (n) => heard.push(n), fetcher, () => Date.now());
+    answer = (p) => (p.endsWith("/join") ? new ApiError(409, "That alliance is full (20).") : p.endsWith("/alliance") ? { school: [], alliance: null } : { ok: true });
+    link.handle([{ op: "ally_say", phrase: 3 }, { op: "ally_join", id: 7 }]);
+    await flush();
+    expect(calls.map((c) => c.path)).toContain("/api/play/abc/alliance/say");
+    expect(calls.find((c) => c.path.endsWith("/say"))!.opts!.json).toEqual({ phrase: 3 });
+    expect(heard).toContainEqual({ ally_error: "That alliance is full (20)." });
+    expect(heard).toContainEqual({ ally: { school: [], alliance: null } });
+  });
+
   it("a search's answer, a finish's result (and fresh news), each back for the game", async () => {
     const link = new RaidLink("abc", (n) => heard.push(n), fetcher, () => Date.now());
     answer = (p) => (p.endsWith("/find") ? { raid: null, why: "Nobody to raid." } : p.endsWith("/9") ? { trophies: 13, mine: 40 } : { trophies: 40 });

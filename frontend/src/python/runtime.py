@@ -129,6 +129,7 @@ __all__ = [
     # multiplayer
     "net_room", "net_me", "net_players", "net_send", "net_shout", "net_messages", "net_away", "net_tell", "net_host",
     "raid_online", "raid_share", "raid_find", "raid_found", "raid_finish", "raid_result", "raid_news", "raid_seen",
+    "ally_news", "ally_error", "ally_create", "ally_join", "ally_leave", "ally_ask", "ally_give", "ally_taken", "ally_say",
     # game feel
     "particles", "effect", "weather", "particles_clear", "hit_pause", "lighting", "light", "screen_effect",
     "screen_flash", "screen_fade", "tween", "tween_stop", "ease", "say", "ask", "answer", "dialogue_open", "dialogue_clear",
@@ -2667,8 +2668,70 @@ def raid_seen(ids):
     _raid_order({"op": "seen", "ids": [int(i) for i in ids]})
 
 
+# ---- alliances: players of a raid game at one school, banded together (the server's
+# alliances.py). No typed words ever reach anyone: an alliance's name is two word numbers
+# and a banner number, a message a phrase number, and the game turns them into its own
+# words. Like raids, nothing happens outside a published game, signed in.
+_ally_news = None
+
+
+def ally_news():
+    """Your school's alliances and yours: {"school": [{"id", "words", "banner", "members",
+    "trophies"}], "alliance": None or {..., "members", "requests", "messages", "gifts"},
+    "can"}; None until it comes, or outside a published game."""
+    return _ally_news
+
+
+_ally_error = None
+
+
+def ally_error():
+    """Why the last alliance order was refused, in words, once; None if it wasn't."""
+    global _ally_error
+    e, _ally_error = _ally_error, None
+    return e
+
+
+def ally_create(word1, word2, banner):
+    """Founds an alliance named by two of your game's words (by number) with a banner (a number)."""
+    _raid_order({"op": "ally_create", "words": [int(word1), int(word2)], "banner": int(banner)})
+
+
+def ally_join(alliance_id):
+    _raid_order({"op": "ally_join", "id": int(alliance_id)})
+
+
+def ally_leave():
+    _raid_order({"op": "ally_leave"})
+
+
+def ally_ask(room):
+    """Asks your alliance for troops: so much room."""
+    _raid_order({"op": "ally_ask", "room": int(room)})
+
+
+def ally_give(request_id, kind, count, space):
+    """Gives troops to an ally's request: count of a kind, each taking `space` room."""
+    _raid_order({"op": "ally_give", "request": int(request_id), "kind": str(kind), "count": int(count), "space": int(space)})
+
+
+def ally_taken(ids):
+    """Tells the server your game has put these gifts in your army."""
+    _raid_order({"op": "ally_taken", "ids": [int(i) for i in ids]})
+
+
+def ally_say(phrase):
+    """A message to your alliance: one of your game's phrases, by number."""
+    _raid_order({"op": "ally_say", "phrase": int(phrase)})
+
+
 def _raid_arrive(got):
-    global _raid_online, _raid_found, _raid_result, _raid_news
+    global _raid_online, _raid_found, _raid_result, _raid_news, _ally_news
+    global _ally_error
+    if "ally" in got:
+        _ally_news = got["ally"]
+    if "ally_error" in got:
+        _ally_error = got["ally_error"]
     if "online" in got:
         _raid_online = bool(got["online"])
     if "found" in got:

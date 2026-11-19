@@ -223,7 +223,7 @@ describe("events", () => {
       instances: [{ object: "R", x: 0, y: 0 }],
     });
     // Offline (the editor): nothing goes out, nothing comes.
-    py(game, 'raid_share([{"kind": "keep", "gx": 1, "gy": 2, "level": 3}], 10, 20)\nraid_find()');
+    py(game, 'raid_share([{"kind": "keep", "gx": 1, "gy": 2, "level": 3}], 10, 20)\nraid_find()\nally_say(2)\nally_join(4)');
     run(game, 1);
     expect(orders).toEqual([]);
     game.raidArrive({ online: true, news: { trophies: 5 } });
@@ -242,6 +242,14 @@ describe("events", () => {
     game.raidArrive({ result: { trophies: 13 } });
     run(game, 1);
     expect(py(game, "[raid_found(), raid_result()]")).toEqual([{ id: 9, name: "Ben" }, { trophies: 13 }]);
+    // Alliances ride the same way: numbers out, the news and any refusal back.
+    py(game, 'ally_create(4, 9, 2)\nally_say(3)\nally_give(5, "archer", 2, 1)');
+    run(game, 1);
+    expect(orders.slice(-3)).toEqual([{ op: "ally_create", words: [4, 9], banner: 2 }, { op: "ally_say", phrase: 3 },
+      { op: "ally_give", request: 5, kind: "archer", count: 2, space: 1 }]);
+    game.raidArrive({ ally: { school: [], alliance: null, can: true }, ally_error: "That alliance is full (20)." });
+    run(game, 1);
+    expect(py(game, "[ally_news()['can'], ally_error(), ally_error() is None]")).toEqual([true, "That alliance is full (20).", true]);
   });
 
   it("the mouse wheel: notches turned since the last step, up positive, for that step only", async () => {

@@ -2390,6 +2390,78 @@ check("raids: the trophies at stake: more against someone ahead, less against so
 check("raids: unpublishing takes the kingdoms and raids", _amy.delete("/api/projects/rd1/publish").status_code == 200
       and server.SessionLocal().query(raids.Raid).count() == 0 and server.SessionLocal().query(raids.RaidBase).count() == 0)
 
+# ---------------------------------------------------------------- alliances (alliances.py)
+# Same school only, first names only, no typed words (numbers for names, banners, phrases).
+import alliances
+put(_amy, "al1", project("al1", "Kingdom"), 0)
+AL = _amy.post("/api/projects/al1/publish", json={"title": "Kingdom", "visibility": "unlisted"}).get_json()["published"]["id"]
+def _al(c):
+    return c.get(f"/api/play/{AL}/alliance").get_json()
+def _ap(c, path, body=None):
+    return c.post(f"/api/play/{AL}/alliance/{path}", json=body or {})
+for _c, _t in ((_amy, 100), (_ben, 50), (_pat, 10)):
+    _c.put(f"/api/play/{AL}/raid/base", json={"buildings": [{"kind": "keep", "gx": 1, "gy": 1, "level": 3}], "gold": 1, "food": 1, "power": 3})
+_sdb = server.SessionLocal()
+for _email, _t in ((f"amy@{M}", 100), (f"ben@{M}", 50), (f"pat@{M}", 10)):
+    _u = _sdb.query(accounts.User).filter_by(email=_email).first()
+    for _b in _sdb.query(raids.RaidBase).filter_by(user_id=_u.id).all():
+        _b.trophies = _t
+_sdb.commit()
+_sdb.close()
+check("alliances: signing in comes first", client().get(f"/api/play/{AL}/alliance").status_code == 401)
+check("alliances: a personal address has no school, so no alliances", _ap(_mail2, "create", {"words": [1, 2], "banner": 3}).status_code == 403)
+check("alliances: a name is two word numbers and a banner number, never words",
+      all(_ap(_amy, "create", b).status_code == 400 for b in ({"words": ["Iron", "Wolves"], "banner": 1}, {"words": [1], "banner": 1},
+                                                            {"words": [1, 99], "banner": 1}, {"words": [1, 2], "banner": "red"})))
+_aid = _ap(_amy, "create", {"words": [4, 9], "banner": 2}).get_json()["id"]
+check("alliances: founded, its founder its leader", _al(_amy)["alliance"]["you_lead"] is True and _al(_amy)["alliance"]["words"] == [4, 9])
+check("alliances: …one alliance at a time", _ap(_amy, "create", {"words": [1, 1], "banner": 1}).status_code == 409)
+check("alliances: classmates see it; another school doesn't", [a["id"] for a in _al(_ben)["school"]] == [_aid] and _al(_far)["school"] == [])
+check("alliances: …and can't join it", _ap(_far, f"{_aid}/join").status_code == 404 and _ap(_look, f"{_aid}/join").status_code == 404)
+check("alliances: a classmate joins", _ap(_ben, f"{_aid}/join").status_code == 200 and _al(_ben)["alliance"]["members"][1]["name"] == "Ben")
+_raw = json.dumps(_al(_ben))
+check("alliances: members by first name, never an email or a last name", "@" not in _raw and "Zebrowski" not in _raw and M not in _raw, _raw)
+check("alliances: its trophies are its members' together", _al(_pat)["school"][0]["trophies"] == 150)
+# Troops: asked for, given by an ally, taken once.
+check("alliances: asking needs an alliance", _ap(_pat, "ask", {"room": 10}).status_code == 404)
+check("alliances: asking for troops", _ap(_ben, "ask", {"room": 10}).status_code == 200)
+check("alliances: …not again straight away", _ap(_ben, "ask", {"room": 10}).status_code == 429)
+_rq = _al(_amy)["alliance"]["requests"][0]
+check("alliances: allies see the request", (_rq["name"], _rq["room"], _rq["filled"], _rq["yours"]) == ("Ben", 10, 0, False))
+check("alliances: you can't fill your own request", _ap(_ben, "give", {"request": _rq["id"], "kind": "footman", "count": 1, "space": 1}).status_code == 400)
+check("alliances: someone outside the alliance can't give", _ap(_pat, "give", {"request": _rq["id"], "kind": "footman", "count": 1, "space": 1}).status_code == 400)
+check("alliances: a gift is a troop's kind, a count and its room", _ap(_amy, "give", {"request": _rq["id"], "kind": "<b>", "count": 1, "space": 1}).status_code == 400)
+check("alliances: an ally gives", _ap(_amy, "give", {"request": _rq["id"], "kind": "archer", "count": 3, "space": 1}).status_code == 200)
+check("alliances: …no more than fits", _ap(_amy, "give", {"request": _rq["id"], "kind": "brute", "count": 2, "space": 5}).status_code == 409)
+check("alliances: …nor more than five of yours to one request", _ap(_amy, "give", {"request": _rq["id"], "kind": "archer", "count": 3, "space": 1}).status_code == 409)
+_g = _al(_ben)["alliance"]["gifts"]
+check("alliances: the asker's game hears of the gift", [(x["from"], x["kind"], x["count"]) for x in _g] == [("Amy", "archer", 3)], _g)
+check("alliances: …and says when it's taken them", _ap(_ben, "taken", {"ids": [_g[0]["id"]]}).status_code == 200 and _al(_ben)["alliance"]["gifts"] == [])
+_ap(_pat, "create", {"words": [2, 3], "banner": 1})
+check("alliances: another alliance's member can't fill a request", _ap(_pat, "give", {"request": _rq["id"], "kind": "footman", "count": 1, "space": 1}).status_code == 404)
+_ap(_pat, "leave")
+# Twenty at most: the twenty-first classmate is turned away.
+_crowd = [client(f"s{_n}@{M}") for _n in range(19)]
+for _c in _crowd[:18]:
+    _ap(_c, f"{_aid}/join")
+check("alliances: twenty at most", _ap(_crowd[18], f"{_aid}/join").status_code == 409 and len(_al(_ben)["alliance"]["members"]) == 20)
+for _c in _crowd[:18]:
+    _ap(_c, "leave")
+# Messages: phrases by number only.
+check("alliances: a message is a phrase's number", _ap(_amy, "say", {"phrase": "hello"}).status_code == 400 and _ap(_amy, "say", {"phrase": 3}).status_code == 200)
+check("alliances: allies read it", [(m["name"], m["phrase"]) for m in _al(_ben)["alliance"]["messages"]] == [("Amy", 3)])
+check("alliances: only the last forty are kept", all(_ap(_ben, "say", {"phrase": 1}).status_code == 200 for _ in range(45)) and len(_al(_ben)["alliance"]["messages"]) == 40)
+# No raiding your own allies.
+put(_amy, "al1", project("al1", "Kingdom"), 1)
+check("alliances: raids never match you with an ally (Ben, nearest in trophies, never comes up)",
+      all((_f := _amy.post(f"/api/play/{AL}/raid/find", json={}).get_json()["raid"]) is None or _f["name"] != "Ben" for _ in range(8)))
+# Leaving: the leader passes on; the last one out ends it.
+check("alliances: the leader leaves, the next longest-serving leads", _ap(_amy, "leave").status_code == 200 and _al(_ben)["alliance"]["you_lead"] is True)
+check("alliances: the last one out ends it", _ap(_ben, "leave").status_code == 200 and _al(_ben)["school"] == [])
+_ap(_ben, "create", {"words": [1, 2], "banner": 0})
+check("alliances: unpublishing takes them", _amy.delete("/api/projects/al1/publish").status_code == 200
+      and server.SessionLocal().query(alliances.Alliance).count() == 0 and server.SessionLocal().query(alliances.AllianceMember).count() == 0)
+
 print()
 if failures:
     print(f"FAILED: {len(failures)} — " + "; ".join(failures))

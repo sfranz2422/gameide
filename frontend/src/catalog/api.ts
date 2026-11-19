@@ -309,6 +309,21 @@ export const API: ApiEntry[] = [
   fn("Multiplayer", "raid_seen", [p("ids", "any")], "nothing",
     "Tells the server your game has taken these raids' losses off your kingdom, so they're no longer new."),
 
+  // Alliances: players at one school banded together (runtime.py's ally_ section, backend/alliances.py)
+  fn("Multiplayer", "ally_news", [], "a dict, or None",
+    'Your school\'s alliances and yours: {"school": [...], "alliance": None or {"members", "requests", "messages", "gifts", ...}}. None outside a published game.'),
+  fn("Multiplayer", "ally_error", [], "words, or None",
+    "Why the last alliance order was refused (the alliance is full, you asked a moment ago…), once; None if it wasn't."),
+  fn("Multiplayer", "ally_create", [p("word1", "number"), p("word2", "number"), p("banner", "number")], "nothing",
+    "Founds an alliance named by two of your game's words, by number, with a banner number: no typed name ever reaches anyone."),
+  fn("Multiplayer", "ally_join", [p("alliance_id", "number")], "nothing", "Joins an alliance at your school, if it has room."),
+  fn("Multiplayer", "ally_leave", [], "nothing", "Leaves your alliance. Its leader passes on; the last one out ends it."),
+  fn("Multiplayer", "ally_ask", [p("room", "number")], "nothing", "Asks your alliance for troops: so much room."),
+  fn("Multiplayer", "ally_give", [p("request_id", "number"), p("kind", "string"), p("count", "number"), p("space", "number")], "nothing",
+    "Gives troops to an ally's request: how many of a kind, and the room each takes. The server checks they fit."),
+  fn("Multiplayer", "ally_taken", [p("ids", "any")], "nothing", "Tells the server your game has put these gifts in your army."),
+  fn("Multiplayer", "ally_say", [p("phrase", "number")], "nothing", "A message to your alliance: one of your game's phrases, by number."),
+
   // Effects: game feel (engine/effects.ts, render/feel.ts)
   fn("Effects", "effect", [p("kind", "string"), p("x", "number"), p("y", "number"), p("color", "color", "None"), p("scale", "number", "1")], "nothing",
     'A ready-made effect at (x, y): "explosion", "sparkle", "dust", "smoke", "confetti" or "hit". scale makes it bigger or smaller; color changes its colours.'),

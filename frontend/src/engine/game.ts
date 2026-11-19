@@ -240,7 +240,14 @@ export type RaidOrder =
   | { op: "share"; base: { buildings: { kind: string; gx: number; gy: number; level: number }[]; gold: number; food: number; power: number } }
   | { op: "find" }
   | { op: "finish"; id: number; stars: number; percent: number; gold: number; food: number; replay: unknown[] }
-  | { op: "seen"; ids: number[] };
+  | { op: "seen"; ids: number[] }
+  | { op: "ally_create"; words: number[]; banner: number }
+  | { op: "ally_join"; id: number }
+  | { op: "ally_leave" }
+  | { op: "ally_ask"; room: number }
+  | { op: "ally_give"; request: number; kind: string; count: number; space: number }
+  | { op: "ally_taken"; ids: number[] }
+  | { op: "ally_say"; phrase: number };
 
 /** What comes back into the game about raids (any of these, in one go). */
 export interface RaidNews {
@@ -248,6 +255,10 @@ export interface RaidNews {
   found?: unknown;
   result?: unknown;
   news?: unknown;
+  /** The alliance's news (ally_news). */
+  ally?: unknown;
+  /** Why an alliance order was refused, in words (ally_error()). */
+  ally_error?: string;
 }
 
 export interface NetOut {

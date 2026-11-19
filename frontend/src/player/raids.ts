@@ -12,6 +12,8 @@ import type { RaidNews, RaidOrder } from "../engine/game";
 
 export const SHARE_EVERY = 15_000;
 export const NEWS_EVERY = 60_000;
+/** The alliance's news (its messages, requests, gifts): every this often. */
+export const ALLY_EVERY = 30_000;
 
 export const usesRaids = (project: unknown) => JSON.stringify(project).includes("raid_");
 
@@ -22,6 +24,7 @@ export class RaidLink {
   private shareTimer: ReturnType<typeof setTimeout> | null = null;
   private lastShare = 0;
   private newsTimer: ReturnType<typeof setInterval> | null = null;
+  private allyTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor(
     private readonly slug: string,
@@ -38,12 +41,33 @@ export class RaidLink {
   start() {
     void this.news();
     this.newsTimer = setInterval(() => void this.news(), NEWS_EVERY);
+    void this.allyNews();
+    this.allyTimer = setInterval(() => void this.allyNews(), ALLY_EVERY);
+  }
+
+  async allyNews() {
+    try {
+      this.arrive({ ally: await this.fetch<unknown>(`/api/play/${encodeURIComponent(this.slug)}/alliance`) });
+    } catch {
+      // Signed out (the raids' news says so) or the server's busy: the next time.
+    }
+  }
+
+  /** An alliance order: sent, then the alliance's news again; a refusal comes back as words. */
+  private async ally(path: string, body: unknown) {
+    try {
+      await this.fetch(`/api/play/${encodeURIComponent(this.slug)}/alliance/${path}`, { json: body });
+    } catch (e) {
+      this.arrive({ ally_error: e instanceof Error ? e.message : "The server didn't answer." });
+    }
+    void this.allyNews();
   }
 
   stop() {
     if (this.newsTimer) clearInterval(this.newsTimer);
+    if (this.allyTimer) clearInterval(this.allyTimer);
     if (this.shareTimer) clearTimeout(this.shareTimer);
-    this.newsTimer = this.shareTimer = null;
+    this.newsTimer = this.shareTimer = this.allyTimer = null;
   }
 
   async news() {
@@ -62,6 +86,13 @@ export class RaidLink {
       else if (o.op === "find") void this.find();
       else if (o.op === "finish") void this.finish(o);
       else if (o.op === "seen") void this.seen(o.ids);
+      else if (o.op === "ally_create") void this.ally("create", { words: o.words, banner: o.banner });
+      else if (o.op === "ally_join") void this.ally(`${o.id}/join`, {});
+      else if (o.op === "ally_leave") void this.ally("leave", {});
+      else if (o.op === "ally_ask") void this.ally("ask", { room: o.room });
+      else if (o.op === "ally_give") void this.ally("give", { request: o.request, kind: o.kind, count: o.count, space: o.space });
+      else if (o.op === "ally_taken") void this.ally("taken", { ids: o.ids });
+      else if (o.op === "ally_say") void this.ally("say", { phrase: o.phrase });
     }
   }
 

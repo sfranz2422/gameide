@@ -492,6 +492,39 @@ def open_panel(kind, of=None):
             t = make_button(x1 + 576, y, 210, ARMY_ROW - 8, words, "research", k, 13, True)
             t.off = why is not None
             t.hot = not t.off
+    elif kind == "alliance":
+        x1, y1 = VIEW_W / 2 - 480, HUD_H + 4
+        global_vars.panel_box = (x1, y1, x1 + 960, y1 + 508)
+        al = my_alliance()
+        news = ally_news() or {}
+        if al is None:
+            for i, a in enumerate(news.get("school", [])[:ALLY_ROWS]):
+                j = make_button(x1 + 470, y1 + 84 + i * 50, 90, 38, "Join", "ally_join", a["id"], 14, True)
+                j.off = a["members"] >= 20
+            px = x1 + 620
+            for n, (label, y) in enumerate((("First word", 120), ("Second word", 180), ("Banner", 240))):
+                make_button(px, y1 + y, 40, 36, "<", "ally_pick", (n, -1), 16, True)
+                make_button(px + 270, y1 + y, 40, 36, ">", "ally_pick", (n, 1), 16, True)
+            f = make_button(px, y1 + 360, 310, 50, "Found it", "ally_found", None, 18, True)
+            f.off = not raid_online()
+            f.hot = not f.off
+        else:
+            tab = getattr(global_vars, "ally_tab", "members")
+            for j, (t_, words) in enumerate((("members", "Members"), ("troops", "Troops"), ("chat", "Chat"))):
+                b = make_button(x1 + 420 + j * 120, y1 + 10, 112, 36, words, "ally_tab", t_, 14, True)
+                b.picked = t_ == tab
+            make_button(x1 + 790, y1 + 10, 100, 36, "Leave", "ally_leave", None, 14, True)
+            if tab == "troops":
+                a = make_button(x1 + 30, y1 + 70, 300, 46, f"Ask for troops ({hall_room(r)} room)", "ally_ask", None, 15, True)
+                a.off = can_ask(r) is not None
+                a.hot = not a.off
+                for i, q in enumerate([q for q in al["requests"] if not q["yours"]][:ALLY_ROWS]):
+                    g = make_button(x1 + 780, y1 + 136 + i * 46, 140, 38, "Give a troop", "ally_give", q["id"], 13, True)
+                    g.off = can_give(r, q) is not None
+                    g.hot = not g.off
+            elif tab == "chat":
+                for n, words in enumerate(PHRASES):
+                    make_button(x1 + 480 + (n % 2) * 232, y1 + 64 + (n // 2) * 54, 224, 46, words, "ally_say", n, 13, True)
     elif kind == "obstacle":
         o = r["obstacles"][of]
         x1, y1 = VIEW_W / 2 - 240, VIEW_H / 2 - 110
@@ -519,6 +552,7 @@ def open_panel(kind, of=None):
         global_vars.focus = next((b for b in instances("Button") if b.in_panel and (b.act, b.arg) == was), None)
 
 
+ALLY_ROWS = 8              # alliances listed, or requests shown
 ARMY_ROW = 52              # the Army window's rows, a troop each
 CAMP_ROW = 112             # the Attack window's cards, four to a row
 DEFENSE_ROWS, DEFENSE_ROW = 8, 56   # the Classmates tab's raids on you
@@ -563,7 +597,47 @@ def do_act(what, arg):
             sound_play("nope", volume=0.5)
             say(res, RED)
         open_panel("forge")
-    elif what in ("shop", "army", "campaign", "forge"):
+    elif what == "ally_tab":
+        global_vars.ally_tab = arg
+        open_panel("alliance")
+    elif what == "ally_pick":
+        n, d = arg
+        pick = list(getattr(global_vars, "ally_pick", [0, 0, 0]))
+        sizes = [len(ALLY_FIRST), len(ALLY_SECOND), len(BANNERS)]
+        pick[n] = (pick[n] + d) % sizes[n]
+        global_vars.ally_pick = pick
+    elif what == "ally_found":
+        pick = getattr(global_vars, "ally_pick", [0, 0, 0])
+        ally_create(pick[0], pick[1], pick[2])
+        sound_play("levelup", volume=0.5)
+        say(f"{ally_name(pick[:2])} is founded!", MINT)
+    elif what == "ally_join":
+        ally_join(arg)
+        sound_play("click", volume=0.5)
+    elif what == "ally_leave":
+        ally_leave()
+        sound_play("click", volume=0.5)
+        close_panel()
+    elif what == "ally_ask":
+        res = ask_troops(r)
+        if res == "asked":
+            sound_play("click", volume=0.5)
+            say("Your allies can see you're asking.", MINT)
+        else:
+            say(res, RED)
+    elif what == "ally_give":
+        req = next((q for q in (my_alliance() or {}).get("requests", []) if q["id"] == arg), None)
+        res = give_troop(r, req) if req else "That request's gone."
+        if res == "given":
+            sound_play("coin", volume=0.5)
+            keep_save(r)
+            open_panel("alliance")
+        else:
+            say(res, RED)
+    elif what == "ally_say":
+        ally_say(arg)
+        sound_play("click", volume=0.4)
+    elif what in ("shop", "army", "campaign", "forge", "alliance"):
         if global_vars.panel == what:
             close_panel()
         else:

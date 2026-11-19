@@ -112,7 +112,5 @@ def take_raids(r, news):
         r["food"] = max(0, r["food"] - d["food"])
         r["raids_applied"].append(d["id"])
     r["raids_applied"] = r["raids_applied"][-APPLIED_KEPT:]
-    ids = [d["id"] for d in news.get("defenses", []) if d.get("new")]
-    if ids:
-        raid_seen(ids)
+    told(raid_seen, [d["id"] for d in news.get("defenses", []) if d.get("new")])
     return fresh
