@@ -167,6 +167,9 @@ class GameVersion(Base):
 
 TAGS = ["platformer", "puzzle", "shooter", "adventure", "racing", "arcade", "story", "sport", "music", "other"]
 MAX_PUBLISHED_PER_USER = 50
+# A teacher publishes far more (2026-11-19: the teacher hit 50 with the showcase games and
+# their versions; a game deleted from My Games stays published, so it still counts).
+MAX_PUBLISHED_TEACHER = 500
 MAX_THUMBNAIL_BYTES = 300_000
 
 

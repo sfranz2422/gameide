@@ -287,6 +287,18 @@ pub = r.get_json()["published"]
 SLUG = pub["id"]
 check("publishing gives a play link", r.status_code == 200 and pub["url"] == f"/play/{SLUG}", r.get_json())
 check("an email as the author name is replaced by a first name", "@" not in pub["author"])
+# How many one account may publish: a student 50, a teacher far more (the teacher hit 50).
+_was = gamestore.MAX_PUBLISHED_PER_USER
+gamestore.MAX_PUBLISHED_PER_USER = 1
+put(alice, "lim1", project("lim1", "Second game"), 0)
+_r = alice.post("/api/projects/lim1/publish", json={"title": "Second", "visibility": "unlisted"})
+check("a student can't publish past the most an account may have", _r.status_code == 413 and "Unpublish one first" in _r.get_json()["error"], _r.get_json())
+_tch = client("teacher@example.com")
+for _n in ("tlim1", "tlim2"):
+    put(_tch, _n, project(_n, "Teacher's game"), 0)
+_codes = [_tch.post(f"/api/projects/{_n}/publish", json={"title": "Teacher's", "visibility": "unlisted"}).status_code for _n in ("tlim1", "tlim2")]
+check("…but a teacher can publish far more", _codes == [200, 200], _codes)
+gamestore.MAX_PUBLISHED_PER_USER = _was
 r = anon.get(f"/api/play/{SLUG}")
 check("an unlisted game plays for anyone with the link, signed out too", r.status_code == 200 and r.get_json()["project"]["name"] == "Coin Run")
 check("…and its page holds no email address", "@example.com" not in r.get_data(as_text=True))

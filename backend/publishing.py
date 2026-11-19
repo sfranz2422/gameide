@@ -313,7 +313,8 @@ def publish(slug):
         pub = db.query(Published).filter_by(project_id=p.id).first()
         if pub is None:
             count = db.query(func.count(Published.id)).filter_by(owner_id=user.id).scalar()
-            if count >= gamestore.MAX_PUBLISHED_PER_USER:
+            most = gamestore.MAX_PUBLISHED_TEACHER if (is_teacher(user) or is_admin(user)) else gamestore.MAX_PUBLISHED_PER_USER
+            if count >= most:
                 return err(f"You have {count} published games, the most one account can have. Unpublish one first.", 413)
             pub = Published(slug=secrets.token_urlsafe(8).replace("-", "a").replace("_", "b")[:10],
                             project_id=p.id, owner_id=user.id, data="")
