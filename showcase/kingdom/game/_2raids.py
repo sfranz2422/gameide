@@ -48,7 +48,7 @@ def search(r):
     """Pays for a search and asks the server: 'searching', or why not, in words."""
     if not raid_online():
         return "Raiding classmates works in the published game, signed in."
-    if army_size(r) == 0:
+    if army_size(r) == 0 and not champs_for_battle(r):
         return "Train an army first: tap a barracks, or the Army button."
     cost = search_cost(r)
     if r["gold"] < cost:
@@ -71,7 +71,8 @@ def found_layout(found):
 
 def start_player_raid(r, found):
     """A battle against the kingdom found."""
-    return new_battle(found_layout(found), r["army"], [found.get("gold", 0), found.get("food", 0)])
+    return new_battle(found_layout(found), r["army"], [found.get("gold", 0), found.get("food", 0)],
+                      champs_for_battle(r), r["spells"], tower_level(r))
 
 
 def expected_trophies(raid, stars, sent):
@@ -89,12 +90,14 @@ def finish_player_raid(r, raid, b):
         r["army"][k] = r["army"].get(k, 0) - n
         if r["army"][k] <= 0:
             del r["army"][k]
+    champs_home(r, b)
+    spells_home(r, b)
     kept = [add(r, "gold", b["loot"][0]), add(r, "food", b["loot"][1])]
     levels_ = add_xp(r, RAID_XP * b["stars"]) if b["stars"] else []
     raid_finish(raid["id"], b["stars"], destroyed_pct(b), b["loot"][0], b["loot"][1], b["replay"])
     return {"stars": b["stars"], "new_stars": 0, "gold": kept[0], "food": kept[1],
             "lost": b["loot"][0] + b["loot"][1] - kept[0] - kept[1], "levels": levels_,
-            "trophies": expected_trophies(raid, b["stars"], sum(b["sent"].values()))}
+            "trophies": expected_trophies(raid, b["stars"], len(b["replay"]))}
 
 
 def take_raids(r, news):

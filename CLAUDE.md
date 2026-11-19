@@ -1032,4 +1032,12 @@ own save once (`raids_applied`) and tells the server (`raid_seen`). A battle rec
 deploys (`replay`), and replaying them at the same moments gives the same battle (no randomness
 in `_2battle.py`: keep it that way). Looking round before the first troop is free (the clock
 starts then); Next costs a search. Names are first names: a new raid route needs a leak check.
+**Phase 4, champions and spells** (`_2magic.py` at home, the battle script in battle): a
+champion's level is their altar's, their wounds heal on the real clock (`champ_hp`); spells
+are brewed in the mage tower for gold. In battle a champion is a unit carrying its own
+`stats` (`troop_stats`), its ability once (`ability`); spells are `cast` anywhere, Lightning at
+once, the others as `zones`. Every action goes in the replay as a code `battle_act` reads back
+(a troop's kind, "warlord_5_900", "rage_3", "cry"); a replay step is due within half a tick of
+its time (they're kept to thousandths: matched exactly, a step landed a tick late and the
+replay drifted).
 

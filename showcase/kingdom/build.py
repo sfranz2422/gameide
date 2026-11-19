@@ -42,9 +42,10 @@ VIEW_W, VIEW_H, TW, TH = G["VIEW_W"], G["VIEW_H"], G["TILE_W"], G["TILE_H"]
 ART = HERE / "art"
 ICONS = ["gold", "food", "renown", "builder", "hammer", "clock", "shield", "sword", "up", "keep",
          "star", "attack", "army",     # phase 2: a battle's stars, the Attack! and Army buttons
-         "trophy", "shield_on"]        # phase 3: trophies, and a shield (stand-ins until Gemini's)
+         "trophy", "shield_on",        # phase 3: trophies, and a shield (stand-ins until Gemini's)
+         "heal", "rage", "lightning", "freeze"]   # phase 4: the spells
 # Stand-ins' colours: stone grey, timber brown, thatch… a plain block each, taller with each tier.
-COLOURS = {"keep": (150, 146, 138), "gold_mine": (120, 104, 84), "farm": (176, 150, 92), "treasury": (160, 150, 120),
+COLOURS = {"warlord_altar": (150, 60, 50), "huntress_altar": (70, 120, 80), "mage_tower": (90, 80, 150),"keep": (150, 146, 138), "gold_mine": (120, 104, 84), "farm": (176, 150, 92), "treasury": (160, 150, 120),
            "granary": (170, 130, 80), "builder_hut": (140, 110, 80), "archer_tower": (140, 136, 128),
            "ballista": (120, 90, 60), "trebuchet": (110, 84, 56), "barracks": (130, 100, 76), "army_camp": (120, 110, 90)}
 TALL = {"keep": 150, "archer_tower": 130, "trebuchet": 90, "army_camp": 30, "farm": 26}
@@ -109,7 +110,8 @@ def stand_in_scaffold(n):
 TROOP_LOOK = {   # a stand-in troop: its tunic, what it carries, how big
     "footman": ((150, 40, 40), "sword", 1.0), "archer": ((60, 110, 50), "bow", 0.95), "brute": ((110, 110, 120), "mace", 1.35),
     "raider": ((120, 80, 40), "dagger", 0.9), "sapper": ((90, 70, 50), "keg", 0.95), "knight": ((200, 200, 210), "lance", 1.4),
-    "ram": ((110, 80, 50), "ram", 1.6)}
+    "ram": ((110, 80, 50), "ram", 1.6),
+    "warlord": ((120, 30, 30), "mace", 1.5), "huntress": ((40, 90, 60), "bow", 1.25)}
 
 
 def stand_in_troop(kind, view, frame):
@@ -277,7 +279,7 @@ def build(out):
     for n in (2, 3, 4):
         im = half(f"scaffold_{n}") if (ART / f"scaffold_{n}.png").exists() else stand_in_scaffold(n)
         P.sprite(f"scaffold_{n}", [im], (im.width // 2, im.height - TH * n // 2))
-    for kind in G["TROOPS"]:
+    for kind in list(G["TROOPS"]) + list(G["CHAMPIONS"]):
         for view in ("front", "back"):
             name = f"troop_{kind}_{view}"
             frames = [half(f"{name}_{k}") if (ART / f"{name}_{k}.png").exists() else stand_in_troop(kind, view, k) for k in range(4)]

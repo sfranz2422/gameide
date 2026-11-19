@@ -132,6 +132,29 @@ BUILDINGS = {
                   "keep": [1, 2, 3, 4, 5, 6, 8, 9],
                   "hp":   [250, 270, 290, 310, 330, 350, 400, 500],
                   "room": [20, 30, 35, 40, 45, 50, 55, 60]},
+    # -- champions' altars and the mage tower (phase 4): an altar's level is its champion's
+    "warlord_altar": {"name": "Warlord's altar", "size": 3, "pays": "food", "group": "army",
+                      "about": "Home of the Warlord, who joins your raids. His level is the altar's.",
+                      "count": [0, 0, 0, 1, 1, 1, 1, 1, 1, 1],
+                      "cost": [5000, 10000, 20000, 35000, 60000, 90000, 130000, 180000, 240000, 320000],
+                      "time": [600, 1800, 3600, 7200, 10800, 14400, 21600, 28800, 36000, 43200],
+                      "keep": [4, 4, 5, 5, 6, 6, 7, 8, 9, 10],
+                      "hp":   [600, 650, 700, 750, 800, 850, 900, 950, 1000, 1100]},
+    "huntress_altar": {"name": "Huntress's altar", "size": 3, "pays": "food", "group": "army",
+                       "about": "Home of the Huntress, who joins your raids. Her level is the altar's.",
+                       "count": [0, 0, 0, 0, 0, 1, 1, 1, 1, 1],
+                       "cost": [15000, 25000, 40000, 60000, 85000, 115000, 150000, 200000, 260000, 340000],
+                       "time": [1800, 3600, 7200, 10800, 14400, 21600, 28800, 36000, 43200, 50400],
+                       "keep": [6, 6, 6, 7, 7, 8, 8, 9, 9, 10],
+                       "hp":   [600, 650, 700, 750, 800, 850, 900, 950, 1000, 1100]},
+    "mage_tower": {"name": "Mage tower", "size": 3, "pays": "gold", "group": "army",
+                   "about": "Brews spells for your raids. Each level a new spell, and room for more.",
+                   "count": [0, 0, 0, 0, 1, 1, 1, 1, 1, 1],
+                   "cost": [15000, 30000, 60000, 120000, 240000, 480000],
+                   "time": [1800, 7200, 14400, 28800, 43200, 64800],
+                   "keep": [5, 5, 6, 7, 8, 9],
+                   "hp":   [425, 470, 520, 570, 620, 680],
+                   "room": [2, 3, 4, 5, 6, 7]},
     # -- walls: one tile each, many of them, upgraded at once (no builder)
     "wall": {"name": "Wall", "size": 1, "pays": "gold", "group": "walls",
              "about": "Slows raiders down: they must break through, or go round.",
@@ -243,3 +266,39 @@ SEARCH_COST = 50                  # gold to look for a kingdom, times your keep 
 RAID_XP = 6                       # renown for each star won against a classmate
 SHARE_EVERY_STEPS = 300           # how often the kingdom is offered to the server (only a change goes)
 APPLIED_KEPT = 60                 # raids on you whose loss has been taken, remembered (so never twice)
+
+
+# ---- phase 4: champions and spells
+# A champion joins a raid (one of each), at their altar's level; once a battle they use
+# their ability. Wounds heal on the real clock: from nothing to whole in CHAMP_REST.
+CHAMPIONS = {
+    "warlord":  {"name": "Warlord", "altar": "warlord_altar", "speed": 1.1, "reach": 0.7, "wants": "any",
+                 "hp": [900, 1000, 1110, 1230, 1360, 1500, 1650, 1810, 1980, 2160],
+                 "damage": [60, 66, 73, 80, 88, 96, 105, 115, 126, 138],
+                 "ability": "cry", "ability_name": "Battle Cry",
+                 "about": "A great axe and a greater roar. Battle Cry: troops near him rage, and he's healed."},
+    "huntress": {"name": "Huntress", "altar": "huntress_altar", "speed": 1.5, "reach": 4.0, "wants": "defense",
+                 "hp": [420, 470, 520, 580, 640, 710, 780, 860, 940, 1030],
+                 "damage": [55, 61, 67, 74, 81, 89, 98, 107, 117, 128],
+                 "ability": "volley", "ability_name": "Volley",
+                 "about": "A longbow from afar, after the defenses. Volley: arrows on every building near her."},
+}
+CHAMP_REST = 20 * 60              # seconds from no health to all of it
+CRY_RAGE, CRY_RADIUS, CRY_HEAL = 8.0, 4.0, 0.35      # seconds of rage, tiles, share of health back
+VOLLEY_RADIUS, VOLLEY_HITS = 4.0, 6                  # tiles; times her damage on each building
+
+# Spells, brewed one after another in the mage tower for gold, kept in its room; each
+# opens at a tower level. Cast anywhere on the field. A spell's power grows with the
+# tower's level (SPELL_GROW a level).
+SPELLS = {
+    "heal":      {"name": "Heal",      "tower": 1, "space": 1, "cost": 1500, "time": 360, "radius": 3.0, "seconds": 8,
+                  "power": 30, "about": "Heals your troops in the circle: so much a second, for a while."},
+    "rage":      {"name": "Rage",      "tower": 2, "space": 1, "cost": 2500, "time": 480, "radius": 3.0, "seconds": 10,
+                  "power": 0, "about": "Troops in the circle move faster and hit harder."},
+    "lightning": {"name": "Lightning", "tower": 3, "space": 1, "cost": 3500, "time": 600, "radius": 2.0, "seconds": 0,
+                  "power": 400, "about": "Strikes the buildings in the circle at once."},
+    "freeze":    {"name": "Freeze",    "tower": 4, "space": 1, "cost": 4500, "time": 720, "radius": 3.0, "seconds": 5,
+                  "power": 0, "about": "Defenses in the circle stop shooting for a few seconds."},
+}
+SPELL_GROW = 0.15
+RAGE_SPEED, RAGE_DAMAGE = 1.6, 1.8

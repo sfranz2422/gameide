@@ -95,9 +95,9 @@ def start_raid(r, i):
     """A battle against village i with the army ready, or why not, in words."""
     if not village_open(r, i):
         return f"Win a star at {CAMPAIGN[i - 1]['name']} first."
-    if army_size(r) == 0:
+    if army_size(r) == 0 and not champs_for_battle(r):
         return "Train an army first: tap a barracks, or the Army button."
-    return new_battle(village_layout(i), r["army"], village_loot(r, i))
+    return new_battle(village_layout(i), r["army"], village_loot(r, i), champs_for_battle(r), r["spells"], tower_level(r))
 
 
 def finish_raid(r, i, b):
@@ -109,6 +109,8 @@ def finish_raid(r, i, b):
         r["army"][k] = r["army"].get(k, 0) - n
         if r["army"][k] <= 0:
             del r["army"][k]
+    champs_home(r, b)
+    spells_home(r, b)
     kept = [add(r, "gold", b["loot"][0]), add(r, "food", b["loot"][1])]
     left = village_loot(r, i)
     r["campaign_loot"][str(i)] = [max(0, left[0] - b["loot"][0]), max(0, left[1] - b["loot"][1])]

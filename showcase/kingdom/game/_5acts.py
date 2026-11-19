@@ -240,7 +240,22 @@ def send_troop(field, at, quiet=False):
     """Puts the chosen troop down at `at` (tiles, fractions): 'sent', or why not (said,
     unless `quiet`: while held, a step too close says nothing)."""
     b = global_vars.battle
-    if at is None or field.chosen is None:
+    if at is None:
+        return None
+    if field.spell is not None:
+        # A spell: anywhere, even inside the village; tapped, not held.
+        if quiet:
+            return None
+        res = cast(b, field.spell, at[0], at[1])
+        if res == "cast":
+            sound_play("levelup", volume=0.4)
+            effect("sparkle" if field.spell != "lightning" else "explosion", *tile_xy(*at), None, 1.2)
+            field.spell = None
+        else:
+            sound_play("nope", volume=0.4)
+            say(res, RED)
+        return res
+    if field.chosen is None:
         return None
     res = deploy(b, field.chosen, at[0], at[1])
     if res == "sent":
@@ -423,7 +438,20 @@ def open_panel(kind, of=None):
     elif kind == "army":
         x1, y1 = VIEW_W / 2 - 400, HUD_H + 6
         global_vars.panel_box = (x1, y1, x1 + 800, y1 + 108 + len(TROOPS) * ARMY_ROW)
-        for i, k in enumerate(TROOPS):
+        tab = getattr(global_vars, "army_tab", "troops")
+        for j, (t_, words) in enumerate((("troops", "Troops"), ("spells", "Spells"), ("champions", "Champions"))):
+            b = make_button(x1 + 230 + j * 120, y1 + 10, 112, 36, words, "army_tab", t_, 14, True)
+            b.picked = t_ == tab
+        for i, k in enumerate(SPELLS if tab == "spells" else []):
+            y = y1 + 92 + i * ARMY_ROW
+            why = can_brew(r, k)
+            t = make_button(x1 + 610, y, 130, ARMY_ROW - 8, f"Brew: {SPELLS[k]['cost']:,} gold" if not why or why.startswith("That needs")
+                            else ("Locked" if why.startswith("Upgrade") else "No room"), "brew", k, 13, True)
+            t.off = why is not None
+            t.hot = not t.off
+            u = make_button(x1 + 746, y, 40, ARMY_ROW - 8, "-", "unbrew", k, 18, True)
+            u.off = k not in r["brewing"]
+        for i, k in enumerate(TROOPS if tab == "troops" else []):
             y = y1 + 92 + i * ARMY_ROW
             why = can_train(r, k)
             t = make_button(x1 + 610, y, 130, ARMY_ROW - 8, f"Train: {TROOPS[k]['cost']} food" if not why or why.startswith("That needs")
@@ -526,6 +554,33 @@ def do_act(what, arg):
             sound_play("nope", volume=0.5)
             say(res, RED)
         open_panel("army")
+    elif what == "army_tab":
+        global_vars.army_tab = arg
+        open_panel("army")
+    elif what == "brew":
+        res = brew(r, arg)
+        if res == "queued":
+            sound_play("click", volume=0.4)
+            keep_save(r)
+        else:
+            sound_play("nope", volume=0.5)
+            say(res, RED)
+        open_panel("army")
+    elif what == "unbrew":
+        if unbrew(r, arg):
+            keep_save(r)
+        open_panel("army")
+    elif what == "spell":
+        for f in instances("Battlefield"):
+            f.spell = None if f.spell == arg else arg
+    elif what == "ability":
+        res = ability(global_vars.battle, arg)
+        if res == "used":
+            sound_play("levelup", volume=0.5)
+            u = champ_unit(global_vars.battle, arg)
+            effect("sparkle", *tile_xy(u["x"], u["y"]), None, 1.5)
+        else:
+            say(res, RED)
     elif what == "untrain":
         if untrain(r, arg):
             keep_save(r)
@@ -558,16 +613,13 @@ def do_act(what, arg):
             say(res, RED)
     elif what == "watch":
         d = raid_news()["defenses"][arg]
-        army = {}
-        for s in d["replay"]:
-            army[s[1]] = army.get(s[1], 0) + 1
         close_panel()
-        global_vars.battle = new_battle(found_layout(d), army, [d["gold"], d["food"]])
+        global_vars.battle = new_battle(found_layout(d), replay_army(d["replay"]), [d["gold"], d["food"]])
         global_vars.raid = {"kind": "replay", "name": d["name"], "steps": d["replay"]}
         room_goto("Battle")
     elif what == "troop":
         for f in instances("Battlefield"):
-            f.chosen = arg
+            f.chosen, f.spell = arg, None
     elif what == "end_battle":
         end_battle(global_vars.battle)
     elif what == "go_home":

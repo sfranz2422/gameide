@@ -49,14 +49,20 @@ if self.shown:
     draw_set_color("#15130f")
     draw_rect(self.x, self.y, self.x + self.wide, self.y + self.high, True)
     tx = self.x + self.wide / 2
-    if self.icon:
-        icon(self.icon, self.x + self.high / 2 + 2, self.y + self.high / 2, self.high - 10)
-        tx += self.high / 2 - 4
-    if self.pic:
-        draw_sprite_ext(self.pic, 0, self.x + self.wide / 2, self.y + self.high - 22, 0.8, 0.8, 0, "white", 0.4 if self.off else 1)
-        text(tx, self.y + self.high - 20, self.words, "#ece6da" if self.off else INK, self.size, "center")
+    tall = bool(self.icon) and self.high >= 56
+    if tall:
+        # A tall button (a battle's spells): the icon above, the words under it.
+        icon(self.icon, tx, self.y + (self.high - 16) / 2, self.high - 28, 0.4 if self.off else 1)
+        text(tx, self.y + self.high - 19, self.words, "#ece6da" if self.off else INK, self.size, "center")
     else:
-        text(tx, self.y + self.high / 2 - self.size * 0.62, self.words, "#ece6da" if self.off else INK, self.size, "center")
+        if self.icon:
+            icon(self.icon, self.x + self.high / 2 + 2, self.y + self.high / 2, self.high - 10)
+            tx += self.high / 2 - 4
+        if self.pic:
+            draw_sprite_ext(self.pic, 0, self.x + self.wide / 2, self.y + self.high - 22, 0.8, 0.8, 0, "white", 0.4 if self.off else 1)
+            text(tx, self.y + self.high - 20, self.words, "#ece6da" if self.off else INK, self.size, "center")
+        else:
+            text(tx, self.y + self.high / 2 - self.size * 0.62, self.words, "#ece6da" if self.off else INK, self.size, "center")
     if self.count is not None:
         text(self.x + self.wide - 8, self.y + 4, str(self.count), DIM if self.off else GOLD, 16, "right")
     draw_focus(self)

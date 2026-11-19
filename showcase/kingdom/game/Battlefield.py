@@ -36,15 +36,24 @@ for i, s in enumerate(b["bs"]):
         if ((gx, gy - 1) in walls or (gx, gy + 1) in walls) and not ((gx - 1, gy) in walls or (gx + 1, gy) in walls):
             self.props[i].sprite += "_gy"
 self.troops = []                     # a Prop for each troop, in the battle's order
-self.chosen = next(iter(b["army"]), None)
+self.chosen = next(iter(b["army"]), next(iter(b["champs"]), None))
 self.kind = global_vars.raid["kind"]
 self.steps = list(global_vars.raid.get("steps", []))     # a replay's: [seconds, troop, x, y], in order
 self.tray = []
-for k, kind in enumerate(TROOPS):
-    if self.kind != "replay" and r["army"].get(kind, 0):
-        bt = make_button(16 + len(self.tray) * 108, VIEW_H - 96, 100, 82, TROOPS[kind]["name"], "troop", kind, 11)
-        bt.pic = f"troop_{kind}_front"
-        self.tray.append(bt)
+self.spell = None                    # a spell chosen to cast (a tap anywhere casts it), or None
+if self.kind != "replay":
+    # Troops and champions along the bottom; spells up the right-hand side.
+    for kind in list(TROOPS) + list(CHAMPIONS):
+        if b["army"].get(kind, 0) or kind in b["champs"]:
+            name = TROOPS[kind]["name"] if kind in TROOPS else CHAMPIONS[kind]["name"]
+            bt = make_button(16 + len(self.tray) * 92, VIEW_H - 96, 86, 82, name, "troop", kind, 11)
+            bt.pic = f"troop_{kind}_front"
+            self.tray.append(bt)
+self.spell_buttons = []
+for i, kind in enumerate(k for k in SPELLS if b["spells"].get(k)):
+    bt = make_button(VIEW_W - 100, 170 + i * 70, 86, 62, SPELLS[kind]["name"], "spell", kind, 11)
+    bt.icon = kind
+    self.spell_buttons.append(bt)
 self.end = make_button(VIEW_W - 170, 66, 156, 40, "Stop watching" if self.kind == "replay" else "End battle", "end_battle", None, 15)
 # A classmate's kingdom: before the first troop, Next looks for another (a search's cost).
 self.next = make_button(VIEW_W - 170, 114, 156, 40, f"Next: {search_cost(r):,} gold", "next_raid", None, 14)
@@ -69,24 +78,46 @@ track_mouse()
 # Choosing a troop: its button, or a number key.
 for j, bt in enumerate(self.tray):
     if keyboard_check_pressed(str(j + 1)):
-        self.chosen = bt.arg
-    bt.picked = bt.arg == self.chosen
-    bt.off = b["army"].get(bt.arg, 0) == 0
-    bt.count = b["army"].get(bt.arg, 0)
+        if bt.arg in CHAMPIONS and bt.act == "ability":
+            do_act("ability", bt.arg)
+        else:
+            self.chosen, self.spell = bt.arg, None
+    if bt.arg in CHAMPIONS:
+        # A champion's button: put them down, then it's their ability's (once a battle).
+        if champ_unit(b, bt.arg) is not None:
+            bt.act, bt.words = "ability", CHAMPIONS[bt.arg]["ability_name"]
+            bt.off = can_ability(b, bt.arg) is not None
+            bt.hot = not bt.off
+            bt.picked = False
+        else:
+            bt.picked = bt.arg == self.chosen and self.spell is None
+        bt.count = None
+    else:
+        bt.picked = bt.arg == self.chosen and self.spell is None
+        bt.off = b["army"].get(bt.arg, 0) == 0
+        bt.count = b["army"].get(bt.arg, 0)
     bt.shown = not b["over"]
+for bt in self.spell_buttons:
+    bt.picked = bt.arg == self.spell
+    bt.off = b["spells"].get(bt.arg, 0) == 0
+    bt.count = b["spells"].get(bt.arg, 0)
+    bt.shown = not b["over"]
+if self.spell is not None and b["spells"].get(self.spell, 0) == 0:
+    self.spell = None
 self.end.shown = not b["over"]
 self.next.shown = self.kind == "player" and not b["units"] and not b["over"]
 self.next.off = r["gold"] < search_cost(r)
-if self.chosen is not None and b["army"].get(self.chosen, 0) == 0:
-    self.chosen = next(iter(b["army"]), None)
+if self.chosen is not None and b["army"].get(self.chosen, 0) == 0 and self.chosen not in b["champs"]:
+    self.chosen = next(iter(b["army"]), next(iter(b["champs"]), None))
 if b["over"]:
     run_buttons(self.home)          # only then: in battle, Space sends a troop and 1-7 choose one
 if not b["over"]:
     if self.kind == "replay":
         # The raider's troops, each at the moment it went down.
-        while self.steps and self.steps[0][0] <= b["time"] + 1e-6:
+        # (a step's time is kept to thousandths: within half a tick is its tick)
+        while self.steps and self.steps[0][0] <= b["time"] + BATTLE_TICK / 2:
             s = self.steps.pop(0)
-            deploy(b, s[1], s[2], s[3])
+            battle_act(b, s[1], s[2], s[3])
     else:
         battle_pointer(self)
         battle_keys(self)
@@ -144,6 +175,17 @@ if global_vars.said is not None:
 
 # === draw
 b = global_vars.battle
+# The spells' circles on the ground.
+for z in b["zones"]:
+    x, y = tile_xy(z["x"], z["y"])
+    col = {"heal": "#7ef07e", "rage": "#c060ff", "freeze": "#9ad8ff"}[z["kind"]]
+    rx, ry = z["r"] * TILE_W * 0.71, z["r"] * TILE_H * 0.71
+    draw_set_alpha(0.18 + 0.06 * math.sin(global_vars.t * 0.2))
+    draw_set_color(col)
+    draw_ellipse(x - rx, y - ry, x + rx, y + ry)
+    draw_set_alpha(0.7)
+    draw_ellipse(x - rx, y - ry, x + rx, y + ry, True)
+draw_set_alpha(1)
 # Shots in flight.
 for sh in b["shots"]:
     x, y = tile_xy(sh["x"], sh["y"])
@@ -172,8 +214,16 @@ for u in b["units"]:
         draw_rect(x - 12, y - 58, x + 12, y - 54)
         draw_set_color("#6fd16a")
         draw_rect(x - 12, y - 58, x - 12 + 24 * u["hp"] / u["max"], y - 54)
-# Where the chosen troop would go: green outside the village, red too close.
-if not b["over"] and self.chosen is not None:
+# A spell chosen: its circle under the pointer. A troop: green outside the village, red too close.
+if not b["over"] and self.spell is not None:
+    t = tile_frac(mouse_x, mouse_y) if not keyed() else global_vars.cursor
+    x, y = tile_xy(*t)
+    rad = SPELLS[self.spell]["radius"]
+    draw_set_alpha(0.6)
+    draw_set_color("#ffffff")
+    draw_ellipse(x - rad * TILE_W * 0.71, y - rad * TILE_H * 0.71, x + rad * TILE_W * 0.71, y + rad * TILE_H * 0.71, True)
+    draw_set_alpha(1)
+elif not b["over"] and self.chosen is not None:
     t = tile_at(mouse_x, mouse_y) if not keyed() else global_vars.cursor
     if t is not None:
         ok = can_deploy(b, self.chosen, *t) is None

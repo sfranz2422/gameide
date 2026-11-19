@@ -64,7 +64,7 @@ if global_vars.t % 30 == 0:
     if len(busy(r)) < jobs or grew:
         level_up(gained)
         keep_save(r)
-    if train_tick(r):
+    if train_tick(r) + brew_tick(r):
         keep_save(r)
     if global_vars.panel in ("building", "army"):
         open_panel(global_vars.panel, global_vars.panel_of)
@@ -283,13 +283,52 @@ if global_vars.panel and box:
             text(x1 + 270, y2 - 124, f"Waiting: {big_number(waiting(b))} of {big_number(stat(kind, 'hold', lv))}", GOLD if makes(b) == "gold" else FOOD, 14)
     elif global_vars.panel == "army":
         text(x1 + 20, y1 + 12, "Your army", GOLD, 26)
-        text(x1 + 230, y1 + 20, f"Camps: {army_used(r)} of {army_room(r)} room", INK if army_used(r) < army_room(r) else GOLD, 16)
-        if r["training"]:
-            k = r["training"][0]
-            text(x1 + 230, y1 + 46, f"Training a {TROOPS[k]['name'].lower()}: {clock_words(train_left(r))}  ·  {len(r['training'])} in the queue", MINT, 13)
+        tab = getattr(global_vars, "army_tab", "troops")
+        if tab == "troops":
+            if r["training"]:
+                k = r["training"][0]
+                text(x1 + 20, y1 + 58, f"Camps: {army_used(r)} of {army_room(r)} room  ·  Training a {TROOPS[k]['name'].lower()}: "
+                     f"{clock_words(train_left(r))}  ·  {len(r['training'])} in the queue", MINT, 13)
+            else:
+                text(x1 + 20, y1 + 58, f"Camps: {army_used(r)} of {army_room(r)} room  ·  Barracks level {barracks_level(r)}: each level trains a new kind of troop.",
+                     INK if army_used(r) < army_room(r) else GOLD, 13)
+        elif tab == "spells":
+            if r["brewing"]:
+                k = r["brewing"][0]
+                text(x1 + 20, y1 + 58, f"Mage tower: {spells_used(r)} of {spell_room(r)} room  ·  Brewing {SPELLS[k]['name']}: {clock_words(brew_left(r))}", MINT, 13)
+            else:
+                text(x1 + 20, y1 + 58, f"Mage tower level {tower_level(r)}: {spells_used(r)} of {spell_room(r)} room. Spells cost gold.", DIM, 13)
+            for i, (k, sp) in enumerate(SPELLS.items()):
+                y = y1 + 92 + i * ARMY_ROW
+                locked = tower_level(r) < sp["tower"]
+                icon(k, x1 + 40, y + 20, 40, 0.35 if locked else 1)
+                text(x1 + 76, y + 2, sp["name"] + (f"  (mage tower {sp['tower']})" if locked else ""), DIM if locked else INK, 15)
+                text(x1 + 76, y + 22, sp["about"], DIM, 11, "left", 330)
+                text(x1 + 420, y + 4, f"{sp['space']} room · {clock_words(sp['time'])}", DIM, 12)
+                n = r["spells"].get(k, 0)
+                q = r["brewing"].count(k)
+                text(x1 + 420, y + 24, f"{n} ready" + (f", {q} coming" if q else ""), GOLD if n else DIM, 13)
         else:
-            text(x1 + 230, y1 + 46, f"Barracks level {barracks_level(r)}: each level trains a new kind of troop.", DIM, 13)
-        for i, (k, t) in enumerate(TROOPS.items()):
+            text(x1 + 20, y1 + 58, "Champions join every raid while they're well. Upgrade their altars to make them stronger.", DIM, 13)
+            for i, (k, c) in enumerate(CHAMPIONS.items()):
+                y = y1 + 92 + i * 170
+                lv = champ_level(r, k)
+                draw_sprite_ext(f"troop_{k}_front", 0, x1 + 70, y + 130, 1.1, 1.1, 0, "white", 1 if lv else 0.35)
+                text(x1 + 140, y + 4, c["name"] + (f"  ·  level {lv}" if lv else ""), GOLD if lv else DIM, 20)
+                text(x1 + 140, y + 34, c["about"], DIM, 13, "left", 600)
+                why = champ_ready(r, k)
+                if lv:
+                    hp, most = champ_hp(r, k), champ_max(k, lv)
+                    draw_set_color("#0c0b0a")
+                    draw_rect(x1 + 140, y + 84, x1 + 440, y + 98)
+                    draw_set_color(MINT)
+                    draw_rect(x1 + 140, y + 84, x1 + 140 + 300 * hp / most, y + 98)
+                    text(x1 + 452, y + 80, f"{hp:,} / {most:,}", INK, 13)
+                    text(x1 + 140, y + 108, f"Damage {c['damage'][lv - 1]} a second  ·  {c['ability_name']} once a battle", INK, 13)
+                    if hp < most:
+                        text(x1 + 140, y + 130, f"Resting: well again in {clock_words((most - hp) / most * CHAMP_REST)}", GOLD, 13)
+                text(x1 + 140, y + 130 if not lv else y + 150, why or "Ready for battle!", RED if why else MINT, 13)
+        for i, (k, t) in enumerate(TROOPS.items() if tab == "troops" else []):
             y = y1 + 92 + i * ARMY_ROW
             locked = barracks_level(r) < t["barracks"]
             draw_sprite_ext(f"troop_{k}_front", 0, x1 + 40, y + 40, 0.7, 0.7, 0, "white", 0.35 if locked else 1)

@@ -18,12 +18,14 @@ import heapq
 import math
 
 
-def new_battle(layout, army, loot):
+def new_battle(layout, army, loot, champs=None, spells=None, tower=1):
     """A battle against a layout ([{"kind", "gx", "gy", "level"}]) with `loot` ([gold,
-    food]) to win, shared out among its keep, stores, mines and farms."""
+    food]) to win, shared out among its keep, stores, mines and farms. `champs` {kind:
+    [level, health]} and `spells` {kind: n} (at the mage tower's level) come too (phase 4)."""
     b = {"bs": [], "cells": {}, "units": [], "shots": [], "army": {k: n for k, n in army.items() if n > 0},
          "sent": {}, "time": 0.0, "loot": [0, 0], "over": False, "stars": 0, "flows": {}, "walls_v": 0, "ended": "",
-         "replay": []}
+         "replay": [], "champs": dict(champs or {}), "spells": {k: n for k, n in (spells or {}).items() if n > 0},
+         "tower": max(1, tower), "cast": {}, "zones": []}
     for d in layout:
         n = BUILDINGS[d["kind"]]["size"]
         hp = stat(d["kind"], "hp", d["level"])
@@ -80,11 +82,19 @@ def stars_now(b):
 
 # ---- putting troops down
 
+def troop_stats(u):
+    """A troop's numbers: a champion carries their own (by level), anyone else is TROOPS'."""
+    return u.get("stats") or TROOPS[u["kind"]]
+
+
 def can_deploy(b, kind, x, y):
-    """None if a troop of a kind can be put down at (x, y) (tiles), or why not, in words."""
+    """None if a troop (or a champion) can be put down at (x, y) (tiles), or why not, in words."""
     if b["over"]:
         return "The battle's over."
-    if b["army"].get(kind, 0) < 1:
+    if kind in CHAMPIONS:
+        if kind not in b["champs"]:
+            return f"The {CHAMPIONS[kind]['name']} isn't here to send."
+    elif b["army"].get(kind, 0) < 1:
         return f"No more {TROOPS[kind]['name'].lower()}s to send."
     t = (round(x), round(y))
     if not on_map(*t):
@@ -99,6 +109,8 @@ def deploy(b, kind, x, y):
     why = can_deploy(b, kind, x, y)
     if why:
         return why
+    if kind in CHAMPIONS:
+        return deploy_champ(b, kind, x, y)
     b["army"][kind] -= 1
     if not b["army"][kind]:
         del b["army"][kind]
@@ -110,6 +122,132 @@ def deploy(b, kind, x, y):
     b["units"].append({"kind": kind, "x": float(x), "y": float(y), "hp": t["hp"], "max": t["hp"], "dead": False,
                        "goal": None, "hit": None, "cool": 0.0, "moving": False, "dir": (1, 1)})
     return "sent"
+
+
+def deploy_champ(b, kind, x, y):
+    """A champion down, at their level and with the health they came with."""
+    level, hp = b["champs"].pop(kind)
+    c = CHAMPIONS[kind]
+    stats = {"name": c["name"], "speed": c["speed"], "reach": c["reach"], "wants": c["wants"],
+             "damage": c["damage"][level - 1], "hp": c["hp"][level - 1]}
+    b["replay"].append([round(b["time"], 3), f"{kind}_{level}_{int(hp)}", round(float(x), 3), round(float(y), 3)])
+    b["units"].append({"kind": kind, "x": float(x), "y": float(y), "hp": float(hp), "max": stats["hp"], "dead": False,
+                       "goal": None, "hit": None, "cool": 0.0, "moving": False, "dir": (1, 1), "rage": 0.0,
+                       "champ": True, "stats": stats, "used": False})
+    return "sent"
+
+
+def champ_unit(b, kind):
+    return next((u for u in b["units"] if u.get("champ") and u["kind"] == kind), None)
+
+
+def can_ability(b, kind):
+    u = champ_unit(b, kind)
+    if u is None or u["dead"]:
+        return f"The {CHAMPIONS[kind]['name']} isn't on the field."
+    if u["used"]:
+        return f"{CHAMPIONS[kind]['ability_name']} is used: once a battle."
+    return None
+
+
+def ability(b, kind):
+    """A champion's ability, once a battle: the Warlord's Battle Cry (troops near him rage,
+    and he's healed), the Huntress's Volley (arrows on every building near her)."""
+    why = can_ability(b, kind)
+    if why:
+        return why
+    u = champ_unit(b, kind)
+    u["used"] = True
+    b["replay"].append([round(b["time"], 3), CHAMPIONS[kind]["ability"], 0, 0])
+    if kind == "warlord":
+        for v in b["units"]:
+            if not v["dead"] and math.hypot(v["x"] - u["x"], v["y"] - u["y"]) <= CRY_RADIUS:
+                v["rage"] = max(v.get("rage", 0.0), CRY_RAGE)
+        u["hp"] = min(u["max"], u["hp"] + u["max"] * CRY_HEAL)
+    else:
+        for i, x in enumerate(b["bs"]):
+            if x["kind"] != "wall" and not x["dead"] and rect_dist(u["x"], u["y"], x) <= VOLLEY_RADIUS:
+                hurt(b, i, u["stats"]["damage"] * VOLLEY_HITS)
+    return "used"
+
+
+def spell_power(b, kind):
+    return SPELLS[kind]["power"] * (1 + SPELL_GROW * (b["tower"] - 1))
+
+
+def can_cast(b, kind, x, y):
+    if b["over"]:
+        return "The battle's over."
+    if b["spells"].get(kind, 0) < 1:
+        return f"No {SPELLS[kind]['name']} spells left."
+    if not on_map(round(x), round(y)):
+        return "That's off the map."
+    return None
+
+
+def cast(b, kind, x, y):
+    """A spell anywhere on the field (even inside the village): Lightning strikes at once,
+    the others make a circle that lasts a while. 'cast', or why not in words."""
+    why = can_cast(b, kind, x, y)
+    if why:
+        return why
+    b["spells"][kind] -= 1
+    if not b["spells"][kind]:
+        del b["spells"][kind]
+    b["cast"][kind] = b["cast"].get(kind, 0) + 1
+    b["replay"].append([round(b["time"], 3), f"{kind}_{b['tower']}", round(float(x), 3), round(float(y), 3)])
+    sp = SPELLS[kind]
+    if kind == "lightning":
+        for i, s in enumerate(b["bs"]):
+            if not s["dead"] and rect_dist(x, y, s) <= sp["radius"]:
+                hurt(b, i, spell_power(b, kind))
+    else:
+        b["zones"].append({"kind": kind, "x": float(x), "y": float(y), "r": sp["radius"], "left": float(sp["seconds"])})
+    return "cast"
+
+
+def zones_tick(b, dt):
+    """The spells' circles: Heal heals, Rage enrages, Freeze stops the defenses inside."""
+    for z in b["zones"]:
+        z["left"] -= dt
+        if z["kind"] == "freeze":
+            for s in b["bs"]:
+                if s["kind"] in DEFENSE_SHOTS and not s["dead"] and rect_dist(z["x"], z["y"], s) <= z["r"]:
+                    s["frozen"] = max(s.get("frozen", 0.0), dt * 1.5)
+            continue
+        for u in b["units"]:
+            if not u["dead"] and math.hypot(u["x"] - z["x"], u["y"] - z["y"]) <= z["r"]:
+                if z["kind"] == "heal":
+                    u["hp"] = min(u["max"], u["hp"] + spell_power(b, "heal") * dt)
+                else:
+                    u["rage"] = max(u.get("rage", 0.0), dt * 1.5)
+    b["zones"] = [z for z in b["zones"] if z["left"] > 0]
+
+
+def battle_act(b, code, x, y):
+    """One thing done in a battle, as a replay keeps it: a troop's kind, a champion
+    ("warlord_5_900": their level and health), a spell ("rage_3": the tower's level), or an
+    ability ("cry", "volley"). How a replay plays the raid out again."""
+    if code in ("cry", "volley"):
+        return ability(b, next(k for k, c in CHAMPIONS.items() if c["ability"] == code))
+    parts = code.split("_")
+    if parts[0] in CHAMPIONS and len(parts) == 3:
+        b["champs"].setdefault(parts[0], [int(parts[1]), int(parts[2])])
+        return deploy(b, parts[0], x, y)
+    if parts[0] in SPELLS and len(parts) == 2:
+        b["tower"] = int(parts[1])
+        b["spells"][parts[0]] = b["spells"].get(parts[0], 0) + 1
+        return cast(b, parts[0], x, y)
+    return deploy(b, code, x, y)
+
+
+def replay_army(steps):
+    """The troops a replay sends ({kind: n}); its champions and spells come with their steps."""
+    army = {}
+    for s in steps:
+        if s[1] in TROOPS:
+            army[s[1]] = army.get(s[1], 0) + 1
+    return army
 
 
 # ---- where troops go
@@ -127,9 +265,8 @@ def middle(s):
     return s["gx"] + (s["n"] - 1) / 2, s["gy"] + (s["n"] - 1) / 2
 
 
-def wanted(b, kind):
-    """What a troop of a kind goes for: its favourites if any stand, else any building."""
-    wants = TROOPS[kind]["wants"]
+def wanted(b, wants):
+    """What a troop goes for (its `wants`): its favourites if any stand, else any building."""
     live = standing(b)
     if wants == "walls":
         walls = [i for i, x in enumerate(b["bs"]) if x["kind"] == "wall" and not x["dead"]]
@@ -144,7 +281,7 @@ def wanted(b, kind):
 
 
 def choose_goal(b, u):
-    goals = wanted(b, u["kind"])
+    goals = wanted(b, troop_stats(u)["wants"])
     if not goals:
         return None
     return min(goals, key=lambda i: rect_dist(u["x"], u["y"], b["bs"][i]))
@@ -232,7 +369,10 @@ def hurt(b, i, dmg):
 
 
 def unit_tick(b, u, dt):
-    t = TROOPS[u["kind"]]
+    t = troop_stats(u)
+    rage = u.get("rage", 0.0) > 0
+    if rage:
+        u["rage"] -= dt
     u["moving"] = False
     # Hitting something already: keep at it while it stands.
     if u["hit"] is not None and not b["bs"][u["hit"]]["dead"]:
@@ -246,7 +386,7 @@ def unit_tick(b, u, dt):
             u["dead"] = True
             u["hp"] = 0
             return
-        dmg = t["damage"] * dt * (LOOT_DOUBLE if u["kind"] == "raider" and s["kind"] in LOOT_KINDS else 1)
+        dmg = t["damage"] * dt * (LOOT_DOUBLE if u["kind"] == "raider" and s["kind"] in LOOT_KINDS else 1) * (RAGE_DAMAGE if rage else 1)
         hurt(b, u["hit"], dmg)
         return
     u["hit"] = None
@@ -269,7 +409,7 @@ def unit_tick(b, u, dt):
             return
     dx, dy = nxt[0] - u["x"], nxt[1] - u["y"]
     d = math.hypot(dx, dy) or 1
-    step = min(d, t["speed"] * dt)
+    step = min(d, t["speed"] * dt * (RAGE_SPEED if rage else 1))
     u["x"] += dx / d * step
     u["y"] += dy / d * step
     u["moving"] = True
@@ -279,6 +419,9 @@ def unit_tick(b, u, dt):
 def defense_tick(b, i, dt):
     s = b["bs"][i]
     rule = DEFENSE_SHOTS[s["kind"]]
+    if s.get("frozen", 0) > 0:
+        s["frozen"] -= dt            # frozen (the Freeze spell): no shooting
+        return
     s["cool"] -= dt
     if s["cool"] > 0:
         return
@@ -332,6 +475,7 @@ def tick(b, dt=BATTLE_TICK):
     if not b["units"]:
         return              # the clock starts with the first troop (looking round is free)
     b["time"] += dt
+    zones_tick(b, dt)
     for u in b["units"]:
         if not u["dead"]:
             unit_tick(b, u, dt)
@@ -344,7 +488,7 @@ def tick(b, dt=BATTLE_TICK):
         end_battle(b, "Everything's down!")
     elif b["time"] >= BATTLE_TIME:
         end_battle(b, "Time's up.")
-    elif b["units"] and not b["army"] and all(u["dead"] for u in b["units"]):
+    elif b["units"] and not b["army"] and not b["champs"] and all(u["dead"] for u in b["units"]):
         end_battle(b, "Your army has fallen.")
 
 

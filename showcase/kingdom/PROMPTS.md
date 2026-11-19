@@ -128,6 +128,28 @@ to the LEFT (two steps, two swings). The game turns them round to face right.
 > two handles; a glowing blue magical shield (a translucent dome of light over a small
 > castle). Flat magenta background.
 
+## Phase 4: champions and spells
+
+**14. The champions.** MAGENTA. (Like picture 10: eight frames a row, the same figure.)
+> [the same as 10] Two rows of eight frames. Row 1: the Warlord, a huge bearded warrior in
+> dark plate armour and a red cloak, with a two-handed battle axe. Row 2: the Huntress, a
+> lithe archer in a green hooded cloak and leather armour, with a tall longbow. Frames 1-2
+> walking towards the viewer and to the left, 3-4 attacking towards the viewer and the
+> left, 5-6 walking away and to the left, 7-8 attacking away and to the left. Flat magenta background.
+
+**15. Altars and the mage tower.** MAGENTA.
+> [the style] Three rows of three, each on its own square patch of ground the size of 3 × 3
+> ground diamonds, each building in three ages, left to right growing grander. Row 1: the
+> Warlord's altar: a stone platform with a great axe on a plinth and red banners. Row 2:
+> the Huntress's altar: a grove shrine of standing stones, a bow on a carved tree stump and
+> green banners. Row 3: a mage tower: a slender stone tower with a pointed roof, glowing
+> violet windows and floating runes. Flat magenta background.
+
+**16. Spell icons.** MAGENTA. (Attach picture 8, the icons.)
+> In exactly the style of the attached icons, one row of four, no text: a glowing green
+> healing potion; a red-violet flask of rage with bubbles; a forked bolt of lightning; a
+> frost crystal snowflake in ice blue. Flat magenta background.
+
 ## Later phases
 
 - **Phase 3 on:** champions, alliances' banners and league badges.

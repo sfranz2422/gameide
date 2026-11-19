@@ -39,6 +39,9 @@ MATCH_FROM = 5                   # picked at random among this many nearest in t
 MOST_BUILDINGS = 800
 MOST_REPLAY = 600
 KIND = re.compile(r"^[a-z_]{1,24}$")
+# What a replay's step may be: a troop, a champion with their level and health
+# ("warlord_5_900"), a spell with its tower's level ("rage_3") or an ability.
+STEP = re.compile(r"^[a-z][a-z0-9_]{0,23}$")
 
 
 def _aware(t):
@@ -206,7 +209,7 @@ def finish(slug, raid_id):
             return err("That isn't how a raid ends: stars (0-3), percent, and no more loot than was there.", 400)
         steps = []
         for s in replay:
-            if (not isinstance(s, list) or len(s) != 4 or not isinstance(s[1], str) or not KIND.match(s[1])
+            if (not isinstance(s, list) or len(s) != 4 or not isinstance(s[1], str) or not STEP.match(s[1])
                     or any(isinstance(v, bool) or not isinstance(v, (int, float)) for v in (s[0], s[2], s[3]))):
                 return err("That replay isn't a list of [time, troop, x, y].", 400)
             steps.append([round(float(s[0]), 3), s[1], round(float(s[2]), 3), round(float(s[3]), 3)])

@@ -665,4 +665,177 @@ done = [b["stars"], destroyed_pct(b)]`);
     expect(py<number>(g, 'len([b for b in instances("Button") if b.act == "watch"])')).toBe(1);
     expect(py<number>(g, "global_vars.panel_box[3]")).toBeLessThanOrEqual(py<number>(g, "VIEW_H"));
   });
+
+  // ---- phase 4: champions and spells
+
+  /** A kingdom with both altars, a mage tower and an army. */
+  async function mighty() {
+    const g = await start();
+    await realmOf(g);
+    py(g, `r = global_vars.realm
+r["obstacles"] = []
+next(b for b in r["buildings"] if b["kind"] == "keep")["level"] = 9
+r["gold"] = r["food"] = 50000
+def place(kind, level):
+    spot = next((x, y) for x in range(MAP_W) for y in range(MAP_H) if fits(r, kind, x, y))
+    b = new_building(kind, *spot, level)
+    r["buildings"].append(b)
+    return b
+wa = place("warlord_altar", 3)
+ha = place("huntress_altar", 1)
+mt = place("mage_tower", 4)
+r["army"] = {"footman": 20}`);
+    return g;
+  }
+
+  it("phase 4: champions: their altar's level, well or resting on the real clock, busy while it's upgraded", async () => {
+    const g = await mighty();
+    expect(py(g, '[champ_level(r, "warlord"), champ_hp(r, "warlord"), sorted(champs_for_battle(r))]')).toEqual([3, 1110, ["huntress", "warlord"]]);
+    // Hurt in a battle: half healed after half the rest.
+    py(g, 'r["champions"]["warlord"] = {"hurt": 1000, "t": now()}');
+    later(g, py<number>(g, "CHAMP_REST / 2"));
+    expect(py(g, 'champ_hp(r, "warlord")')).toBe(1110 - 1000 + 555);
+    later(g, py<number>(g, "CHAMP_REST"));
+    expect(py(g, 'champ_hp(r, "warlord")')).toBe(1110);
+    // Upgrading the altar: he stays home.
+    py(g, 'upgrade(r, wa)');
+    expect(py(g, 'champ_ready(r, "warlord")')).toBe("The Warlord is busy while the altar is upgraded.");
+    expect(py(g, 'sorted(champs_for_battle(r))')).toEqual(["huntress"]);
+    expect(py(g, 'champ_ready(r, "huntress") is None and new_realm(1)["champions"] == {}')).toBe(true);
+  });
+
+  it("phase 4: in battle, a champion fights, and uses their ability once: Battle Cry enrages and heals, Volley strikes the buildings near her", async () => {
+    const g = await mighty();
+    py(g, `b = new_battle(village_layout(3), {"footman": 6}, [0, 0], {"warlord": [3, 600], "huntress": [1, 420]}, {}, 1)
+def near_spot(b, reach):
+    """A tile troops may go down on, within reach of a building (not a wall)."""
+    return next((x, y) for x in range(MAP_W) for y in range(MAP_H) if (x, y) not in b["no_deploy"]
+                and any(s["kind"] != "wall" and rect_dist(x, y, s) <= reach for s in b["bs"]))
+sx, sy = near_spot(b, 3)
+deploy(b, "warlord", sx, sy)
+for n in range(6):
+    deploy(b, "footman", sx, sy)
+w = champ_unit(b, "warlord")`);
+    expect(py(g, '[w["hp"], w["max"], w["stats"]["damage"], can_ability(b, "huntress")]')).toEqual([600, 1110, 73, "The Huntress isn't on the field."]);
+    expect(py(g, 'ability(b, "warlord")')).toBe("used");
+    expect(py(g, '[w["hp"] > 600, sum(1 for u in b["units"] if u.get("rage", 0) > 0), ability(b, "warlord")]')).toEqual([true, 7, "Battle Cry is used: once a battle."]);
+    // Volley: every building near her loses health at once.
+    py(g, `deploy(b, "huntress", *near_spot(b, 3))
+h = champ_unit(b, "huntress")
+near = [i for i, x in enumerate(b["bs"]) if x["kind"] != "wall" and rect_dist(h["x"], h["y"], x) <= VOLLEY_RADIUS]
+before = [b["bs"][i]["hp"] for i in near]
+ability(b, "huntress")`);
+    expect(py(g, 'len(near) > 0 and all(b["bs"][i]["hp"] < hp or b["bs"][i]["dead"] for i, hp in zip(near, before))')).toBe(true);
+    // Wounds come home.
+    py(g, 'h["hp"] = 100\nw["dead"] = True\nchamps_home(r, b)');
+    expect(py(g, '[r["champions"]["huntress"]["hurt"], r["champions"]["warlord"]["hurt"]]')).toEqual([320, 1110]);
+  });
+
+  it("phase 4: spells: brewed in the mage tower for gold on the real clock, room for so many; open by the tower's level", async () => {
+    const g = await mighty();
+    expect(py(g, '[spell_room(r), brew(r, "heal"), r["gold"]]')).toEqual([5, "queued", 48500]);
+    expect(py(g, 'can_brew(r, "freeze") is None and can_brew(new_realm(1), "heal") is not None')).toBe(true);
+    py(g, 'for _ in range(6):\n    brew(r, "rage")');
+    expect(py(g, '[spells_used(r), can_brew(r, "heal")]')).toEqual([5, "No room in the mage tower: upgrade it."]);
+    expect(py(g, 'unbrew(r, "rage")')).toBe(true);
+    later(g, 361);
+    expect(py(g, '[brew_tick(r), r["spells"]]')).toEqual([1, { heal: 1 }]);
+    py(g, 'mt["level"] = 2');
+    expect(py(g, 'can_brew(r, "lightning")')).toBe("Upgrade the mage tower to level 3 first.");
+  });
+
+  it("phase 4: spells in battle: Lightning strikes, Freeze stops defenses, Heal heals, Rage speeds; cast ones are gone after", async () => {
+    const g = await mighty();
+    py(g, `b = new_battle(village_layout(1), {"footman": 2}, [0, 0], {}, {"lightning": 1, "freeze": 1, "heal": 1, "rage": 1}, 3)
+keep_ = next(x for x in b["bs"] if x["kind"] == "keep")
+kx, ky = middle(keep_)
+hp = keep_["hp"]`);
+    expect(py(g, 'cast(b, "lightning", kx, ky)')).toBe("cast");
+    expect(py(g, 'hp - keep_["hp"]')).toBe(py(g, 'round(400 * (1 + SPELL_GROW * 2))'));
+    expect(py(g, 'cast(b, "lightning", kx, ky)')).toBe("No Lightning spells left.");
+    // Freeze over the tower: a footman in its reach is safe while it lasts.
+    py(g, `tw = next(x for x in b["bs"] if x["kind"] == "archer_tower")
+tx, ty = middle(tw)
+cast(b, "freeze", tx, ty)
+deploy(b, "footman", MID - 12, MID - 12)
+u = b["units"][0]
+u["x"], u["y"] = tx + 3, ty
+for _ in range(60):
+    tick(b)
+frozen_hp = u["hp"]`);
+    expect(py(g, 'frozen_hp')).toBe(py(g, 'TROOPS["footman"]["hp"]'));
+    // Heal: health back; Rage: faster.
+    py(g, 'u["hp"] = 10\ncast(b, "heal", u["x"], u["y"])\nfor _ in range(30):\n    zones_tick(b, BATTLE_TICK)');
+    expect(py<number>(g, 'u["hp"]')).toBeGreaterThan(10);
+    // Rage: the same walk goes further.
+    py(g, `def walk(rage):
+    t = new_battle(village_layout(1), {"footman": 1}, [0, 0], {}, {"rage": 1}, 3)
+    deploy(t, "footman", MID - 14, MID - 14)
+    v = t["units"][0]
+    if rage:
+        cast(t, "rage", v["x"], v["y"])
+    for _ in range(20):
+        tick(t)
+    return math.hypot(v["x"] - (MID - 14), v["y"] - (MID - 14))`);
+    expect(py<number>(g, 'walk(True) / walk(False)')).toBeGreaterThan(1.4);
+    py(g, 'r["spells"] = {"lightning": 2, "heal": 1, "rage": 1}\nspells_home(r, b)');
+    expect(py(g, 'r["spells"]')).toEqual({ lightning: 1, rage: 1 });      // lightning and heal were cast here
+  });
+
+  it("phase 4: a raid with champions, spells and an ability replays exactly", async () => {
+    const g = await mighty();
+    py(g, `b = new_battle(village_layout(2), {"footman": 10}, [0, 0], {"warlord": [3, 900]}, {"rage": 1, "lightning": 1}, 4)
+deploy(b, "warlord", MID - 16, MID - 16)
+for n in range(10):
+    deploy(b, "footman", MID - 14 + n % 5, MID - 13)
+for _ in range(200):
+    tick(b)
+cast(b, "rage", MID - 8, MID - 8)
+ability(b, "warlord")
+for _ in range(100):
+    tick(b)
+cast(b, "lightning", MID, MID)
+while not b["over"]:
+    tick(b)
+want = [b["stars"], destroyed_pct(b), round(champ_unit(b, "warlord")["hp"], 3)]
+steps = list(b["replay"])
+again = new_battle(village_layout(2), replay_army(steps), [0, 0])
+queue = list(steps)
+while not again["over"]:
+    while queue and queue[0][0] <= again["time"] + BATTLE_TICK / 2:
+        s = queue.pop(0)
+        battle_act(again, s[1], s[2], s[3])
+    tick(again)
+got = [again["stars"], destroyed_pct(again), round(champ_unit(again, "warlord")["hp"], 3)]`);
+    expect(py(g, "got")).toEqual(py(g, "want"));
+    expect(py<string[]>(g, '[s[1] for s in steps if not s[1] in TROOPS]')).toEqual(["warlord_3_900", "rage_4", "cry", "lightning_4"]);
+    // The champion comes back with the health he went in with, not all of it.
+    expect(py(g, 'one = new_battle(village_layout(2), {}, [0, 0])\nbattle_act(one, "warlord_3_900", MID - 16, MID - 16)\nchamp_unit(one, "warlord")["hp"]')).toBe(900);
+  }, 120_000);
+
+  it("phase 4: on screen: the Army window's tabs fit; in battle, a champion's button sends them, then uses their ability; a spell is cast with a tap", async () => {
+    const g = await mighty();
+    py(g, 'r["spells"] = {"lightning": 1}');
+    for (const t of ["troops", "spells", "champions"]) {
+      py(g, `global_vars.army_tab = "${t}"\nopen_panel("army")`);
+      step(g, 3);
+      expect(py<number>(g, "global_vars.panel_box[3]")).toBeLessThanOrEqual(py<number>(g, "VIEW_H"));
+    }
+    py(g, 'close_panel()\ndo_act("attack", 0)');
+    step(g, 3);
+    expect(room(g)).toBe("Battle");
+    py(g, 'f = instances("Battlefield")[0]\nx, y = tile_xy(MID - 12, MID - 14)\nw, h = shown()\nmove_camera(x - w / 2, y - h / 2)');
+    step(g, 2);
+    py(g, 'press(next(bt for bt in f.tray if bt.arg == "warlord"))');
+    step(g);
+    click(g, ...py<[number, number]>(g, 'list(to_screen(*tile_xy(MID - 12, MID - 14)))'));
+    expect(py(g, 'champ_unit(global_vars.battle, "warlord") is not None')).toBe(true);
+    step(g, 2);
+    expect(py(g, 'next(bt for bt in f.tray if bt.arg == "warlord").act')).toBe("ability");
+    py(g, 'press(next(bt for bt in f.tray if bt.arg == "warlord"))');
+    expect(py(g, 'champ_unit(global_vars.battle, "warlord")["used"]')).toBe(true);
+    py(g, 'press(f.spell_buttons[0])');
+    click(g, ...py<[number, number]>(g, 'list(to_screen(*tile_xy(MID, MID)))'));
+    expect(py(g, 'global_vars.battle["cast"]')).toEqual({ lightning: 1 });
+  });
 });
