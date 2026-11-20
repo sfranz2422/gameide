@@ -215,7 +215,6 @@ BUILDER_COSTS = [0, 0, 2500, 10000, 40000]       # the 1st, 2nd … 5th builder'
 # three pictures for ten levels left most upgrades looking the same): look 1 is levels 1-2,
 # look 2 levels 3-4… up to look 5. Which drawing each look is: LOOKS in build.py.
 LEVELS_A_LOOK = 2
-BADGE_R = 11                    # the level badge on a building, its size on the screen
 UPGRADE_SHOW = 90               # steps the "Level 5!" moment lasts
 
 # ---- a new kingdom: the keep in the middle, two builders, a mine and a farm

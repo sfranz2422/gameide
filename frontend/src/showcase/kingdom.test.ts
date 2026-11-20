@@ -1161,7 +1161,7 @@ def outlined(x, y, words, colour=INK, size=16, align="left"):
     step(g, 3);
   });
 
-  it("upgrades show: a new look every two levels, a level badge, and a moment when one finishes", async () => {
+  it("upgrades show: a new look every two levels, no number over it, and a moment when one finishes", async () => {
     const g = await start();
     // Every two levels a different look, for every building, as far as its levels go.
     expect(py(g, "[tier(l) for l in range(1, 11)]")).toEqual([1, 1, 2, 2, 3, 3, 4, 4, 5, 5]);
@@ -1185,8 +1185,11 @@ def text(x, y, words, colour=INK, size=16, align="left", width=None):
     step(g, 2);
     expect(py(g, "_fx")).toEqual(expect.arrayContaining(["sparkle", "confetti"]));
     expect(py<string[]>(g, "_words")).toContain(py<string>(g, 'f"Level {b[\'level\']}!"'));
-    // Its level on its badge.
-    expect(py<string[]>(g, "_words")).toContain(py<string>(g, 'str(b["level"])'));
+    // No number over it (the teacher's choice: the look shows the level).
+    step(g, py<number>(g, "UPGRADE_SHOW") + 5);
+    py(g, "_words.clear()");
+    step(g);
+    expect(py<string[]>(g, "_words")).not.toContain(py<string>(g, 'str(b["level"])'));
     step(g, py<number>(g, "UPGRADE_SHOW") + 5);
     py(g, "_words.clear()");
     step(g);

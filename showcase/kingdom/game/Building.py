@@ -1,6 +1,6 @@
 # object: Building
-# One building on the map: its picture for its level (a new look every two levels), its
-# level on a badge, scaffolding while it's first built, a builder's clock while a job runs,
+# One building on the map: its picture for its level (a new look every two levels),
+# scaffolding while it's first built, a builder's clock while a job runs,
 # and gold or food waiting over a mine or farm. Where it is and what level it's at are
 # the kingdom's (`b`, its dict), read each step, so a move moves it. A level going up is
 # celebrated (the teacher: you couldn't tell anything had been upgraded).
@@ -36,16 +36,9 @@ if b["level"] == 0:
 else:
     # Just upgraded: a little bounce as it changes.
     pop = 1 + 0.1 * max(0, self.shine - (UPGRADE_SHOW - 20)) / 20
+    # (No level badge: the teacher found the numbers over everything too busy, 2026-11-20;
+    # the look changing every two levels shows it. A building's window says its level.)
     draw_sprite_ext(f"{kind}_{tier(b['level'])}", 0, x, y, pop, pop, 0, "white", 0.35 if held else 1)
-    if kind != "builder_hut" and not held:
-        # Its level, on a badge at its front corner: the same size on the screen at any zoom.
-        z = zoom()
-        fy = y + size * TILE_H / 2 - 2 / z
-        draw_set_color("#3a2a12")
-        draw_circle(x, fy, (BADGE_R + 2) / z)
-        draw_set_color(GOLD if b["level"] >= levels(kind) else "#e9dcc0")
-        draw_circle(x, fy, BADGE_R / z)
-        text(x, fy - 9 / z, str(b["level"]), "#3a2a12", 11 / z, "center")
 if global_vars.chosen is b and not held:
     diamond(x, y, GOLD, 0.9, size, True)
 top = y - size * TILE_H / 2 - 70

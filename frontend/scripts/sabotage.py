@@ -2413,7 +2413,6 @@ CASES = [
  ('kingdom: no scaffolding for a trap', '../showcase/kingdom/build.py', '    for n in (1, 2, 3, 4):\n        # 1 × 1: the traps', '    for n in (2, 3, 4):\n        # 1 × 1: the traps', 'every building built over time has scaffolding', KING),
  ('kingdom: three looks for ten levels', _kg('_3screen'), '    return (max(1, level) + LEVELS_A_LOOK - 1) // LEVELS_A_LOOK', '    return 1 if level <= 3 else 2 if level <= 6 else 3', 'upgrades show: a new look', KING),
  ('kingdom: an upgrade goes unseen', _kg('Building'), 'if self.seen is not None and b["level"] > self.seen:', 'if False:', 'upgrades show: a new look', KING),
- ('kingdom: no level badge', _kg('Building'), '        text(x, fy - 9 / z, str(b["level"]), "#3a2a12", 11 / z, "center")', '        pass', 'upgrades show: a new look', KING),
 
  ('tell: the page drops them', NETS, '    if (o.tells && !this.away) this.tells.push(...o.tells);\n', '', "one player on a WebSocket and one polling", E2E),
 

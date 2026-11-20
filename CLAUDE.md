@@ -1061,7 +1061,7 @@ trees and rocks are Props** (no events), kept in step by the Realm: a kingdom ha
 A building's look changes every two levels (`tier`, `LEVELS_A_LOOK`; 2026-11-20, the teacher:
 "you can't tell it was upgraded"): build.py's `LOOKS` spreads the three drawings over a building's
 looks and fills the rest with in-betweens (`_1b`, `_2b`, sheets 20-23), showing the look below
-until they're drawn. Each building shows its level on a badge (gold at the top level), and an
+until they're drawn. No number over a building (the teacher found it busy); an
 upgrade finishing is celebrated (Building notices its level rise: sparkles, confetti, a bounce,
 "Level 5!" rising; never on load). Board: renown level.
 **Zoom** (the teacher's ask): `ZOOMS`, starting a little out; - and + buttons, Q and E. The bar and
