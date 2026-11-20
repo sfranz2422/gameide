@@ -300,8 +300,15 @@ def build(out):
             if kind == "wall":
                 # Gemini's walls run along gx (top left to bottom right); one along gy is the same, mirrored.
                 P.sprite(f"{name}_gy", [im.transpose(Image.FLIP_LEFT_RIGHT)], (im.width // 2, im.height - TH * n // 2))
-    for n in (2, 3, 4):
-        im = half(f"scaffold_{n}") if (ART / f"scaffold_{n}.png").exists() else stand_in_scaffold(n)
+    for n in (1, 2, 3, 4):
+        # 1 × 1: the traps (a spike pit, a powder keg) are built over time too, and had no
+        # scaffolding (the teacher's game stopped placing a pit). Gemini drew 2 to 4: the 2 × 2
+        # at half size.
+        if n == 1 and (ART / "scaffold_2.png").exists():
+            two = half("scaffold_2")
+            im = two.resize((max(1, two.width // 2), max(1, two.height // 2)), Image.LANCZOS)
+        else:
+            im = half(f"scaffold_{n}") if (ART / f"scaffold_{n}.png").exists() else stand_in_scaffold(n)
         P.sprite(f"scaffold_{n}", [im], (im.width // 2, im.height - TH * n // 2))
     for kind in list(G["TROOPS"]) + list(G["CHAMPIONS"]):
         for view in ("front", "back"):

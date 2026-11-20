@@ -1149,4 +1149,15 @@ def outlined(x, y, words, colour=INK, size=16, align="left"):
       expect(py<string[]>(g, "_shadowed")).not.toContain(b);
     }
   });
+
+  it("every building built over time has scaffolding its size (a spike pit had none, and placing one stopped the game)", async () => {
+    const g = await start();
+    const sizes = py<number[]>(g, 'sorted({b["size"] for b in BUILDINGS.values() if b["time"][0] > 0})');
+    const sprites = new Set(g.project.sprites.map((sp) => sp.name));
+    for (const n of sizes) expect(sprites.has(`scaffold_${n}`), `scaffold_${n}`).toBe(true);
+    // And one placed and drawn while it's built: no error.
+    await realmOf(g);
+    py(g, 'r = global_vars.realm\nr["obstacles"] = []\nr["gold"] = r["food"] = 10**6\nb = new_building("spike_pit", 6, 6, 0)\nb["job"] = {"to": 1, "end": now() + 600}\nr["buildings"].append(b)');
+    step(g, 3);
+  });
 });
