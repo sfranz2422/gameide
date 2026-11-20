@@ -2163,6 +2163,8 @@ CASES = [
  ('mix: the board is never told', _mx("_2mix"), '        high_score(len(p["found"]))\n', '', "either way round", MIX),
  ('mix: questions mid-drag', _mx("Lab"), 'question_ok(dragged() is None)', 'question_ok(True)', "except while something is being dragged", MIX),
  ('mix: keys never reach the bench', _mx("_4keys"), '        tap(o)\n', '        pass\n', "from the keyboard alone", MIX),
+ ('mixlab: a new award never earned', '../showcase/alchemy/game/_2mix.py', '        "spooky": {"ghost", "vampire", "witch", "mummy", "zombie"} <= f,', '        "spooky": False,', 'a bot finds all 216', MIX),
+ ('mixlab: a new pair makes two things', '../showcase/alchemy/game/_1rules.py', '("human", "fog", "ghost")', '("human", "night", "ghost")', 'no pair makes two things', MIX),
 
  ('assign tutorial: changed text accepted', "../backend/classes.py", '    if without_points(text) != without_points(original):', '    if False:', "changed in more than its points", PY),
  ('assign tutorial: a new row every time', "../backend/classes.py", '    for row in rows.all():\n        if row.body == text:\n            return row, None', '    for row in rows.all():\n        pass', "same points again use the same row", PY),

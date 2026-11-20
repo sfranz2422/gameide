@@ -1,7 +1,7 @@
 # Mix Lab: picture prompts for Gemini
 
 A combining game: drag one thing onto another and see what they make. You start with
-Water, Fire, Earth and Air and can make 144 things, from Steam and Mud to Dragons,
+Water, Fire, Earth and Air and can make 216 things, from Steam and Mud to Dragons,
 Rockets and Video Games. What you make also shows up living in a little world at the
 top of the screen. The game draws the little world's land, sea and sky itself, so
 the pictures are a workbench and the icons.
@@ -65,3 +65,19 @@ so they can't be lost.
 
 **9. Icons 8 (Tool, Sword, Wheel, Engine, Car, Train, Airplane, Rocket, Light Bulb, Paper, Book, Computer, Robot, Internet, Video Game, Music, Fireworks, Party).** MAGENTA.
 > [the style], in this order. Row 1: a hammer, a sword, a wooden wheel, a metal engine with pipes, a red car, a steam train. Row 2: an airplane, a red and white rocket, a glowing light bulb, a sheet of paper, a closed book, a computer with a screen. Row 3: a friendly robot, a globe with a wifi symbol, a game controller, music notes, colourful fireworks bursting, party balloons and confetti.
+
+## 72 more things (2026-11-20)
+
+Attach picture 2 (the first icon sheet) to each, as before, and keep the exact order.
+
+**10. Icons 9 (Hail, Blizzard, Hurricane, Northern Lights, Iceberg, Glacier, Crystal, Diamond, Oasis, Canyon, Jungle, Coral Reef, Valley, Meadow, Sunset, Eclipse, Black Hole, Satellite).** MAGENTA.
+> [the style], in this order. Row 1: white hailstones falling from a grey cloud, a swirling white snowstorm, a big grey spiral hurricane, green and purple northern lights rippling in a dark sky, a white iceberg floating in blue water, a pale blue glacier of ice on a mountain. Row 2: a glowing purple crystal, a sparkling blue diamond, a little pool with two palm trees in the sand, a red rock canyon with a river at the bottom, thick green jungle leaves and vines, a colourful coral reef. Row 3: a green valley between two hills, a grassy meadow with little flowers, an orange sunset over the sea, a dark moon covering the sun with a glowing ring, a swirling black hole with a purple glow, a satellite with solar panels.
+
+**11. Icons 10 (Octopus, Crab, Jellyfish, Dolphin, Mermaid, Parrot, Monkey, Elephant, Giraffe, Zebra, Camel, Polar Bear, Fox, Rabbit, Mouse, Chicken, Pig, Sheep).** MAGENTA.
+> [the style], in this order. Row 1: a friendly purple octopus, a red crab, a pink glowing jellyfish, a grey dolphin jumping, a friendly mermaid with a green tail, a colourful parrot. Row 2: a brown monkey, a grey elephant, a tall giraffe, a zebra, a camel with two humps, a white polar bear. Row 3: an orange fox, a white rabbit, a little grey mouse, a hen, a pink pig, a fluffy white sheep.
+
+**12. Icons 11 (Ghost, Vampire, Wizard, Witch, Fairy, Superhero, Ninja, Chef, Doctor, Firefighter, Baby, Family, Queen, Princess, Cowboy, Mummy, Zombie, Yeti).** MAGENTA.
+> [the style], everyone friendly and not scary, in this order. Row 1: a cute white ghost, a smiling vampire in a cape, a wizard with a pointed hat and a wand, a witch on a broom, a little fairy with wings, a superhero with a cape. Row 2: a ninja in black, a chef in a tall white hat, a doctor with a stethoscope, a firefighter in a helmet, a smiling baby, a family of three holding hands. Row 3: a queen with a crown, a princess in a gown, a cowboy in a hat, a friendly mummy wrapped in bandages, a silly green zombie, a fluffy white yeti.
+
+**13. Icons 12 (Pizza, Cookie, Ice Cream, Popcorn, Soup, Chocolate, Candy, Pie, Tea, Bicycle, Submarine, Helicopter, Telescope, Camera, Phone, TV, Clock, Guitar).** MAGENTA.
+> [the style], in this order. Row 1: a slice of pizza, a chocolate chip cookie, an ice cream cone, a striped bucket of popcorn, a bowl of soup, a bar of chocolate. Row 2: a wrapped sweet, a fruit pie, a cup of tea, a bicycle, a yellow submarine, a helicopter. Row 3: a telescope, a camera, a smartphone, a television, an alarm clock, a guitar.

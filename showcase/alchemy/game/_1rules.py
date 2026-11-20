@@ -188,3 +188,86 @@ ACHIEVEMENTS = [
     ("nohints", "No Help Needed", "Find 15 things in a row without a hint."),
     ("party", "Let's Party", "Throw a Party."),
 ]
+
+# ---- 72 more (the teacher's ask, 2026-11-20): four more Gemini sheets, 10 to 13, in this
+# order. Many are made from things that used to make nothing more (the dragon, the whale,
+# the castle…), so more of the collection leads somewhere.
+THINGS.update({
+    # sheet 10: nature and space
+    "hail": ("Hail", "weather"), "blizzard": ("Blizzard", "weather"), "hurricane": ("Hurricane", "weather"),
+    "aurora": ("Northern Lights", "weather"), "iceberg": ("Iceberg", "places"), "glacier": ("Glacier", "places"),
+    "crystal": ("Crystal", "elements"), "diamond": ("Diamond", "elements"), "oasis": ("Oasis", "places"),
+    "canyon": ("Canyon", "places"), "jungle": ("Jungle", "places"), "reef": ("Coral Reef", "places"),
+    "valley": ("Valley", "places"), "meadow": ("Meadow", "places"), "sunset": ("Sunset", "space"),
+    "eclipse": ("Eclipse", "space"), "blackhole": ("Black Hole", "space"), "satellite": ("Satellite", "space"),
+    # sheet 11: animals
+    "octopus": ("Octopus", "animals"), "crab": ("Crab", "animals"), "jellyfish": ("Jellyfish", "animals"),
+    "dolphin": ("Dolphin", "animals"), "mermaid": ("Mermaid", "people"), "parrot": ("Parrot", "animals"),
+    "monkey": ("Monkey", "animals"), "elephant": ("Elephant", "animals"), "giraffe": ("Giraffe", "animals"),
+    "zebra": ("Zebra", "animals"), "camel": ("Camel", "animals"), "polarbear": ("Polar Bear", "animals"),
+    "fox": ("Fox", "animals"), "rabbit": ("Rabbit", "animals"), "mouse": ("Mouse", "animals"),
+    "chicken": ("Chicken", "animals"), "pig": ("Pig", "animals"), "sheep": ("Sheep", "animals"),
+    # sheet 12: people and make-believe
+    "ghost": ("Ghost", "people"), "vampire": ("Vampire", "people"), "wizard": ("Wizard", "people"),
+    "witch": ("Witch", "people"), "fairy": ("Fairy", "people"), "superhero": ("Superhero", "people"),
+    "ninja": ("Ninja", "people"), "chef": ("Chef", "people"), "doctor": ("Doctor", "people"),
+    "firefighter": ("Firefighter", "people"), "baby": ("Baby", "people"), "family": ("Family", "people"),
+    "queen": ("Queen", "people"), "princess": ("Princess", "people"), "cowboy": ("Cowboy", "people"),
+    "mummy": ("Mummy", "people"), "zombie": ("Zombie", "people"), "yeti": ("Yeti", "people"),
+    # sheet 13: food and inventions
+    "pizza": ("Pizza", "food"), "cookie": ("Cookie", "food"), "icecream": ("Ice Cream", "food"),
+    "popcorn": ("Popcorn", "food"), "soup": ("Soup", "food"), "chocolate": ("Chocolate", "food"),
+    "candy": ("Candy", "food"), "pie": ("Pie", "food"), "tea": ("Tea", "food"),
+    "bicycle": ("Bicycle", "inventions"), "submarine": ("Submarine", "inventions"), "helicopter": ("Helicopter", "inventions"),
+    "telescope": ("Telescope", "inventions"), "camera": ("Camera", "inventions"), "phone": ("Phone", "inventions"),
+    "tv": ("TV", "inventions"), "clock": ("Clock", "inventions"), "guitar": ("Guitar", "inventions"),
+})
+# (Each listed after the recipes its ingredients come from, as hints need.)
+RECIPES += [
+    # nature and space
+    ("storm", "ice", "hail"), ("snow", "wind", "blizzard"), ("storm", "ocean", "hurricane"),
+    ("night", "electricity", "aurora"), ("ice", "ocean", "iceberg"), ("ice", "mountain", "glacier"),
+    ("glass", "cave", "crystal"), ("crystal", "volcano", "diamond"), ("desert", "water", "oasis"),
+    ("river", "desert", "canyon"), ("forest", "rain", "jungle"), ("seaweed", "stone", "reef"),
+    ("mountain", "land", "valley"), ("grass", "grass", "meadow"), ("sun", "ocean", "sunset"),
+    ("sun", "moon", "eclipse"), ("space", "galaxy", "blackhole"), ("metal", "space", "satellite"),
+    # animals
+    ("fish", "reef", "octopus"), ("fish", "sand", "crab"), ("life", "ocean", "jellyfish"),
+    ("fish", "air", "dolphin"), ("fish", "human", "mermaid"), ("bird", "jungle", "parrot"),
+    ("animal", "jungle", "monkey"), ("animal", "tree", "elephant"), ("horse", "tree", "giraffe"),
+    ("horse", "night", "zebra"), ("horse", "desert", "camel"), ("bear", "ice", "polarbear"),
+    ("dog", "forest", "fox"), ("animal", "garden", "rabbit"), ("animal", "cheese", "mouse"),
+    ("bird", "farm", "chicken"), ("animal", "mud", "pig"), ("animal", "cloud", "sheep"),
+    # people and make-believe
+    ("human", "fog", "ghost"), ("human", "bat", "vampire"), ("human", "lightning", "wizard"),
+    ("wizard", "cat", "witch"), ("human", "butterfly", "fairy"), ("human", "energy", "superhero"),
+    ("human", "night", "ninja"), ("human", "cake", "chef"), ("scientist", "life", "doctor"),
+    ("human", "smoke", "firefighter"), ("human", "human", "baby"), ("baby", "house", "family"),
+    ("king", "flower", "queen"), ("queen", "castle", "princess"), ("human", "horse", "cowboy"),
+    ("human", "desert", "mummy"), ("human", "swamp", "zombie"), ("bear", "mountain", "yeti"),
+    # food and inventions
+    ("flour", "cheese", "pizza"), ("flour", "milk", "cookie"), ("milk", "ice", "icecream"),
+    ("seed", "fire", "popcorn"), ("plant", "steam", "soup"), ("seed", "milk", "chocolate"),
+    ("fruit", "honey", "candy"), ("fruit", "flour", "pie"), ("plant", "water", "tea"),
+    ("wheel", "wheel", "bicycle"), ("ship", "fish", "submarine"), ("airplane", "tornado", "helicopter"),
+    ("glass", "star", "telescope"), ("glass", "computer", "camera"), ("music", "internet", "phone"),
+    ("computer", "lightbulb", "tv"), ("day", "night", "clock"), ("music", "wood", "guitar"),
+]
+WORLD.update({
+    "aurora": ("sky", 0.3), "eclipse": ("sky", 0.74), "satellite": ("fly", 0.55), "helicopter": ("fly", 0.25),
+    "fairy": ("fly", 0.65), "parrot": ("fly", 0.15), "ghost": ("fly", 0.42),
+    "jungle": ("ground", 0.06), "glacier": ("ground", 0.18), "oasis": ("ground", 0.52), "meadow": ("ground", 0.35),
+    "monkey": ("walk", 0.12), "elephant": ("walk", 0.22), "giraffe": ("walk", 0.27), "zebra": ("walk", 0.33),
+    "camel": ("walk", 0.5), "polarbear": ("walk", 0.16), "fox": ("walk", 0.4), "rabbit": ("walk", 0.57),
+    "pig": ("walk", 0.6), "sheep": ("walk", 0.63), "chicken": ("walk", 0.66), "wizard": ("walk", 0.2),
+    "witch": ("walk", 0.3), "princess": ("walk", 0.14), "cowboy": ("walk", 0.48), "zombie": ("walk", 0.37),
+    "yeti": ("walk", 0.1), "bicycle": ("walk", 0.55),
+    "octopus": ("swim", 0.86), "jellyfish": ("swim", 0.82), "dolphin": ("swim", 0.9), "mermaid": ("swim", 0.78),
+    "submarine": ("swim", 0.88), "reef": ("sea", 0.76), "iceberg": ("sea", 0.94), "crab": ("sea", 0.74),
+})
+ACHIEVEMENTS += [
+    ("sea", "Under the Sea", "Find the Octopus, Crab, Jellyfish, Dolphin and Mermaid."),
+    ("spooky", "Spooky!", "Find the Ghost, Vampire, Witch, Mummy and Zombie."),
+    ("barnyard", "Old MacDonald", "Find the Cow, Horse, Chicken, Pig and Sheep."),
+    ("gadgets", "Gadget Lover", "Find the Phone, TV, Camera and Computer."),
+]

@@ -951,6 +951,10 @@ on magenta lighter in the middle, so `key_magenta` keys by how magenta a pixel i
 outside the outlines, and cuts by the 6 × 3 grid. Picture 1 came back as 18 adventure things
 instead of the workbench: cut as `extra_*` for the art library; the bench is still the
 build's. Both new games are art library packs (`make_gemini_library.py sandwich alchemy`).
+**216 things since 2026-11-20** (the teacher's ask): 72 more (sheets 10-13: nature and space,
+animals, people and make-believe, food and inventions), many made from things that used to be
+dead ends, and four more awards. New things are appended to THINGS (the sheets follow its order)
+and their recipes after everything they use.
 
 ## Cloverbrook
 

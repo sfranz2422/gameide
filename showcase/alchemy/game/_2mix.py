@@ -149,6 +149,10 @@ def earned(p, key):
         "tryer": p["fails"] >= 25,
         "nohints": p["streak"] >= 15,
         "party": "party" in f,
+        "sea": {"octopus", "crab", "jellyfish", "dolphin", "mermaid"} <= f,
+        "spooky": {"ghost", "vampire", "witch", "mummy", "zombie"} <= f,
+        "barnyard": {"cow", "horse", "chicken", "pig", "sheep"} <= f,
+        "gadgets": {"phone", "tv", "camera", "computer"} <= f,
     }[key]
 
 

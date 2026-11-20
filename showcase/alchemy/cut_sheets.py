@@ -84,7 +84,7 @@ def key_magenta(im):
 SOLID, CLEAR = 60, 125      # magenta-ness: at or under SOLID a pixel is drawing; over CLEAR, background
 
 
-PINK = {"icon_flower"}       # pink all through, with gaps in its outline: keyed the old way (it came out dark red)
+PINK = {"icon_flower", "icon_crystal"}       # pink all through, with gaps in its outline: keyed the old way (it came out dark red)
 
 
 def icons(n, names):
@@ -123,6 +123,8 @@ def main():
     icons(1, [f"extra_{k}" for k in EXTRAS])
     keys = list(GAME["THINGS"])
     for n in range(2, 2 + (len(keys) + PER_SHEET - 1) // PER_SHEET):
+        if not (RAW / f"{n:02d}.jpeg").exists():
+            continue                 # not drawn yet: the build draws stand-ins for its things
         icons(n, [f"icon_{k}" for k in keys[(n - 2) * PER_SHEET:(n - 1) * PER_SHEET]])
     print(f"{sum(1 for _ in ART.glob('*.png'))} pictures in {ART}")
 

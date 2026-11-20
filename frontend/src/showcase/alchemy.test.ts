@@ -2,7 +2,7 @@
  * The combining showcase game, Mix Lab, played headless in the real Pyodide: the
  * list of things (everything can be made from the four you start with, no pair
  * makes two things), mixing by dragging and by tapping, hints, how a thing was made,
- * every achievement earned by a bot that finds all 144 things through the game's own
+ * every achievement earned by a bot that finds all 216 things through the game's own
  * taps, saving, the board, questions never mid-drag, and mixing from the keyboard alone.
  * Runs when the game has been built (python3 showcase/alchemy/build.py).
  */
@@ -83,7 +83,7 @@ const foundKeys = (g: PythonGame) => py<string[]>(g, 'progress()["found"]');
 describe.runIf(have)("Mix Lab", () => {
   it("everything can be made from the four you start with, and no pair makes two things", async () => {
     const g = await start();
-    expect(py(g, "len(THINGS)")).toBe(144);
+    expect(py(g, "len(THINGS)")).toBe(216);
     const bad = py<string[]>(g, `
 pairs, out = set(), []
 for a, b, c in RECIPES:
@@ -226,7 +226,7 @@ for a, b in [("air", "air"), ("water", "fire"), ("steam", "air"), ("cloud", "win
     expect(py(g, "global_vars.how is None")).toBe(true);
   });
 
-  it("a bot finds all 144 through the game's own taps and earns every award; the save and the board keep up", async () => {
+  it("a bot finds all 216 through the game's own taps and earns every award; the save and the board keep up", async () => {
     const g = await start();
     await lab(g);
     // 25 tries that make nothing first (the Mad Scientist), by the same taps.
@@ -253,21 +253,21 @@ while True:
         tap(card(b))
 rounds`);
     expect(rounds).toBeLessThan(200);
-    expect(py(g, 'len(progress()["found"])')).toBe(144);
+    expect(py(g, 'len(progress()["found"])')).toBe(216);
     expect(py(g, 'progress()["fails"]')).toBeGreaterThanOrEqual(25);
     expect(py<string[]>(g, 'sorted(progress()["awards"])')).toEqual(py<string[]>(g, "sorted(a[0] for a in ACHIEVEMENTS)"));
     // The world, the awards and the title draw with everything found.
     step(g, 200);
-    expect(g.scores.at(-1)).toBe(144);
+    expect(g.scores.at(-1)).toBe(216);
     const saved = g.saved().progress as { found: string[]; awards: string[] };
-    expect(saved.found.length).toBe(144);
+    expect(saved.found.length).toBe(216);
     py(g, 'do_act("awards", None)');
     step(g, 10);
     py(g, 'do_act("title", None)');
     step(g, 10);
     // Played again with that save: all still there.
     const again = await start({ progress: saved });
-    expect(py(again, 'len(progress()["found"])')).toBe(144);
+    expect(py(again, 'len(progress()["found"])')).toBe(216);
   }, 120_000);
 
   it("questions may come any time except while something is being dragged", async () => {
