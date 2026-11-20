@@ -16,9 +16,13 @@ self.buys = []
 # days). The board keeps each player's best, so it ranks the most money made.
 high_score(s["money"] // 100)
 # Two columns: 11 upgrades and 3 places didn't fit in one.
-spend = [("upgrade", u[0]) for u in UPGRADES] + [("unlock", i) for i, p in enumerate(PLACES) if p["unlock"]]
+# The stand itself first (the next one up), then the upgrades and the places, two by two.
+spend = [("tier", None)] + [("upgrade", u[0]) for u in UPGRADES] + [("unlock", i) for i, p in enumerate(PLACES) if p["unlock"]]
 for n, (act, arg) in enumerate(spend):
-    self.buys.append(make_button(700 + (n % 2) * 152, 118 + (n // 2) * 46, 146, 40, "", act, arg, 12))
+    self.buys.append(make_button(700 + (n % 2) * 152, 116 + (n // 2) * 40, 146, 36, "", act, arg, 12))
+# Your staff, and the trophies.
+self.staff_b = make_button(430, 10, 120, 40, "Staff", "staff", size=15)
+self.trophy_b = make_button(560, 10, 130, 40, "Trophies", "trophies", size=15)
 self.first = make_button(VIEW_W / 2 - 150, 498, 300, 56, "Next morning", "next", size=22)
 self.first.hot = True
 self.title = make_button(VIEW_W - 166, 504, 150, 44, "Title", "title", size=16)
@@ -30,7 +34,10 @@ self.offer.shown = s.get("offer") is not None
 question_ok(True)
 s = global_vars.s
 for b in self.buys:
-    if b.act == "upgrade":
+    if b.act == "tier":
+        nxt = next_tier(s)
+        name, cost, owned = (nxt["name"], nxt["cost"], False) if nxt else (tier_now(s)["name"], 0, True)
+    elif b.act == "upgrade":
         _, name, cost, _ = next(u for u in UPGRADES if u[0] == b.arg)
         owned = has(s, b.arg)
     else:
@@ -70,6 +77,10 @@ if t.get("popcorn"):
     rows.append((f"Popcorn: {t['pop_bags'] - t.get('combos', 0)} bags at {money(t['pop_price'])}", money(t["pop_income"]), MINT))
 if t.get("combos"):
     rows.append((f"Combos: {t['combos']} at {money(t['combo_price'])}", money(t["combo_income"]), MINT))
+if t.get("cocoa_cups"):
+    rows.append((f"Cocoa: {t['cocoa_cups']} mugs at {money(t['cocoa_price'])}", money(t["cocoa_income"]), MINT))
+if t.get("prizes"):
+    rows.append((f"Trophies won: {len(t['trophies'])}", money(t["prizes"]), GOLD))
 if t.get("ad_cost"):
     rows.append((f"Ad: {next(a[1] for a in ADS if a[0] == t['ad'])}", money(-t["ad_cost"]), RED))
 c = t.get("contract")
@@ -145,9 +156,18 @@ text(700, 98, "Upgrades and new places are yours for good.", DIM, 12)
 # What the one pointed at (or chosen by the keys) does.
 for b in self.buys:
     if (keyed() and global_vars.focus is b) or (not keyed() and inside(b, mouse_x, mouse_y)):
-        if b.act == "upgrade":
+        if b.act == "tier":
+            nxt = next_tier(s)
+            words = (f"A better stand: more people notice it, {nxt['queue'] - tier_now(s)['queue']} more in the queue" if nxt
+                     else "The best stand there is!")
+        elif b.act == "upgrade":
             words = next(u[3] for u in UPGRADES if u[0] == b.arg)
         else:
             p = PLACES[b.arg]
             words = f"Crowds of about {p['crowd']} on a good day; rent {money(p['rent'])}"
         text(849, 462, words, SKY, 12, "center")
+# A trophy won tonight: said, above Next morning.
+if t.get("trophies"):
+    name, tier = t["trophies"][-1]
+    more = f" (and {len(t['trophies']) - 1} more)" if len(t["trophies"]) > 1 else ""
+    text(VIEW_W / 2, 470, f"Trophy won: {name}, {['bronze', 'silver', 'gold'][tier]}!{more}", GOLD, 15, "center")

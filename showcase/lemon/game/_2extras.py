@@ -207,6 +207,8 @@ def week_ahead(s):
             out.append((name, "a heat wave begins"))
         if p["rainy_week"] and (x == s["day"] or not day_plan(s["seed"], x - 1)["rainy_week"]):
             out.append((name, "a rainy spell begins"))
+        if x % MONTH == 0:
+            out.append((name, f"{SEASONS[p['season']]['name'].lower()} begins"))
         if p["parade"]:
             out.append((name, "parade downtown"))
         if p["rival"] is not None:

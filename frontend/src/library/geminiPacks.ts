@@ -199,7 +199,7 @@ export const GEMINI_PACKS: LibraryPack[] = [
       {
         "name": "Big characters",
         "file": "library/gemini/lemon/big-characters.png",
-        "tileWidth": 140,
+        "tileWidth": 97,
         "tileHeight": 128,
         "use": "sprites"
       },

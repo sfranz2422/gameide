@@ -93,7 +93,7 @@ VERDICT_WORDS = {"perfect": "Perfect!", "love": "Love the pink!", "sour": "Too s
 BUBBLE = {"sour": 0, "sweet": 1, "watery": 2, "warm": 2, "pricey": 3, "perfect": 4, "love": 4, "thirsty": 5}
 
 # ---- crowd: how temperature and sky change it
-CROWD_TEMP_LOW, CROWD_TEMP_HIGH = 0.4, 1.6      # at 60°F and at 100°F and above
+CROWD_TEMP_LOW, CROWD_TEMP_HIGH = 0.55, 1.6     # at 60°F (and colder: 0.4 left winter empty) and at 100°F and above
 SKY_CROWD = {"sunny": 1.0, "cloudy": 0.85}       # rain is each place's own "rain"
 CROWD_REP_BASE, CROWD_REP = 0.7, 0.6             # x (0.7 + 0.6 x reputation)
 SIGN_CROWD = 1.15
@@ -150,7 +150,7 @@ POP_THIRST = 0.3             # popcorn's salt: thirst goes up this much, so more
 # Measured on Gemini's bare stand (sheet 13): its counter top, its awning's top.
 COUNTER_Y = 65
 STAND_SPOTS = {
-    "sign": (0, 211), "register": (-76, COUNTER_Y), "pitcher": (-34, COUNTER_Y), "juicer": (40, COUNTER_Y),
+    "sign": (0, 211), "register": (-84, COUNTER_Y), "cocoa": (-52, COUNTER_Y), "pitcher": (-20, COUNTER_Y), "juicer": (40, COUNTER_Y),
     "blender": (80, COUNTER_Y), "helper": (66, 45),   # stands where you do (OWNER_LIFT)
     "cooler": (152, 0), "fridge": (220, 0), "icemaker": (286, 0), "popcorn": (364, 0),
 }
@@ -237,3 +237,67 @@ INSPECTOR_FAIL_REP = -0.05
 
 # The Monday paper: every WEEK days, before the morning.
 WEEK = 7
+
+# ---- part 2: seasons and hot cocoa. The year turns every MONTH days: summer, autumn,
+# winter, spring, and round again. Each season moves the day's temperature by its shift;
+# heat waves come only in summer; rain in winter falls as snow. A summer saved before
+# seasons keeps summer for the month it's in (`season_from`).
+SEASONS = [
+    # tint: a wash over the street's picture, and how strong (light blue at 0.28 didn't show).
+    {"key": "summer", "name": "Summer", "shift": 0,   "tint": None,      "tint_alpha": 0,    "icon": "sun"},
+    {"key": "autumn", "name": "Autumn", "shift": -13, "tint": "#e8782a", "tint_alpha": 0.24, "icon": "leaf"},
+    {"key": "winter", "name": "Winter", "shift": -27, "tint": "#eef4ff", "tint_alpha": 0.45, "icon": "snowflake"},
+    {"key": "spring", "name": "Spring", "shift": -9,  "tint": "#ffb8dc", "tint_alpha": 0.16, "icon": "blossom"},
+]
+# Hot cocoa (the cocoa urn): cocoa mix and a cup a mug. Wanted by the cold: chill is how
+# far below COCOA_FROM it is (over COCOA_RANGE), and what they'd pay grows with it.
+COCOA_SUPPLY = ("cocoa", "Cocoa mix", 20, "mugs' worth", 180, 260)
+COCOA_FROM, COCOA_RANGE = 66, 26
+COCOA_WANT = 1.0             # times chill: the chance someone who notices you wants a mug
+COCOA_PAY = (0.45, 0.85)     # budget × (first + second × chill)
+COCOA_STEPS = 30             # pouring a mug
+UPGRADES.insert(4, ("cocoa", "Hot cocoa urn", 2000, "Sell hot cocoa: the colder, the more it sells"))
+
+# ---- part 2: staff. Your helper (the Helper upgrade) and the second stand's are trained
+# a level at a time, for good: yours serves faster each level; the second stand's pours
+# more a day.
+STAFF = {"helper": {"name": "Sam", "about": "Helps at your stand"},
+         "second": {"name": "Jo", "about": "Runs your second stand"}}
+TRAIN_COST = [0, 1500, 3500]          # to reach level 2, then 3
+TRAIN_FASTER = 0.8                    # each level, your helper's serving takes this much as long
+TRAIN_SECOND_MORE = 40                # each level, the second stand pours this many more a day
+STAFF_TOP = 3
+
+# ---- part 2: the stand itself. Each one bought in turn; each brings more people
+# (NOTICE more), and a longer queue.
+STAND_TIERS = [
+    {"name": "Wooden stand",  "cost": 0,     "notice": 0.0,  "crowd": 1.0,  "queue": 0},
+    {"name": "Painted stand", "cost": 2500,  "notice": 0.04, "crowd": 1.06, "queue": 1},
+    {"name": "Lemonade cart", "cost": 6000,  "notice": 0.08, "crowd": 1.12, "queue": 2},
+    {"name": "Lemonade kiosk", "cost": 15000, "notice": 0.12, "crowd": 1.2,  "queue": 3},
+]
+
+# Each stand's counter and sign, up or down from the wooden one's (measured on Gemini's).
+# (Measured on Gemini's sheet 16: the cart's counter is its top, the kiosk's its window's sill.)
+TIER_COUNTER = [0, -2, 42, 19]       # how much higher its counter is than COUNTER_Y (you stand that much higher too)
+TIER_SIGN = [0, -6, 75, None]        # how much higher the sign sits (the cart's umbrella); None: no room (the kiosk's lemon)
+TIER_SQUEEZE = [1, 1, 1, 0.6]        # what's on the counter drawn this much closer in (the kiosk's sill is narrow)
+
+# ---- part 2: goals and trophies. Each goal has three trophies (bronze, silver, gold),
+# won once each as it's reached, for a prize; read from the history and the summer.
+GOALS = [
+    # key          name                   about                         goals                   unit
+    ("cups",      "Lemonade lover",      "Cups sold",                  (100, 1000, 5000),      ""),
+    ("best_day",  "Big day",             "Profit in one day",          (2000, 10000, 30000),   "money"),
+    ("money",     "Savings",             "Money in the bank",          (10000, 100000, 1000000), "money"),
+    ("stars",     "Five stars",          "Reputation (stars)",         (3, 4, 5),              ""),
+    ("places",    "Everywhere",          "Places you sell at",         (2, 3, 4),              ""),
+    ("contracts", "Deal maker",          "Contracts delivered",        (1, 5, 20),             ""),
+    ("popcorn",   "Popcorn king",        "Bags of popcorn sold",       (50, 500, 2000),        ""),
+    ("cocoa",     "Cocoa cosy",          "Mugs of cocoa sold",         (25, 250, 1000),        ""),
+    ("combos",    "Combo master",        "Combos sold",                (10, 100, 500),         ""),
+    ("days",      "Open for business",   "Days open",                  (7, 30, 120),           ""),
+]
+TROPHY_PRIZE = [500, 2000, 5000]      # cents: bronze, silver, gold
+EXTRA_SUPPLIES = POP_SUPPLIES + [COCOA_SUPPLY]       # bought on the Extras screen, priced by pop_prices
+EXTRA_KEYS = [x[0] for x in EXTRA_SUPPLIES]

@@ -39,7 +39,8 @@ self.second.shown = has(s, "second")
 sec = second_open(s)
 self.second.words = f"Second stand: {PLACES[sec['place']]['name']}, {sec['cups']} cups" if sec and sec["place"] is not None else "Second stand: closed"
 ad = ad_now(s)[1] if s["plan"]["ad"] else "no ad"
-self.pop.words = f"Extras: {ad}" + (f", popcorn {money(s['plan']['pop_price'])}" if selling_pop(s) else "")
+self.pop.words = (f"Extras: {ad}" + (f", popcorn {money(s['plan']['pop_price'])}" if selling_pop(s) else "")
+                  + (f", cocoa {money(s['plan']['cocoa_price'])}" if selling_cocoa(s) else ""))
 run_controls(self.first)
 
 # === draw
@@ -52,7 +53,10 @@ draw_set_alpha(0.35)
 draw_set_color("#000000")
 draw_rect(0, 0, VIEW_W, VIEW_H)
 draw_set_alpha(1)
+season = SEASONS[day["season"]]
 text(20, 14, f"Morning, day {s['day'] + 1}", GOLD, 28)
+icon(season["icon"], 290, 32, 0.45)
+text(310, 20, f"{season['name']}, day {s['day'] % MONTH + 1} of {MONTH}", INK, 16)
 text(22, 52, rank_of(s["money"]), DIM, 15)
 text(VIEW_W - 20, 14, f"Money {money(s['money'])}", INK, 26, "right")
 text(VIEW_W - 140, 52, "Reputation", DIM, 14, "right")

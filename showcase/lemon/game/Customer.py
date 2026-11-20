@@ -23,6 +23,8 @@ self.lemonade = False       # what they'll be served (decided as they reach the 
 self.popcorn = False
 self.has_popcorn = False    # holding a bag (drawn in their hand)
 self.combo = False          # a cup and a bag at the combo price
+self.cocoa = False          # a mug of hot cocoa
+self.has_cocoa = False
 
 # === step
 s = global_vars.s
@@ -47,8 +49,10 @@ if self.state == "walk":
         # Buying one of the two, with a combo on: the combo, if the extra's worth it to them.
         if (lem or pop) and lem != pop and not why_not(s) and not pop_why_not(s) and takes_combo(s, self.who, t, lem, pop):
             lem = pop = self.combo = True
-        if lem or pop:
-            self.lemonade, self.popcorn = lem, pop
+        # Hot cocoa: the cold want it (popcorn's salt doesn't come into it).
+        coc = choice != "full" and wants_cocoa(s, self.who, t) and not cocoa_why_not(s)
+        if lem or pop or coc:
+            self.lemonade, self.popcorn, self.cocoa = lem, pop, coc
             q.append(self)
             self.state = "queue"
         elif choice == "buy":
@@ -92,3 +96,5 @@ draw_self()
 if self.has_popcorn:
     # Their bag of popcorn, in the hand in front (they all face right).
     icon("popcorn", self.x + 22, self.y - 52, 0.42)
+if self.has_cocoa:
+    icon("mug", self.x + (8 if self.has_popcorn else 22), self.y - 56, 0.4)

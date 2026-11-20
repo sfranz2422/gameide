@@ -3,7 +3,8 @@
 INK, SHADOW, GOLD, RED, MINT, SKY, DIM = "#ffffff", "#3a2a10", "#ffd23f", "#ff6b5f", "#9ff0c0", "#bfe6ff", "#d9d2bf"
 PANEL, PANEL_EDGE = "#4a3418", "#ffe38a"
 ICONS = ["lemon", "sugar", "ice", "cups", "pitcher", "pitcher_pink", "coin", "cooler", "juicer", "sign", "second", "strawberry", "soft_lemon",
-         "popcorn", "kernels"]
+         "popcorn", "kernels",
+         "cocoa", "mug", "sun", "leaf", "snowflake", "blossom", "trophy_gold", "trophy_silver", "trophy_bronze"]
 
 
 def text(x, y, words, colour=INK, size=16, align="left"):

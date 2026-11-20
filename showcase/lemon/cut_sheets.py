@@ -103,6 +103,37 @@ def wide(n, name):
     raw(n).convert("RGB").resize((_build.VIEW_W, _build.VIEW_H), Image.LANCZOS).save(ART / f"{name}.png", optimize=True)
 
 
+def no_steam(part):
+    """Rubs out steam Gemini drew in the magenta's own pink (pinkish pixels in the top third)."""
+    px = part.load()
+    for y in range(part.height // 3):
+        for x in range(part.width):
+            r, g, b, a_ = px[x, y]
+            if a_ and (r + b) / 2 - g > 30:
+                px[x, y] = (0, 0, 0, 0)
+    return part
+
+
+def open_window(part):
+    """The kiosk's serving window, drawn solid dark: made see-through (the dark patch round
+    the middle, found by filling from it), so you and your helper show inside."""
+    from collections import deque
+    px = part.load()
+    w, h = part.size
+    start = (w // 2, int(h * 0.62))                  # the middle of the window (measured)
+    base = px[start][:3]
+    dark = lambda c: c[3] > 0 and sum(abs(c[i] - base[i]) for i in range(3)) < 45
+    seen, todo = {start}, deque([start])
+    while todo:
+        x, y = todo.popleft()
+        px[x, y] = (0, 0, 0, 0)
+        for nx, ny in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)):
+            if 0 <= nx < w and 0 <= ny < h and (nx, ny) not in seen and dark(px[nx, ny]):
+                seen.add((nx, ny))
+                todo.append((nx, ny))
+    return part
+
+
 def main():
     ART.mkdir(exist_ok=True)
     # 1: the four stands, in the order the game numbers them (plain, sign, cooler and juicer, pink).
@@ -154,6 +185,34 @@ def main():
         im, boxes = sheet(15, [2, 2])
         together(im, boxes[:2], ["helper_0", "helper_1"], _build.HELPER)
         apart(im, boxes[2:], ["icon_popcorn", "icon_kernels"], _build.ICON)
+    if (RAW / "16.jpeg").exists():
+        # 16: the three bigger stands. Each as wide as the wooden one (its counter the same
+        # width, so what's on it fits), at its own height; the build stands them all on one
+        # canvas. The kiosk's window was drawn solid: opened up, so you can be seen in it.
+        im, boxes = sheet(16, [3])
+        bare_w = Image.open(ART / "stand_bare_0.png").getbbox()
+        bare_w = bare_w[2] - bare_w[0]
+        for k, b in enumerate(boxes, 1):
+            part = im.crop(b)
+            scale = bare_w / part.width
+            part = part.resize((round(part.width * scale), round(part.height * scale)), Image.LANCZOS)
+            if k == 3:
+                part = open_window(part)
+            save(part, f"stand_tier_{k}")
+    if (RAW / "17.jpeg").exists():
+        # 17: the cocoa urn (for the counter), cocoa and season icons, three trophies. The
+        # steam over the urn and the mug came out pink from the magenta: rubbed out.
+        im, boxes = sheet(17, [5, 5])
+        names = ["thing_cocoa", "icon_cocoa", "icon_mug", "icon_sun", "icon_leaf",
+                 "icon_snowflake", "icon_blossom", "icon_trophy_gold", "icon_trophy_silver", "icon_trophy_bronze"]
+        for name, b in zip(names, boxes):
+            part = no_steam(im.crop(b)) if name in ("thing_cocoa", "icon_mug") else im.crop(b)
+            part = part.crop(part.getbbox())
+            if name == "thing_cocoa":
+                k = _build.THINGS["cocoa"][1] * 2 / part.height        # as tall as the build asks, at twice
+                save(part.resize((round(part.width * k), round(part.height * k)), Image.LANCZOS), name)
+            else:
+                save(centred(part, (0, 0, part.width, part.height), size2(_build.ICON), fit([(0, 0, part.width, part.height)], size2(_build.ICON))), name)
 
 
 if __name__ == "__main__":

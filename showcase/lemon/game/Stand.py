@@ -8,7 +8,8 @@
 # === create
 s = global_vars.s
 self.image_speed = 0
-self.image_index = 1 if global_vars.t["pink"] else 0      # the bare stand, or the pink one
+tier = s.get("tier", 0)
+self.image_index = tier + 1 if tier else (1 if global_vars.t["pink"] else 0)      # the bare stand, the pink one, or a better one
 self.busy = 0
 self.serving = None
 self.pose = 0
@@ -36,7 +37,8 @@ elif q and q[0].arrived:
     # What can still be had: a cup if the lemonade's not run out, a bag if the popcorn hasn't.
     c.lemonade = c.lemonade and not why_not(s)
     c.popcorn = c.popcorn and not pop_why_not(s)
-    if not c.lemonade and not c.popcorn:
+    c.cocoa = c.cocoa and not cocoa_why_not(s)
+    if not c.lemonade and not c.popcorn and not c.cocoa:
         say(c, "thirsty")              # sold out of what they came for
         c.state = "walk"
     else:
@@ -56,6 +58,10 @@ elif q and q[0].arrived:
                 self.popping = POP_STEPS      # a new batch popping: the machine shakes
             self.busy += HAND_STEPS + (POP_STEPS if self.popping == POP_STEPS else 0)
             c.has_popcorn = True
+        if c.cocoa:
+            sell_cocoa(s, t)
+            self.busy += COCOA_STEPS
+            c.has_cocoa = True
         self.serving = c
         c.state = "served"
         self.pose = 1
@@ -67,24 +73,35 @@ self.out = why_not(s)
 s = global_vars.s
 # Everything you've bought shows (the kids' ask): on the ground beside the stand, behind
 # the counter, on it, and the sign on top. Where, STAND_SPOTS.
+tier = s.get("tier", 0)
 def put(name, frame=0, shake=0):
     dx, up = STAND_SPOTS[name]
+    if up == COUNTER_Y:
+        up += TIER_COUNTER[tier]      # a bigger stand's counter may sit higher...
+        dx *= TIER_SQUEEZE[tier]      # ...or be narrower
+    elif name == "sign":
+        if TIER_SIGN[tier] is None:
+            return                    # the kiosk: its lemon is its sign
+        up += TIER_SIGN[tier]
     draw_sprite(name, frame, self.x + dx + shake, self.y - up)
 for k in ("cooler", "fridge", "icemaker"):
     if has(s, k):
         put(k)
 if has(s, "popcorn"):
     put("popcorn", 0, (1 if int(self.popping) % 4 < 2 else -1) if self.popping > 0 else 0)
-draw_sprite("owner", self.pose, self.x, self.y - OWNER_LIFT)
+# Your helper, then you, behind the counter, as high as this stand's counter is. (You in
+# front: in the kiosk's narrow window the helper hid you.)
 if has(s, "helper"):
     dx, up = STAND_SPOTS["helper"]
-    draw_sprite("helper", 1 if self.busy > 0 else 0, self.x + dx, self.y - up)
-self.image_index = 1 if global_vars.t["pink"] else 0
+    draw_sprite("helper", 1 if self.busy > 0 else 0, self.x + dx * TIER_SQUEEZE[tier], self.y - up - TIER_COUNTER[tier])
+draw_sprite("owner", self.pose, self.x, self.y - OWNER_LIFT - TIER_COUNTER[tier])
+# The stand: the wooden one (pink on pink days), or the one bought since (frames 2-4).
+self.image_index = tier + 1 if tier else (1 if global_vars.t["pink"] else 0)
 draw_self()
 if has(s, "sign"):
     put("sign")
 put("pitcher", 1 if global_vars.t["pink"] else 0)
-for k in ("register", "juicer", "blender"):
+for k in ("register", "cocoa", "juicer", "blender"):
     if has(s, k):
         put(k)
 if self.out:

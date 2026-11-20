@@ -888,8 +888,15 @@ each evening from the seed and the day, `contract_offer`; taken, delivered from 
 stand opens and paid in the evening; short, it falls through and costs reputation); **bad luck**
 (`trouble_on`: its own random numbers, so it changes nothing else about a day; the inspector's
 fine is at most what you have: at -$9.45 a summer could never buy again); the **Monday paper**
-(`News`, every `WEEK` mornings, read from the days' own plans, so it's never wrong). Part 2:
-seasons and hot cocoa, staff training, stand upgrades, trophies.
+(`News`, every `WEEK` mornings, read from the days' own plans, so it's never wrong). Part 2 (`_2more.py`): **seasons**, the
+year turning every `MONTH` days (summer, autumn, winter, spring: a temperature `shift`, heat waves
+only in summer, winter's rain as snow); a summer saved before seasons keeps this month summer
+(`season_from`, which `day_plan` learns through `set_season_from`). **Hot cocoa** (the urn) for the
+cold (`chill`); the cold crowd's floor went up (0.4 left winter empty). **Staff** trained a level at a
+time; **the stand itself** bought in turn (`STAND_TIERS`, frames 2-4 of "stand"); **trophies**
+(`GOALS`, bronze to gold, a prize each, in the ledger but never in the day's profit). The season's
+wash over the street is a stretched white picture (`Tint`): a rectangle drawn in the world goes
+under every picture.
 
 ## Order Up!
 

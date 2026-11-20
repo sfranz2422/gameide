@@ -12,6 +12,21 @@ import random
 
 
 _plans = {}
+_season_from = {}           # seed -> the month that was summer (a summer saved before seasons)
+
+
+def set_season_from(s):
+    """Tells day_plan which month was this summer's first summer, forgetting any days
+    planned before it knew (they'd be in the wrong season)."""
+    if _season_from.get(s["seed"], 0) != s.get("season_from", 0):
+        for key in [k for k in _plans if k[0] == s["seed"]]:
+            del _plans[key]
+    _season_from[s["seed"]] = s.get("season_from", 0)
+
+
+def season_of(seed, d):
+    """The season of day d: SEASONS' index (summer first, from the summer's own start)."""
+    return (d // MONTH - _season_from.get(seed, 0)) % len(SEASONS)
 
 
 def month_events(seed, m):
@@ -36,6 +51,9 @@ def day_plan(seed, d):
     temp = TEMP_MID + TEMP_ARC * math.sin(math.pi * k / (MONTH - 1)) + rng.uniform(-TEMP_NOISE, TEMP_NOISE)
     heat = heat_start <= k < heat_start + HEAT_WAVE_DAYS
     rainy_week = rain_start <= k < rain_start + RAINY_WEEK_DAYS
+    season = season_of(seed, d)
+    heat = heat and season == 0           # heat waves only in summer
+    temp += SEASONS[season]["shift"]
     if heat:
         temp += HEAT_WAVE_EXTRA
     r = rng.random()
@@ -52,7 +70,8 @@ def day_plan(seed, d):
     if trouble and trouble["kind"] == "sugar_shortage":
         prices["sugar"] = round(prices["sugar"] * SHORTAGE_PRICE / 5) * 5
     out = {"day": d, "temp": temp, "sky": sky, "forecast": guess, "rain_pct": rain_pct, "prices": prices,
-           "heat": heat, "parade": k == parade, "rival": rival, "rainy_week": rainy_week, "trouble": trouble}
+           "heat": heat, "parade": k == parade, "rival": rival, "rainy_week": rainy_week, "trouble": trouble,
+           "season": season, "snow": sky == "rain" and SEASONS[season]["key"] == "winter"}
     _plans[(seed, d)] = out
     return out
 
@@ -66,9 +85,11 @@ def new_summer(seed):
     return {"seed": seed, "day": 0, "money": START_MONEY, "rep": START_REP,
             "lemons": [], "sugar": 0, "ice": 0.0, "cups": 0, "pitcher": 0, "kernels": 0, "bags": 0, "popped": 0,
             "upgrades": [], "places": [0], "history": [], "news": None, "phase": "morning", "contract": None, "offer": None,
+            "season_from": 0, "cocoa": 0, "staff": {"helper": 1, "second": 1}, "tier": 0, "trophies": {},
             "plan": {"buy": {"lemons": 2, "sugar": 1, "ice": 1, "cups": 2},
                      "lemons": 4, "sugar": 4, "ice": 3, "price": 100, "place": 0, "pink": False,
                      "frozen": False, "popcorn": True, "pop_price": 100, "ad": 0, "combo_on": False, "combo": COMBO_START,
+                     "cocoa_on": True, "cocoa_price": 150,
                      "second": new_second()}}
 
 
@@ -93,6 +114,17 @@ def bring_up_to_date(s):
         s["plan"].setdefault(k, v)
     s.setdefault("contract", None)
     s.setdefault("offer", None)
+    # Part 2. Seasons: a summer saved before them keeps this month summer.
+    if "season_from" not in s:
+        s["season_from"] = s["day"] // MONTH
+    set_season_from(s)
+    for k, v in (("cocoa", 0),):
+        s.setdefault(k, v)
+    s["plan"].setdefault("cocoa_on", True)
+    s["plan"].setdefault("cocoa_price", 150)
+    s.setdefault("staff", {"helper": 1, "second": 1})
+    s.setdefault("tier", 0)
+    s.setdefault("trophies", {})
     return s
 
 
@@ -163,14 +195,15 @@ def next_day(s):
 def shopping_cost(s, buy=None):
     prices = today(s)["prices"]
     buy = s["plan"]["buy"] if buy is None else buy
-    pop = sum(buy.get(k, 0) * pop_prices(s)[k] for k in POP_KEYS)
+    pop = sum(buy.get(k, 0) * pop_prices(s)[k] for k in EXTRA_KEYS)
     return sum(buy.get(k, 0) * prices[k] for k in SUPPLY_KEYS) + pop
 
 
 def pop_prices(s):
     """Today's popcorn supply prices: the day's own, from the seed (like the others')."""
     rng = random.Random(s["seed"] * 6151 + s["day"] * 3571 + 9)
-    return {k: round(rng.uniform(low, high) / 5) * 5 for k, _, _, _, low, high in POP_SUPPLIES}
+    # (Cocoa's after popcorn's, so popcorn's prices are what they always were.)
+    return {k: round(rng.uniform(low, high) / 5) * 5 for k, _, _, _, low, high in EXTRA_SUPPLIES}
 
 
 def selling_pop(s):
@@ -209,10 +242,12 @@ def open_stand(s):
          "frozen": bool(s["plan"]["frozen"] and has(s, "blender")),
          "popcorn": selling_pop(s), "pop_price": s["plan"]["pop_price"], "pop_income": 0, "pop_bags": 0,
          "combo": combo_on(s), "combo_price": s["plan"]["combo"], "combos": 0, "combo_income": 0,
-         "ad": ad[0], "ad_cost": ad[2]}
+         "ad": ad[0], "ad_cost": ad[2],
+         "cocoa": selling_cocoa(s), "cocoa_price": s["plan"]["cocoa_price"], "cocoa_cups": 0, "cocoa_income": 0,
+         "season": today(s)["season"]}
     s["money"] -= cost + rent + ad[2]
-    packs = dict((x[0], x[2]) for x in SUPPLIES + POP_SUPPLIES)
-    for k in SUPPLY_KEYS + POP_KEYS:
+    packs = dict((x[0], x[2]) for x in SUPPLIES + EXTRA_SUPPLIES)
+    for k in SUPPLY_KEYS + EXTRA_KEYS:
         n = s["plan"]["buy"].get(k, 0) * packs[k]
         if k == "lemons" and n:
             s["lemons"].append([s["day"], n])
@@ -309,7 +344,7 @@ def run_second(s, t):
     sent = sec["sent"]
     per = lemons_a_pitcher(s)
     pitchers = min(sent["lemons"] // per if per else 10 ** 6, sent["sugar"] // s["plan"]["sugar"] if s["plan"]["sugar"] else 10 ** 6)
-    can_pour = min(sent["cups"], pitchers * CUPS_PER_PITCHER, SECOND_MOST)
+    can_pour = min(sent["cups"], pitchers * CUPS_PER_PITCHER, second_most(s))
     melt = max(ICE_MELT_LOW, min(ICE_MELT_HIGH, ICE_MELT_LOW + (day["temp"] - 55) / 45 * (ICE_MELT_HIGH - ICE_MELT_LOW)))
     if has(s, "cooler"):
         melt *= COOLER_MELT
@@ -423,8 +458,7 @@ def wants_popcorn(s, who, t, rng=random):
     some (kids more often), at a price they'd pay. Hot or cold, popcorn sells."""
     if not t.get("popcorn"):
         return False
-    notice = NOTICE + (NOTICE_SIGN if has(s, "sign") else 0) + NOTICE_REP * s["rep"]
-    if rng.random() > notice:
+    if rng.random() > notice_chance(s):
         return False
     if rng.random() > (POP_WANT_KID if CUSTOMERS[who["kind"]]["kid"] else POP_WANT):
         return False
@@ -501,14 +535,13 @@ def decide(s, who, t, queue, rival, rng=random):
     """
     if who["thirst"] < THIRSTY_ENOUGH:
         return "pass"
-    notice = NOTICE + (NOTICE_SIGN if has(s, "sign") else 0) + NOTICE_REP * s["rep"]
-    if rng.random() > notice:
+    if rng.random() > notice_chance(s):
         return "pass"
     if would_pay(s, who, t["pink"], t.get("frozen", False)) < t["price"]:
         return "pricey"
     if rival is not None and rival < t["price"] and rng.random() < RIVAL_STEALS:
         return "rival"
-    if queue >= QUEUE_MAX + (QUEUE_SECOND_STAND if has(s, "helper") else 0):
+    if queue >= QUEUE_MAX + (QUEUE_SECOND_STAND if has(s, "helper") else 0) + tier_now(s)["queue"]:
         return "full"
     return "buy"
 
@@ -547,7 +580,8 @@ def crowd_size(s, day=None, at=None):
         n *= PARADE_CROWD
     n *= trouble_crowd(day, PLACES.index(place))
     if at is None:
-        n *= ad_now(s)[3]            # an ad brings people to your own stand
+        n *= ad_now(s)[3]            # an ad brings people to your own stand...
+        n *= tier_now(s)["crowd"]    # ...and so does a better stand
     return max(3, round(n))
 
 
@@ -562,8 +596,8 @@ def end_day(s, t):
     settle_contract(s, t)
     t["inspector"] = inspect(s, t)
     t["money_end"] = s["money"]
-    t["profit"] = (t["income"] + t.get("pop_income", 0) + t.get("combo_income", 0) - t["supplies"] - t["rent"]
-                   - t.get("ad_cost", 0))
+    t["profit"] = (t["income"] + t.get("pop_income", 0) + t.get("combo_income", 0) + t.get("cocoa_income", 0)
+                   - t["supplies"] - t["rent"] - t.get("ad_cost", 0))
     c = t.get("contract")
     if c and c["done"]:
         t["profit"] += c["pay"]
@@ -574,7 +608,13 @@ def end_day(s, t):
     t["rep_end"] = s["rep"]
     t["left"] = {"lemons": lemon_count(s), "sugar": s["sugar"], "ice": int(s["ice"]), "cups": s["cups"],
                  "kernels": s["kernels"], "bags": s["bags"]}
+    t["left"].update(cocoa=s["cocoa"])
     s["history"].append(t)
+    # Trophies reached with today counted: won, their prizes paid. A prize is in the ledger
+    # (money tonight) but not the day's profit, which is what selling made.
+    t["trophies"] = award_trophies(s)
+    t["prizes"] = sum(TROPHY_PRIZE[tier] for _, tier in t["trophies"])
+    t["money_end"] = s["money"]
     s["offer"] = contract_offer(s, s["day"] + 1)     # tomorrow's, if any: taken or left in the evening
     s["phase"] = "evening"
     return t

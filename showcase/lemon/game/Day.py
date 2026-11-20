@@ -19,7 +19,12 @@ self.over = False
 self.times = sorted(random.uniform(0, DAY_STEPS * SPAWN_UNTIL) for _ in range(crowd_size(s, self.day)))
 self.k = 0
 instance_create(STAND_X, self.ground, "Stand")
-if self.day["sky"] == "rain":
+instance_create(0, 0, "Tint")            # the season's colour over the street's picture
+season = SEASONS[self.day["season"]]
+if self.day["snow"]:
+    weather("snow", 2)               # winter's rain falls as snow
+    lighting(0.25, "#cfe4ff")
+elif self.day["sky"] == "rain":
     weather("rain", 2)
     lighting(0.3, "#23324a")
 else:
@@ -66,17 +71,20 @@ if self.day["rival"] is not None:
 s = global_vars.s
 t = global_vars.t
 panel(0, 0, VIEW_W, 48, 0.8)
-text(14, 10, f"Day {s['day'] + 1}  ·  {PLACES[t['place']]['name']}  ·  {self.day['temp']}°F", INK, 20)
+text(14, 10, f"Day {s['day'] + 1}  ·  {SEASONS[self.day['season']]['name']}  ·  {PLACES[t['place']]['name']}  ·  {self.day['temp']}°F", INK, 20)
 text(VIEW_W / 2 + 40, 10, clock_words(self.clock), GOLD, 22, "center")
 text(VIEW_W - 14, 10, money(s["money"]), GOLD, 22, "right")
 # The day so far, and the stock left.
 stock = [("lemon", lemon_count(s)), ("sugar", s["sugar"]), ("ice", int(s["ice"])), ("cups", s["cups"])]
 if t.get("popcorn"):
     stock += [("kernels", s["kernels"] + s["popped"]), ("popcorn", s["bags"])]
+if t.get("cocoa"):
+    stock += [("cocoa", s["cocoa"])]
 # Wider with popcorn's two (they ran past the panel's edge).
 panel(0, 48, 196 + 42 * len(stock) + 8, 100, 0.7)
 text(12, 54, f"Sold {t['cups']} at {money(t['price'])}", INK, 16)
-text(12, 76, f"{t['passers']} walked by" + (f" · {t['pop_bags']} popcorn" if t.get("popcorn") else ""), DIM, 13)
+text(12, 76, f"{t['passers']} walked by" + (f" · {t['pop_bags']} popcorn" if t.get("popcorn") else "")
+     + (f" · {t['cocoa_cups']} cocoa" if t.get("cocoa") else ""), DIM, 13)
 x = 196
 for pic, n in stock:
     icon(pic, x, 74, 0.38)

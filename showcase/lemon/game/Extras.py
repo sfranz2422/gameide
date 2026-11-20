@@ -13,6 +13,9 @@ if has(s, "popcorn"):
         make_stepper(352, y, k, 316)
         y += 54
 make_stepper(696, 120, "ad", 300)
+if has(s, "cocoa"):
+    for i, k in enumerate(("cocoa_on", "buy_cocoa", "cocoa_price")):
+        make_stepper(696, 220 + i * 54, k, 300)
 self.done = make_button(VIEW_W / 2 - 150, 498, 300, 56, "Done", "done_second", size=24)
 self.done.hot = True
 self.first = self.done
@@ -70,13 +73,17 @@ else:
 
 panel(684, 96, 1010, 470)
 text(696, 100, "Advertising", GOLD, 18)
-for i, (key, name, cost, more) in enumerate(ADS[1:]):
-    y = 196 + i * 58
-    text(706, y, name, INK if plan["ad"] != i + 1 else GOLD, 16)
-    text(706, y + 22, f"{money(cost)} · about {round((more - 1) * 100)}% more people walk by", DIM, 13)
-text(706, 390, "Just for today, at your own stand.", DIM, 13)
-text(706, 410, "Worth it on a busy day; not on a cold", DIM, 13)
-text(706, 430, "or rainy one, when few will buy.", DIM, 13)
+text(706, 172, "Today only. Worth it on a busy day.", DIM, 12)
+text(696, 196, "Hot cocoa", GOLD, 18)
+if has(s, "cocoa"):
+    temp = today(s)["forecast"]
+    want = "lots of people want it" if chill(temp) > 0.6 else "some want it" if chill(temp) > 0.2 else "few want it" if chill(temp) > 0 else "too warm for cocoa"
+    text(706, 384, f"{s['cocoa']} mugs' worth of mix on the shelf", INK, 13)
+    text(706, 404, f"At {temp}°F, {want}.", MINT if chill(temp) > 0.2 else DIM, 13)
+    text(706, 424, "A mug uses a cup. The mix keeps.", DIM, 12)
+else:
+    text(706, 228, "Buy a hot cocoa urn in the evening", INK, 14)
+    text(706, 248, "to sell cocoa on cold days.", INK, 14)
 if global_vars.problem:
     text(VIEW_W / 2, 474, global_vars.problem, RED, 15, "center")
 text(VIEW_W / 2, 558, "Arrows choose · Left and Right change a number · Space presses", "#fff6d8", 13, "center")

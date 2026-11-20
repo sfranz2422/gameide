@@ -47,7 +47,7 @@ def _limits(key):
     if key == "s_price":
         return PRICE_MIN, PRICE_MAX, PRICE_STEP
     if key == "s_cups":
-        return 0, SECOND_MOST, SECOND_STEP
+        return 0, second_most(s), SECOND_STEP
     if key in ("lemons", "sugar", "ice"):
         return 0, RECIPE_MAX, 1
     if key == "price":
@@ -58,8 +58,10 @@ def _limits(key):
         return 0, len(styles(s)) - 1, 1
     if key == "pop_price":
         return PRICE_MIN, PRICE_MAX, PRICE_STEP
-    if key == "combo_on":
+    if key in ("combo_on", "cocoa_on"):
         return 0, 1, 1
+    if key == "cocoa_price":
+        return PRICE_MIN, PRICE_MAX, PRICE_STEP
     if key == "combo":
         return PRICE_MIN, PRICE_MAX * 2, PRICE_STEP
     if key == "ad":
@@ -87,6 +89,8 @@ def stepper_value(key):
         return 1 if plan["popcorn"] else 0
     if key == "combo_on":
         return 1 if plan["combo_on"] else 0
+    if key == "cocoa_on":
+        return 1 if plan["cocoa_on"] else 0
     if key == "style":
         now = (bool(plan["pink"]), bool(plan["frozen"]))
         return styles(global_vars.s).index(now) if now in styles(global_vars.s) else 0
@@ -116,6 +120,8 @@ def stepper_set(key, d):
         plan["popcorn"] = bool(v)
     elif key == "combo_on":
         plan["combo_on"] = bool(v)
+    elif key == "cocoa_on":
+        plan["cocoa_on"] = bool(v)
     elif key == "style":
         plan["pink"], plan["frozen"] = styles(s)[v]
     else:
@@ -131,9 +137,9 @@ def stepper_words(key):
     day = today(s)
     if key.startswith("buy_"):
         k = key[4:]
-        _, name, pack, unit, _, _ = next(x for x in SUPPLIES + POP_SUPPLIES if x[0] == k)
+        _, name, pack, unit, _, _ = next(x for x in SUPPLIES + EXTRA_SUPPLIES if x[0] == k)
         n = plan["buy"].get(k, 0)
-        price = pop_prices(s)[k] if k in POP_KEYS else day["prices"][k]
+        price = pop_prices(s)[k] if k in EXTRA_KEYS else day["prices"][k]
         return name, f"{n} pack{'s' if n != 1 else ''}", f"{money(price)} for {pack} {unit}"
     if key == "style":
         pink, frozen = styles(s)[stepper_value("style")]
@@ -146,6 +152,10 @@ def stepper_words(key):
         return "Price a bag", money(plan["pop_price"]), ""
     if key == "combo_on":
         return "Combo: a cup and a bag", "Yes" if plan["combo_on"] else "No", "One price for the two"
+    if key == "cocoa_on":
+        return "Sell cocoa today", "Yes" if plan["cocoa_on"] else "No", "The colder, the better"
+    if key == "cocoa_price":
+        return "Price a mug", money(plan["cocoa_price"]), ""
     if key == "combo":
         apart = plan["price"] + plan["pop_price"]
         return "Combo price", money(plan["combo"]), f"Apart they're {money(apart)}"
@@ -174,7 +184,7 @@ def stepper_words(key):
     if key == "s_price":
         return "Price a cup", money(sec["price"]), "Its own price; your recipe"
     if key == "s_cups":
-        return "Cups to send", str(sec["cups"]), f"A helper pours {SECOND_MOST} at most"
+        return "Cups to send", str(sec["cups"]), f"{STAFF['second']['name']} pours {second_most(s)} at most"
     place = PLACES[plan["place"]]
     return "Where", place["name"], f"Rent {money(place['rent'])} a day" if place["rent"] else "No rent"
 
@@ -221,6 +231,20 @@ def do_act(name, arg):
         if s.get("contract") is s.get("offer"):
             s["contract"] = None
         keep(s)
+        room_goto("Evening")
+    elif name == "tier":
+        if buy_tier(s):
+            sound_play("coin", volume=0.6)
+            keep(s)
+    elif name == "staff":
+        room_goto("Staff")
+    elif name == "trophies":
+        room_goto("Trophies")
+    elif name == "train":
+        if train(s, arg) == "trained":
+            sound_play("coin", volume=0.6)
+            keep(s)
+    elif name == "back_evening":
         room_goto("Evening")
     elif name == "paper_done":
         s["paper_read"] = s["day"]

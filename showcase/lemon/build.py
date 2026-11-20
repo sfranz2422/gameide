@@ -50,10 +50,11 @@ PERSON = (120, 130)    # wide enough for a stroller or a dog alongside
 ICON = (64, 64)
 BUBBLE = (76, 76)
 ICON_NAMES = ["lemon", "sugar", "ice", "cups", "pitcher", "pitcher_pink", "coin", "cooler", "juicer", "sign", "second", "strawberry", "soft_lemon",
-              "popcorn", "kernels"]
+              "popcorn", "kernels",
+              "cocoa", "mug", "sun", "leaf", "snowflake", "blossom", "trophy_gold", "trophy_silver", "trophy_bronze"]
 # What you buy, shown at the stand (the kids' ask, 2026-11-19): each its own picture, its
 # foot at the bottom middle, placed by STAND_SPOTS in the rules. Sizes in the game.
-THINGS = {"sign": (230, 56), "register": (44, 38), "juicer": (36, 34), "blender": (30, 52), "pitcher": (40, 44),
+THINGS = {"cocoa": (40, 54), "sign": (230, 56), "register": (44, 38), "juicer": (36, 34), "blender": (30, 52), "pitcher": (40, 44),
           "cooler": (66, 42), "fridge": (54, 76), "icemaker": (52, 66), "popcorn": (76, 118)}
 PERSON_FRAMES = ["walk1", "walk2", "stand", "drink", "happy"]
 
@@ -82,6 +83,12 @@ def art(name, size):
     """One of the teacher's pictures (art/ keeps them at twice the game's size), fitted to `size`."""
     im = Image.open(ART / f"{name}.png").convert("RGBA")
     return im.resize(size, Image.LANCZOS)
+
+
+def half_size(name):
+    """One of the teacher's pictures at half its size (art/ keeps them at twice), not fitted."""
+    im = Image.open(ART / f"{name}.png").convert("RGBA")
+    return im.resize((max(1, im.width // 2), max(1, im.height // 2)), Image.LANCZOS)
 
 
 def picture(name, size, stand_in):
@@ -129,6 +136,29 @@ def stand_in_stand(k):
     return done(im, STAND)
 
 
+def stand_in_tier(k):
+    """A plain drawing of a bigger stand, until Gemini's: painted white, a cart, a kiosk."""
+    w, h = STAND
+    im = canvas(STAND)
+    d = ImageDraw.Draw(im)
+    ink = (60, 40, 20)
+    box = lambda *v: tuple(x * S for x in v)
+    body = [(245, 245, 235), (255, 214, 64), (250, 236, 200)][k - 1]
+    d.rectangle(box(14, 155, w - 14, h - 4), fill=body, outline=ink, width=2 * S)
+    if k == 2:
+        for x in (50, w - 50):
+            d.ellipse(box(x - 26, h - 52, x + 26, h), fill=(80, 60, 40), outline=ink, width=2 * S)
+    if k == 3:
+        d.rectangle(box(14, 30, w - 14, 155), fill=body, outline=ink, width=2 * S)
+        d.rectangle(box(40, 70, w - 40, 152), fill=(60, 40, 30))
+        d.polygon([(4 * S, 34 * S), ((w - 4) * S, 34 * S), ((w / 2) * S, 2 * S)], fill=(200, 80, 60), outline=ink)
+    else:
+        d.rectangle(box(22, 60, 30, 155), fill=ink)
+        d.rectangle(box(w - 30, 60, w - 22, 155), fill=ink)
+        d.rectangle(box(4, 20 if k == 1 else 30, w - 4, 62), fill=(255, 214, 64), outline=ink, width=2 * S)
+    return done(im, STAND)
+
+
 def stand_in_thing(name, pink=False):
     """A plain drawing of something bought for the stand, until Gemini's."""
     size = THINGS[name]
@@ -164,6 +194,9 @@ def stand_in_thing(name, pink=False):
     elif name == "icemaker":
         d.rectangle(box(2, 2, w - 2, h - 1), fill=(190, 200, 210), outline=ink, width=2 * S)
         d.rectangle(box(10, 24, w - 10, 50), fill=(200, 236, 255), outline=ink, width=S)
+    elif name == "cocoa":
+        d.rectangle(box(4, 8, w - 4, h - 4), fill=(170, 60, 50), outline=ink, width=2 * S)
+        d.rectangle(box(w / 2 - 4, h - 18, w / 2 + 4, h - 8), fill=(200, 200, 210))
     elif name == "popcorn":
         d.rectangle(box(8, h - 50, w - 8, h - 6), fill=(220, 40, 40), outline=ink, width=2 * S)
         d.rectangle(box(10, 14, w - 10, h - 50), fill=(255, 248, 200), outline=ink, width=2 * S)
@@ -319,6 +352,18 @@ def stand_in_icon(name):
             d.rectangle(box(x - 2, 24, x + 2, 56), fill=(220, 40, 40))
         for x, y in ((22, 16), (32, 12), (42, 16), (27, 20), (37, 20)):
             d.ellipse(box(x - 6, y - 6, x + 6, y + 6), fill=(255, 246, 200), outline=(200, 170, 80))
+    elif name in ("trophy_gold", "trophy_silver", "trophy_bronze"):
+        c = {"trophy_gold": (240, 200, 60), "trophy_silver": (200, 205, 215), "trophy_bronze": (190, 120, 60)}[name]
+        d.ellipse(box(14, 8, 50, 40), fill=c, outline=ink, width=2 * S)
+        d.rectangle(box(28, 38, 36, 50), fill=c)
+        d.rectangle(box(18, 50, 46, 58), fill=c, outline=ink, width=S)
+    elif name in ("cocoa", "mug"):
+        d.rectangle(box(16, 18, 44, 56), fill=(120, 70, 40) if name == "mug" else (180, 60, 50), outline=ink, width=2 * S)
+        if name == "mug":
+            d.arc(box(38, 26, 54, 44), 270, 90, fill=ink, width=3 * S)
+    elif name in ("sun", "leaf", "snowflake", "blossom"):
+        c = {"sun": (255, 210, 60), "leaf": (230, 120, 40), "snowflake": (200, 230, 255), "blossom": (255, 170, 200)}[name]
+        d.ellipse(box(12, 12, 52, 52), fill=c, outline=ink, width=2 * S)
     elif name == "kernels":
         d.ellipse(box(10, 18, 54, 58), fill=(196, 160, 100), outline=ink, width=2 * S)
         d.rectangle(box(24, 10, 40, 20), fill=(170, 130, 70), outline=ink, width=S)
@@ -425,7 +470,17 @@ def build(out):
     # The bare stand and the pink one: Gemini's bare ones once they're cut, else the old
     # pictures (which have a pitcher and cups painted on), else stand-ins.
     bare = lambda k, old: picture(f"stand_bare_{k}", STAND, lambda: picture(f"stand_{old}", STAND, lambda: stand_in_stand(old)))
-    P.sprite("stand", [bare(0, 0), bare(1, 3)], (STAND[0] // 2, STAND[1]))
+    # Then the three stands bought since (part 2 of the teacher's list): frames 2-4.
+    # (Gemini's are cut as wide as the wooden one, each at its own height: halved, not fitted.)
+    tiers = [half_size(f"stand_tier_{k}") if have(f"stand_tier_{k}") else stand_in_tier(k) for k in (1, 2, 3)]
+    stands = [bare(0, 0), bare(1, 3)] + tiers
+    sw, sh = max(f.width for f in stands), max(f.height for f in stands)
+    same = []
+    for f in stands:                  # one canvas for all, each standing on its bottom row
+        c = Image.new("RGBA", (sw, sh), (0, 0, 0, 0))
+        c.alpha_composite(f, ((sw - f.width) // 2, sh - f.height))
+        same.append(c)
+    P.sprite("stand", same, (sw // 2, sh))
     P.sprite("owner", [picture(f"owner_{k}", OWNER, lambda k=k: stand_in_owner(k)) for k in range(6)], (OWNER[0] // 2, OWNER[1]))
     P.sprite("helper", [picture(f"helper_{k}", HELPER, lambda k=k: stand_in_owner([0, 2][k], (90, 190, 110)).crop((-20, 0, 150, 110)))
                         for k in range(2)], (HELPER[0] // 2, HELPER[1]))
@@ -468,6 +523,7 @@ def build(out):
     P.sprite("icons", [picture(f"icon_{n}", ICON, lambda n=n: stand_in_icon(n)) for n in ICON_NAMES], (ICON[0] // 2, ICON[1] // 2))
     P.sprite("bubbles", [picture(f"bubble_{k}", BUBBLE, lambda k=k: stand_in_bubble(k)) for k in range(6)], (BUBBLE[0] // 2, BUBBLE[1] // 2))
     P.sprite("cloud", [cloud_picture()], (100, 45))
+    P.sprite("white", [Image.new("RGBA", (4, 4), (255, 255, 255, 255))], (0, 0))     # the seasons' wash, stretched
     P.sprite("title", [picture("title", (VIEW_W, VIEW_H), stand_in_title)], (0, 0))
     P.sprite("icon", [icon_picture()], (0, 0))
     make_sounds(P)
@@ -506,6 +562,8 @@ def build(out):
     room("Extras", [("Extras", 0, 0)])
     room("Offer", [("Offer", 0, 0)])
     room("News", [("News", 0, 0)], "#cbb98f")
+    room("Staff", [("Staff", 0, 0)])
+    room("Trophies", [("Trophies", 0, 0)])
     room("Street", [("Day", 0, 0)])
     room("Evening", [("Evening", 0, 0)])
 

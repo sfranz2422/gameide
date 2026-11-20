@@ -150,3 +150,21 @@ side on the same pavement. Attach picture 1 (the stand) as well as the style pic
 > drawings: smiling and waiting; handing over a bag of popcorn. Row 2, in the style of
 > the icons (picture 10), each the same size as those: a red-and-white striped paper bag
 > of popcorn, a small burlap sack of popcorn kernels. Flat magenta background.
+
+## Part 2 of the teacher's list (2026-11-19): stand upgrades, seasons, trophies
+
+**16. Bigger and better stands.** MAGENTA. (Attach picture 13, the bare stand.)
+> The same lemonade stand as the attached picture, grown up in three steps, one row,
+> left to right, **each with its counter at exactly the same height and as wide as the
+> attached stand's**, and nothing on the counter: a freshly painted white stand with
+> lemons painted on the front, a bigger yellow-and-white awning and flower boxes; a
+> yellow lemonade cart on two big wheels with a striped umbrella; a little lemonade
+> kiosk (a tiny building with a serving window as its counter, a sloped roof and a
+> lemon on top, no words). Flat magenta background.
+
+**17. Cocoa, seasons and trophies.** MAGENTA. (Attach picture 10, the icons.)
+> In the style and size of the attached icons, evenly spaced in two rows of five: Row 1:
+> a steaming hot cocoa urn with a tap (to sit on a counter, drawn a little bigger than the
+> others), a box of cocoa mix, a mug of hot cocoa with marshmallows, a bright sun, an
+> orange autumn leaf. Row 2: a snowflake, a pink spring blossom, a gold trophy cup, a
+> silver trophy cup, a bronze trophy cup. Flat magenta background.

@@ -202,12 +202,17 @@ describe.skipIf(!have)("Squeeze", () => {
     expect(money[29]!).toBeGreaterThan(30_000);
     expect(py<string[]>(g, "global_vars.s['upgrades']").length).toBeGreaterThanOrEqual(3);
     expect(py(g, "[global_vars.s['day'], len(global_vars.s['history'])]")).toEqual([39, 40]);
-    expect(money[39]!).toBeGreaterThan(money[29]!);
+    // Past day 30 it goes on, into autumn: cooler, so fewer cups a day than the summer's last ten.
+    expect(py(g, "season_of(global_vars.s['seed'], 35)")).toBe(1);
+    expect(py<number>(g, "sum(h['cups'] for h in global_vars.s['history'][30:40])"))
+      .toBeLessThan(py<number>(g, "sum(h['cups'] for h in global_vars.s['history'][20:30])"));
     // The second stand sold for it, and its money is in the ledger.
     expect(py<number>(g, "sum(h['second']['cups'] for h in global_vars.s['history'] if h.get('second'))")).toBeGreaterThan(50);
     const h = await summer(11);
     const lost = wholeSummer(h, true);
-    expect(lost.at(-1)!).toBeLessThan(2000);
+    // It loses money selling (trophies for days open pay a little back: their prizes aren't profit).
+    expect(lost.length).toBe(30);
+    expect(py<number>(h, "sum(t['profit'] for t in global_vars.s['history'])")).toBeLessThan(0);
     expect(py<number>(h, "sum(t['cups'] for t in global_vars.s['history'])")).toBe(0);
   }, 600_000);
 
@@ -334,7 +339,9 @@ def who(thirst, budget):
 
   it("the summer's events, every month for ever: a heat wave, a rainy spell, a parade downtown, and rival days", async () => {
     const g = await summer();
-    for (const [seed, start] of [[1, 0], [2, 0], [3, 30], [4, 60], [5, 300]]) {
+    // Summers (months 0, 4, 8…, the year turning every month since part 2 of the teacher's
+    // list): heat waves come only then.
+    for (const [seed, start] of [[1, 0], [2, 0], [3, 120], [4, 240], [5, 480]]) {
       const [n, heat, hotter, rainy, allRain, parades, earlyRival] = py<[number, number, boolean, number, boolean, number, boolean]>(g, `p = summer_plan(${seed}, ${start})
 avg = sum(d["temp"] for d in p) / len(p)
 [len(p), sum(d["heat"] for d in p), all(d["temp"] > avg for d in p if d["heat"]),
@@ -342,6 +349,7 @@ avg = sum(d["temp"] for d in p) / len(p)
  sum(d["parade"] for d in p), ${start} == 0 and any(d["rival"] is not None for d in p[:3])]`);
       expect([n, heat, hotter, rainy, allRain, parades, earlyRival]).toEqual([30, 3, true, 4, true, 1, false]);
     }
+    expect(py(g, 'sum(d["heat"] for m in (30, 60, 90) for d in summer_plan(1, m))')).toBe(0);
     // Each month its own events, not the first month's again (each day's noise differs anyway).
     expect(py(g, "any([d['heat'] for d in summer_plan(sd, 30)] != [d['heat'] for d in summer_plan(sd, 0)] for sd in range(1, 6))")).toBe(true);
     // The same seed, the same summer: a reload can't bring better weather, whichever day's asked for first.
@@ -431,7 +439,7 @@ avg = sum(d["temp"] for d in p) / len(p)
 
   it("no last day: day 30 goes on to day 31, on the board in dollars every evening; a summer that ended carries on", async () => {
     const g = await summer(3);
-    py(g, "s = global_vars.s\ns['day'] = 29\ns['money'] = 41234");
+    py(g, "s = global_vars.s\ns['day'] = 29\ns['money'] = 41234\ns['trophies'] = {g[0]: 3 for g in GOALS}");
     py(g, 'global_vars.s["plan"]["buy"] = {"lemons": 0, "sugar": 0, "ice": 0, "cups": 0}');
     openAndPlay(g);
     expect(g.scores).toEqual([412]);
@@ -488,7 +496,7 @@ avg = sum(d["temp"] for d in p) / len(p)
 
   it("the second stand: a helper sells at another place, with what you send from your shelf; its money and what's left come back in the evening", async () => {
     const g = await summer(4);
-    py(g, "s = global_vars.s\ns['money'] = 20000\nbuy_upgrade(s, 'second')\ns['plan']['second']['open'] = True");
+    py(g, "s = global_vars.s\ns['money'] = 20000\nbuy_upgrade(s, 'second')\ns['plan']['second']['open'] = True\ns['trophies'] = {g[0]: 3 for g in GOALS}");
     // Only the park so far: nowhere for it.
     expect(py(g, "second_places(global_vars.s)")).toEqual([]);
     expect(py<string>(g, "open_stand(global_vars.s)")).toMatch(/^Choose where your second stand goes/);
@@ -620,7 +628,7 @@ b = tt['second']['back']
     py(g, "t = open_stand(s)");
     expect(py(g, "[s['kernels'], s['bags'], t['popcorn']]")).toEqual([30, 30, true]);
     expect(before - py<number>(g, "s['money']")).toBe(py(g, "t['supplies'] + t['rent']"));
-    expect(py(g, "t['supplies']")).toBe(py(g, "sum(pop_prices(s).values())"));
+    expect(py(g, "t['supplies']")).toBe(py(g, "sum(pop_prices(s)[k] for k in POP_KEYS)"));
     expect(py(g, "[sell_bag(s, t), sell_bag(s, t), s['kernels'], s['popped'], s['bags'], t['pop_bags'], t['pop_income']]"))
       .toEqual([true, false, 20, 8, 28, 2, 200]);
     py(g, "end_day(s, t)\nnext_day(s)");
@@ -847,5 +855,120 @@ s["plan"]["buy"].update({"kernels": 2, "bags": 2})`);
     py(g, 'do_act("accept", None)');
     step(g, 2);
     expect([room(g), py(g, 's["contract"]["cups"]')]).toEqual(["Evening", 30]);
+  });
+
+  // ---- 2026-11-19, the teacher's list, part 2
+
+  it("seasons: the year turns every month; winter is cold and snows; a summer saved before seasons keeps summer this month", async () => {
+    const g = await summer();
+    const avg = (m: number) => py<number>(g, `sum(d["temp"] for d in summer_plan(7, ${m * 30})) / 30`);
+    expect(avg(0)).toBeGreaterThan(avg(1));
+    expect(avg(1)).toBeGreaterThan(avg(2));
+    expect(avg(3)).toBeGreaterThan(avg(2));
+    expect(avg(2)).toBeLessThan(55);
+    expect(py(g, 'all(d["season"] == 2 for d in summer_plan(7, 60))')).toBe(true);
+    expect(py(g, 'all(d["snow"] == (d["sky"] == "rain") for d in summer_plan(7, 60))')).toBe(true);
+    expect(py(g, 'any(d["snow"] for d in summer_plan(7, 0))')).toBe(false);
+    // An old summer on day 75 (month 2): still summer now, autumn next month.
+    py(g, 'old = new_summer(99)\nold.pop("season_from")\nold["day"] = 75\nbring_up_to_date(old)');
+    expect(py(g, "[old['season_from'], season_of(99, 75), season_of(99, 95)]")).toEqual([2, 0, 1]);
+    expect(py(g, "day_plan(99, 75)['season']")).toBe(0);
+  });
+
+  it("hot cocoa: the colder it is, the more want it and the more they pay; a mug uses a cup", async () => {
+    const g = await summer();
+    py(g, `import random
+s = global_vars.s
+s["money"] = 10**6
+buy_upgrade(s, "cocoa")
+t = {"cocoa": True, "cocoa_price": 120, "temp": 40}`);
+    const share = (temp: number) => py<number>(g, `rng = random.Random(4)\nt["temp"] = ${temp}\nsum(wants_cocoa(s, {"budget": 200}, t, rng) for _ in range(3000)) / 3000`);
+    const cold = share(35), cool = share(55), warm = share(75);
+    expect(cold).toBeGreaterThan(cool);
+    expect(cool).toBeGreaterThan(0);
+    expect(warm).toBe(0);
+    expect(py<number>(g, 'cocoa_would_pay(s, {"budget": 200}, 30)')).toBeGreaterThan(py<number>(g, 'cocoa_would_pay(s, {"budget": 200}, 60)'));
+    py(g, 's["cocoa"] = 5\ns["cups"] = 5\nt.update({"cocoa_income": 0, "cocoa_cups": 0})\nm = s["money"]\nsell_cocoa(s, t)');
+    expect(py(g, '[s["cocoa"], s["cups"], s["money"] - m, t["cocoa_cups"]]')).toEqual([4, 4, 120, 1]);
+    expect(py(g, 'cocoa_why_not(dict(s, cocoa=0))')).toBe("No cocoa mix left!");
+    // A winter's day with cocoa: mugs sold, in the ledger and the profit.
+    py(g, BOT);
+    py(g, 'set_season_from(s)\ns["day"] = 61\nbot_morning()\ns["plan"]["buy"]["cocoa"] = 4\ns["plan"]["cocoa_price"] = 100\nimport random\nrandom.seed(2)');
+    openAndPlay(g);
+    const day = py<{ cocoa_cups: number; cocoa_income: number; profit: number; income: number; supplies: number; rent: number }>(g, "s['history'][-1]");
+    expect(day.cocoa_cups).toBeGreaterThan(0);
+    expect(day.profit).toBe(day.income + day.cocoa_income - day.supplies - day.rent);
+  });
+
+  it("staff: trained a level at a time, paid once; your helper serves faster, the second stand's pours more", async () => {
+    const g = await summer();
+    py(g, 's = global_vars.s\ns["money"] = 10000');
+    expect(py<string>(g, 'train(s, "helper")')).toContain("Helper");
+    py(g, 'buy_upgrade(s, "helper")\nbuy_upgrade(s, "second")\ns["money"] = 10000');
+    const slow = py<number>(g, "serve_steps(s)");
+    expect(py(g, '[train(s, "helper"), s["money"], staff_level(s, "helper")]')).toEqual(["trained", 8500, 2]);
+    expect(py<number>(g, "serve_steps(s)")).toBeLessThan(slow);
+    expect(py(g, '[train(s, "helper"), staff_level(s, "helper"), train(s, "helper")]')).toEqual(["trained", 3, "As good as they get!"]);
+    expect(py<number>(g, "second_most(s)")).toBe(py<number>(g, "SECOND_MOST"));
+    py(g, 's["money"] = 10000\ntrain(s, "second")');
+    expect(py<number>(g, "second_most(s)")).toBe(py<number>(g, "SECOND_MOST + TRAIN_SECOND_MORE"));
+    py(g, 's["money"] = 10');
+    expect(py<string>(g, 'can_train(s, "second")')).toContain("costs");
+  });
+
+  it("the stand itself: bought in turn; each brings more people and a longer queue; drawn as the one you own", async () => {
+    const g = await summer();
+    py(g, 's = global_vars.s\ns["money"] = 10**6');
+    const crowd = py<number>(g, "crowd_size(s)");
+    const notice = py<number>(g, "notice_chance(s)");
+    expect(py(g, "[buy_tier(s), buy_tier(s), buy_tier(s), buy_tier(s), s['tier']]")).toEqual([true, true, true, false, 3]);
+    expect(py<number>(g, "crowd_size(s)")).toBeGreaterThan(crowd);
+    expect(py<number>(g, "notice_chance(s)")).toBeGreaterThan(notice);
+    expect(py(g, "10**6 - s['money']")).toBe(py(g, "sum(t['cost'] for t in STAND_TIERS)"));
+    py(g, 'room_goto("Morning")');
+    step(g, 2);
+    py(g, 's["plan"]["buy"] = {"lemons": 1, "sugar": 1, "ice": 1, "cups": 1}\ndo_act("open", None)');
+    step(g, 3);
+    expect(py(g, 'instances("Stand")[0].image_index')).toBe(4);
+    // Too dear: nothing.
+    py(g, 'r = new_summer(3)\nr["money"] = 100');
+    expect(py(g, "[buy_tier(r), r['tier']]")).toEqual([false, 0]);
+  });
+
+  it("goals and trophies: won once each as they're reached, the prize paid, in the ledger but not the profit", async () => {
+    const g = await summer();
+    py(g, 's = global_vars.s\ns["plan"]["buy"] = {"lemons": 2, "sugar": 1, "ice": 2, "cups": 2}');
+    expect(py(g, "award_trophies(s)")).toEqual([]);
+    py(g, 's["money"] = 150000');
+    const won = py<[string, number][]>(g, "award_trophies(s)");
+    expect(won).toEqual([["Savings", 0], ["Savings", 1]]);
+    expect(py(g, "s['money']")).toBe(150000 + 500 + 2000);
+    expect(py(g, "award_trophies(s)")).toEqual([]);
+    expect(py(g, 'trophies_won(s, "money")')).toBe(2);
+    // From a day: a week of days open wins "Open for business".
+    py(g, 's["money"] = 3000\ns["history"] = [dict(cups=0, profit=0, pop_bags=0) for _ in range(6)]');
+    openAndPlay(g);
+    const t = py<{ trophies: [string, number][]; prizes: number; profit: number; income: number; supplies: number; rent: number; money_end: number; money_start: number }>(g, "s['history'][-1]");
+    expect(t.trophies).toContainEqual(["Open for business", 0]);
+    expect(t.prizes).toBeGreaterThanOrEqual(500);
+    expect(t.profit).toBe(t.income - t.supplies - t.rent);
+    expect(t.money_end).toBe(t.money_start + t.profit + t.prizes);
+  });
+
+  it("part 2's screens draw: staff, trophies, Extras with cocoa; the paper says when a season begins", async () => {
+    const g = await summer();
+    py(g, 's = global_vars.s\ns["money"] = 10**6\nfor u in ("helper", "second", "cocoa", "popcorn"):\n    buy_upgrade(s, u)');
+    for (const r of ["Staff", "Trophies", "Extras"]) {
+      py(g, `room_goto("${r}")`);
+      step(g, 3);
+      expect(room(g)).toBe(r);
+    }
+    py(g, 'room_goto("Staff")');
+    step(g, 2);
+    py(g, 'press(next(b for b in instances("Button") if b.act == "train" and b.arg == "helper"))');
+    step(g);
+    expect(py(g, 'staff_level(s, "helper")')).toBe(2);
+    py(g, 's["day"] = 28');
+    expect(py<string[][]>(g, "week_ahead(s)").some((x) => x[1] === "autumn begins")).toBe(true);
   });
 });
