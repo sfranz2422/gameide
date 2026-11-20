@@ -496,6 +496,32 @@ describe.skipIf(!have)("Order Up!: the kitchen", () => {
   }, 60_000);
 });
 
+describe.skipIf(!have)("Order Up!: what an order shows", () => {
+  it("a cheeseburger's bubble shows its cheese: in the bubble each topping has room to be seen", async () => {
+    const g = await start();
+    // Where draw_dish draws each layer, as an order's bubble draws it (and on the counter).
+    py(g, `_drawn = []
+_real_pic = pic
+def pic(name, x, y, size=1.0, alpha=1.0, frame=0, flip=False):
+    _drawn.append((name, y))
+    _real_pic(name, x, y, size, alpha, frame, flip)`);
+    const ys = (spread: number) => py<[string, number][]>(g, `_drawn.clear()
+draw_dish(["bun", "patty", "cheese", "top"], "burger", 0, 0, 0.55, ${spread})
+list(_drawn)`);
+    const gap = (drawn: [string, number][]) => {
+      const cheese = drawn.find(([n]) => n === "cheese")![1];
+      const top = drawn.find(([n]) => n === "bun_top")![1];
+      return cheese - top;
+    };
+    expect(gap(ys(0))).toBeLessThan(4);                      // on the counter as before: a thin slice
+    expect(gap(ys(py<number>(g, "BUBBLE_SPREAD")))).toBeGreaterThanOrEqual(8);   // in the bubble: plain to see
+    // And a waiting customer's bubble asks for it spread: their Draw event's own call.
+    const customer = g.project.objects.find((o) => o.name === "Customer")!;
+    const draw = customer.events.map((e) => e.code).join("\n");
+    expect(draw).toMatch(/draw_dish\([^)]*BUBBLE_SPREAD\)/);
+  });
+});
+
 describe.skipIf(!have)("Order Up!: days, saving and the board", () => {
   it("day 1 opens the next once it has a star; the noodle bar opens with the shack's tenth day", async () => {
     const g = await start();

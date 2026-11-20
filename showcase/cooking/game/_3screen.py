@@ -8,6 +8,7 @@ FOOD_SIZE = 72                # food pictures are this square (build.py)
 # How tall each part sits in a stacked burger (pixels at full size): the pictures
 # are drawn from the side, so a bun is thicker than a slice of cheese.
 LAYER = {"bun": 16, "patty": 13, "cheese": 5, "lettuce": 7, "tomato": 8, "top": 0}
+BUBBLE_SPREAD = 12          # an order's bubble: this much more room above each topping, so each one shows
 
 
 def text(x, y, words, colour=INK, size=16, align="left"):
@@ -35,14 +36,17 @@ def pic(name, x, y, size=1.0, alpha=1.0, frame=0, flip=False):
     draw_sprite_ext(name, frame, x, y, -size if flip else size, size, 0, "white", alpha)
 
 
-def draw_dish(parts, dish, x, y, size=1.0):
+def draw_dish(parts, dish, x, y, size=1.0, spread=0):
     """A dish as built so far, standing on (x, y): a burger stacked from its bottom bun up,
-    or a bowl with what's in it and its toppings on top."""
+    or a bowl with what's in it and its toppings on top. `spread`: extra room above each
+    burger topping. An order's bubble draws it small, and there the cheese, 5 pixels above
+    the patty with the bun on top of it, was too thin to see: nobody knew to make a
+    cheeseburger (the teacher's report, 2026-11-20)."""
     if dish == "burger":
         h = 0
         for p in parts:
             pic(PART_PICS[p], x, y - (h + 14) * size, size)
-            h += LAYER[p]
+            h += LAYER[p] + (spread if p in BURGER_TOPPINGS else 0)
         return
     full = "noodles" in parts and "broth" in parts
     pic("noodles_bowl" if full else "bowl", x, y - 26 * size, size)

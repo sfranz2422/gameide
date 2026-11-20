@@ -72,7 +72,7 @@ if self.phase == "wait":
         x = bx + (j - (len(items) - 1) / 2) * 50
         had = (it == "dish" and self.got_dish) or (it != "dish" and self.got.count(it) > 0)
         if it == "dish":
-            draw_dish(self.order["parts"], dish, x, by + 22, 0.55)
+            draw_dish(self.order["parts"], dish, x, by + 22, 0.55, BUBBLE_SPREAD)
         else:
             pic(item_pic(it), x, by + 2, 0.55)
         if had:
