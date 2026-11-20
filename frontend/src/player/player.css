@@ -85,6 +85,12 @@ body.player {
   margin: 0 0 10px;
   font-size: 14px;
 }
+/* XP a score just earned (a showcase game): a moment, in the actions' green. */
+.score-xp {
+  margin: -4px 0 10px;
+  font-weight: 700;
+  color: var(--go);
+}
 /* Too narrow for three across: the game first, the boards under it. */
 @media (max-width: 1000px) {
   .player-middle.with-boards {

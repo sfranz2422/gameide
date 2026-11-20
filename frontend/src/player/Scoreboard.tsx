@@ -16,6 +16,8 @@ export interface Board {
   /** From the published game's settings. */
   lowest: boolean;
   unit: string;
+  /** XP the last score just earned (showcase games: a new best, a place at school), shown a moment. */
+  earned?: number;
 }
 
 /** A score as the board shows it: "time" scores are kept in hundredths of a second. */
@@ -32,9 +34,12 @@ export const usesScores = (project: Project) => JSON.stringify(project).includes
 const REFRESH_MS = 60_000;
 /** A game can raise its score every step: the server hears at most this often. */
 const SEND_MS = 2_000;
+/** How long "+40 XP" stays on the board after a score earns it. */
+const EARNED_MS = 6_000;
 
 export function useScores(slug: string | null) {
   const [board, setBoard] = useState<Board | null>(null);
+  const [earned, setEarned] = useState(0);
   const waiting = useRef<number | null>(null);
   const rules = useRef({ lowest: false });
   rules.current.lowest = board?.lowest ?? false;
@@ -71,12 +76,19 @@ export function useScores(slug: string | null) {
         const n = waiting.current;
         waiting.current = null;
         if (n === null) return;
-        api(`/api/play/${encodeURIComponent(slug)}/score`, { json: { score: n } }).then(load, () => undefined);
+        api<{ kept: boolean; xp?: number }>(`/api/play/${encodeURIComponent(slug)}/score`, { json: { score: n } }).then((r) => {
+          // A showcase game's score can earn XP (the kids' ask, 2026-11-20): say so on the board.
+          if (r.xp) {
+            setEarned(r.xp);
+            window.setTimeout(() => setEarned(0), EARNED_MS);
+          }
+          void load();
+        }, () => undefined);
       }, SEND_MS);
     },
     [slug, load],
   );
-  return { board, send };
+  return { board: board && earned ? { ...board, earned } : board, send };
 }
 
 function Rows({ rows, first, unit }: { rows: Board["scores"]; first: number; unit: string }) {
@@ -122,6 +134,11 @@ export function Scoreboard({ side, board }: { side: "left" | "right"; board: Boa
           ) : (
             <p className="muted small">{board?.school ? "Play to get on the board." : "Your best score shows here."}</p>
           )}
+          {board?.earned ? (
+            <p className="score-xp" data-testid="score-xp">
+              +{board.earned} XP
+            </p>
+          ) : null}
           {shown && shown.length > 0 && <Rows rows={shown} first={11} unit={board?.unit ?? ""} />}
         </>
       )}

@@ -587,6 +587,50 @@ def _board_name(user) -> str:
     return "A student" if "@" in name else name
 
 
+# ---- XP for high scores (the kids' ask, 2026-11-20; the teacher chose these): in showcase
+# games only (a student's own game could hand out any score), students only, as all XP.
+# A place on the school's board pays once per game per place; a new best pays a little, at
+# most BEST_XP_DAY a day across every game. Each source is unique, so nothing pays twice.
+PLACE_XP = [(1, 40, "1st"), (3, 20, "the top 3"), (10, 10, "the top 10")]
+BEST_XP = 3
+BEST_XP_DAY = 15
+
+
+def school_rank(db, pub, user, lowest):
+    """This player's place on their school's board for a game, or None (no school, no score)."""
+    domain = school_domain(user)
+    if domain is None:
+        return None
+    rows = (db.query(HighScore.user_id).join(accounts.User, HighScore.user_id == accounts.User.id)
+            .filter(HighScore.published_id == pub.id,
+                    func.lower(accounts.User.email).endswith("@" + domain, autoescape=True))
+            .order_by(HighScore.score.asc() if lowest else HighScore.score.desc(), HighScore.updated_at.asc()).all())
+    for rank, (uid,) in enumerate(rows, 1):
+        if uid == user.id:
+            return rank
+    return None
+
+
+def score_xp(db, pub, user, lowest):
+    """XP for a new best just kept: the best's own (while today's allowance lasts) and any
+    place on the school's board reached for the first time. The XP given."""
+    import rewards
+    import xp
+    if not pub.showcase or not rewards.earns_xp(user):
+        return 0
+    got = 0
+    day = now().strftime("%Y-%m-%d")
+    paid_today = (db.query(func.count(accounts.XpAward.id))
+                  .filter(accounts.XpAward.user_id == user.id, accounts.XpAward.source.like(f"best:{day}:%")).scalar() or 0)
+    if paid_today * BEST_XP < BEST_XP_DAY:
+        got += xp.award(db, user.id, f"best:{day}:{paid_today}", BEST_XP, f"A new best in {pub.title}", rewards.APP_NAME)
+    rank = school_rank(db, pub, user, lowest)
+    for place, amount, words in PLACE_XP:
+        if rank is not None and rank <= place:
+            got += xp.award(db, user.id, f"place:{pub.id}:{place}", amount, f"Made {words} at your school in {pub.title}", rewards.APP_NAME)
+    return got
+
+
 @bp.get("/api/play/<slug>/scores")
 def high_scores(slug):
     db = _db()
@@ -647,7 +691,7 @@ def post_score(slug):
         except IntegrityError:   # two tabs sending a first score at once: one row is enough
             db.rollback()
             return jsonify(kept=False)
-        return jsonify(kept=True)
+        return jsonify(kept=True, xp=score_xp(db, pub, user, lowest))
     finally:
         db.close()
 

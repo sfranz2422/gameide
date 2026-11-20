@@ -579,6 +579,18 @@ header; steps are `---` slides; ` ```check ` blocks gate Next (strict); a
   teacher asked for "frogger, pong, zelda": they're Busy Road and the like).
   Each is walked step by step in `makes.test.ts`, its code taken from its
   own markdown: add a new one there, or its checks are never run.
+  **They're becoming open lessons** (the teacher's ask, 2026-11-20: "not cookie cutter";
+  students choose their own pictures, names, keys and direction): each step says what the game
+  needs, offers choices, and shows code as one example to adapt. Their checks have **no names in
+  them** (`some object has a sprite`, `room Room1 has at least 6 things`, `some object has event
+  collision`, `holding a key moves something`: it tries arrows, W A S D and Space and counts
+  only movement the key caused). makes.test.ts plays each as a student who chose differently
+  from the examples (Busy Road: Hopper on W A S D, dodging dragons), with `adapt` saying how
+  they changed the code. **All ten are open** (2026-11-20): each lesson's replay is a file of
+  its own, `src/tutorials/makes/make-*.ts` (`steps`, and `play` for what no name-free check can
+  see: a clock counting down, a hop going the right way, a paddle on its own keys), read from the
+  folder by makes.test.ts (not import.meta.glob: Vitest's cache kept the glob's old list and a new
+  replay was silently skipped). From "Every lane" on, Busy Road gives code with blanks (`___`) and parts left to the student, checked by `some object's EVENT uses WORD`, `things move at N or more speeds`, `some things move left and some move right`.
 - **No Copy button on tutorial code**, ever (the teacher's decision).
   tutorials.test.ts fails on "copy" anywhere in a built-in; the sprite
   editor's buttons in bold (**Copy**, **Copy frame**) are the one exception.
@@ -687,6 +699,11 @@ games are untouched.
 - **How a game's scores rank is `settings.scoreboard`** (`lowest`, `unit`; set in Game settings or by a showcase build), and the server reads it from the published game, never from the page, or one student could turn a board upside down. Unit `time` is seconds, kept as hundredths.
 - Every showcase game reports (`src/showcase/scores.test.ts`). Thornwood and Greymire can't be built without their art, so `showcase/patch_zip.py` puts new code into a zip that already has the pictures, writing `-patched` files beside it. **Their runners can't test a sabotage here; a build that lacks art also overwrites `out/` with stand-ins for the games that allow that (mystery, football, baseball). Check `~/Downloads` before rebuilding those.**
 - It goes Python → `_commands` "score" → worker → `GameHost.events.score` → at most one POST per 2 s, because a game may call it every step.
+- **Scores pay XP in showcase games** (the kids' ask, 2026-11-20; the teacher's numbers): students
+  only, `publishing.score_xp`. A place on the school's board pays once per game (`PLACE_XP`: 1st 40,
+  top 3 20, top 10 10, sources `place:<pub>:<n>`); a new best 3, at most `BEST_XP_DAY` (15) a day
+  across games (`best:<day>:<n>`). Never a student's own game: one could hand out any score. The
+  reply carries `xp`, and the board beside the game shows "+N XP" a moment.
 
 ## Multiplayer rooms
 

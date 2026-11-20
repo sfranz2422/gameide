@@ -1900,7 +1900,7 @@ _names = lambda c: [(r["name"], r["score"]) for r in _board(c)["scores"]]
 check("high scores: signing in comes first", _score(client(), 10).status_code == 401)
 check("high scores: signed out shows no names", _board(client()) == {"signedIn": False, "school": False, "scores": [], "mine": None, "lowest": False, "unit": ""})
 check("high scores: a score is a number above zero", all(_score(_amy, v).status_code == 400 for v in ("100", True, None, 0, -5, 10 ** 13, [1])))
-check("high scores: a first score counts", _score(_amy, 100).get_json() == {"kept": True})
+check("high scores: a first score counts (and pays no XP: not a showcase game)", _score(_amy, 100).get_json() == {"kept": True, "xp": 0})
 _score(_ben, 300)
 _score(_far, 900)
 _score(_look, 800)
@@ -1920,7 +1920,7 @@ check("high scores: you can find yourself", _board(_ben)["mine"] == {"score": 30
 _miss = client(f"miss@{M}")
 _te = os.environ["TEACHER_EMAILS"]
 os.environ["TEACHER_EMAILS"] = _te + f",miss@{M}"
-check("high scores: a teacher's score is kept", _score(_miss, 9999).get_json() == {"kept": True})
+check("high scores: a teacher's score is kept", _score(_miss, 9999).get_json()["kept"] is True)
 check("high scores: a teacher shows on their school's board", (_board(_miss)["mine"] or {}).get("score") == 9999 and 9999 in [s for _, s in _names(_pat)], _names(_pat))
 check("high scores: a teacher with only one name shows it", ("Miss", 9999) in _names(_pat), _names(_pat))
 _mu = _sdb.query(accounts.User).filter_by(email=f"miss@{M}").first()
@@ -1954,6 +1954,29 @@ _sdb.commit()
 put(_amy, "hs2", project("hs2", "Class only"), 0)
 _cg = _amy.post("/api/projects/hs2/publish", json={"title": "Class only", "visibility": "class", "classId": _kc.id}).get_json()["published"]["id"]
 check("high scores: a class game's board is only for its class", _pat.get(f"/api/play/{_cg}/scores").status_code == 403 and _score(_pat, 5, _cg).status_code == 403)
+# XP for high scores (the kids' ask, 2026-11-20): showcase games only, students only; a place
+# on the school's board once per game (1st 40, top 3 20, top 10 10), a new best 3, 15 a day.
+put(ct, "hsx", project("hsx", "Showcase scores"), 0)
+HSX = ct.post("/api/projects/hsx/publish", json={"title": "Showcase scores", "visibility": "public", "showcase": True}).get_json()["published"]["id"]
+_xa, _xb, _xg = client(f"xpa@{M}"), client(f"xpb@{M}"), client("xpg@gmail.com")
+check("score XP: a first score in a showcase game: a best, and 1st, top 3 and top 10 at school", _score(_xa, 100, HSX).get_json() == {"kept": True, "xp": 3 + 40 + 20 + 10}, _score(_xa, 1, HSX).get_json())
+check("score XP: a better one: only the best (each place pays once)", _score(_xa, 200, HSX).get_json()["xp"] == 3)
+check("score XP: not a better one: nothing", _score(_xa, 150, HSX).get_json() == {"kept": False})
+_paid = [_score(_xa, n, HSX).get_json()["xp"] for n in (300, 400, 500, 600)]
+check("score XP: new bests pay at most 15 a day", _paid == [3, 3, 3, 0], _paid)
+check("score XP: second at school: a best, top 3 and top 10", _score(_xb, 50, HSX).get_json()["xp"] == 3 + 20 + 10)
+check("score XP: no school (a personal address): a best only", _score(_xg, 9000, HSX).get_json()["xp"] == 3)
+check("score XP: a game that isn't a showcase pays nothing", _score(client(f"xpc@{M}"), 10).get_json() == {"kept": True, "xp": 0})
+os.environ["TEACHER_EMAILS"] = _te + f",xpt@{M}"
+check("score XP: teachers earn none", _score(client(f"xpt@{M}"), 99999, HSX).get_json() == {"kept": True, "xp": 0})
+os.environ["TEACHER_EMAILS"] = _te
+_xdb = server.SessionLocal()
+_xu = _xdb.query(accounts.User).filter_by(email=f"xpa@{M}").first()
+_rows = _xdb.query(accounts.XpAward).filter_by(user_id=_xu.id).all()
+check("score XP: in the XP list, said in words, as GameIDE's", sum(r.xp for r in _rows) == 3 * 5 + 70 and all(r.app == "gameide" for r in _rows)
+      and any("Showcase scores" in r.reason for r in _rows), [(r.source, r.xp, r.reason) for r in _rows])
+_xdb.close()
+
 # A new version, published again (My Games' Update, then Publish): the board stays.
 put(_amy, "hs1", project("hs1", "Scores v2"), 1)
 check("high scores: publishing a new version keeps the board", _amy.post("/api/projects/hs1/publish", json={"title": "Scores", "visibility": "unlisted"}).get_json()["published"]["id"] == HS
@@ -1998,7 +2021,7 @@ _score(_ben, 40, LO)
 _b = _board(_pat, LO)
 check("high scores: lowest wins when the game says so", [r["score"] for r in _b["scores"]] == [40, 50] and _b["lowest"] is True and _b["unit"] == "strokes", _b)
 check("high scores: a higher score isn't your best then", _score(_ben, 60, LO).get_json() == {"kept": False} and _board(_ben, LO)["mine"] == {"score": 40, "rank": 1})
-check("high scores: a lower one is", _score(_amy, 30, LO).get_json() == {"kept": True} and _board(_amy, LO)["mine"] == {"score": 30, "rank": 1})
+check("high scores: a lower one is", _score(_amy, 30, LO).get_json()["kept"] is True and _board(_amy, LO)["mine"] == {"score": 30, "rank": 1})
 _forged = _ben.post(f"/api/play/{LO}/score", json={"score": 90, "lowest": False, "unit": "points"}).get_json()
 _bf = _board(_pat, LO)
 check("high scores: a page can't change the rules", _forged == {"kept": False} and _bf["lowest"] is True and _bf["unit"] == "strokes", (_forged, _bf))

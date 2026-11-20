@@ -349,7 +349,8 @@ on("lemon")("Squeeze's board", () => {
     // A later day (summers have no last day now): the money, in dollars.
     g.py('do_act("next", None)');
     g.step(2);
-    g.py('s = global_vars.s\ns["day"] = 40\ns["money"] = 15099\ns["plan"]["buy"] = {"lemons": 0, "sugar": 0, "ice": 0, "cups": 0}\ndo_act("open", None)');
+    // (Trophies already won: a prize reached tonight would add to the money.)
+    g.py('s = global_vars.s\ns["day"] = 40\ns["money"] = 15099\ns["trophies"] = {k[0]: 3 for k in GOALS}\ns["plan"]["buy"] = {"lemons": 0, "sugar": 0, "ice": 0, "cups": 0}\ndo_act("open", None)');
     g.step(2);
     g.py("global_vars.speed = 4");
     for (let k = 0; k < 3000 && (g.py("room_name()") as string) === "Street"; k++) g.step();
