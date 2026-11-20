@@ -1160,4 +1160,36 @@ def outlined(x, y, words, colour=INK, size=16, align="left"):
     py(g, 'r = global_vars.realm\nr["obstacles"] = []\nr["gold"] = r["food"] = 10**6\nb = new_building("spike_pit", 6, 6, 0)\nb["job"] = {"to": 1, "end": now() + 600}\nr["buildings"].append(b)');
     step(g, 3);
   });
+
+  it("upgrades show: a new look every two levels, a level badge, and a moment when one finishes", async () => {
+    const g = await start();
+    // Every two levels a different look, for every building, as far as its levels go.
+    expect(py(g, "[tier(l) for l in range(1, 11)]")).toEqual([1, 1, 2, 2, 3, 3, 4, 4, 5, 5]);
+    const missing = py<string[]>(g, '[f"{k}_{tier(n)}" for k, b in BUILDINGS.items() for n in range(1, len(b["cost"]) + 1)]');
+    const sprites = new Set(g.project.sprites.map((sp) => sp.name));
+    expect(missing.filter((n) => !sprites.has(n))).toEqual([]);
+    await realmOf(g);
+    py(g, `r = global_vars.realm
+_fx, _words = [], []
+_real_effect, _real_text = effect, text
+def effect(name, x, y, colour=None, scale=1):
+    _fx.append(name)
+    _real_effect(name, x, y, colour, scale)
+def text(x, y, words, colour=INK, size=16, align="left", width=None):
+    _words.append(str(words))
+    _real_text(x, y, words, colour, size, align, width)`);
+    step(g, 3);
+    // A kingdom just loaded celebrates nothing.
+    expect(py(g, "_fx")).toEqual([]);
+    py(g, 'b = next(x for x in r["buildings"] if x["kind"] == "gold_mine")\nb["level"] += 1\n_words.clear()');
+    step(g, 2);
+    expect(py(g, "_fx")).toEqual(expect.arrayContaining(["sparkle", "confetti"]));
+    expect(py<string[]>(g, "_words")).toContain(py<string>(g, 'f"Level {b[\'level\']}!"'));
+    // Its level on its badge.
+    expect(py<string[]>(g, "_words")).toContain(py<string>(g, 'str(b["level"])'));
+    step(g, py<number>(g, "UPGRADE_SHOW") + 5);
+    py(g, "_words.clear()");
+    step(g);
+    expect(py<string[]>(g, "_words")).not.toContain(py<string>(g, 'f"Level {b[\'level\']}!"'));
+  });
 });

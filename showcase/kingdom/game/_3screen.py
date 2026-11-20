@@ -160,8 +160,9 @@ def clock_words(seconds):
 
 
 def tier(level):
-    """Which of a building's three pictures: levels 1-3, 4-6, then 7 on."""
-    return 1 if level <= TIERS[0] else 2 if level <= TIERS[1] else 3
+    """Which of a building's looks: one every LEVELS_A_LOOK levels (levels 1-2 are look 1).
+    The build makes as many looks as a building's levels need."""
+    return (max(1, level) + LEVELS_A_LOOK - 1) // LEVELS_A_LOOK
 
 
 def big_number(n):

@@ -53,6 +53,17 @@ ROWS = {
     # 18: the alliance hall. Two versions came: this one's halls (on thick ground, like the other
     # buildings); the icon is the other's (raw/18-tilted.png: on a tilted tile, as the bar's are).
     "18": [[("alliance_hall_1", 3), ("alliance_hall_2", 3), ("alliance_hall_3", 3)]],
+    # 20-23 (2026-11-20): the in-between looks, so every two levels look different (the
+    # teacher: you couldn't tell anything was upgraded). "_1b" sits between a building's first
+    # two drawings, "_2b" between its second and third (build.py's LOOKS).
+    # (Gemini drew three keeps on 20, not two: the middle one is keep 2 again, kept aside.)
+    "20": [[("keep_1b", 4), ("keep_extra", 4), ("keep_2b", 4)],
+           [("gold_mine_1b", 3), ("gold_mine_2b", 3), ("farm_1b", 3), ("farm_2b", 3)]],
+    "21": [[("treasury_1b", 3), ("treasury_2b", 3), ("granary_1b", 3), ("granary_2b", 3)],
+           [("archer_tower_1b", 3), ("archer_tower_2b", 3), ("ballista_1b", 3), ("ballista_2b", 3)]],
+    "22": [[("barracks_1b", 3), ("barracks_2b", 3), ("trebuchet_1b", 3), ("army_camp_1b", 4)],
+           [("wall_1b", 1), ("wall_2b", 1)]],
+    "23": [[("warlord_altar_1b", 3), ("warlord_altar_2b", 3)], [("huntress_altar_1b", 3), ("huntress_altar_2b", 3)]],
     "07": [[("oak", 1), ("pine", 1), ("bush", 1), ("boulder", 1), ("stump", 1)],
            [("scaffold_2", 2), ("scaffold_3", 3), ("scaffold_4", 4)]],
 }

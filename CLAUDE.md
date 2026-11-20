@@ -1058,7 +1058,12 @@ is the rules (builders' jobs on the clock, `finish_jobs`; mines filling, `waitin
 storage, `capacity`; walls; trees and rocks growing back from the seed). Isometric with
 Cloverbrook's arithmetic on smaller tiles (64 × 32; the keep is 4 × 4, a wall 1 × 1). **Walls,
 trees and rocks are Props** (no events), kept in step by the Realm: a kingdom has hundreds.
-A building's picture is one of three a kind (`tier`: levels 1-3, 4-6, 7 on). Board: renown level.
+A building's look changes every two levels (`tier`, `LEVELS_A_LOOK`; 2026-11-20, the teacher:
+"you can't tell it was upgraded"): build.py's `LOOKS` spreads the three drawings over a building's
+looks and fills the rest with in-betweens (`_1b`, `_2b`, sheets 20-23), showing the look below
+until they're drawn. Each building shows its level on a badge (gold at the top level), and an
+upgrade finishing is celebrated (Building notices its level rise: sparkles, confetti, a bounce,
+"Level 5!" rising; never on load). Board: renown level.
 **Zoom** (the teacher's ask): `ZOOMS`, starting a little out; - and + buttons, Q and E. The bar and
 windows don't zoom, so a world point on the screen is `to_screen` (× the zoom), and `zoom()` is
 read from the engine (`view_width`), never the Realm's setting: scaled by that on the title, the

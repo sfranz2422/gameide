@@ -185,3 +185,41 @@ to the LEFT (two steps, two swings). The game turns them round to face right.
 ## Later phases
 
 - **Phase 3 on:** champions, alliances' banners and league badges.
+
+## Upgrades you can see (2026-11-20)
+
+Each building used to have three pictures for up to ten levels, so most upgrades changed
+nothing. Now there's a look every two levels, and the buildings with ten levels (or eight)
+need in-between pictures. **Attach the picture named in each prompt** (the building's three
+versions), and say: *"Exactly the same art style, size, angle and ground patch as the
+attached picture."* Keep the order: left to right, top to bottom.
+
+**20. Keep, gold mine and farm, in between.** MAGENTA. (Attach pictures 1 and 2.)
+> [the style] Row 1, two keeps, each on its own square patch of ground the size of 4 × 4
+> ground diamonds: a keep halfway between the attached first and second keeps (the small
+> tower grown a stone storey and a first banner); a keep halfway between the second and
+> third (battlements, two small turrets, more banners). Row 2, four pictures on patches the
+> size of 3 × 3 ground diamonds: a gold mine halfway between the attached first and second;
+> one halfway between the second and third; a farm halfway between the first and second;
+> one halfway between the second and third. Flat magenta background.
+
+**21. Treasury, granary, archer tower and ballista, in between.** MAGENTA. (Attach pictures 3 and 4.)
+> [the style] Two rows of four, each on its own square patch of ground the size of 3 × 3
+> ground diamonds. Row 1: a treasury halfway between the attached first and second; one
+> halfway between the second and third; a granary halfway between the first and second; one
+> halfway between the second and third. Row 2: the same for the archer tower (two), then the
+> ballista (two). Flat magenta background.
+
+**22. Barracks, trebuchet, army camp and walls, in between.** MAGENTA. (Attach pictures 5 and 6.)
+> [the style] Row 1: a barracks halfway between the attached first and second; one halfway
+> between the second and third; a trebuchet halfway between the first and second (each on a
+> patch of 3 × 3 ground diamonds); an army camp halfway between the first and second (on 4 × 4).
+> Row 2, two single wall pieces, each on one ground diamond like the attached walls: one
+> halfway between the first and second walls, one halfway between the second and third.
+> Flat magenta background.
+
+**23. The champions' altars, in between.** MAGENTA. (Attach picture 15.)
+> [the style] Two rows of two, each on its own square patch of ground the size of 3 × 3
+> ground diamonds. Row 1: the warlord's altar halfway between the attached first and second;
+> one halfway between the second and third. Row 2: the same for the huntress's altar.
+> Flat magenta background.

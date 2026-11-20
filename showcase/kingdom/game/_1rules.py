@@ -211,7 +211,12 @@ BUILDINGS = {
 }
 GROUPS = [("economy", "Economy"), ("defense", "Defense"), ("traps", "Traps"), ("army", "Army"), ("walls", "Walls")]
 BUILDER_COSTS = [0, 0, 2500, 10000, 40000]       # the 1st, 2nd … 5th builder's hut (two come with the keep)
-TIERS = [3, 6]                                   # a building's picture: levels 1-3, 4-6 and 7 on
+# A building's picture changes every two levels (the teacher: "you can't tell it was upgraded";
+# three pictures for ten levels left most upgrades looking the same): look 1 is levels 1-2,
+# look 2 levels 3-4… up to look 5. Which drawing each look is: LOOKS in build.py.
+LEVELS_A_LOOK = 2
+BADGE_R = 11                    # the level badge on a building, its size on the screen
+UPGRADE_SHOW = 90               # steps the "Level 5!" moment lasts
 
 # ---- a new kingdom: the keep in the middle, two builders, a mine and a farm
 START_BUILDINGS = [("keep", MID - 2, MID - 2), ("builder_hut", MID - 5, MID - 3), ("builder_hut", MID + 3, MID - 3),

@@ -54,6 +54,16 @@ COLOURS = {"alliance_hall": (160, 130, 60), "forge": (90, 70, 60), "warlord_alta
 TALL = {"keep": 150, "archer_tower": 130, "trebuchet": 90, "army_camp": 30, "farm": 26}
 
 
+# Each look's drawing, by how many looks a building has (a look every LEVELS_A_LOOK levels):
+# the three Gemini drew first ("1", "2", "3") spread over them, and the in-betweens drawn
+# since ("1b": between 1 and 2, "2b": between 2 and 3) where ten or eight levels need more.
+LOOKS = {1: ["1"], 2: ["1", "3"], 3: ["1", "2", "3"], 4: ["1", "1b", "2", "3"], 5: ["1", "1b", "2", "2b", "3"]}
+
+
+def looks_of(kind, levels):
+    return LOOKS[-(-levels // G["LEVELS_A_LOOK"])]
+
+
 def half(name):
     """One of the teacher's pictures at the game's size (art/ keeps them at twice)."""
     im = Image.open(ART / f"{name}.png").convert("RGBA")
@@ -287,14 +297,20 @@ def build(out):
 
     for kind, i in G["BUILDINGS"].items():
         n = i["size"]
-        for t in (1, 2, 3):
+        for t, drawn in enumerate(looks_of(kind, len(i["cost"])), 1):
             name = f"{kind}_{t}"
+            # (art/ keeps each drawing by its old name: kind_1, _2, _3, and the in-betweens
+            # _1b and _2b; a missing in-between shows the look below it.)
+            art_name = f"{kind}_{drawn}"
+            if not (ART / f"{art_name}.png").exists() and drawn.endswith("b"):
+                art_name = f"{kind}_{drawn[0]}"
+            stand = int(drawn[0])
             if kind == "wall":
-                im = half(name) if (ART / f"{name}.png").exists() else stand_in_wall(t)
+                im = half(art_name) if (ART / f"{art_name}.png").exists() else stand_in_wall(stand)
             elif kind in G["TRAPS"]:
-                im = half(name) if (ART / f"{name}.png").exists() else stand_in_trap(kind, t)
+                im = half(art_name) if (ART / f"{art_name}.png").exists() else stand_in_trap(kind, stand)
             else:
-                im = half(name) if (ART / f"{name}.png").exists() else stand_in_building(kind, t)
+                im = half(art_name) if (ART / f"{art_name}.png").exists() else stand_in_building(kind, stand)
             # Standing on the middle of its footprint's diamond.
             P.sprite(name, [im], (im.width // 2, im.height - TH * n // 2))
             if kind == "wall":

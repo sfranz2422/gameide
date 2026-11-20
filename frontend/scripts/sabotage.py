@@ -2411,6 +2411,9 @@ CASES = [
  ('kingdom: words under the buttons', _kg('Realm'), '            text(x1 + 250, y2 - 120, "Upgrading takes no time"', '            text(x1 + 345, y2 - 64, "Upgrading takes no time"', 'no words under its buttons', KING),
  ("kingdom: a full bar's number doubled", _kg('Realm'), '    outlined(x + 125, 19, f"{big_number(r[res])} / {big_number(cap)}", INK, 13, "center")', '    text(x + 125, 19, f"{big_number(r[res])} / {big_number(cap)}", SHADOW if r[res] / max(1, cap) > 0.55 else INK, 13, "center")', "the top bar's numbers are outlined", KING),
  ('kingdom: no scaffolding for a trap', '../showcase/kingdom/build.py', '    for n in (1, 2, 3, 4):\n        # 1 × 1: the traps', '    for n in (2, 3, 4):\n        # 1 × 1: the traps', 'every building built over time has scaffolding', KING),
+ ('kingdom: three looks for ten levels', _kg('_3screen'), '    return (max(1, level) + LEVELS_A_LOOK - 1) // LEVELS_A_LOOK', '    return 1 if level <= 3 else 2 if level <= 6 else 3', 'upgrades show: a new look', KING),
+ ('kingdom: an upgrade goes unseen', _kg('Building'), 'if self.seen is not None and b["level"] > self.seen:', 'if False:', 'upgrades show: a new look', KING),
+ ('kingdom: no level badge', _kg('Building'), '        text(x, fy - 9 / z, str(b["level"]), "#3a2a12", 11 / z, "center")', '        pass', 'upgrades show: a new look', KING),
 
  ('tell: the page drops them', NETS, '    if (o.tells && !this.away) this.tells.push(...o.tells);\n', '', "one player on a WebSocket and one polling", E2E),
 
