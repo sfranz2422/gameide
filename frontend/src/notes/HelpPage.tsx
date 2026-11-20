@@ -29,6 +29,15 @@ export const CHECK_EXAMPLES: [string, string][] = [
   ["game runs 2 seconds without errors", "Plays the game for 2 seconds."],
   ["after 1 second holding right, Player.x increased", "Plays it holding keys (right and up, space…); also decreased, changed, stayed the same."],
   ['after 2 seconds, instance_number("Coin") < 15', "Any Python that should come out true after that long."],
+  // With no names: for work where students choose their own names, pictures and keys.
+  ["some object has a sprite", "Whatever it's called; or at least 3 objects have sprites."],
+  ["at least 3 objects exist", "Objects of any names."],
+  ["some object has event collision", "Any collision, with anything (or any event, by name: some object has event draw gui)."],
+  ["room Room1 has at least 6 things", "Instances of any objects placed in that room."],
+  ["holding a key moves something", "Plays the game trying the arrow keys, W A S D and Space: something moves differently while one is held."],
+  ["some object's collision uses lives", "That kind of event, in any object, uses the word (also create, step, draw gui…)."],
+  ["things move at 3 or more speeds", "Plays the game and watches what moves: at least that many different speeds."],
+  ["some things move left and some move right", "Plays the game: things moving both ways."],
 ];
 
 const QUESTIONS = `\`\`\`quiz

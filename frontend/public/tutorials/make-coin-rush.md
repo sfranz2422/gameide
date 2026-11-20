@@ -4,38 +4,51 @@ level: Now You Can Make
 after: collect-coins
 time: 35 min
 starter: empty
-description: A whole game from an empty one: grab as many coins as you can in thirty seconds.
+description: Your own grab-it-quick game, from an empty one: you choose who grabs, what they grab, how it looks, which keys play it and how long the clock runs.
 ---
 # Coin Rush
 
-You know sprites, objects, rooms, events and collisions now. That's enough to make a whole game, starting from nothing.
+You know sprites, objects, rooms, events and collisions now. That's enough to make a whole game of **your own**, starting from nothing.
 
-In **Coin Rush** a coin appears somewhere in the room. Grab it, and it jumps somewhere else. You have thirty seconds to grab as many as you can.
+It's a race against the clock: something to grab appears somewhere in the room. Grab it, and it jumps somewhere else. Grab as many as you can before the time runs out. **Everything else is up to you.**
+
+- **Who grabs?** A cat, a robot, a bee, a kid with a net…
+- **What do they grab?** Coins, gems, apples, stars, socks…
+- **Which keys?** The arrows, W A S D, or something else.
+- **How long?** Thirty seconds, a minute, you choose.
+- **What does it look like?** Draw your own pictures, pick from the art library, or import your own.
+
+Each step tells you **what** your game needs next and shows **one way** to do it. The code is an example: change the names, keys and numbers to fit your game. The checks don't care what you call things, only that your game does what the step asks.
+
+The room is 640 × 480.
 
 ---
 
-## The player
+## Your hero
 
-Press the **+** beside **Sprites** and pick the **player**.
+Make the one who does the grabbing.
 
-Then press the **+** beside **Objects**, name it **Player**, and choose **player** in its **Sprite** box.
+1. **Its picture.** Choose one way:
+   - **Draw it:** make a new sprite and paint it in the sprite editor.
+   - **The art library:** open **Library** and pick a picture.
+   - **Your own file:** import a picture you made.
+2. **Its object.** Make an object for it, give it that sprite, and give it a name that fits your game (*Cat*, *Robot*, *Grabber*…).
+3. **Put it in the room.** Drag one into the middle of **Room1**.
 
-Open **Room1** and drag **Player** into the middle of the room.
-
-highlight: add-sprites
+highlight: open-library
 
 ```check
-sprite player exists
-object Player exists
-Player has sprite
-room Room1 has 1 Player
+some object has a sprite
+room Room1 has at least 1 thing
 ```
 
 ---
 
-## Moving
+## Your controls
 
-Give **Player** a **Step** event:
+Give your hero a **Step** event that moves it with the keys **you** choose.
+
+Here is one way: the arrow keys, gliding while a key is held. Change `"up"`, `"down"`, `"left"` and `"right"` to your keys (letter keys are written as the letter, like `"w"`), and `speed` to how fast you like.
 
 ```python
 speed = 5
@@ -45,29 +58,30 @@ self.x = clamp(self.x, 0, room_width - 24)
 self.y = clamp(self.y, 0, room_height - 24)
 ```
 
-`clamp` keeps a number between two others, so the player can't walk off the screen. The player is 24 pixels wide, so its left edge stops 24 pixels before the right edge of the room.
+`clamp` keeps a number between two others, so your hero can't walk off the screen. 24 is how big the hero's picture is: if yours is bigger or smaller, change the 24s to its size.
 
 ```quiz
 What does `clamp(700, 0, 616)` give?
 answer: 616
 ```
 
-highlight: add-event
+highlight: code-editor
 
 ```check
-Player has event step
-Player.step uses clamp
-after 1 second holding right, Player.x increased
-after 1 second holding up, Player.y decreased
+holding a key moves something
+uses clamp
 ```
 
 ---
 
-## A coin
+## Something to grab
 
-Add the **coin** sprite, then an object called **Coin** with that sprite. Drag **one** Coin into the room.
+Now the thing your hero grabs: your coins, gems, apples or stars.
 
-Give **Coin** a **Create** event. It puts the coin somewhere new each time the game starts:
+1. **Its picture.** Draw it, pick it from the library, or import it, like your hero's.
+2. **Its object.** Make an object with that sprite, named for your game.
+3. **Put one in the room.** Just **one**: it will jump around.
+4. **Somewhere new each game.** Give it a **Create** event:
 
 ```python
 import random
@@ -80,40 +94,39 @@ self.y = random.randint(16, room_height - 16)
 highlight: add-objects
 
 ```check
-object Coin exists
-Coin has sprite
-room Room1 has 1 Coin
-Coin.create uses randint
+at least 2 objects have sprites
+room Room1 has at least 2 things
+uses randint
 ```
 
 ---
 
 ## Grab it
 
-Give **Player** a **Create** event, to start the score at nothing:
+Give your hero a **Create** event, to start the score at nothing:
 
 ```python
 global_vars.score = 0
 ```
 
-Then add a **Collision with Coin** event to **Player**. The coin isn't destroyed: it jumps somewhere else, so there's always one to chase.
+Then add a **Collision** event to your hero, with the thing it grabs. The thing isn't destroyed: it jumps somewhere else, so there's always one to chase. Fill in the blank (`___`):
 
 ```python
 import random
-global_vars.score += 1
+global_vars.score += ___    # how many points each one is worth
 other.x = random.randint(16, room_width - 16)
-other.y = random.randint(16, room_height - 16)
 ```
 
-Play it and grab a few coins.
+`other` is the thing your hero touched. That line moves it across. **Finish it yourself:** add a line that moves it down or up too, to a new `other.y`. The room is `room_height` tall.
+
+Play it and grab a few.
 
 highlight: add-event
 
 ```check
-Player has event create
-Player.create uses score
-Player has event collision with Coin
-Player.collision with Coin uses randint
+some object has event collision
+some object's collision uses score
+some object's collision uses room_height
 game runs 2 seconds without errors
 ```
 
@@ -121,15 +134,19 @@ game runs 2 seconds without errors
 
 ## The score on screen
 
-Make an object called **Hud**, with no sprite, and drag one into the room. Give it a **Draw GUI** event:
+Make an object with **no sprite** to show the score, name it (*Hud*, *Scoreboard*…), and drag one into the room. Give it a **Draw GUI** event.
+
+You choose the colour and the words. Fill in the blanks:
 
 ```python
-draw_set_color("white")
-draw_text(10, 10, f"Coins: {global_vars.score}")
+draw_set_color(___)        # a colour, like "white" or "yellow"
+draw_text(10, 10, f"___ {global_vars.score}")
 ```
 
+Draw GUI is drawn on top of everything, at screen pixels: (10, 10) is near the top-left corner. `f"…{…}"` puts a value into the words.
+
 ````quiz
-You've grabbed 7 coins. What does the Hud show?
+You've grabbed 7. What does this show?
 ```py
 draw_text(10, 10, f"Coins: {global_vars.score}")
 ```
@@ -141,90 +158,96 @@ draw_text(10, 10, f"Coins: {global_vars.score}")
 highlight: add-objects
 
 ```check
-object Hud exists
-room Room1 has 1 Hud
-Hud has event draw gui
-Hud.draw gui uses draw_text
+some object's draw gui uses score
 ```
 
 ---
 
-## Thirty seconds
+## Against the clock
 
-Give **Hud** a **Create** event. It starts the clock, and sets **alarm 0** to go off in 60 steps, which is one second:
+Give your score object a **Create** event. It starts the clock, and sets **alarm 0** to go off in 60 steps, which is one second. Fill in how long your game lasts:
 
 ```python
-global_vars.time = 30
+global_vars.time = ___     # how many seconds, like 30
 self.alarm[0] = 60
 ```
 
-Add an **Alarm 0** event. Each second it takes one off the clock, then sets the alarm again, until the time is gone:
+Add an **Alarm 0** event. Each second it takes one off the clock, then sets the alarm again, until the time is gone. Fill in the blanks:
 
 ```python
 if global_vars.time > 0:
-    global_vars.time -= 1
-    self.alarm[0] = 60
+    global_vars.time -= ___    # one second gone
+    self.alarm[0] = ___        # steps until it goes off again
 ```
 
-And show the time: add this line at the bottom of the **Draw GUI** event.
-
-```python
-draw_text(10, 30, f"Time: {global_vars.time}")
-```
+**Show the time yourself:** add a line at the bottom of the **Draw GUI** event that draws `global_vars.time`, a little under the score.
 
 highlight: add-event
 
 ```check
-Hud has event alarm 0
-Hud.alarm 0 uses alarm
-after 2 seconds, global_vars.time < 30
+some object has event alarm 0
+some object's draw gui uses time
+game runs 2 seconds without errors
 ```
 
 ---
 
 ## Time's up
 
-When the time runs out, the player stops, and Enter plays again. Add these lines at the **top** of **Player**'s **Step** event:
+When the time runs out, your hero should stop, and a key of your choice should play again. Fill in the key, and put these lines at the **top** of your hero's **Step** event:
 
 ```python
 if global_vars.time == 0:
-    if keyboard_check_pressed("enter"):
+    if keyboard_check_pressed(___):
         room_restart()
     return
 ```
 
-`return` ends the event there: the lines under it, the ones that move the player, don't run.
+`return` ends the event there: the lines under it, the ones that move your hero, don't run.
 
-`room_restart()` starts the room again from the beginning. Every Create event runs again, so the score is 0 and the clock is 30.
+`room_restart()` starts the room again from the beginning. Every Create event runs again, so the score is 0 and the clock is full.
 
-Then tell the player, at the bottom of **Hud**'s **Draw GUI** event:
-
-```python
-if global_vars.time == 0:
-    draw_text(220, 220, "Time's up! Enter to play again")
-```
+Then, in your score object's **Draw GUI** event, write your own time's-up words when the clock reaches 0, and say which key plays again.
 
 ```quiz
-Why doesn't the player move once the time is 0?
+Why doesn't your hero move once the time is 0?
 - [x] `return` ends the Step event before the lines that move it
-- [ ] `room_restart()` freezes the player
+- [ ] `room_restart()` freezes the hero
 - [ ] The alarm stops the Step event
 ```
 
 highlight: code-editor
 
 ```check
-Player.step uses keyboard_check_pressed
-Player.step uses room_restart
+uses room_restart
+some object's step uses return
 game runs 2 seconds without errors
 ```
 
 ---
 
-## You made Coin Rush
+## Make it yours
 
-That's a whole game, made from an empty one. Ideas to make it yours:
+Make your game more fun to play. Choose one (or more), and write it yourself:
 
-- Make the coins worth more as the clock runs down.
-- Add a second kind of coin that gives you five extra seconds.
-- Keep a best score: look at **6. End Screen** in **Game Elements 2** to see how.
+- **Last-second rush:** grabs are worth more when the clock is nearly out. Hint: in the collision, `if global_vars.time < 10:`
+- **A time bonus:** a second kind of thing to grab that adds a few seconds to `global_vars.time`.
+- **Something to avoid:** a thing that wanders about and takes seconds away when you touch it.
+- **Your own idea:** a hero that speeds up as the score goes up, anything.
+
+highlight: code-editor
+
+```check
+game runs 2 seconds without errors
+```
+
+---
+
+## You made your own grab game
+
+That's a whole game, made from an empty one. Play it, then make it even more yours:
+
+- A **background**: a meadow, a kitchen, space. Paint one, or pick one from the library.
+- **Sounds** for a grab and for time's up.
+- A **best score** that's kept between games: look at **6. End Screen** in **Game Elements 2** to see how.
+- A **title screen** in a room of its own.

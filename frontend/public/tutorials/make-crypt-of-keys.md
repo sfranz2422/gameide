@@ -4,21 +4,37 @@ level: Now You Can Make
 after: el3-strike
 time: 55 min
 starter: empty
-description: A whole top-down adventure from an empty one: find keys to open locked doors, fight slimes with a sword, and escape with the gem.
+description: Your own top-down adventure, from an empty one: you choose the explorer, the guards, the keys, the doors, the prize, the map and the keys that play it.
 ---
 # Crypt of Keys
 
-You've drawn levels as text, made a strike that hits what's in front of you, and health that runs down. Now make a top-down adventure of your own, from an empty one.
+You've drawn levels as text, made a strike that hits what's in front of you, and health that runs down. Now make a top-down adventure of **your own** from an empty one.
 
-In **Crypt of Keys** you're shut in an old crypt, seen from above. Each locked door needs a key, and the keys are guarded by slimes. Fight your way through with your sword, and grab the gem in the last room to escape.
+It's an escape: your explorer is shut in somewhere, seen from above. Each locked door needs a key, the keys are guarded, and a prize waits in the last room. **Everything else is up to you.**
+
+- **Where is it?** An old crypt, a haunted library, a spaceship, a candy factory…
+- **Who explores?** A knight, a cat, a robot, an owl…
+- **What guards the keys?** Slimes, ghosts, bats, angry vacuum cleaners…
+- **What do the keys, doors, weapon and prize look like?** A key could be a scroll, a keycard or a bone. The prize could be a gem, a crown or a lost book.
+- **Which keys?** The arrows, W A S D, or something else.
+- **What does it look like?** Draw your own pictures, pick from the art library, or import your own.
+
+Each step tells you **what** your game needs next and shows **one way** to do it. The code is an example: change the names, keys and numbers to fit your game. The checks don't care what you call things, only that your game does what the step asks.
+
+The room is 640 × 480: a map of squares of 32, 20 across and 15 down. Walls and doors should be **32 × 32**, one square each. Make your explorer a little smaller, like 24 × 24 or 16 × 16, so it fits through a gap.
 
 ---
 
-## The crypt
+## The walls
 
-Add the **wall** sprite and an object called **Wall** with it, and tick **Solid**.
+Make the walls of your crypt.
 
-Make an object called **Level**, with no sprite, and drag one into **Room1**. Give it a **Create** event: the crypt as a map, 20 by 15. Only the `#`s become walls for now.
+1. **Their picture.** Choose one way:
+   - **Draw it:** make a new sprite, 32 × 32, and paint it in the sprite editor.
+   - **The art library:** open **Library** and pick a picture.
+   - **Your own file:** import a picture you made.
+2. **Their object.** Make an object for it, give it that sprite, name it (*Wall*, *Stone*, *Hedge*…), and tick **Solid**.
+3. **The map.** Make an object with **no sprite** that builds the level, name it (*Level*, *Builder*…), and drag one into **Room1**. Give it a **Create** event:
 
 ```python
 rows = [
@@ -44,35 +60,41 @@ for row in range(len(rows)):
             instance_create(col * 32, row * 32, "Wall")
 ```
 
-There are three rooms along the top, with a locked door `D` between each, and a hall underneath the middle one.
+Change `"Wall"` to your wall object's name. Only the `#`s become walls for now: the other letters come later. `P` is where your explorer starts, `k` a key, `D` a locked door, `s` a guard and `G` the prize.
 
-highlight: add-objects
+**Make it yours:** change the map. Keep it 20 across and 15 down, with walls all round the edge, and put each letter somewhere it can be reached.
+
+highlight: open-library
 
 ```check
-object Wall exists
-room Room1 has 1 Level
-Level.create uses for
+some object has a sprite
+room Room1 has at least 1 thing
+some object's create uses instance_create
 ```
 
 ---
 
-## The explorer
+## Your explorer
 
-Add the **player** sprite and an object called **Player** with it. In **Level**'s loop, under the Wall line:
+Make the one who explores: its picture (draw it, the library, or import it), and an object with it, named for your game.
+
+Your map-building object makes it at the `P`. In its loop, under the wall line:
 
 ```python
         elif rows[row][col] == "P":
             instance_create(col * 32 + 4, row * 32 + 4, "Player")
 ```
 
-Give **Player** a **Create** event. `face_x` and `face_y` are the way it's facing, which the sword will need:
+Change `"Player"` to your explorer's name. `+ 4` puts a 24-pixel picture in the middle of its square. If your picture's origin is its middle, use `+ 16` instead.
+
+Give your explorer a **Create** event. `face_x` and `face_y` are the way it's facing, which the weapon will need:
 
 ```python
 self.face_x = 1
 self.face_y = 0
 ```
 
-And a **Step** event. Seen from above there's no falling, just walking in four directions, stopped by walls:
+And a **Step** event: walking in four directions, stopped by walls. Change `"up"`, `"down"`, `"left"` and `"right"` to your keys:
 
 ```python
 speed = 3
@@ -90,50 +112,45 @@ Moving across and down separately means that walking into a wall at an angle sli
 highlight: add-event
 
 ```check
-Level.create uses elif
-Player.step uses move_and_collide
-after 1 second holding right, Player.x increased
-after 1 second holding down, Player.y increased
+holding a key moves something
+some object's step uses move_and_collide
+some object's create uses elif
 ```
 
 ---
 
 ## Keys and doors
 
-Add the **key** sprite and an object called **Key**, and the **door** sprite and an object called **Door**. Tick **Solid** for Door. In **Level**'s loop:
+Make two more things, each with its picture and its object: a **key** (or a keycard, a scroll, a bone…) and a **door** (or a gate, a force field…). Tick **Solid** for the door.
+
+In the map's loop, fill in your objects' names:
 
 ```python
         elif rows[row][col] == "k":
-            instance_create(col * 32 + 16, row * 32 + 16, "Key")
+            instance_create(col * 32 + 16, row * 32 + 16, ___)    # your key's object, in quotes
         elif rows[row][col] == "D":
-            instance_create(col * 32, row * 32, "Door")
+            instance_create(col * 32, row * 32, ___)    # your door's object, in quotes
 ```
 
-Add a line to **Player**'s **Create** event:
+Now your explorer needs to count keys. Add a line to its **Create** event yourself that sets `global_vars.keys` to 0.
 
-```python
-global_vars.keys = 0
-```
-
-A **Collision with Key** event on **Player** picks one up:
+A **Collision** event on your explorer, with the key, picks one up:
 
 ```python
 global_vars.keys += 1
 other.destroy()
 ```
 
-A door is solid, so you never touch it: you stop beside it. So the player opens the nearest door when it's close enough, if there's a key to open it with. Add to the bottom of **Player**'s **Step** event:
+A door is solid, so you never touch it: you stop beside it. So your explorer opens the nearest door when it's close enough, if there's a key to open it with. Add to the bottom of its **Step** event, and fill in the blanks:
 
 ```python
-door = instance_nearest(self.x, self.y, "Door")
-if door and global_vars.keys > 0 and point_distance(self.x + 12, self.y + 12, door.x + 16, door.y + 16) < 40:
+door = instance_nearest(self.x, self.y, ___)    # your door's object, in quotes
+if door and global_vars.keys > 0 and point_distance(self.x, self.y, door.x, door.y) < ___:    # how close
     door.destroy()
     global_vars.keys -= 1
 ```
 
-`self.x + 12` is the middle of the player, and `door.x + 16` the middle of the door: from middle to middle, they're 28 pixels apart when they touch.
-
-Play it: there are two doors in the map, so `instance_number("Door")`, the number of doors, is 2 until you open one.
+How close? Standing beside a door, your explorer is about a square away from it, so a bit more than 32 works, like 48. Too small and the door never opens; too big and it opens from across the room.
 
 ```quiz
 You walk up to a door with no keys. What happens?
@@ -145,198 +162,183 @@ You walk up to a door with no keys. What happens?
 highlight: add-objects
 
 ```check
-object Key exists
-object Door exists
-Player has event collision with Key
-Player.step uses instance_nearest
-after 1 second, instance_number("Door") == 2
+at least 4 objects have sprites
+some object's collision uses keys
+some object's step uses instance_nearest
+after 1 second, global_vars.keys == 0
 ```
 
 ---
 
-## Slimes
+## The guards
 
-Add the **enemy** sprite and an object called **Slime** with it. In **Level**'s loop:
+Make what guards the keys: its picture and its object, named for your game.
 
-```python
-        elif rows[row][col] == "s":
-            instance_create(col * 32 + 16, row * 32 + 16, "Slime")
-```
+In the map's loop, add an `elif` for the `s` yourself, like the key's: make one of your guards in the middle of the square.
 
-Give **Slime** a **Step** event. When the player is near, it creeps towards them, stopped by walls and doors like the player:
+Give your guard a **Step** event. When your explorer is near, it creeps towards them, stopped by walls and doors. Fill in the blanks:
 
 ```python
-player = instance_nearest(self.x, self.y, "Player")
-if player and point_distance(self.x, self.y, player.x + 12, player.y + 12) < 150:
-    move_and_collide(sign(player.x + 12 - self.x), 0)
-    move_and_collide(0, sign(player.y + 12 - self.y))
+hero = instance_nearest(self.x, self.y, ___)    # your explorer's object, in quotes
+if hero and point_distance(self.x, self.y, hero.x, hero.y) < ___:    # how near before it comes for you, like 150
+    move_and_collide(sign(hero.x - self.x), 0)
+    move_and_collide(0, sign(hero.y - self.y))
 ```
 
-`sign` is -1, 0 or 1: one pixel a step, towards the player, across and down. Slower than you, so you can get away.
+`sign` is -1, 0 or 1: one pixel a step, towards your explorer, across and down. Slower than you, so you can get away.
+
+**Make it yours:** a quicker guard moves `sign(…) * 2`. A lazy one only notices you from very close.
 
 highlight: add-event
 
 ```check
-object Slime exists
-Slime.step uses point_distance
+at least 5 objects have sprites
 game runs 2 seconds without errors
 ```
 
 ---
 
-## A sword
+## A weapon
 
-Add the **slash** sprite and an object called **Slash** with it. Give **Slash** a **Create** event, so it only lasts a moment:
+Make your weapon: a sword's slash, a magic spark, a puff of pepper… Its picture and its object.
 
-```python
-self.alarm[0] = 10
-```
-
-An **Alarm 0** event:
+Give it a **Create** event, so it only lasts a moment:
 
 ```python
-self.destroy()
+self.alarm[0] = ___    # how many steps it lasts: 10 is a sixth of a second
 ```
 
-And a **Collision with Slime** event:
+Give it an **Alarm 0** event yourself, that destroys it.
+
+And a **Collision** event with your guard:
 
 ```python
 effect("hit", other.x, other.y)
 other.destroy()
 ```
 
-Now swing it. At the bottom of **Player**'s **Step** event, X makes a slash in front of the player, turned the way it faces:
+Now swing it. At the bottom of your explorer's **Step** event, choose your attack key and fill in your weapon's name:
 
 ```python
-if keyboard_check_pressed("x"):
-    s = instance_create(self.x + 12 + self.face_x * 24, self.y + 12 + self.face_y * 24, "Slash")
+if keyboard_check_pressed(___):    # your attack key, like "x" or "space"
+    s = instance_create(self.x + self.face_x * 24, self.y + self.face_y * 24, ___)    # your weapon's object
     s.image_angle = point_direction(0, 0, self.face_x, self.face_y)
 ```
 
-`point_direction(0, 0, self.face_x, self.face_y)` is the angle the player faces: 0 for right, 90 for up, 180 for left, 270 for down.
+That makes one in front of your explorer, turned the way it faces. `point_direction(0, 0, self.face_x, self.face_y)` is that angle: 0 for right, 90 for up, 180 for left, 270 for down.
 
 highlight: add-event
 
 ```check
-object Slash exists
-Slash has event collision with Slime
-Player.step uses image_angle
+some object has event alarm 0
+some object's alarm 0 uses destroy
+some object's collision uses effect
+some object's step uses image_angle
 ```
 
 ---
 
 ## Hearts
 
-Add these lines to **Player**'s **Create** event. `hurt` counts down after a hit, so one slime can't take all your hearts at once:
+Your explorer needs hearts (or lives, or batteries). Add these lines to its **Create** event, and choose how many. `hurt` counts down after a hit, so one guard can't take all your hearts at once:
 
 ```python
-global_vars.hearts = 3
+global_vars.hearts = ___    # how many hearts you start with
 self.hurt = 0
 ```
 
-Add a **Collision with Slime** event to **Player**:
+Add a **Collision** event to your explorer, with your guard:
 
 ```python
 if self.hurt == 0:
     global_vars.hearts -= 1
-    self.hurt = 60
-    self.flash("red", 20)
+    self.hurt = ___    # steps before it can hurt you again: 60 is a second
+    self.flash(___, 20)    # a colour, like "red"
     if global_vars.hearts <= 0:
         room_restart()
 ```
 
-And count it down, at the bottom of **Player**'s **Step** event:
+Then count `hurt` down yourself: at the bottom of your explorer's **Step** event, if `self.hurt` is more than 0, take 1 off it.
 
-```python
-if self.hurt > 0:
-    self.hurt -= 1
-```
-
-Add the **heart** sprite. Make an object called **Hud**, with no sprite, drag one into the room, and give it a **Draw GUI** event. A loop draws one heart for each you have:
+Make a sprite for one heart (draw it, or pick one from the library). Make an object with **no sprite** to show the hearts and keys, name it (*Hud*, *Panel*…), drag one into the room, and give it a **Draw GUI** event. A loop draws one heart for each you have:
 
 ```python
 for i in range(global_vars.hearts):
-    draw_sprite("heart", 0, 20 + i * 20, 20)
+    draw_sprite(___, 0, 20 + i * 20, 20)    # your heart sprite's name, in quotes
 draw_set_color("white")
-draw_text(84, 12, f"Keys: {global_vars.keys}")
 ```
 
+Under it, show how many keys you have, with `draw_text` and `global_vars.keys`. You choose the words.
+
 ```quiz
-A slime touches you on every step for a whole second (60 steps). How many hearts do you lose?
+Your `self.hurt` is set to 60. A guard touches you on every step for a whole second (60 steps). How many hearts do you lose?
 answer: 1
 ```
 
 highlight: add-objects
 
 ```check
-Player has event collision with Slime
-Player.create uses hearts
-room Room1 has 1 Hud
-Hud.draw gui uses draw_sprite
+room Room1 has at least 2 things
+some object's collision uses hurt
+some object's step uses hurt
+some object's draw gui uses draw_sprite
+some object's draw gui uses keys
+after 1 second, global_vars.hearts > 0
 ```
 
 ---
 
-## The gem
+## The prize
 
-Add the **gem** sprite and an object called **Gem** with it. In **Level**'s loop:
+Make your prize: its picture and its object. In the map's loop, add an `elif` for the `G` yourself.
 
-```python
-        elif rows[row][col] == "G":
-            instance_create(col * 32 + 16, row * 32 + 16, "Gem")
-```
+Your explorer's **Create** event needs one more line: write one that sets `global_vars.escaped` to False.
 
-A **Collision with Gem** event on **Player**:
+A **Collision** event on your explorer, with the prize:
 
 ```python
 global_vars.escaped = True
 other.destroy()
 ```
 
-Start it as False in **Player**'s **Create** event:
-
-```python
-global_vars.escaped = False
-```
-
-Once you've escaped, the explorer stops and Enter plays again. At the **top** of **Player**'s **Step** event:
+Once you've escaped, your explorer stops, and a key of your choice plays again. At the **top** of its **Step** event:
 
 ```python
 if global_vars.escaped:
-    if keyboard_check_pressed("enter"):
+    if keyboard_check_pressed(___):    # the key that plays again
         room_restart()
     return
 ```
 
-And at the bottom of **Hud**'s **Draw GUI** event:
-
-```python
-if global_vars.escaped:
-    draw_text(200, 220, "You escaped with the gem! Enter to play again")
-```
+Then, in your Draw GUI event, write your own words for when `global_vars.escaped` is True, and say which key plays again.
 
 ```quiz
 Why does `return` stop the explorer from moving?
-- [x] It ends the Step event before the lines that move the player
-- [ ] It sends the player back to the start
-- [ ] It destroys the player
+- [x] It ends the Step event before the lines that move it
+- [ ] It sends the explorer back to the start
+- [ ] It destroys the explorer
 ```
 
 highlight: add-event
 
 ```check
-object Gem exists
-Player has event collision with Gem
-Player.create uses escaped
+at least 7 objects have sprites
+some object's create uses escaped
+some object's collision uses escaped
+some object's step uses return
+some object's draw gui uses escaped
 game runs 2 seconds without errors
 ```
 
 ---
 
-## You made Crypt of Keys
+## You made your own adventure
 
-Ideas to make it yours:
+Play it, then make it even more yours:
 
-- A second crypt: another room and map, and the gem takes you there with `room_goto`.
-- Slimes that need two hits: give them an `hp`, as in **5. Health Bars**.
-- A heart to pick up that gives one back, never more than 3.
+- A **second map**: another room, and the prize takes you there with `room_goto`.
+- Guards that need **two hits**: give them an `hp`, as in **5. Health Bars**.
+- A **heart to pick up** that gives one back, never more than you started with.
+- A guard that **walks a beat** back and forth until it sees you.
+- A **floor**: paint one, or pick a background from the library.
+- **Sounds** for a swing, a key and a door opening.

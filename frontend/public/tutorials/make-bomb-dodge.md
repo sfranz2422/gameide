@@ -4,157 +4,185 @@ level: Now You Can Make
 after: el2-difficulty
 time: 40 min
 starter: empty
-description: A whole game from an empty one: bombs rain down faster and faster, and you dodge them for as long as you can.
+description: Your own dodging game, from an empty one: you choose who dodges, what falls from the sky, how it looks and which keys play it.
 ---
 # Bomb Dodge
 
-You've made a player, collisions, a score, lives, alarms, and a spawner that makes enemies faster and faster. Now put them together into a game of your own, from an empty one.
+You've made a player, collisions, a score, lives, alarms, and a spawner that makes enemies faster and faster. Now put them together into a game of **your own**, from an empty one.
 
-In **Bomb Dodge**, bombs fall from the sky. Every bomb you dodge is a point, every bomb that hits you is a life, and the bombs come faster the better you do.
+It's a dodging game: things fall from the sky. Every one you dodge is a point, every one that hits you is a life, and they come faster the better you do. **Everything else is up to you.**
+
+- **Who dodges?** A cat with an umbrella, a snail, a tiny knight, a spaceship…
+- **What falls?** Bombs, rocks, raindrops, pianos, meteors…
+- **Which keys?** The arrows, A and D, or something else. Your hero only goes left and right.
+- **What does it look like?** Draw your own pictures, pick from the art library, or import your own.
+
+Each step tells you **what** your game needs next and shows **one way** to do it. The code is an example: change the names, keys and numbers to fit your game. The checks don't care what you call things, only that your game does what the step asks.
+
+The room is 640 × 480.
 
 ---
 
-## The player
+## Your hero
 
-Add the **player** sprite and an object called **Player** with it. Open **Room1** and drag **Player** to the bottom middle of the room.
+Make the one who dodges.
 
-Give **Player** a **Step** event. The player only goes left and right:
+1. **Its picture.** Choose one way:
+   - **Draw it:** make a new sprite and paint it in the sprite editor.
+   - **The art library:** open **Library** and pick a picture.
+   - **Your own file:** import a picture you made.
+2. **Its object.** Make an object for it, give it that sprite, and give it a name that fits your game (*Cat*, *Knight*, *Dodger*…).
+3. **Put it in the room.** Drag one to the bottom middle of **Room1**.
+
+highlight: open-library
+
+```check
+some object has a sprite
+room Room1 has at least 1 thing
+```
+
+---
+
+## Your controls
+
+Give your hero a **Step** event that moves it left and right with the keys **you** choose.
+
+Here is one way: the arrow keys. Change `"left"` and `"right"` to your keys (letter keys are written as the letter, like `"a"`), and the 6 to how fast you like.
 
 ```python
 self.x += (keyboard_check("right") - keyboard_check("left")) * 6
 self.x = clamp(self.x, 0, room_width - 24)
 ```
 
-highlight: add-sprites
+`clamp` keeps your hero on the screen. 24 is how wide the hero's picture is: if yours is wider or thinner, change it to its width.
+
+highlight: code-editor
 
 ```check
-object Player exists
-Player has sprite
-room Room1 has 1 Player
-Player.step uses clamp
-after 1 second holding left, Player.x decreased
+holding a key moves something
+uses clamp
 ```
 
 ---
 
-## A bomb
+## What falls
 
-Add the **bomb** sprite, and an object called **Bomb** with it. Don't put any bombs in the room: the game will make them.
+Now the things that fall: your bombs, rocks or raindrops.
 
-Give **Bomb** a **Create** event:
+1. **Their picture.** Draw it, pick it from the library, or import it, like your hero's.
+2. **Their object.** Make an object with that sprite, named for your game. **Don't** put any in the room: the game will make them.
+3. **Make them fall.** Give it a **Create** event:
 
 ```python
 self.vspeed = 3
 ```
 
-`vspeed` is how far an instance moves down by itself, every step. A bomb with a `vspeed` of 3 falls without any more code.
+`vspeed` is how far an instance moves down by itself, every step. One with a `vspeed` of 3 falls without any more code.
 
 highlight: add-objects
 
 ```check
-object Bomb exists
-Bomb has sprite
-Bomb.create uses vspeed
+at least 2 objects have sprites
+uses vspeed
 ```
 
 ---
 
-## Where bombs come from
+## Where they come from
 
-Make an object called **Spawner**, with no sprite, and drag one into the room. Its **Create** event sets an alarm:
+Make an object with **no sprite** that makes the falling things, name it (*Spawner*, *Cloud*, *Sky*…), and drag one into the room. Give it a **Create** event that sets an alarm. Fill in the blank (`___`):
 
 ```python
-self.alarm[0] = 30
+self.alarm[0] = ___        # steps until the first one falls: 60 is a second
 ```
 
-Its **Alarm 0** event makes a bomb just above the top of the room, at a random place across, then sets the alarm again:
+Its **Alarm 0** event makes one just above the top of the room, at a random place across, then sets the alarm again. Fill in the blanks:
 
 ```python
 import random
-instance_create(random.randint(8, room_width - 8), -10, "Bomb")
-self.alarm[0] = 30
+instance_create(random.randint(8, room_width - 8), -10, ___)   # your falling object's name, in quotes
+self.alarm[0] = ___        # steps until the next one
 ```
 
-Play it. After a few seconds, `instance_number("Bomb")`, the number of bombs, is more than one.
+Play it. If your falling object's name is spelled differently from the one in quotes, the game stops with an error: the names must match exactly, capitals too.
 
 ```quiz
-`self.alarm[0] = 30`. How often does the Spawner make a bomb?
+`self.alarm[0] = 30`. How often does a new one fall?
 - [x] Every half a second (30 steps, at 60 steps a second)
 - [ ] Every 30 seconds
-- [ ] 30 bombs at once
+- [ ] 30 at once
 ```
 
 highlight: add-event
 
 ```check
-room Room1 has 1 Spawner
-Spawner has event alarm 0
-Spawner.alarm 0 uses instance_create
-after 3 seconds, instance_number("Bomb") >= 2
+room Room1 has at least 2 things
+some object's alarm 0 uses instance_create
+game runs 3 seconds without errors
 ```
 
 ---
 
 ## Dodged
 
-Give **Player** a **Create** event, for the score and the lives:
+Give your hero a **Create** event, for the score and the lives. Fill in how many lives your game gives:
 
 ```python
 global_vars.score = 0
-global_vars.lives = 3
+global_vars.lives = ___
 ```
 
-A bomb that falls out of the bottom of the room was dodged. Give **Bomb** a **Step** event:
+One that falls out of the bottom of the room was dodged. Give your falling object a **Step** event, and fill in the points:
 
 ```python
 if self.y > room_height:
-    global_vars.score += 1
-    self.destroy()
+    global_vars.score += ___
 ```
 
-`destroy()` takes it out of the game. Without it, every bomb would keep falling forever, far below the room.
+**Finish it yourself:** after the point, take it out of the game with `self.destroy()`, inside the `if`. Without that, every one would keep falling forever, far below the room.
 
 highlight: add-event
 
 ```check
-Player.create uses lives
-Bomb has event step
-Bomb.step uses destroy
-after 4 seconds, global_vars.score >= 1
+some object's create uses lives
+some object's step uses destroy
+after 6 seconds, global_vars.score >= 1
 ```
 
 ---
 
 ## Hit
 
-Add a **Collision with Bomb** event to **Player**:
+Add a **Collision** event to your hero, with the falling object. Fill in how many lives a hit takes:
 
 ```python
 other.destroy()
-global_vars.lives -= 1
-self.flash("white", 10)
+global_vars.lives -= ___
 ```
 
-The bomb is destroyed, so it can only hit once. `self.flash("white", 10)` makes the player flash white for 10 steps, so you can see you were hit.
+The falling one is destroyed, so it can only hit once.
+
+**Finish it yourself:** make your hero flash, so you can see you were hit. `self.flash("white", 10)` flashes white for 10 steps: choose your own colour and number of steps.
 
 highlight: add-event
 
 ```check
-Player has event collision with Bomb
-Player.collision with Bomb uses lives
-Player.collision with Bomb uses flash
+some object has event collision
+some object's collision uses lives
+some object's collision uses flash
 ```
 
 ---
 
 ## Score and lives
 
-Make an object called **Hud**, with no sprite, and drag one into the room. Give it a **Draw GUI** event:
+Make an object with **no sprite** to show the score and lives, name it (*Hud*, *Scoreboard*…), and drag one into the room. Give it a **Draw GUI** event.
+
+You choose the colour, the words and where they go. Fill in the blanks, and **show the lives yourself**, on a line underneath:
 
 ```python
-draw_set_color("white")
-draw_text(10, 10, f"Dodged: {global_vars.score}")
-draw_text(10, 30, f"Lives: {global_vars.lives}")
+draw_set_color(___)        # a colour, like "white" or "yellow"
+draw_text(10, 10, f"___ {global_vars.score}")
 ```
 
 ```quiz
@@ -167,43 +195,36 @@ Which one of these shows the lives?
 highlight: add-objects
 
 ```check
-object Hud exists
-room Room1 has 1 Hud
-Hud.draw gui uses draw_text
+some object's draw gui uses score
+some object's draw gui uses lives
 ```
 
 ---
 
 ## Game over
 
-When the lives are gone, the game stops and Enter plays again. Add these lines at the **top** of **Player**'s **Step** event:
+When the lives are gone, your hero should stop, and a key of your choice should play again. Fill in the key, and put these lines at the **top** of your hero's **Step** event:
 
 ```python
 if global_vars.lives <= 0:
-    if keyboard_check_pressed("enter"):
+    if keyboard_check_pressed(___):
         room_restart()
     return
 ```
 
-The bombs should stop too. In **Spawner**'s **Alarm 0** event, put the line that makes a bomb inside an `if`:
+`return` ends the Step event there, so nothing below it runs: your hero stops.
 
-```python
-if global_vars.lives > 0:
-    instance_create(random.randint(8, room_width - 8), -10, "Bomb")
-```
+**Finish it yourself:**
 
-And say so, at the bottom of **Hud**'s **Draw GUI** event:
-
-```python
-if global_vars.lives <= 0:
-    draw_text(250, 220, "Game over! Enter to play again")
-```
+- Nothing should fall once the game is over. In the **Alarm 0** event that makes them, put the `instance_create` line inside an `if`, so it only runs while `global_vars.lives > 0`.
+- In your score object's **Draw GUI** event, write your own game-over words when the lives are gone, and say which key plays again.
 
 highlight: code-editor
 
 ```check
-Player.step uses room_restart
-Player.step uses keyboard_check_pressed
+uses room_restart
+some object's step uses return
+some object's alarm 0 uses lives
 game runs 3 seconds without errors
 ```
 
@@ -211,39 +232,42 @@ game runs 3 seconds without errors
 
 ## Faster and faster
 
-It's too easy. The better you do, the faster the bombs should come.
+It's too easy. The better you do, the faster they should come.
 
-In **Spawner**'s **Alarm 0** event, change the last line, `self.alarm[0] = 30`, to:
+In the **Alarm 0** event, change the last line, the one that sets the alarm again, to this. Fill in the blanks:
 
 ```python
-self.alarm[0] = max(8, 30 - global_vars.score)
+self.alarm[0] = max(___, ___ - global_vars.score)   # the shortest wait; the wait at the start
 ```
 
-Every bomb you dodge takes a step off the wait, but never below 8 steps. And in **Bomb**'s **Create** event, change the speed to:
+Every one you dodge takes a step off the wait, but never below the shortest wait.
+
+Then make them fall faster too: in your falling object's **Create** event, change the speed to this, and fill in the blanks:
 
 ```python
-self.vspeed = 3 + global_vars.score / 10
+self.vspeed = ___ + global_vars.score / ___     # the speed at the start; how many points make it 1 faster
 ```
 
 ```quiz
-You've dodged 25 bombs. How many steps is the wait now, `max(8, 30 - 25)`?
+You've dodged 25. How many steps is the wait now, `max(8, 30 - 25)`?
 answer: 8
 ```
 
 highlight: code-editor
 
 ```check
-Spawner.alarm 0 uses max
-Bomb.create uses score
+some object's alarm 0 uses max
 game runs 3 seconds without errors
 ```
 
 ---
 
-## You made Bomb Dodge
+## You made your own dodging game
 
-Ideas to make it yours:
+Play it, then make it even more yours:
 
-- A heart that falls now and then, and gives a life back.
-- A best score that's kept between games.
-- Bombs that drift sideways as they fall: give them an `hspeed` too.
+- A **background**: a city, a cave, space. Paint one, or pick one from the library.
+- Something that falls now and then and **gives a life back**.
+- A **best score** that's kept between games.
+- Falling things that **drift sideways**: give them an `hspeed` too.
+- **Sounds** for a hit and for game over.

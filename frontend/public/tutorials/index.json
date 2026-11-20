@@ -486,7 +486,7 @@
   "after": "collect-coins",
   "time": "35 min",
   "starter": "empty",
-  "description": "A whole game from an empty one: grab as many coins as you can in thirty seconds."
+  "description": "Your own grab-it-quick game, from an empty one: you choose who grabs, what they grab, how it looks, which keys play it and how long the clock runs."
  },
  {
   "key": "make-busy-road",
@@ -495,7 +495,7 @@
   "after": "el1-time-limit",
   "time": "45 min",
   "starter": "empty",
-  "description": "A whole game from an empty one: hop across lanes of traffic, one square at a time, without getting squashed."
+  "description": "Your own crossing game, from an empty one: you choose who crosses, what's in the way, how it looks and which keys play it."
  },
  {
   "key": "make-bomb-dodge",
@@ -504,7 +504,7 @@
   "after": "el2-difficulty",
   "time": "40 min",
   "starter": "empty",
-  "description": "A whole game from an empty one: bombs rain down faster and faster, and you dodge them for as long as you can."
+  "description": "Your own dodging game, from an empty one: you choose who dodges, what falls from the sky, how it looks and which keys play it."
  },
  {
   "key": "make-paddle-duel",
@@ -513,7 +513,7 @@
   "after": "el2-multiplayer",
   "time": "45 min",
   "starter": "empty",
-  "description": "A whole game from an empty one, for two players on one keyboard: knock the ball past each other, first to five wins."
+  "description": "Your own two-player game on one keyboard, from an empty one: you choose the paddles, the ball, how it looks, both players' keys and the score that wins."
  },
  {
   "key": "make-ledge-runner",
@@ -522,7 +522,7 @@
   "after": "el3-camera",
   "time": "50 min",
   "starter": "empty",
-  "description": "A whole platformer from an empty one: a level drawn as text, running and jumping, coins, crawlers to stomp, and a flag at the end."
+  "description": "Your own platformer, from an empty one: you design the level, and choose who runs, what they collect, what's in the way, the goal, the look and the keys."
  },
  {
   "key": "make-crypt-of-keys",
@@ -531,7 +531,7 @@
   "after": "el3-strike",
   "time": "55 min",
   "starter": "empty",
-  "description": "A whole top-down adventure from an empty one: find keys to open locked doors, fight slimes with a sword, and escape with the gem."
+  "description": "Your own top-down adventure, from an empty one: you choose the explorer, the guards, the keys, the doors, the prize, the map and the keys that play it."
  },
  {
   "key": "make-alley-brawl",
@@ -540,7 +540,7 @@
   "after": "el3-strike",
   "time": "50 min",
   "starter": "empty",
-  "description": "A whole beat 'em up from an empty one: walk a long street, punch the thugs that close in from both sides, and clear it before your health runs out."
+  "description": "Your own beat 'em up, from an empty one: you choose who fights, who they fight, where, how a hit looks and which keys play it."
  },
  {
   "key": "make-gem-guard",
@@ -549,7 +549,7 @@
   "after": "el3-button",
   "time": "50 min",
   "starter": "empty",
-  "description": "A whole tower defense from an empty game: enemies march down a road to steal your gem, and you click to build the towers that stop them."
+  "description": "Your own tower defense, from an empty game: you choose what marches, what it's after, the path it takes, your towers and what they cost."
  },
  {
   "key": "make-moonwell",
@@ -558,7 +558,7 @@
   "after": "Starter Projects",
   "time": "55 min",
   "starter": "empty",
-  "description": "A whole metroidvania from an empty one: rooms to walk between, a power-up that lets you reach a ledge you couldn't before, and the gem up there."
+  "description": "Your own metroidvania, from an empty one: rooms to walk between, a power-up that reaches a ledge you couldn't before, and a prize up there. You choose the explorer, the power-up, the prize, the look and the keys."
  },
  {
   "key": "make-robots-garden",
@@ -567,6 +567,6 @@
   "after": "art-town",
   "time": "50 min",
   "starter": "empty",
-  "description": "A whole game from an empty one: a garden you cut, autotile and paint yourself, a robot from a sprite sheet, quicker on the paths, collecting every seed before the clock runs out."
+  "description": "Your own collecting game, from an empty one: a garden you cut, autotile and paint yourself, and a gardener from a sprite sheet, quicker on the paths, collecting everything before the clock runs out. You choose the gardener, what it collects, the clock and the keys."
  }
 ]

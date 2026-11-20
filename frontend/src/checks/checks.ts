@@ -24,6 +24,18 @@
  *   after 2 seconds, instance_number("Coin") < 15        any Python that should come out true
  *   prints Hello, world!                    the console shows it, a second in (any case and spacing)
  *
+ * And with no names in them, for lessons where students choose their own (the "Now you can
+ * make" tutorials, 2026-11-20: their names, pictures and keys are the student's):
+ *
+ *   some object has a sprite                or "at least 3 objects have sprites"
+ *   at least 3 objects exist
+ *   some object has event collision         any collision event (or any other event, by name)
+ *   room Room1 has at least 6 things        instances of any objects
+ *   holding a key moves something           arrows, W A S D or Space: anything moving differently
+ *   some object's collision uses lives      that kind of event, in any object (also create, step, draw gui…)
+ *   things move at 3 or more speeds         watched for half a second: different speeds among what moves
+ *   some things move left and some move right
+ *
  * "(2 points)" at the end of a line makes it worth 2; every line is 1 otherwise.
  *
  * `parseTests` reads a block exactly as backend/checks.py does (the server
@@ -129,6 +141,14 @@ export type Check =
   | { kind: "after"; seconds: number; hold: string[]; object: string; prop: string; change: Change }
   | { kind: "after-expr"; seconds: number; hold: string[]; expr: string }
   | { kind: "prints"; text: string }
+  | { kind: "any-sprites"; n: number }
+  | { kind: "objects"; n: number }
+  | { kind: "any-event"; event: string }
+  | { kind: "things"; room: string; n: number }
+  | { kind: "key-moves" }
+  | { kind: "any-uses"; event: string; word: string }
+  | { kind: "speeds"; n: number }
+  | { kind: "both-ways" }
   | { kind: "unknown"; why: string };
 
 const NAME = String.raw`([A-Za-z_][A-Za-z0-9_]*)`;
@@ -138,6 +158,16 @@ const SECONDS = String.raw`(\d+(?:\.\d+)?)\s+seconds?`;
 export function readCheck(line: string): Check {
   let m: RegExpExecArray | null;
   const s = line.trim();
+  // No names: the student's own choices (read first, so "some" is never taken for a name).
+  if (/^(?:some|an|any)\s+object\s+has\s+(?:a\s+)?sprite$/i.test(s)) return { kind: "any-sprites", n: 1 };
+  if ((m = /^at\s+least\s+(\d+)\s+objects?\s+have\s+sprites?$/i.exec(s))) return { kind: "any-sprites", n: Number(m[1]) };
+  if ((m = /^at\s+least\s+(\d+)\s+objects?\s+exists?$/i.exec(s))) return { kind: "objects", n: Number(m[1]) };
+  if ((m = /^(?:some|an|any)\s+object\s+has\s+(?:an?\s+)?event\s+(.+)$/i.exec(s))) return { kind: "any-event", event: m[1]!.trim() };
+  if ((m = new RegExp(String.raw`^room\s+${NAME}\s+has\s+at\s+least\s+(\d+)\s+things?$`, "i").exec(s))) return { kind: "things", room: m[1]!, n: Number(m[2]) };
+  if (/^holding\s+a\s+key\s+moves\s+something$/i.test(s)) return { kind: "key-moves" };
+  if ((m = /^(?:some|an|any)\s+object's\s+(.+?)\s+uses\s+(\S+)$/i.exec(s))) return { kind: "any-uses", event: m[1]!.trim(), word: m[2]! };
+  if ((m = /^things\s+move\s+at\s+(\d+)\s+or\s+more\s+speeds$/i.exec(s))) return { kind: "speeds", n: Number(m[1]) };
+  if (/^some\s+things\s+move\s+left\s+and\s+some\s+(?:move\s+)?right$/i.test(s)) return { kind: "both-ways" };
   if ((m = new RegExp(String.raw`^(object|sprite|room|sound|font|script|tileset)\s+${NAME}\s+exists$`, "i").exec(s)))
     return { kind: "exists", what: m[1]!.toLowerCase() as "object", name: m[2]! };
   if ((m = new RegExp(String.raw`^${NAME}\s+has\s+(?:a\s+)?sprite(?:\s+${NAME})?$`, "i").exec(s))) return { kind: "has-sprite", object: m[1]!, ...(m[2] ? { sprite: m[2] } : {}) };
@@ -192,7 +222,9 @@ export function readCheck(line: string): Check {
   return { kind: "unknown", why: "GameIDE doesn't know this kind of check." };
 }
 
-export const needsGame = (c: Check) => c.kind === "runs" || c.kind === "after" || c.kind === "after-expr" || c.kind === "prints";
+export const needsGame = (c: Check) =>
+  c.kind === "runs" || c.kind === "after" || c.kind === "after-expr" || c.kind === "prints" || c.kind === "key-moves" ||
+  c.kind === "speeds" || c.kind === "both-ways";
 
 // ---------------------------------------------------------------- checks of the project
 
@@ -264,6 +296,42 @@ export function checkProject(p: Project, c: Check): { ok: boolean; detail: strin
       const found = wordIn(code, c.word);
       if (c.avoid) return found ? { ok: false, detail: `${where} uses ${c.word}, and shouldn't.` } : { ok: true, detail: "" };
       return found ? { ok: true, detail: "" } : { ok: false, detail: `${where} doesn't use ${c.word} yet.` };
+    }
+    case "any-sprites": {
+      const n = p.objects.filter((o) => p.sprites.some((sp) => sp.id === o.sprite)).length;
+      return n >= c.n
+        ? { ok: true, detail: "" }
+        : { ok: false, detail: c.n === 1 ? "None of your objects has a sprite yet." : `${n} of your objects ${n === 1 ? "has" : "have"} a sprite, not ${c.n} yet.` };
+    }
+    case "objects": {
+      const n = p.objects.length;
+      return n >= c.n ? { ok: true, detail: "" } : { ok: false, detail: `Your game has ${n} object${n === 1 ? "" : "s"}, not ${c.n} yet.` };
+    }
+    case "any-event": {
+      // "collision" on its own: a collision with anything.
+      const want = eventName(c.event);
+      const any = want === eventName("collision");
+      const ok = p.objects.some((o) => o.events.some((e) => {
+        const name = eventName(eventLabel(p, e.key));
+        return any ? name.startsWith(want) : name === want;
+      }));
+      return ok ? { ok: true, detail: "" } : { ok: false, detail: `None of your objects has a ${c.event} event yet.` };
+    }
+    case "any-uses": {
+      // That kind of event in any object ("collision": a collision with anything).
+      const want = eventName(c.event);
+      const fits = (label: string) => (want === eventName("collision") ? eventName(label).startsWith(want) : eventName(label) === want);
+      const events = p.objects.flatMap((o) => o.events.filter((e) => fits(eventLabel(p, e.key))));
+      if (!events.length) return { ok: false, detail: `None of your objects has a ${c.event} event yet.` };
+      return events.some((e) => wordIn(e.code, c.word))
+        ? { ok: true, detail: "" }
+        : { ok: false, detail: `No ${c.event} event uses ${c.word} yet.` };
+    }
+    case "things": {
+      const room = p.rooms.find((r) => same(r.name, c.room));
+      if (!room) return { ok: false, detail: `There's no room called ${c.room}.` };
+      const n = room.instances.length;
+      return n >= c.n ? { ok: true, detail: "" } : { ok: false, detail: `${room.name} has ${n} thing${n === 1 ? "" : "s"} in it, not ${c.n} yet.` };
     }
     case "count": {
       const room = p.rooms.find((r) => same(r.name, c.room));
@@ -436,6 +504,8 @@ export async function checkGame(run: GameRunner, c: Check): Promise<{ ok: boolea
       if (bad) return { ok: false, detail: bad };
       return printedOk(String(out ?? ""), c.text);
     }
+    if (c.kind === "key-moves") return await keyMoves(run);
+    if (c.kind === "speeds" || c.kind === "both-ways") return await howThingsMove(run, c);
     const before = c.kind === "after" ? await run.py(propExpr(c.object, c.prop)) : null;
     for (const k of c.hold) run.hold(k, true);
     const ran = await runFor(run, c.seconds);
@@ -468,6 +538,75 @@ export async function checkGame(run: GameRunner, c: Check): Promise<{ ok: boolea
 }
 
 const round = (n: number) => Math.round(n * 100) / 100;
+
+/**
+ * How what moves by itself moves: after a second to settle, every instance watched for
+ * half a second. "things move at 3 or more speeds": that many different speeds (whole
+ * pixels a step) among the ones moving; "some things move left and some move right".
+ */
+async function howThingsMove(run: GameRunner, c: Check & { kind: "speeds" | "both-ways" }): Promise<{ ok: boolean; detail: string }> {
+  const stopped = () => ({ ok: false, detail: run.errors()[0] ? `The game stopped with an error: ${run.errors()[0]}` : "The game didn't keep running long enough to check." });
+  if (!(await runFor(run, 1))) return stopped();
+  const a = await run.py(PLACES);
+  const steps = Math.round(WATCH_MOVING * run.stepsPerSecond);
+  if (!(await runFor(run, WATCH_MOVING))) return stopped();
+  const b = await run.py(PLACES);
+  if (failedEval(a) || failedEval(b)) return { ok: false, detail: failedEval(a) ?? failedEval(b) ?? "" };
+  const before = new Map((a as [number, number, number][]).map(([id, x]) => [id, x]));
+  const dx = (b as [number, number, number][]).filter(([id]) => before.has(id)).map(([id, x]) => (x - before.get(id)!) / steps)
+    .filter((v) => Math.abs(v) > 0.2);
+  if (c.kind === "both-ways") {
+    const ok = dx.some((v) => v < 0) && dx.some((v) => v > 0);
+    return ok ? { ok: true, detail: "" } : { ok: false, detail: dx.length ? `Everything moving goes the same way (${dx[0]! < 0 ? "left" : "right"}).` : "Nothing is moving across the screen." };
+  }
+  const speeds = new Set(dx.map((v) => Math.round(Math.abs(v) * 2) / 2));
+  return speeds.size >= c.n
+    ? { ok: true, detail: "" }
+    : { ok: false, detail: `What moves goes at ${speeds.size} speed${speeds.size === 1 ? "" : "s"}, not ${c.n} or more yet.` };
+}
+const WATCH_MOVING = 0.5;
+
+/** The keys a student might choose for their controls, tried in turn. */
+const MOVE_KEYS = ["right", "left", "up", "down", "d", "a", "w", "s", "space"];
+const WATCH = 0.4;            // seconds watched with no key, then with the key held
+
+/** Every instance's place, by its id: [[id, x, y], …]. */
+const PLACES = "[[id(o), round(o.x, 1), round(o.y, 1)] for l in __import__('gameide')._by_type for o in l if o._alive]";
+
+/**
+ * "holding a key moves something": with no names, whatever the student called their
+ * player and whichever keys they chose. After a second to settle, for each key: how far
+ * everything moves on its own, then how far with the key held. Something moving
+ * differently while it's held is the student's controls; cars driving past move the
+ * same either way, so they don't count.
+ */
+async function keyMoves(run: GameRunner): Promise<{ ok: boolean; detail: string }> {
+  const places = async () => {
+    const v = await run.py(PLACES);
+    if (failedEval(v)) return null;
+    return new Map((v as [number, number, number][]).map(([id, x, y]) => [id, [x, y] as const]));
+  };
+  if (!(await runFor(run, 1))) return { ok: false, detail: run.errors()[0] ? `The game stopped with an error: ${run.errors()[0]}` : "The game didn't keep running long enough to check." };
+  for (const key of MOVE_KEYS) {
+    const a = await places();
+    await runFor(run, WATCH);
+    const b = await places();
+    run.hold(key, true);
+    await runFor(run, WATCH);
+    run.hold(key, false);
+    const c = await places();
+    if (run.errors().length) return { ok: false, detail: `The game stopped with an error: ${run.errors()[0]}` };
+    if (!a || !b || !c) continue;
+    for (const [id, [x2, y2]] of c) {
+      const p0 = a.get(id), p1 = b.get(id);
+      if (!p0 || !p1) continue;
+      const own = [p1[0] - p0[0], p1[1] - p0[1]];
+      const held = [x2 - p1[0], y2 - p1[1]];
+      if (Math.abs(held[0]! - own[0]!) > 3 || Math.abs(held[1]! - own[1]!) > 3) return { ok: true, detail: "" };
+    }
+  }
+  return { ok: false, detail: "Holding the arrow keys, W A S D or Space didn't move anything. Which keys did you choose, and does that object have a Step event that reads them?" };
+}
 
 /**
  * Did the console show `want`? Capitals and spacing don't count — a

@@ -4,19 +4,29 @@ level: Now You Can Make
 after: Starter Projects
 time: 55 min
 starter: empty
-description: A whole metroidvania from an empty one: rooms to walk between, a power-up that lets you reach a ledge you couldn't before, and the gem up there.
+description: Your own metroidvania, from an empty one: rooms to walk between, a power-up that reaches a ledge you couldn't before, and a prize up there. You choose the explorer, the power-up, the prize, the look and the keys.
 ---
 # Moonwell
 
-You've made platformers, levels drawn as text, and games with more than one room. Now make a **metroidvania** of your own, from an empty one.
+You've made platformers, levels drawn as text, and games with more than one room. Now make a **metroidvania** of **your own** from an empty one.
 
-In a metroidvania the world is rooms you walk between, and some places can't be reached yet. Find a new power and you can go back and reach them. In **Moonwell** there's a gem on a ledge in the first room, too high to jump to. Somewhere in the next room is an orb that lets you jump again in mid-air.
+In a metroidvania the world is rooms you walk between, and some places can't be reached yet. Find a new power and you can go back and reach them. In this one there's a prize on a ledge in the first room, too high to jump to. Somewhere in the next room is a power-up that lets you jump again in mid-air. **Everything else is up to you.**
+
+- **Who explores?** A fox, an astronaut, a little wizard, a jumping bean…
+- **What's the power-up?** A glowing orb, a feather, rocket boots, a magic bean…
+- **What's the prize?** A gem, a golden acorn, a lost moon…
+- **Which keys?** The arrows, W A S D, or something else.
+- **What does it look like?** Draw your own pictures, pick from the art library, or import your own.
+
+Each step tells you **what** your game needs next and shows **one way** to do it. The code is an example: change the names, keys and numbers to fit your game. The checks don't care what you call things, only that your game does what the step asks.
+
+The rooms are 640 × 480: maps of squares of 32, 20 across and 15 down. Walls should be **32 × 32**, one square each. Make your explorer smaller, like 24 × 24 or 16 × 16.
 
 ---
 
 ## Two rooms, two maps
 
-Press the **+** beside **Rooms** to make **Room2**. Both rooms will be built from maps, so keep the maps together in one place: make a **script** called **maps**.
+Press the **+** beside **Rooms** to make **Room2**. Both rooms will be built from maps, so keep the maps together in one place: make a **script**, and name it (*maps* is a good name).
 
 ```python
 MAPS = {
@@ -61,20 +71,24 @@ LEFT = {"Room2": "Room1"}
 
 `MAPS` is a **dictionary**: look up a room's name, and get its map. Room1 has a gap in its right wall, and Room2 one in its left. `RIGHT` says which room is through the right-hand gap, and `LEFT` the left.
 
+`P` is where your explorer starts. `L` and `R` are where it arrives, coming in from the left or the right. `g` is the prize, and `o` the power-up.
+
+**Make it yours:** change Room2's map: more ledges, a pit, a long climb. Leave Room1's prize ledge where it is for now: it's just out of reach of one jump.
+
 highlight: folder-scripts
 
 ```check
 room Room2 exists
-script maps exists
+uses MAPS
 ```
 
 ---
 
 ## Walls in both rooms
 
-Add the **wall** sprite and an object called **Wall** with it, and tick **Solid**.
+Make the walls: a picture (draw one 32 × 32, pick one from the **Library**, or import one), an object with it named for your game (*Wall*, *Rock*, *Cloud*…), and tick **Solid**.
 
-Make an object called **Level**, with no sprite. Drag one into **Room1**, and one into **Room2**. Its **Create** event builds whichever room it's in, from that room's map:
+Make an object with **no sprite** that builds the rooms, name it (*Level*, *World*…), and drag one into **Room1** and one into **Room2**. Its **Create** event builds whichever room it's in, from that room's map. Change `"Wall"` to your wall's name:
 
 ```python
 if not hasattr(global_vars, "arrive"):
@@ -97,20 +111,22 @@ Why is `global_vars.double_jump = False` inside the `if not hasattr(...)`?
 - [ ] So that Room2 starts with the double jump
 ```
 
-highlight: add-objects
+highlight: open-library
 
 ```check
-object Wall exists
-room Room1 has 1 Level
-room Room2 has 1 Level
-Level.create uses room_name
+some object has a sprite
+room Room1 has at least 1 thing
+room Room2 has at least 1 thing
+some object's create uses room_name
 ```
 
 ---
 
-## The explorer
+## Your explorer
 
-Add the **player** sprite and an object called **Player** with it. The Level makes the player, at the `P` when the game starts. Coming in from the left, it's made at the `L`, and from the right at the `R`. Add to **Level**'s loop, under the Wall line:
+Make your explorer: its picture (draw it, the library, or import it), and an object with it, named for your game.
+
+Your room-building object makes it at the `P` when the game starts. Coming in from the left, it's made at the `L`, and from the right at the `R`. Add to its loop, under the wall line, and change `"Player"` to your explorer's name:
 
 ```python
         elif ch == "P" and global_vars.arrive == "start":
@@ -121,14 +137,16 @@ Add the **player** sprite and an object called **Player** with it. The Level mak
             instance_create(col * 32 + 4, row * 32 + 8, "Player")
 ```
 
-Give **Player** a **Create** event:
+`+ 4` and `+ 8` put a 24-pixel picture in its square. If your picture's origin is its middle, use `+ 16` for both.
+
+Give your explorer a **Create** event:
 
 ```python
 self.vy = 0
 self.air_jumps = 0
 ```
 
-And a **Step** event: running and falling as in **10. Platformer Tools**, and a jump on each press of up:
+And a **Step** event: running and falling as in **10. Platformer Tools**, and a jump on each press. Change `"left"`, `"right"` and `"up"` to your keys:
 
 ```python
 move = keyboard_check("right") - keyboard_check("left")
@@ -144,59 +162,59 @@ if on_ground and keyboard_check_pressed("up"):
 highlight: add-event
 
 ```check
-object Player exists
-Level.create uses arrive
-after 1 second holding right, Player.x increased
-after 0.3 seconds holding up, Player.y decreased
+at least 2 objects have sprites
+holding a key moves something
+some object's step uses move_and_collide
 ```
 
 ---
 
 ## Through the gaps
 
-Walk off the right of a room and you go to the room in `RIGHT`, arriving on its left. Walk off the left, and you go to the room in `LEFT`, arriving on its right. Add to the bottom of **Player**'s **Step** event:
+Walk off the right of a room and you go to the room in `RIGHT`, arriving on its left. Add to the bottom of your explorer's **Step** event, and fill in the blank:
 
 ```python
-if self.x > room_width - 16 and room_name() in RIGHT:
+if self.x > ___ and room_name() in RIGHT:    # past the right edge, like room_width - 16
     global_vars.arrive = "left"
     room_goto(RIGHT[room_name()])
-if self.x < -8 and room_name() in LEFT:
-    global_vars.arrive = "right"
-    room_goto(LEFT[room_name()])
 ```
 
 `room_name() in RIGHT` asks whether the dictionary has this room in it. Room2 has no gap on its right, so it isn't in `RIGHT`.
 
-Play it, and walk right into Room2, then back. After a few seconds of holding right, `room_name()` is `"Room2"`.
+Now write the other way yourself, under it: walking off the **left** (when `self.x` is less than -8) of a room that's in `LEFT` goes to the room in `LEFT`, arriving on its **right**.
+
+Play it: walk right into Room2, then back again.
 
 highlight: code-editor
 
 ```check
-Player.step uses room_goto
-after 4 seconds holding right, room_name() == "Room2"
+some object's step uses room_goto
+some object's step uses LEFT
+game runs 2 seconds without errors
 ```
 
 ---
 
-## The orb
+## The power-up
 
-Add the **orb** sprite and an object called **Orb** with it. In **Level**'s loop:
+Make your power-up: its picture and its object. Your room-building object makes it at the `o`, unless you have its power already. Add to its loop:
 
 ```python
         elif ch == "o" and not global_vars.double_jump:
-            instance_create(col * 32 + 16, row * 32 + 16, "Orb")
+            instance_create(col * 32 + 16, row * 32 + 16, ___)    # your power-up's object, in quotes
 ```
 
-Give **Player** a **Collision with Orb** event:
+Give your explorer a **Collision** event with the power-up. It gives you the power:
 
 ```python
 global_vars.double_jump = True
-other.destroy()
 ```
 
+Then, under it, write a line yourself that destroys the power-up you touched (`other`).
+
 ```quiz
-You take the orb, walk back to Room1, then return to Room2. Why isn't the orb there again?
-- [x] Level only makes it while `global_vars.double_jump` is False, and taking it made that True
+You take the power-up, walk back to Room1, then return to Room2. Why isn't it there again?
+- [x] It's only made while `global_vars.double_jump` is False, and taking it made that True
 - [ ] Destroyed instances never come back, in any room
 - [ ] Room2 remembers everything in it
 ```
@@ -204,70 +222,65 @@ You take the orb, walk back to Room1, then return to Room2. Why isn't the orb th
 highlight: add-event
 
 ```check
-object Orb exists
-Player has event collision with Orb
-Level.create uses double_jump
+at least 3 objects have sprites
+some object's collision uses double_jump
+some object's collision uses destroy
 ```
 
 ---
 
 ## The double jump
 
-Now give the power something to do. In **Player**'s **Step** event, change the jump, the two lines under `on_ground = …`, to:
+Now give the power something to do. In your explorer's **Step** event, change the jump, the two lines under `on_ground = …`, to this, and fill in the blanks:
 
 ```python
-if keyboard_check_pressed("up"):
+if keyboard_check_pressed(___):    # your jump key
     if on_ground:
-        self.vy = -9
+        self.vy = ___    # your jump, like -9
     elif global_vars.double_jump and self.air_jumps == 0:
-        self.vy = -9
+        self.vy = ___    # the second jump: the same, a little less, or more
         self.air_jumps = 1
 if on_ground:
     self.air_jumps = 0
 ```
 
-Pressing up in mid-air jumps again, but only once (`air_jumps`) and only with the orb's power. Landing gives the jump back.
+Pressing your jump key in mid-air jumps again, but only once (`air_jumps`) and only with the power. Landing gives the jump back.
+
+From the step in Room1, the prize's ledge is four squares up. A jump of -9 goes two and a half, so you need both jumps. Try your numbers: one jump mustn't reach the ledge, and two must.
 
 highlight: code-editor
 
 ```check
-Player.step uses air_jumps
+some object's step uses air_jumps
 game runs 2 seconds without errors
 ```
 
 ---
 
-## The gem
+## The prize
 
-Add the **gem** sprite and an object called **Gem** with it. In **Level**'s loop:
+Make your prize: its picture and its object. In your room-building object's loop, add an `elif` for the `g` yourself, like the power-up's.
 
-```python
-        elif ch == "g":
-            instance_create(col * 32 + 16, row * 32 + 16, "Gem")
-```
-
-A **Collision with Gem** event on **Player**:
+A **Collision** event on your explorer, with the prize:
 
 ```python
 global_vars.won = True
 other.destroy()
 ```
 
-Make an object called **Hud**, with no sprite, and drag one into **Room1** and one into **Room2**. Its **Draw GUI** event shows your power, and the end:
+Make an object with **no sprite** to show your power and the end, name it (*Hud*, *Sign*…), and drag one into **Room1** and one into **Room2**. Give it a **Draw GUI** event, and fill in the blanks:
 
 ```python
-draw_set_color("white")
+draw_set_color(___)    # a colour, like "white"
 if global_vars.double_jump:
-    draw_text(10, 10, "Double jump!")
-if hasattr(global_vars, "won"):
-    draw_text(200, 220, "You found the Moonwell gem!")
+    draw_text(10, 10, ___)    # words that say you have the power
 ```
 
-From the step in Room1, the gem's ledge is four squares up. One jump goes two and a half, so you need the double jump.
+Then write the end yourself: if `global_vars` has `won` (use `hasattr`, as the room-building object does), draw your own words for finding the prize.
 
 ```quiz
-Why does the Hud check `hasattr(global_vars, "won")`, and not just `global_vars.won`?
-- [x] `won` doesn't exist until the gem is taken, and reading it before then is an error
+Why check `hasattr(global_vars, "won")`, and not just `global_vars.won`?
+- [x] `won` doesn't exist until the prize is taken, and reading it before then is an error
 - [ ] `hasattr` is faster
 - [ ] `global_vars.won` is always True
 ```
@@ -275,18 +288,20 @@ Why does the Hud check `hasattr(global_vars, "won")`, and not just `global_vars.
 highlight: add-objects
 
 ```check
-object Gem exists
-Player has event collision with Gem
-room Room1 has 1 Hud
-room Room2 has 1 Hud
+at least 4 objects have sprites
+room Room2 has at least 2 things
+some object's collision uses won
+some object's draw gui uses hasattr
 ```
 
 ---
 
-## You made Moonwell
+## You made your own metroidvania
 
-That's a metroidvania: the world, a power, and a place you can only reach once you have it. Ideas to make it yours:
+That's a metroidvania: the world, a power, and a place you can only reach once you have it. Make it even more yours:
 
-- A third room, through a gap in Room2, with a new power: a dash, or swimming.
-- A door that only opens once you have the gem.
-- A map in the corner of the Hud, with the room you're in lit up.
+- A **third room**, through a gap in Room2, with a new power: a dash, or swimming.
+- A **door** that only opens once you have the prize.
+- A **map** in the corner of the Draw GUI, with the room you're in lit up.
+- **Backgrounds**: a cave, a forest, the sky. Paint one, or pick one from the library.
+- **Sounds** for a jump, the power-up and the prize.
