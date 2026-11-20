@@ -2393,6 +2393,7 @@ CASES = [
  ('kingdom: a tap on a bubble does nothing', _kg('_3screen'), '        if bb and (wx - bb["x"]) ** 2 + (wy - bb["y"]) ** 2 <= (bb["r"] * 1.3) ** 2:', '        if False:', "a mine's bubble", KING),
  ('kingdom: collecting never explained', _kg('Realm'), '        say("Your mines and farms have made gold and food: tap the bubbles to collect it!", GOLD)', '        pass', "a mine's bubble", KING),
  ('kingdom: words under the buttons', _kg('Realm'), '            text(x1 + 250, y2 - 120, "Upgrading takes no time"', '            text(x1 + 345, y2 - 64, "Upgrading takes no time"', 'no words under its buttons', KING),
+ ("kingdom: a full bar's number doubled", _kg('Realm'), '    outlined(x + 125, 19, f"{big_number(r[res])} / {big_number(cap)}", INK, 13, "center")', '    text(x + 125, 19, f"{big_number(r[res])} / {big_number(cap)}", SHADOW if r[res] / max(1, cap) > 0.55 else INK, 13, "center")', "the top bar's numbers are outlined", KING),
 
  ('tell: the page drops them', NETS, '    if (o.tells && !this.away) this.tells.push(...o.tells);\n', '', "one player on a WebSocket and one polling", E2E),
 

@@ -241,7 +241,7 @@ draw_set_color("#0c0b0a")
 draw_rect(58, 20, 178, 36)
 draw_set_color("#c9a44c")
 draw_rect(58, 20, 58 + 120 * min(1, (r["xp"] - lo) / max(1, hi - lo)), 36)
-text(118, 20, f"{r['xp'] - lo} / {hi - lo}", INK, 11, "center")
+outlined(118, 20, f"{r['xp'] - lo} / {hi - lo}", INK, 11, "center")
 for i, res in enumerate(RESOURCES):
     x = 200 + i * 230
     cap = capacity(r, res)
@@ -250,7 +250,7 @@ for i, res in enumerate(RESOURCES):
     draw_rect(x + 40, 18, x + 210, 38)
     draw_set_color(GOLD if res == "gold" else FOOD)
     draw_rect(x + 40, 18, x + 40 + 170 * min(1, r[res] / max(1, cap)), 38)
-    text(x + 125, 19, f"{big_number(r[res])} / {big_number(cap)}", SHADOW if r[res] / max(1, cap) > 0.55 else INK, 13, "center")
+    outlined(x + 125, 19, f"{big_number(r[res])} / {big_number(cap)}", INK, 13, "center")
 icon("builder", 660, 28, 38)
 text(682, 17, f"{free_builders(r)} / {builders(r)}", INK if free_builders(r) else RED, 18)
 # Trophies, under the bar (online: the server keeps the count), and a shield if there is one.

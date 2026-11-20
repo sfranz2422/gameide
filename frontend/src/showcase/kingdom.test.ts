@@ -1128,4 +1128,25 @@ out`));
     }
     expect(clashes).toEqual([]);
   });
+
+  it("the top bar's numbers are outlined, never shadowed (dark words with a shadow looked doubled on a full bar)", async () => {
+    const g = await start();
+    await realmOf(g);
+    py(g, `r = global_vars.realm
+r["food"] = capacity(r, "food") - 1
+_shadowed, _outlined = [], []
+_t, _o = text, outlined
+def text(x, y, words, colour=INK, size=16, align="left", width=None):
+    _shadowed.append(str(words))
+    _t(x, y, words, colour, size, align, width)
+def outlined(x, y, words, colour=INK, size=16, align="left"):
+    _outlined.append(str(words))
+    _o(x, y, words, colour, size, align)`);
+    step(g, 2);
+    const bars = py<string[]>(g, '[f"{big_number(r[k])} / {big_number(capacity(r, k))}" for k in RESOURCES]');
+    for (const b of bars) {
+      expect(py<string[]>(g, "_outlined")).toContain(b);
+      expect(py<string[]>(g, "_shadowed")).not.toContain(b);
+    }
+  });
 });

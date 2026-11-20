@@ -109,6 +109,22 @@ def text(x, y, words, colour=INK, size=16, align="left", width=None):
     draw_set_halign("left")
 
 
+def outlined(x, y, words, colour=INK, size=16, align="left"):
+    """Light words with a thin dark outline all round: for a number on a bar, which is
+    light on its filled part and dark on its empty part. (Dark words with text()'s shadow,
+    once a bar was over half full, were drawn twice two pixels apart: the teacher saw every
+    number on the top bar doubled, 2026-11-20.)"""
+    size = round(size * TEXT_SCALE)
+    draw_set_font("Lilita", size)
+    draw_set_halign(align)
+    draw_set_color(SHADOW)
+    for dx, dy in ((-1, 0), (1, 0), (0, -1), (0, 1), (-1, -1), (1, 1), (-1, 1), (1, -1)):
+        draw_text(x + dx, y + dy, words)
+    draw_set_color(colour)
+    draw_text(x, y, words)
+    draw_set_halign("left")
+
+
 def plain(x, y, words, colour="#5a3a1c", size=14, align="left"):
     """Words with no shadow, for a light card: dark words with a dark shadow on cream
     looked doubled (the seed bar's "free", 2026-11-17)."""
